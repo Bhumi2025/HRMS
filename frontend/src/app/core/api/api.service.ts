@@ -63,8 +63,6 @@ import {
   CelebrationItem,
   DashboardTemplateData,
   ShiftTemplateDto,
-  ShiftAssignmentDto,
-  RosterMatrix,
   NavigationItem,
   SaveNavigationItemRequest,
   ReorderNavigationBatchRequest,
@@ -648,8 +646,10 @@ export class ApiService {
     return this.http.get<EmployeePunch[]>(this.url('/attendance/punches/today'), { params: toParams({ employeeId }) });
   }
 
-  todayAttendanceOverview(): Observable<TodayAttendanceOverview> {
-    return this.http.get<TodayAttendanceOverview>(this.url('/attendance/overview/today'));
+  todayAttendanceOverview(date?: string): Observable<TodayAttendanceOverview> {
+    return this.http.get<TodayAttendanceOverview>(this.url('/attendance/overview/today'), {
+      params: toParams({ date }),
+    });
   }
 
   enrolledFaces(token?: string): Observable<EnrolledFace[]> {
@@ -698,18 +698,6 @@ export class ApiService {
 
   deleteShiftTemplate(id: string): Observable<void> {
     return this.http.delete<void>(this.url(`/roster/templates/${id}`));
-  }
-
-  shiftAssignments(departmentId?: string): Observable<ShiftAssignmentDto[]> {
-    return this.http.get<ShiftAssignmentDto[]>(this.url('/roster/assignments'), { params: toParams({ departmentId }) });
-  }
-
-  assignShift(payload: any): Observable<ShiftAssignmentDto> {
-    return this.http.post<ShiftAssignmentDto>(this.url('/roster/assignments'), payload);
-  }
-
-  generateRoster(payload: { startDate: string; endDate: string; departmentId?: string }): Observable<RosterMatrix> {
-    return this.http.post<RosterMatrix>(this.url('/roster/generate'), payload);
   }
 
   // ── Roles ──

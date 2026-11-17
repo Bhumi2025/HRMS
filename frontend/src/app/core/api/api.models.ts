@@ -200,6 +200,7 @@ export interface PayrollRun {
 export interface Payslip {
   id: string;
   employeeId: string;
+  employeeCode?: string;
   employeeName: string;
   department: string;
   month: number;
@@ -661,6 +662,9 @@ export interface AttendancePerson {
   department: string;
   designation?: string | null;
   checkInTime?: string | null;
+  checkOutTime?: string | null;
+  workHours?: number;
+  status?: string | null;
   leaveReason?: string | null;
 }
 
@@ -733,42 +737,6 @@ export interface ShiftTemplateDto {
   shiftdays: ShiftdayDto[];
 }
 
-export interface ShiftAssignmentDto {
-  id: string;
-  shiftTemplateId: string;
-  shiftName: string;
-  employeeId: string;
-  employeeName: string;
-  employeeCode: string;
-  startDate: string;
-  endDate?: string | null;
-  isActive: boolean;
-}
-
-export interface RosterCell {
-  date: string;
-  status: string;
-  shiftName?: string | null;
-  startTime?: string | null;
-  endTime?: string | null;
-  isWeekOff: boolean;
-  isHoliday: boolean;
-}
-
-export interface RosterRow {
-  employeeId: string;
-  employeeName: string;
-  employeeCode: string;
-  department: string;
-  days: RosterCell[];
-}
-
-export interface RosterMatrix {
-  startDate: string;
-  endDate: string;
-  dates: string[];
-  rows: RosterRow[];
-}
 
 export interface NavigationItem {
   id: string;

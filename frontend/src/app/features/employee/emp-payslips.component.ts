@@ -23,11 +23,7 @@ interface PayslipRow {
   selector: 'app-emp-payslips',
   imports: [CommonModule, IconDirective, SelectComponent],
   template: `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px">
-      <div>
-        <div class="page-title">My Payslips</div>
-        <div class="page-subtitle">{{ employee()?.fullName ?? 'Your payslips' }} - {{ employee()?.employeeCode ?? '—' }} - {{ employee()?.department ?? '—' }}</div>
-      </div>
+    <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px">
       <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="toast.show('Downloading latest payslip...')">
         <span [appIcon]="'download'"></span> Download Latest
       </button>

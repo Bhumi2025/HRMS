@@ -19,11 +19,7 @@ interface Announcement {
   selector: 'app-emp-announcements',
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 24px">
-      <div>
-        <div class="page-title">Announcements</div>
-        <div class="page-subtitle">Company news, notices and HR updates</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 24px">
       <div style="display: flex; align-items: center; gap: 12px">
         <span class="badge badge-danger" style="font-size: 0.82rem; padding: 6px 14px">{{ announcements().length }} Total</span>
         <button class="btn btn-primary" (click)="openCreateModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600">

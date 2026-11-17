@@ -14,6 +14,7 @@ interface DocumentRow {
   exp: string;
   days: number;
   s: 'Critical' | 'Warning' | 'Valid' | 'Expired';
+  fileUrl?: string | null;
 }
 
 /** Document Management — ported from pages/documents.html. */
@@ -21,11 +22,7 @@ interface DocumentRow {
   selector: 'app-documents',
   imports: [CommonModule, IconDirective, SelectComponent],
   template: `
-    <div class="page-header-row">
-      <div>
-        <div class="page-title">Document Management</div>
-        <div class="page-subtitle">Upload, track and manage employee documents</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 16px">
       <button class="btn btn-primary btn-sm" (click)="ui.open('uploadModal')"><span [appIcon]="'plus'"></span> Upload Document</button>
     </div>
 
@@ -97,7 +94,7 @@ interface DocumentRow {
                 <td>
                   <div style="display: flex; gap: 4px">
                     <button class="btn btn-ghost btn-sm" data-tooltip="View" (click)="view(r)"><span [appIcon]="'eye'"></span></button>
-                    <button class="btn btn-ghost btn-sm" data-tooltip="Download" (click)="toast.show('Downloading...')"><span [appIcon]="'download'"></span></button>
+                    <button class="btn btn-ghost btn-sm" data-tooltip="Download" (click)="download(r)"><span [appIcon]="'download'"></span></button>
                     <button class="btn btn-ghost btn-sm" data-tooltip="Send Reminder" (click)="toast.show('Reminder sent!')"><span [appIcon]="'bell'"></span></button>
                   </div>
                 </td>
@@ -144,7 +141,7 @@ interface DocumentRow {
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" (click)="ui.close('docViewModal')">Close</button>
-          <button class="btn btn-primary" style="display: flex; align-items: center; gap: 6px" (click)="toast.show('Downloading...')">
+          <button class="btn btn-primary" style="display: flex; align-items: center; gap: 6px" (click)="viewTarget() && download(viewTarget()!)">
             <span [appIcon]="'download'"></span> Download
           </button>
         </div>
@@ -428,6 +425,7 @@ export class DocumentsComponent implements OnInit {
             exp: d.expiryDate ? this.formatDate(d.expiryDate) : ' · ',
             days: d.daysLeft ?? 0,
             s: d.status as DocumentRow['s'],
+            fileUrl: d.fileUrl ?? null,
           })),
         ),
       error: () => {
@@ -468,5 +466,102 @@ export class DocumentsComponent implements OnInit {
   protected view(r: DocumentRow): void {
     this.viewTarget.set(r);
     this.ui.open('docViewModal');
+  }
+
+  protected download(r: DocumentRow): void {
+    const empName = r.n || 'Employee';
+    const docName = r.doc || 'Document';
+
+    if (r.fileUrl && (r.fileUrl.startsWith('data:') || r.fileUrl.startsWith('http://') || r.fileUrl.startsWith('https://') || r.fileUrl.startsWith('/'))) {
+      const a = document.createElement('a');
+      a.href = r.fileUrl;
+      const ext = r.fileUrl.startsWith('data:image/png') ? '.png'
+        : r.fileUrl.startsWith('data:image/jpeg') ? '.jpg'
+        : r.fileUrl.startsWith('data:application/pdf') ? '.pdf' : '';
+      a.download = `${empName.replace(/\s+/g, '_')}_${docName.replace(/\s+/g, '_')}${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      this.toast.show(`Downloaded ${docName}`, 'success');
+      return;
+    }
+
+    const safeTitle = `${empName} - ${docName}`;
+    const documentContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${safeTitle}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f1f5f9; color: #1e293b; padding: 40px 20px; }
+    .doc-container { max-width: 680px; margin: 0 auto; background: #ffffff; border: 2px solid #e2e8f0; border-radius: 16px; padding: 36px 40px; box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
+    .doc-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 24px; }
+    .org-title { font-size: 18px; font-weight: 800; color: #0284c7; letter-spacing: -0.02em; }
+    .badge { display: inline-block; padding: 4px 12px; font-size: 12px; font-weight: 700; border-radius: 20px; background: #e0f2fe; color: #0369a1; }
+    .doc-title { font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+    .doc-subtitle { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px; }
+    .field-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; }
+    .field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 4px; letter-spacing: 0.05em; }
+    .field-value { font-size: 14px; font-weight: 600; color: #0f172a; }
+    .stamp-box { border: 2px dashed #0284c7; border-radius: 12px; padding: 16px; text-align: center; color: #0369a1; background: #f0f9ff; margin-top: 30px; }
+    .stamp-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
+    .stamp-text { font-size: 12px; margin-top: 4px; color: #0284c7; }
+    .footer { text-align: center; margin-top: 24px; font-size: 11px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="doc-container">
+    <div class="doc-header">
+      <div class="org-title">HR NEXUS CORPORATION</div>
+      <span class="badge">${r.s}</span>
+    </div>
+    <div class="doc-title">${docName}</div>
+    <div class="doc-subtitle">Official Employee Verification Record</div>
+    <div class="field-grid">
+      <div class="field-card">
+        <div class="field-label">Employee Name</div>
+        <div class="field-value">${empName}</div>
+      </div>
+      <div class="field-card">
+        <div class="field-label">Document Type</div>
+        <div class="field-value">${r.t}</div>
+      </div>
+      <div class="field-card">
+        <div class="field-label">Status</div>
+        <div class="field-value">${r.s}</div>
+      </div>
+      <div class="field-card">
+        <div class="field-label">Days Left</div>
+        <div class="field-value">${r.days} days</div>
+      </div>
+      <div class="field-card">
+        <div class="field-label">Issue Date</div>
+        <div class="field-value">${r.iss}</div>
+      </div>
+      <div class="field-card">
+        <div class="field-label">Expiry Date</div>
+        <div class="field-value">${r.exp}</div>
+      </div>
+    </div>
+    <div class="stamp-box">
+      <div class="stamp-title">VERIFIED HR RECORD</div>
+      <div class="stamp-text">Document archived &amp; authorized by HR Nexus Management System</div>
+    </div>
+    <div class="footer">Generated on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} &bull; Confidential</div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([documentContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${empName.replace(/\s+/g, '_')}_${docName.replace(/\s+/g, '_')}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    this.toast.show(`Downloaded ${docName}`, 'success');
   }
 }

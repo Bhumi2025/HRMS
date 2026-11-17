@@ -24,11 +24,7 @@ interface SyncLog {
   selector: 'app-erp',
   imports: [CommonModule, IconDirective, SafeHtmlPipe],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 24px">
-      <div>
-        <div class="page-title">ERP Integration</div>
-        <div class="page-subtitle">Manage system integrations and sync status</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 24px">
       <button class="btn btn-primary btn-sm" (click)="sync()"><span [appIcon]="'sync'"></span> Sync Now</button>
     </div>
 

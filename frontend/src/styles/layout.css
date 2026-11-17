@@ -304,11 +304,13 @@
   overflow-x: clip;
 }
 .page-title {
+  display: none !important;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--text);
 }
 .page-subtitle {
+  display: none !important;
   font-size: 13px;
   color: var(--muted);
   margin-top: 4px;
@@ -607,7 +609,8 @@
     flex: 1;
     justify-content: center;
   }
-  .flex.justify-between.items-center {
+  .flex.justify-between.items-center,
+  .flex.justify-end.items-center {
     flex-wrap: wrap;
     gap: 8px;
   }

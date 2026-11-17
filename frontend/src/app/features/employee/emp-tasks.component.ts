@@ -17,11 +17,7 @@ interface Task {
   selector: 'app-emp-tasks',
   imports: [CommonModule, IconDirective],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 24px">
-      <div>
-        <div class="page-title">My Tasks</div>
-        <div class="page-subtitle">Track your assigned tasks and deadlines</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 24px">
       <div style="display: flex; gap: 8px">
         <select class="form-control form-select" style="width: 140px; font-size: 0.82rem" [value]="filter()" (change)="filter.set($any($event.target).value)">
           <option value="">All Tasks</option>

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import jsPDF from 'jspdf';
@@ -35,11 +35,7 @@ export interface ComprehensivePayrollRow {
   selector: 'app-payroll',
   imports: [CommonModule, FormsModule, IconDirective],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-      <div>
-        <div class="page-title">Payroll Processing</div>
-        <div class="page-subtitle">{{ activeMonthLabel() }} · {{ filteredRows().length }} Employees in Register</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div class="flex gap-2">
         <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="exportCsv()">
           <span [appIcon]="'download'"></span> Export CSV
@@ -65,37 +61,13 @@ export interface ComprehensivePayrollRow {
       }
     </div>
 
-    <!-- Payroll Tabs -->
+    <!-- Payroll Tabs (Hourly Payroll and Attendance & LOP removed as requested) -->
     <div class="tabs-nav-bar" style="display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 20px;">
       <button 
-        class="tab-btn" 
-        [class.active]="tab() === 'monthly'" 
-        (click)="tab.set('monthly')"
-        style="padding: 10px 18px; font-weight: 700; font-size: 13px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent;"
-        [style.border-bottom-color]="tab() === 'monthly' ? 'var(--p)' : 'transparent'"
-        [style.color]="tab() === 'monthly' ? 'var(--p)' : 'var(--muted)'"
+        class="tab-btn active" 
+        style="padding: 10px 18px; font-weight: 700; font-size: 13px; border: none; background: transparent; cursor: default; border-bottom: 2.5px solid var(--p); color: var(--p);"
       >
         Monthly Payroll
-      </button>
-      <button 
-        class="tab-btn" 
-        [class.active]="tab() === 'hourly'" 
-        (click)="tab.set('hourly')"
-        style="padding: 10px 18px; font-weight: 700; font-size: 13px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent;"
-        [style.border-bottom-color]="tab() === 'hourly' ? 'var(--p)' : 'transparent'"
-        [style.color]="tab() === 'hourly' ? 'var(--p)' : 'var(--muted)'"
-      >
-        Hourly Payroll
-      </button>
-      <button 
-        class="tab-btn" 
-        [class.active]="tab() === 'attendance'" 
-        (click)="tab.set('attendance')"
-        style="padding: 10px 18px; font-weight: 700; font-size: 13px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent;"
-        [style.border-bottom-color]="tab() === 'attendance' ? 'var(--p)' : 'transparent'"
-        [style.color]="tab() === 'attendance' ? 'var(--p)' : 'var(--muted)'"
-      >
-        Attendance &amp; LOP Register
       </button>
     </div>
 
@@ -105,17 +77,58 @@ export interface ComprehensivePayrollRow {
         <div class="card-title">Payroll Register</div>
         
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-          <input 
-            type="text" 
-            class="form-control" 
-            placeholder="Search employee or code..." 
-            style="width: 200px; font-size: 12px; padding: 6px 10px;"
-            [(ngModel)]="searchKeyword"
-          />
+          <!-- Hidden anti-autofill decoys to trap password manager autofill -->
+          <input type="text" style="display:none" aria-hidden="true" autocomplete="username" tabindex="-1" />
+          <input type="password" style="display:none" aria-hidden="true" autocomplete="current-password" tabindex="-1" />
+
+          <!-- Instant Search Input with Icon and Clear Button -->
+          <div style="position: relative; display: flex; align-items: center;">
+            <span style="position: absolute; left: 10px; color: var(--muted); pointer-events: none; display: flex;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </span>
+            <input 
+              #searchInput
+              type="search" 
+              id="payroll_search_filter_query"
+              name="payroll_search_filter_query"
+              class="form-control" 
+              placeholder="Search employee or code..." 
+              style="width: 220px; font-size: 12px; padding: 6px 28px 6px 30px;"
+              [value]="searchKeyword()"
+              [readOnly]="isSearchReadonly()"
+              (focus)="enableSearchEdit()"
+              (pointerdown)="enableSearchEdit()"
+              (keydown)="onSearchKeydown()"
+              (input)="onSearchInput($any($event.target).value, $event)"
+              (change)="onSearchInput($any($event.target).value, $event)"
+              (search)="onSearchInput($any($event.target).value, $event)"
+              autocomplete="new-password"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-bwignore="true"
+              data-form-type="other"
+              role="searchbox"
+            />
+            @if (searchKeyword()) {
+              <button 
+                type="button" 
+                (click)="clearSearch()"
+                style="position: absolute; right: 8px; background: none; border: none; font-size: 13px; cursor: pointer; color: var(--muted); padding: 2px 4px; display: flex; align-items: center;"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            }
+          </div>
+
           <select 
             class="form-control" 
             style="width: 140px; font-size: 12px; padding: 6px 10px;"
-            [(ngModel)]="selectedDept"
+            [value]="selectedDept()"
+            (change)="selectedDept.set($any($event.target).value)"
           >
             <option value="">All Departments</option>
             <option value="Engineering">Engineering</option>
@@ -129,8 +142,8 @@ export interface ComprehensivePayrollRow {
             type="month" 
             class="form-control" 
             style="width: 140px; font-size: 12px; padding: 6px 10px;"
-            [(ngModel)]="selectedMonth" 
-            (change)="onMonthChange()"
+            [value]="selectedMonth()" 
+            (change)="onMonthChange($any($event.target).value)"
           />
         </div>
       </div>
@@ -157,7 +170,7 @@ export interface ComprehensivePayrollRow {
             </tr>
           </thead>
           <tbody>
-            @for (r of filteredRows(); track r.empId) {
+            @for (r of filteredRows(); track (r.empId + '_' + r.name + '_' + $index)) {
               <tr>
                 <td>
                   <div class="table-avatar">
@@ -293,23 +306,52 @@ export interface ComprehensivePayrollRow {
         </div>
       </div>
     }
-  `
+  `,
+  styles: [
+    `
+      input[type="search"]::-webkit-search-decoration,
+      input[type="search"]::-webkit-search-cancel-button,
+      input[type="search"]::-webkit-search-results-button,
+      input[type="search"]::-webkit-search-results-decoration {
+        -webkit-appearance: none;
+        appearance: none;
+        display: none !important;
+      }
+      input[type="search"]::-ms-clear,
+      input[type="search"]::-ms-reveal {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+    `,
+  ],
 })
-export class PayrollComponent implements OnInit {
+export class PayrollComponent implements OnInit, AfterViewInit {
   protected readonly ui = inject(UiService);
   protected readonly toast = inject(ToastService);
   protected readonly perms = inject(PermissionService);
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
 
-  protected readonly tab = signal<'monthly' | 'hourly' | 'attendance'>('monthly');
+  protected readonly tab = signal<'monthly'>('monthly');
   protected readonly showRunModal = signal(false);
   protected readonly runningPayroll = signal(false);
   protected readonly selectedRow = signal<ComprehensivePayrollRow | null>(null);
 
-  protected searchKeyword = '';
-  protected selectedDept = '';
-  protected selectedMonth = new Date().toISOString().slice(0, 7);
+  protected readonly isSearchReadonly = signal(true);
+  private userInteracted = false;
+
+  @ViewChild('searchInput') set searchInputSetter(ref: ElementRef<HTMLInputElement> | undefined) {
+    this.searchInputRef = ref;
+    if (ref?.nativeElement && !this.userInteracted) {
+      ref.nativeElement.value = '';
+    }
+  }
+  private searchInputRef?: ElementRef<HTMLInputElement>;
+
+  protected readonly searchKeyword = signal('');
+  protected readonly selectedDept = signal('');
+  protected readonly selectedMonth = signal(new Date().toISOString().slice(0, 7));
 
   protected runForm = {
     month: new Date().toISOString().slice(0, 7),
@@ -327,7 +369,7 @@ export class PayrollComponent implements OnInit {
   protected readonly rows = signal<ComprehensivePayrollRow[]>([]);
 
   protected readonly activeMonthLabel = computed(() => {
-    const parts = this.selectedMonth.split('-');
+    const parts = this.selectedMonth().split('-');
     const year = parts[0];
     const month = parseInt(parts[1], 10) || 1;
     const name = new Date(parseInt(year, 10), month - 1, 1).toLocaleDateString('en-US', { month: 'long' });
@@ -335,26 +377,76 @@ export class PayrollComponent implements OnInit {
   });
 
   protected readonly filteredRows = computed(() => {
-    const q = this.searchKeyword.toLowerCase().trim();
-    const d = this.selectedDept;
+    const q = this.searchKeyword().toLowerCase().trim();
+    const d = this.selectedDept();
     return this.rows().filter((r) => {
-      const matchQ = !q || r.name.toLowerCase().includes(q) || r.empId.toLowerCase().includes(q);
+      const matchQ =
+        !q ||
+        r.name.toLowerCase().includes(q) ||
+        r.empId.toLowerCase().includes(q) ||
+        r.department.toLowerCase().includes(q) ||
+        r.designation.toLowerCase().includes(q);
       const matchD = !d || r.department === d;
       return matchQ && matchD;
     });
   });
 
+  protected enableSearchEdit(): void {
+    this.isSearchReadonly.set(false);
+    this.userInteracted = true;
+  }
+
+  protected onSearchKeydown(): void {
+    this.isSearchReadonly.set(false);
+    this.userInteracted = true;
+  }
+
+  protected onSearchInput(val: string, event?: Event): void {
+    // If browser autofills an email or credential without user interaction
+    if (!this.userInteracted && (val.includes('@') || !event?.isTrusted)) {
+      this.searchKeyword.set('');
+      if (this.searchInputRef?.nativeElement) {
+        this.searchInputRef.nativeElement.value = '';
+      }
+      return;
+    }
+    this.userInteracted = true;
+    this.searchKeyword.set(val || '');
+  }
+
+  protected clearSearch(): void {
+    this.searchKeyword.set('');
+    if (this.searchInputRef?.nativeElement) {
+      this.searchInputRef.nativeElement.value = '';
+    }
+  }
+
   ngOnInit(): void {
     this.loadBackendPayroll();
   }
 
-  protected onMonthChange(): void {
+  ngAfterViewInit(): void {
+    const clearIfAutofilled = () => {
+      if (this.searchInputRef?.nativeElement && !this.userInteracted) {
+        this.searchInputRef.nativeElement.value = '';
+        this.searchKeyword.set('');
+      }
+    };
+    setTimeout(clearIfAutofilled, 50);
+    setTimeout(clearIfAutofilled, 150);
+    setTimeout(clearIfAutofilled, 300);
+    setTimeout(clearIfAutofilled, 600);
+    setTimeout(clearIfAutofilled, 1200);
+  }
+
+  protected onMonthChange(newMonth: string): void {
+    this.selectedMonth.set(newMonth);
     this.loadBackendPayroll();
     this.toast.show(`Loaded payroll register for ${this.activeMonthLabel()}`);
   }
 
   private loadBackendPayroll(): void {
-    const [yearStr, monthStr] = this.selectedMonth.split('-');
+    const [yearStr, monthStr] = this.selectedMonth().split('-');
     const year = parseInt(yearStr, 10) || new Date().getFullYear();
     const month = parseInt(monthStr, 10) || (new Date().getMonth() + 1);
 
@@ -388,7 +480,7 @@ export class PayrollComponent implements OnInit {
           });
         } else {
           // Check localStorage for offline processed run
-          const local = localStorage.getItem('hrms_payroll_' + this.selectedMonth);
+          const local = localStorage.getItem('hrms_payroll_' + this.selectedMonth());
           if (local) {
             try {
               const parsed = JSON.parse(local);
@@ -404,7 +496,7 @@ export class PayrollComponent implements OnInit {
         }
       },
       error: () => {
-        const local = localStorage.getItem('hrms_payroll_' + this.selectedMonth);
+        const local = localStorage.getItem('hrms_payroll_' + this.selectedMonth());
         if (local) {
           try {
             const parsed = JSON.parse(local);
@@ -421,8 +513,8 @@ export class PayrollComponent implements OnInit {
   }
 
   private applyPayslips(payslips: Payslip[]): void {
-    const mapped: ComprehensivePayrollRow[] = payslips.map((p) => ({
-      empId: p.employeeId ? p.employeeId.slice(0, 8).toUpperCase() : 'EMP-001',
+    const mapped: ComprehensivePayrollRow[] = payslips.map((p, idx) => ({
+      empId: p.employeeCode || (p.employeeId ? p.employeeId.slice(0, 8).toUpperCase() : `EMP-10${idx + 1}`),
       fullEmpId: p.employeeId,
       name: p.employeeName || 'Employee',
       department: p.department || 'Operations',
@@ -646,7 +738,7 @@ export class PayrollComponent implements OnInit {
 
     // Save and download file
     const safeName = r.name.replace(/[^a-zA-Z0-9]/g, '_');
-    doc.save(`Payslip_${safeName}_${this.selectedMonth}.pdf`);
+    doc.save(`Payslip_${safeName}_${this.selectedMonth()}.pdf`);
     this.toast.show(`Payslip downloaded for ${r.name}!`, 'success');
   }
 
@@ -673,7 +765,7 @@ export class PayrollComponent implements OnInit {
       next: (run) => {
         this.runningPayroll.set(false);
         this.showRunModal.set(false);
-        this.selectedMonth = this.runForm.month;
+        this.selectedMonth.set(this.runForm.month);
         this.toast.show(`Payroll for ${this.runForm.month} processed successfully!`, 'success');
 
         this.api.payslipsForRun(run.id).subscribe({
@@ -690,7 +782,7 @@ export class PayrollComponent implements OnInit {
       error: (err) => {
         this.runningPayroll.set(false);
         this.showRunModal.set(false);
-        this.selectedMonth = this.runForm.month;
+        this.selectedMonth.set(this.runForm.month);
 
         if (err?.status === 409) {
           this.toast.show(`Payroll for ${this.runForm.month} was already recorded in database. Loading payslips...`, 'info');
@@ -709,7 +801,7 @@ export class PayrollComponent implements OnInit {
     this.rows.set(updated);
     this.updateKpisFromRows(updated);
     try {
-      localStorage.setItem('hrms_payroll_' + this.selectedMonth, JSON.stringify(updated));
+      localStorage.setItem('hrms_payroll_' + this.selectedMonth(), JSON.stringify(updated));
     } catch {}
   }
 
@@ -755,7 +847,7 @@ export class PayrollComponent implements OnInit {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Payroll_${this.selectedMonth}.csv`;
+    a.download = `Payroll_${this.selectedMonth()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     this.toast.show('Payroll Register exported to CSV');

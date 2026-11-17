@@ -11,11 +11,7 @@ import { ToastService } from '../../core/services/toast.service';
   selector: 'app-emp-payroll',
   imports: [CommonModule, RouterLink, IconDirective],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 24px">
-      <div>
-        <div class="page-title">My Payroll</div>
-        <div class="page-subtitle">Salary slips and breakdown</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 24px">
       <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="toast.show('Downloading...')">
         <span [appIcon]="'download'"></span> Download Latest
       </button>

@@ -23,11 +23,7 @@ interface Loan {
   selector: 'app-loans',
   imports: [CommonModule, IconDirective, SelectComponent],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 24px">
-      <div>
-        <div class="page-title">Loans &amp; Advances</div>
-        <div class="page-subtitle">Manage employee loan requests</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 24px">
       <button class="btn btn-primary btn-sm" (click)="openModal()">+ New Request</button>
     </div>
 

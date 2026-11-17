@@ -80,12 +80,9 @@ function emptyTenantForm(): CreateCompanyRequest {
   imports: [CommonModule, FormsModule, IconDirective],
   template: `
     <div class="company-page">
-      <!-- Top Title Bar -->
-      <div class="flex justify-between items-center" style="margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-        <div>
-          <div class="page-title">{{ isSuperAdmin() ? 'Company & Tenant Management' : 'Company Management' }}</div>
-        </div>
-        @if (isSuperAdmin() && activeTab() === 'directory') {
+      @if (isSuperAdmin() && activeTab() === 'directory') {
+        <!-- Top Action Bar -->
+        <div class="flex justify-end items-center" style="margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
           <div class="flex gap-2">
             <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="loadTenantCompanies()">
               <span [appIcon]="'sync'"></span> Refresh
@@ -94,8 +91,8 @@ function emptyTenantForm(): CreateCompanyRequest {
               <span [appIcon]="'plus'"></span> New Company
             </button>
           </div>
-        }
-      </div>
+        </div>
+      }
 
       <!-- Activation link banner for Super Admin -->
       @if (isSuperAdmin() && activationUrl()) {

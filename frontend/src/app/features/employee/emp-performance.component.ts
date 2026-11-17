@@ -23,11 +23,7 @@ interface Feedback {
   selector: 'app-emp-performance',
   imports: [CommonModule, IconDirective],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 24px">
-      <div>
-        <div class="page-title">My Performance</div>
-        <div class="page-subtitle">Ratings, KPIs and feedback</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 24px">
       <span class="badge badge-primary" style="font-size: 0.82rem; padding: 6px 14px">{{ period() }}</span>
     </div>
 

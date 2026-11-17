@@ -7,13 +7,17 @@ import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
+import { triggerDocumentDownload } from '../../core/utils/document-download.util';
 
 interface DocRow {
+  id?: string;
   doc: string;
   type: string;
   issue: string;
   exp: string;
   s: string;
+  fileUrl?: string | null;
+  fileSize?: string | null;
 }
 
 /**
@@ -308,14 +312,14 @@ interface DocRow {
                 <tr>
                   <td style="font-weight: 600">{{ r.doc }}</td>
                   <td><span class="badge badge-info">{{ r.type }}</span></td>
-                  <td><input class="form-control" type="date" [value]="r.issue" style="padding: 4px 8px; font-size: 12px" /></td>
-                  <td><input class="form-control" type="date" [value]="r.exp" style="padding: 4px 8px; font-size: 12px" /></td>
+                  <td><input class="form-control" type="date" [value]="r.issue" (input)="r.issue = $any($event.target).value" style="padding: 4px 8px; font-size: 12px" /></td>
+                  <td><input class="form-control" type="date" [value]="r.exp" (input)="r.exp = $any($event.target).value" style="padding: 4px 8px; font-size: 12px" /></td>
                   <td><span class="badge badge-success">{{ r.s }}</span></td>
                   <td>
                     <div style="display: flex; gap: 4px">
-                      <button class="btn btn-ghost btn-sm" data-tooltip="View" (click)="toast.show('Opening ' + r.doc)"><span [appIcon]="'eye'"></span></button>
-                      <button class="btn btn-ghost btn-sm" data-tooltip="Download" (click)="toast.show('Downloading...')"><span [appIcon]="'download'"></span></button>
-                      <button class="btn btn-ghost btn-sm" data-tooltip="Save" (click)="toast.show('Saved!')"><span [appIcon]="'check'"></span></button>
+                      <button class="btn btn-ghost btn-sm" data-tooltip="View" (click)="viewDoc(r)"><span [appIcon]="'eye'"></span></button>
+                      <button class="btn btn-ghost btn-sm" data-tooltip="Download" (click)="downloadDocument(r)"><span [appIcon]="'download'"></span></button>
+                      <button class="btn btn-ghost btn-sm" data-tooltip="Save" (click)="saveDocRow(r)"><span [appIcon]="'check'"></span></button>
                     </div>
                   </td>
                 </tr>
@@ -375,6 +379,61 @@ interface DocRow {
           <button class="btn btn-outline" (click)="closeUploadDocModal()">Cancel</button>
           <button class="btn btn-primary" [disabled]="uploadingDoc()" (click)="uploadDocument()">
             {{ uploadingDoc() ? 'Uploading...' : 'Upload' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Document Modal -->
+    <div class="modal-overlay" [class.open]="ui.isOpen('viewDocModal')" (click)="ui.onOverlayClick($event, 'viewDocModal')">
+      <div class="modal" style="max-width: 650px;">
+        <div class="modal-header">
+          <div>
+            <div style="font-size: 15px; font-weight: 700;">{{ selectedDocView()?.doc }}</div>
+            <div style="font-size: 12px; color: var(--muted);">Document Details & Verification</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" (click)="ui.close('viewDocModal')"><span [appIcon]="'x'"></span></button>
+        </div>
+        <div class="modal-body">
+          @if (selectedDocView(); as d) {
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Document Type</div>
+                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.type }}</div>
+              </div>
+              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Status</div>
+                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">
+                  <span class="badge" [class]="d.s === 'Expired' ? 'badge-danger' : 'badge-success'">{{ d.s }}</span>
+                </div>
+              </div>
+              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Issue Date</div>
+                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.issue || 'Not set' }}</div>
+              </div>
+              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Expiry Date</div>
+                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.exp || 'Not set' }}</div>
+              </div>
+            </div>
+
+            @if (d.fileUrl && (d.fileUrl.startsWith('data:image') || d.fileUrl.endsWith('.jpg') || d.fileUrl.endsWith('.jpeg') || d.fileUrl.endsWith('.png'))) {
+              <div style="text-align: center; background: #0f172a; border-radius: 8px; padding: 12px; margin-bottom: 12px; max-height: 240px; overflow: hidden;">
+                <img [src]="d.fileUrl" alt="Document Preview" style="max-height: 220px; max-width: 100%; object-fit: contain; border-radius: 6px;" />
+              </div>
+            } @else {
+              <div style="border: 2px dashed var(--border); border-radius: 10px; padding: 24px; text-align: center; background: var(--bg); margin-bottom: 12px;">
+                <div style="color: var(--p); font-size: 28px; margin-bottom: 6px;"><span [appIcon]="'documents'"></span></div>
+                <div style="font-size: 14px; font-weight: 700; color: var(--text);">{{ d.doc }}</div>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">Verified HR Document &bull; Ready for Download</div>
+              </div>
+            }
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="ui.close('viewDocModal')">Close</button>
+          <button class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;" (click)="selectedDocView() && downloadDocument(selectedDocView()!)">
+            <span [appIcon]="'download'"></span> Download Document
           </button>
         </div>
       </div>
@@ -530,31 +589,42 @@ export class EmpProfileComponent implements OnInit {
     const docName = file ? file.name : `${type} Document`;
     const fileSize = file ? this.formatFileSize(file.size) : '1.2 MB';
 
-    this.uploadingDoc.set(true);
-    this.api
-      .createDocument({
-        employeeId,
-        name: docName,
-        type: documentType,
-        issueDate: this.uploadIssueDate() || new Date().toISOString().slice(0, 10),
-        expiryDate: this.uploadExpiryDate() || null,
-        notes: null,
-        fileUrl: file ? file.name : null,
-        fileSize,
-        isCompanyDocument: false,
-      })
-      .subscribe({
-        next: () => {
-          this.uploadingDoc.set(false);
-          this.closeUploadDocModal();
-          this.toast.show('Document uploaded successfully!', 'success');
-          this.loadDocuments(employeeId);
-        },
-        error: (error) => {
-          this.uploadingDoc.set(false);
-          this.toast.show(error?.error?.title ?? error?.error?.message ?? 'Could not upload the document.', 'danger');
-        },
-      });
+    const executeSave = (fileDataUrl: string | null) => {
+      this.uploadingDoc.set(true);
+      this.api
+        .createDocument({
+          employeeId,
+          name: docName,
+          type: documentType,
+          issueDate: this.uploadIssueDate() || new Date().toISOString().slice(0, 10),
+          expiryDate: this.uploadExpiryDate() || null,
+          notes: null,
+          fileUrl: fileDataUrl,
+          fileSize,
+          isCompanyDocument: false,
+        })
+        .subscribe({
+          next: () => {
+            this.uploadingDoc.set(false);
+            this.closeUploadDocModal();
+            this.toast.show('Document uploaded successfully!', 'success');
+            this.loadDocuments(employeeId);
+          },
+          error: (error) => {
+            this.uploadingDoc.set(false);
+            this.toast.show(error?.error?.title ?? error?.error?.message ?? 'Could not upload the document.', 'danger');
+          },
+        });
+    };
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => executeSave(reader.result as string);
+      reader.onerror = () => executeSave(null);
+      reader.readAsDataURL(file);
+    } else {
+      executeSave(null);
+    }
   }
 
   ngOnInit(): void {
@@ -635,11 +705,14 @@ export class EmpProfileComponent implements OnInit {
       next: (rows) =>
         this.docs.set(
           rows.map((d) => ({
+            id: d.id,
             doc: d.name,
             type: d.type,
             issue: d.issueDate ?? '',
             exp: d.expiryDate ?? '',
             s: d.status,
+            fileUrl: d.fileUrl ?? null,
+            fileSize: d.fileSize ?? null,
           })),
         ),
       error: () => {
@@ -796,6 +869,28 @@ export class EmpProfileComponent implements OnInit {
   });
 
   protected readonly docs = signal<DocRow[]>([]);
+  protected readonly selectedDocView = signal<DocRow | null>(null);
+
+  protected viewDoc(r: DocRow): void {
+    this.selectedDocView.set(r);
+    this.ui.open('viewDocModal');
+  }
+
+  protected downloadDocument(r: DocRow): void {
+    triggerDocumentDownload(r.doc, r.fileUrl, {
+      employeeName: this.detail()?.fullName || 'Employee',
+      employeeCode: this.detail()?.employeeCode || 'EMP',
+      issueDate: r.issue,
+      expiryDate: r.exp,
+      status: r.s,
+      type: r.type,
+    });
+    this.toast.show(`Downloaded ${r.doc}`, 'success');
+  }
+
+  protected saveDocRow(r: DocRow): void {
+    this.toast.show(`Saved ${r.doc} details!`, 'success');
+  }
 
   protected readonly uploadType = signal('Passport');
 

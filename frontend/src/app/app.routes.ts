@@ -108,8 +108,8 @@ export const routes: Routes = [
       },
       {
         path: 'roster',
-        data: { title: 'Shift Roster' },
-        loadComponent: () => import('./features/hr/shift.component').then((m) => m.ShiftComponent),
+        redirectTo: 'shift',
+        pathMatch: 'full',
       },
       {
         path: 'payroll',

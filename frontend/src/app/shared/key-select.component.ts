@@ -83,7 +83,7 @@ export interface KeyOptionItem {
               No options available
             </div>
           } @else {
-            @for (opt of displayOptions(); track opt.key) {
+            @for (opt of displayOptions(); track (opt.key + '_' + opt.value + '_' + $index)) {
               <div
                 class="csel-opt"
                 [class.csel-active]="opt.value === innerValue() || opt.key === innerValue()"

@@ -24,11 +24,6 @@ interface AccountItem {
   selector: 'app-onboarding',
   imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent],
   template: `
-    <div style="margin-bottom: 16px">
-      <div class="page-title">Employee Onboarding</div>
-      <div class="page-subtitle">New hire setup wizard</div>
-    </div>
-
     <!-- Stepper -->
     <div class="ob-stepper">
       @for (s of steps; track s.label; let i = $index) {

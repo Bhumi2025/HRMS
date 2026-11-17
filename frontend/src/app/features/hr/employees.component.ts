@@ -35,10 +35,7 @@ interface Employee {
   selector: 'app-employees',
   imports: [CommonModule, IconDirective, SelectComponent, RouterLink, KeyGroupSelectComponent],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 15px">
-      <div>
-        <div class="page-title">Employees</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 15px">
       <div class="flex gap-2">
         <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="exportCsv()">
           <span [appIcon]="'download'"></span> Export
@@ -65,6 +62,7 @@ interface Employee {
               [value]="search()"
               (input)="onSearchInput($any($event.target).value)"
               (change)="onSearchInput($any($event.target).value)"
+              (search)="onSearchInput($any($event.target).value)"
               (paste)="onSearchPaste($event)"
               autocomplete="off"
               autocorrect="off"
@@ -551,6 +549,20 @@ interface Employee {
     `
       thead th {
         white-space: nowrap;
+      }
+      input[type="search"]::-webkit-search-decoration,
+      input[type="search"]::-webkit-search-cancel-button,
+      input[type="search"]::-webkit-search-results-button,
+      input[type="search"]::-webkit-search-results-decoration {
+        -webkit-appearance: none;
+        appearance: none;
+        display: none !important;
+      }
+      input[type="search"]::-ms-clear,
+      input[type="search"]::-ms-reveal {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
       }
       .form-group {
         margin-bottom: 0;

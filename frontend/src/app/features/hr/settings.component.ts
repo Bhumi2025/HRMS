@@ -48,13 +48,6 @@ export interface FlatNavigationItem {
   imports: [CommonModule, FormsModule, IconDirective],
   template: `
     <div class="settings-page">
-      <div class="flex justify-between items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-        <div>
-          <div class="page-title">Settings</div>
-          <div class="page-subtitle">Configure Key Groups, Navigation Routes, User Roles &amp; Security Permissions</div>
-        </div>
-      </div>
-
       <!-- Settings Top Tabs Navigation -->
       <div class="card p-0" style="margin-bottom: 20px; border-radius: 10px; overflow: hidden;">
         <div style="display: flex; gap: 4px; border-bottom: 1px solid var(--border); background: var(--surface); padding: 4px 12px 0 12px;">

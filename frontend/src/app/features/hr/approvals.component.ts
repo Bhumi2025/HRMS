@@ -25,11 +25,7 @@ interface Approval {
   selector: 'app-approvals',
   imports: [CommonModule, IconDirective],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 15px">
-      <div>
-        <div class="page-title">HR Approvals</div>
-        <div class="page-subtitle">Manage all pending approval requests</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 15px">
       <div class="flex gap-2">
         <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="approveAll()">
           <span [appIcon]="'check'"></span> Approve All

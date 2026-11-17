@@ -48,11 +48,7 @@ interface OtReport {
   selector: 'app-reports',
   imports: [CommonModule, IconDirective, SelectComponent],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
-      <div>
-        <div class="page-title">Reports</div>
-        <div class="page-subtitle">Analytics and data exports</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
       <div class="flex gap-2" style="align-items: center;">
         <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="exportAllPdf()">
           <span [appIcon]="'receipt'"></span> Export All (PDF)

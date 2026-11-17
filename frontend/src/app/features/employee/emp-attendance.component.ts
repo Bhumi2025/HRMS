@@ -28,13 +28,6 @@ interface CalendarDay {
   selector: 'app-emp-attendance',
   imports: [CommonModule, IconDirective],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 15px">
-      <div>
-        <div class="page-title">My Attendance</div>
-        <div class="page-subtitle">Track your daily check-in and attendance history</div>
-      </div>
-    </div>
-
     <div class="grid-2" style="margin-bottom: 15px">
       <div class="card">
         <div class="card-header">

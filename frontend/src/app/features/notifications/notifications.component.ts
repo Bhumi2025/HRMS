@@ -12,11 +12,7 @@ export type { DetailedNotification };
   selector: 'app-notifications',
   imports: [CommonModule, FormsModule, IconDirective],
   template: `
-    <div class="flex justify-between items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-      <div>
-        <div class="page-title">Notifications Center</div>
-        <div class="page-subtitle">All system alerts, approval requests, updates and company activity</div>
-      </div>
+    <div class="flex justify-end items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
         <button class="btn btn-outline btn-sm" (click)="markAllAsRead()" style="display: flex; align-items: center; gap: 6px;">
           <span [appIcon]="'check'"></span> Mark All as Read
@@ -84,6 +80,7 @@ export type { DetailedNotification };
             placeholder="Search notifications…"
             [ngModel]="searchKeyword()"
             (ngModelChange)="searchKeyword.set($event)"
+            (search)="searchKeyword.set($any($event.target).value)"
             autocomplete="off"
             autocorrect="off"
             autocapitalize="off"
@@ -209,6 +206,20 @@ export type { DetailedNotification };
         gap: 6px;
         box-shadow: var(--shadow);
         transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      input[type="search"]::-webkit-search-decoration,
+      input[type="search"]::-webkit-search-cancel-button,
+      input[type="search"]::-webkit-search-results-button,
+      input[type="search"]::-webkit-search-results-decoration {
+        -webkit-appearance: none;
+        appearance: none;
+        display: none !important;
+      }
+      input[type="search"]::-ms-clear,
+      input[type="search"]::-ms-reveal {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
       }
       .kpi-card:hover {
         transform: translateY(-2px);

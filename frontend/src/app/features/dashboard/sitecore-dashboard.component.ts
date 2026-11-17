@@ -544,7 +544,7 @@ export class SitecoreDashboardComponent implements OnInit {
         tile('attendance', 'Attendance', '/attendance', 'ic-teal', 'Daily check-in/out'),
         tile('leave', 'Leave', '/leave', 'ic-green', 'Apply & track leave'),
         tile('holiday', 'Holiday Calendar', '/attendance', 'ic-orange', 'Public & optional'),
-        tile('shift', 'Shift Management', '/shift', 'ic-blue', 'Rosters & timings'),
+        tile('shift', 'Shift Management', '/shift', 'ic-blue', 'Shifts & working hours'),
       ],
     },
     {

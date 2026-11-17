@@ -32,7 +32,7 @@ export interface SelectOption {
         <span class="csel-label">{{ selectedLabel() }}</span>
         <span class="csel-arrow" [class.up]="open()" appIcon="chevron"></span>
       </button>
-      <div class="csel-menu" [class.drop-up]="dropUp()" [style.display]="open() ? 'block' : 'none'">
+      <div class="csel-menu" [class.drop-up]="dropUp()" [class.align-right]="alignRight()" [style.display]="open() ? 'block' : 'none'">
         @for (option of options(); track option.v) {
           <div class="csel-opt" [class.csel-active]="option.v === value()" (click)="pick(option)">
             {{ option.l }}
@@ -66,6 +66,10 @@ export interface SelectOption {
       bottom: calc(100% + 4px) !important;
       box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.18), 0 -8px 10px -6px rgba(0, 0, 0, 0.1) !important;
     }
+    .csel-menu.align-right {
+      left: auto !important;
+      right: 0 !important;
+    }
   `],
 })
 export class SelectComponent {
@@ -78,6 +82,7 @@ export class SelectComponent {
 
   readonly open = signal(false);
   readonly dropUp = signal(false);
+  readonly alignRight = signal(false);
 
   readonly selectedLabel = computed(() => {
     const current = this.options().find((o) => o.v === this.value());
@@ -99,8 +104,11 @@ export class SelectComponent {
         // If space below is less than 240px and there is more space above, open upwards!
         const shouldDropUp = spaceBelow < 240 && rect.top > spaceBelow;
         this.dropUp.set(shouldDropUp);
+        const shouldAlignRight = rect.right + 60 > window.innerWidth;
+        this.alignRight.set(shouldAlignRight);
       } catch {
         this.dropUp.set(false);
+        this.alignRight.set(false);
       }
       this.open.set(true);
     } else {
