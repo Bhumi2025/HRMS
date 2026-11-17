@@ -1,0 +1,99 @@
+# ==============================================================================
+# HRMS Root Git Ignore
+# Covers .NET 10 / ASP.NET Core Backend, Angular 19 Frontend, Tooling & OS
+# ==============================================================================
+
+# ── .NET / Visual Studio Build & Intermediate Artifacts ──
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+TestResults/
+*.pdb
+*.dll.config
+
+# Visual Studio temporary files, user options & state
+.vs/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.userprefs
+*.pidb
+*.booproj
+*.svclog
+Generated_Code/
+_UpgradeReport_Files/
+UpgradeLog*.XML
+UpgradeLog*.htm
+
+# ── Node.js / Angular Frontend ──
+**/node_modules/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Angular build outputs & caches
+frontend/dist/
+dist/
+tmp/
+out-tsc/
+bazel-out/
+.angular/
+.sass-cache/
+/coverage
+/typings
+__screenshots__/
+
+# ── Runtime Uploads & Tenant Media ──
+# Exclude uploaded tenant logos and documents, keep directories intact
+backend/src/Hrms.Api/wwwroot/uploads/*
+!backend/src/Hrms.Api/wwwroot/uploads/.gitkeep
+backend/src/Hrms.Api/wwwroot/uploads/tenants/*
+!backend/src/Hrms.Api/wwwroot/uploads/tenants/.gitkeep
+
+# ── Local Environment & Database Files ──
+appsettings.Local.json
+*.mdf
+*.ldf
+*.ndf
+*.sql.bak
+*.db
+*.sqlite
+*.sqlite3
+
+# ── IDEs & Code Editors ──
+.idea/
+*.sublime-workspace
+*.sublime-project
+.project
+.classpath
+.settings/
+.c9/
+
+# VS Code (ignore workspace state, keep configuration templates)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+
+# ── Tooling, AI Agents & Workspace Scaffolding ──
+.agents/
+.commandcode/
+%DST%/
+.gemini/
+
+# ── Operating System Junk ──
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
