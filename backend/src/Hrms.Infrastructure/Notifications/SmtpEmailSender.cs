@@ -38,6 +38,8 @@ public sealed class SmtpEmailSender : IEmailSender
             using var client = new SmtpClient(_options.Host, _options.Port)
             {
                 EnableSsl = _options.UseSsl,
+                DeliveryMethod = SmtpDeliveryMethod.Network,
+                UseDefaultCredentials = false,
             };
 
             if (!string.IsNullOrWhiteSpace(_options.UserName))

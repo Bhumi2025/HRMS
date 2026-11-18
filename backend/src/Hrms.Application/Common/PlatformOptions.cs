@@ -30,14 +30,20 @@ public sealed class TenancyOptions
     public string? ProvisioningConnectionBase { get; set; }
 }
 
-/// <summary>Email delivery settings bound from the "Email" configuration section.</summary>
+/// <summary>Email delivery settings bound from "Email" or "SmtpSettings" configuration sections.</summary>
 public sealed class EmailOptions
 {
     public const string SectionName = "Email";
 
-    public bool Enabled { get; set; }
+    public bool Enabled { get; set; } = true;
 
     public string Host { get; set; } = string.Empty;
+
+    public string Server
+    {
+        get => Host;
+        set => Host = value;
+    }
 
     public int Port { get; set; } = 587;
 
@@ -45,11 +51,41 @@ public sealed class EmailOptions
 
     public string? UserName { get; set; }
 
+    public string? Username
+    {
+        get => UserName;
+        set => UserName = value;
+    }
+
     public string? Password { get; set; }
 
-    public string FromAddress { get; set; } = "no-reply@hrnexus.com";
+    public string FromAddress { get; set; } = "22bmiit210@gmail.com";
 
-    public string FromName { get; set; } = "HR Nexus";
+    public string SenderEmail
+    {
+        get => FromAddress;
+        set => FromAddress = value;
+    }
+
+    public string FromName { get; set; } = "HRMS Portal";
+
+    public string SenderName
+    {
+        get => FromName;
+        set => FromName = value;
+    }
+
+    public bool? SimulationMode
+    {
+        get => !Enabled;
+        set
+        {
+            if (value.HasValue)
+            {
+                Enabled = !value.Value;
+            }
+        }
+    }
 
     public bool IsConfigured => Enabled && !string.IsNullOrWhiteSpace(Host);
 }
