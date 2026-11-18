@@ -162,9 +162,9 @@ export class LoginComponent implements OnInit, OnDestroy {
         <circle cx="172" cy="160" r="16" fill="#FCD34D"/>
         <text x="172" y="165" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" font-weight="900" fill="#92400e">$</text>
       </svg>`,
-      title: 'Smart Payroll & Analytics',
+      title: 'Smart Payroll & Insights',
       text: 'Process payroll in one click. Get real-time insights on salary, deductions, and workforce costs.',
-      pills: ['💰 Auto Payroll', '📊 Analytics', '🧾 Payslips'],
+      pills: ['💰 Auto Payroll', '📊 Insights', '🧾 Payslips'],
     },
     {
       svg: `<svg viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">

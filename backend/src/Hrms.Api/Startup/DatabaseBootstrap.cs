@@ -614,14 +614,17 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
     {
         try
         {
-            // 1. Remove any legacy /loans, /erp, /kiosk, /announcements navigation items
+            // 1. Remove any legacy /loans, /erp, /kiosk, /announcements, /analytics navigation items
             var toRemove = await db.NavigationItems
                 .Where(n => n.Route.ToLower().Contains("/loans") ||
                             n.Route.ToLower().Contains("/erp") ||
                             n.Route.ToLower().Contains("/kiosk") ||
                             n.Route.ToLower().Contains("announcement") ||
+                            n.Route.ToLower().Contains("/analytics") ||
                             n.Title.ToLower() == "loans" ||
-                            n.Code.ToLower() == "loan")
+                            n.Title.ToLower() == "analytics" ||
+                            n.Code.ToLower() == "loan" ||
+                            n.Code.ToLower() == "anal")
                 .ToListAsync(ct);
 
             if (toRemove.Count > 0)
@@ -635,24 +638,23 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
                 await db.SaveChangesAsync(ct);
             }
 
-            // 2. Standard 14 navigation items matching Image 2
+            // 2. Standard navigation items matching sidebar
             var standardItems = new (string Code, string Title, string Route, string Icon, int Order)[]
             {
                 ("DASH", "Dashboard", "/dashboard", "dashboard", 1),
-                ("ANAL", "Analytics", "/analytics", "reports", 2),
-                ("COMP", "Company", "/company", "company", 3),
-                ("EMPL", "Employees", "/employees", "employees", 4),
-                ("PROF", "Profile", "/employee-profile", "user", 5),
-                ("SHIF", "Shift", "/shift", "clock", 6),
-                ("ATTD", "Attendance", "/attendance", "attendance", 7),
-                ("LEAV", "Leave", "/leave", "leave", 8),
-                ("PAYR", "Payroll", "/payroll", "payroll", 9),
-                ("PAYS", "Payslips", "/payslips", "payslip", 10),
-                ("ONBD", "Onboarding", "/onboarding", "onboarding", 11),
-                ("DOCS", "Documents", "/documents", "documents", 12),
-                ("APPR", "Approvals", "/approvals", "approvals", 13),
-                ("REPT", "Reports", "/reports", "reports", 14),
-                ("SETT", "Settings", "/settings", "settings", 15),
+                ("COMP", "Company", "/company", "company", 2),
+                ("EMPL", "Employees", "/employees", "employees", 3),
+                ("PROF", "Profile", "/employee-profile", "user", 4),
+                ("SHIF", "Shift", "/shift", "clock", 5),
+                ("ATTD", "Attendance", "/attendance", "attendance", 6),
+                ("LEAV", "Leave", "/leave", "leave", 7),
+                ("PAYR", "Payroll", "/payroll", "payroll", 8),
+                ("PAYS", "Payslips", "/payslips", "payslip", 9),
+                ("ONBD", "Onboarding", "/onboarding", "onboarding", 10),
+                ("DOCS", "Documents", "/documents", "documents", 11),
+                ("APPR", "Approvals", "/approvals", "approvals", 12),
+                ("REPT", "Reports", "/reports", "reports", 13),
+                ("SETT", "Settings", "/settings", "settings", 14),
             };
 
             var existingNavs = await db.NavigationItems.ToListAsync(ct);

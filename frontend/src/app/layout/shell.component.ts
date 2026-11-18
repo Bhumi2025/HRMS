@@ -31,7 +31,6 @@ interface MasterNavItem {
 const MASTER_NAV_CATALOGUE: MasterNavItem[] = [
   // Overview
   { label: 'Dashboard', section: 'Overview', icon: 'dashboard', path: '/dashboard', empPath: '/me/dashboard' },
-  { label: 'Analytics', section: 'Overview', icon: 'reports', path: '/analytics', empPath: '/analytics' },
 
   // HR Modules
   { label: 'Company', section: 'HR Modules', icon: 'company', path: '/company', empPath: '/company' },

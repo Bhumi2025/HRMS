@@ -36,7 +36,6 @@ public sealed class PermissionAuthorizationFilter : IAsyncActionFilter
         { "/api/documents", "DOCS" },
         { "/api/approvals", "APPR" },
         { "/api/reports", "REPT" },
-        { "/api/analytics", "ANAL" },
         { "/api/company", "COMP" },
         { "/api/organization", "COMP" },
         { "/api/roles", "SETT" },
