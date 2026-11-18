@@ -27,11 +27,34 @@ public sealed class TenantResolutionMiddleware
     {
         if (context.User.Identity?.IsAuthenticated == true)
         {
-            var claim = context.User.FindFirstValue("companyId");
+            var isSuperAdmin = context.User.IsInRole("Super Admin") || context.User.IsInRole("SuperAdmin");
 
-            var tenant = Guid.TryParse(claim, out var companyId)
-                ? await resolver.ResolveByIdAsync(companyId, context.RequestAborted)
-                : await resolver.ResolveDefaultAsync(context.RequestAborted);
+            ResolvedTenant? tenant = null;
+
+            // Only Super Admins are permitted to switch company database contexts dynamically via headers
+            if (isSuperAdmin)
+            {
+                if (context.Request.Headers.TryGetValue("X-Company-Id", out var companyIdHeader) &&
+                    Guid.TryParse(companyIdHeader.ToString(), out var requestedCompanyId))
+                {
+                    tenant = await resolver.ResolveByIdAsync(requestedCompanyId, context.RequestAborted);
+                }
+                else if (context.Request.Headers.TryGetValue("X-Company-Code", out var companyCodeHeader) &&
+                         !string.IsNullOrWhiteSpace(companyCodeHeader))
+                {
+                    tenant = await resolver.ResolveByCodeAsync(companyCodeHeader.ToString(), context.RequestAborted);
+                }
+            }
+
+            // For regular users (HR Manager, Company Admin, Manager, Employee), resolve strictly from the signed JWT claim
+            if (tenant is null)
+            {
+                var claim = context.User.FindFirstValue("companyId");
+
+                tenant = Guid.TryParse(claim, out var companyId)
+                    ? await resolver.ResolveByIdAsync(companyId, context.RequestAborted)
+                    : await resolver.ResolveDefaultAsync(context.RequestAborted);
+            }
 
             if (tenant is null)
             {
@@ -39,7 +62,7 @@ public sealed class TenantResolutionMiddleware
                 return;
             }
 
-            if (tenant.Status == CompanyStatus.Suspended)
+            if (tenant.Status == CompanyStatus.Suspended && !isSuperAdmin)
             {
                 await WriteProblemAsync(context, StatusCodes.Status403Forbidden, "This company has been suspended.", "COMPANY_SUSPENDED");
                 return;

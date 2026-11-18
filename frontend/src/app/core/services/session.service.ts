@@ -48,6 +48,7 @@ export class SessionService {
       email: apiUser.email,
       initials: apiUser.initials,
       employeeId: apiUser.employeeId ?? undefined,
+      companyId: apiUser.companyId ?? undefined,
       companyName: apiUser.companyName ?? undefined,
       companyCode: apiUser.companyCode ?? undefined,
       companyLogoUrl: apiUser.companyLogoUrl ?? undefined,

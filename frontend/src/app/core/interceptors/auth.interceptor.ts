@@ -10,6 +10,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const toast = inject(ToastService);
   const token = session.token();
   const companyCode = session.user()?.companyCode;
+  const companyId = session.user()?.companyId;
 
   const setHeaders: Record<string, string> = {};
   if (token) {
@@ -17,6 +18,9 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   }
   if (companyCode && !request.headers.has('X-Company-Code')) {
     setHeaders['X-Company-Code'] = companyCode;
+  }
+  if (companyId && !request.headers.has('X-Company-Id')) {
+    setHeaders['X-Company-Id'] = companyId;
   }
 
   const req = Object.keys(setHeaders).length > 0 ? request.clone({ setHeaders }) : request;

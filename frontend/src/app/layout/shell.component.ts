@@ -460,7 +460,11 @@ export class ShellComponent implements OnInit, OnDestroy {
   protected selectTenant(tenant: { id: string; name: string; location: string; logo: string }): void {
     this.selectedTenant.set(tenant);
     sessionStorage.setItem('current_tenant', JSON.stringify(tenant));
-    this.session.updateUser({ companyName: tenant.name, companyCode: tenant.location });
+    this.session.updateUser({
+      companyId: tenant.id && tenant.id !== 'default' ? tenant.id : undefined,
+      companyName: tenant.name,
+      companyCode: tenant.location,
+    });
     this.tenantOpen.set(false);
     this.toast.show(`Switched to tenant: ${tenant.name} (${tenant.location})`, 'success');
   }

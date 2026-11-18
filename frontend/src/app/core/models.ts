@@ -29,6 +29,7 @@ export interface SessionUser {
   /** Linked employee record, when the API provides one. */
   employeeId?: string;
   /** The tenant company the session belongs to. */
+  companyId?: string;
   companyName?: string;
   companyCode?: string;
   companyLogoUrl?: string;
