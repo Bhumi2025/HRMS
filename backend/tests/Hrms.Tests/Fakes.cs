@@ -1,6 +1,7 @@
 using Hrms.Application.Abstractions.Notifications;
 using Hrms.Application.Abstractions.Security;
 using Hrms.Application.Abstractions.Tenancy;
+using Hrms.Application.DTOs;
 using Hrms.Domain.Entities;
 
 namespace Hrms.Tests;
@@ -76,6 +77,9 @@ internal sealed class FakeTenantDatabaseService : ITenantDatabaseService
 
     public Task<int> CountUsersAsync(string databaseName, CancellationToken ct = default) =>
         Task.FromResult(Users.Keys.Count(k => k.StartsWith(databaseName + "|", StringComparison.OrdinalIgnoreCase)));
+
+    public Task<IReadOnlyList<CompanyEmployeeSummaryDto>> GetEmployeesAsync(string databaseName, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<CompanyEmployeeSummaryDto>>(Array.Empty<CompanyEmployeeSummaryDto>());
 
     public Task DropDatabaseAsync(string databaseName, CancellationToken ct = default)
     {

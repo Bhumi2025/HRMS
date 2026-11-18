@@ -82,34 +82,25 @@ function emptyTenantForm(): CreateCompanyRequest {
   imports: [CommonModule, FormsModule, IconDirective],
   template: `
     <div class="company-page">
-      @if (isSuperAdmin() && activeTab() === 'directory') {
-        <!-- Top Action Bar -->
-        <div class="flex justify-end items-center" style="margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-          <div class="flex gap-2">
-            <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="openCreateTenant()">
-              <span [appIcon]="'plus'"></span> New Company
-            </button>
+      @if (!isSuperAdmin()) {
+        <!-- Top Navigation Tabs (For regular tenant: Company Profile, Departments, Designations, Holiday) -->
+        <div class="card p-0" style="margin-bottom: 16px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
+          <div style="display: flex; gap: 4px; border-bottom: 1px solid var(--border); background: var(--surface); padding: 4px 16px 0 16px;">
+            @for (tab of displayTabs(); track tab.id) {
+              <button
+                class="tab-btn"
+                [class.active]="activeTab() === tab.id"
+                (click)="selectTab(tab.id)"
+                style="padding: 12px 22px; font-weight: 700; font-size: 13.5px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent; transition: all .15s;"
+                [style.border-bottom-color]="activeTab() === tab.id ? 'var(--p)' : 'transparent'"
+                [style.color]="activeTab() === tab.id ? 'var(--p)' : 'var(--muted)'"
+              >
+                {{ tab.label }}
+              </button>
+            }
           </div>
         </div>
       }
-
-      <!-- Top Navigation Tabs (Directory/Companies, Departments, Designations, Holiday) -->
-      <div class="card p-0" style="margin-bottom: 20px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
-        <div style="display: flex; gap: 4px; border-bottom: 1px solid var(--border); background: var(--surface); padding: 4px 16px 0 16px;">
-          @for (tab of displayTabs(); track tab.id) {
-            <button
-              class="tab-btn"
-              [class.active]="activeTab() === tab.id"
-              (click)="selectTab(tab.id)"
-              style="padding: 12px 22px; font-weight: 700; font-size: 13.5px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent; transition: all .15s;"
-              [style.border-bottom-color]="activeTab() === tab.id ? 'var(--p)' : 'transparent'"
-              [style.color]="activeTab() === tab.id ? 'var(--p)' : 'var(--muted)'"
-            >
-              {{ tab.label }}
-            </button>
-          }
-        </div>
-      </div>
 
       <!-- Main Card Container -->
       <div class="card p-0" style="border-radius: 10px; overflow: visible; border: 1px solid var(--border);">
@@ -120,10 +111,15 @@ function emptyTenantForm(): CreateCompanyRequest {
           </h4>
 
           @if (isSuperAdmin() && activeTab() === 'directory') {
-            <!-- Super Admin Tenant Companies Search Header -->
-            <div class="input-group" style="max-width: 280px;">
-              <span class="input-icon" [appIcon]="'search'"></span>
-              <input class="form-control" type="text" placeholder="Search name, code, email..." [ngModel]="tenantSearch()" (ngModelChange)="tenantSearch.set($event)" />
+            <!-- Super Admin Tenant Companies Search Header + New Company Button -->
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <div class="input-group" style="max-width: 280px;">
+                <span class="input-icon" [appIcon]="'search'"></span>
+                <input class="form-control" type="text" placeholder="Search name, code, email..." [ngModel]="tenantSearch()" (ngModelChange)="tenantSearch.set($event)" />
+              </div>
+              <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="openCreateTenant()">
+                <span [appIcon]="'plus'"></span> New Company
+              </button>
             </div>
           } @else if (activeTab() === 'profile') {
             <!-- Bottom Save button is used -->
@@ -1604,7 +1600,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
         ) {
           this.api.tenantCompanies().subscribe({
             next: (list) => this.tenantCompanies.set(list || []),
-            error: () => {},
+            error: () => { },
           });
         }
       }, 15000);
@@ -1656,7 +1652,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
 
   protected currentHeaderTitle(): string {
     switch (this.activeTab()) {
-      case 'directory': return 'Registered Companies & Databases';
+      case 'directory': return 'Company Onboarding';
       case 'profile': return 'Company Profile & Branding';
       case 'departments': return 'Departments';
       case 'designations': return 'Designations';
@@ -1876,7 +1872,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
           timeZone: d.timeZone ?? '',
         };
       },
-      error: () => {},
+      error: () => { },
     });
   }
 
@@ -2031,7 +2027,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const reactivating = company.status === 'Suspended';
+    const reactivating = (company.status || '').toLowerCase() === 'suspended';
     this.busyTenantId.set(company.id);
     const request = reactivating
       ? this.api.activateTenantCompany(company.id)
@@ -2588,7 +2584,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
             this.companies.set([]);
           }
         },
-        error: () => {},
+        error: () => { },
       });
     }
 
@@ -2605,7 +2601,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
           }))
         );
       },
-      error: () => {},
+      error: () => { },
     });
 
     this.api.designations().subscribe({
@@ -2622,7 +2618,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
           }))
         );
       },
-      error: () => {},
+      error: () => { },
     });
 
     this.api.holidays().subscribe({
@@ -2638,7 +2634,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
           }))
         );
       },
-      error: () => {},
+      error: () => { },
     });
   }
 }
