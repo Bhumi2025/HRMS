@@ -156,6 +156,73 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Leav
             });
         }
 
+        // Seed 14 standard navigation items matching Image 2
+        var standardNavs = new (string Code, string Title, string Route, string Icon, int Order)[]
+        {
+            ("DASH", "Dashboard", "/dashboard", "dashboard", 1),
+            ("ANAL", "Analytics", "/analytics", "reports", 2),
+            ("COMP", "Company", "/company", "company", 3),
+            ("EMPL", "Employees", "/employees", "employees", 4),
+            ("PROF", "Profile", "/employee-profile", "user", 5),
+            ("SHIF", "Shift", "/shift", "clock", 6),
+            ("ATTD", "Attendance", "/attendance", "attendance", 7),
+            ("LEAV", "Leave", "/leave", "leave", 8),
+            ("PAYR", "Payroll", "/payroll", "payroll", 9),
+            ("PAYS", "Payslips", "/payslips", "payslip", 10),
+            ("ONBD", "Onboarding", "/onboarding", "onboarding", 11),
+            ("DOCS", "Documents", "/documents", "documents", 12),
+            ("APPR", "Approvals", "/approvals", "approvals", 13),
+            ("REPT", "Reports", "/reports", "reports", 14),
+        };
+
+        var existingNavs = await db.NavigationItems.ToListAsync(ct);
+        var navDict = existingNavs.ToDictionary(n => n.Code.ToUpperInvariant());
+
+        foreach (var (code, title, route, icon, order) in standardNavs)
+        {
+            if (!navDict.ContainsKey(code))
+            {
+                var nav = new NavigationItem
+                {
+                    Code = code,
+                    Title = title,
+                    Route = route,
+                    Icon = icon,
+                    OrderIndex = order,
+                    IsActive = true
+                };
+                db.NavigationItems.Add(nav);
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        // Grant permissions to the administrative roles
+        var allNavs = await db.NavigationItems.ToListAsync(ct);
+        var adminRoleList = roles.Where(r => r.Code is "CompanyAdmin" or "HrManager" or "SuperAdmin").ToList();
+        var existingPerms = await db.RoleNavigations.ToListAsync(ct);
+        var permKeys = existingPerms.Select(p => $"{p.RoleId}:{p.NavigationItemId}").ToHashSet();
+
+        foreach (var r in adminRoleList)
+        {
+            foreach (var n in allNavs)
+            {
+                if (!permKeys.Contains($"{r.Id}:{n.Id}"))
+                {
+                    db.RoleNavigations.Add(new RoleNavigation
+                    {
+                        RoleId = r.Id,
+                        NavigationItemId = n.Id,
+                        IsFull = true,
+                        IsView = true,
+                        IsCreate = true,
+                        IsEdit = true,
+                        IsDelete = true
+                    });
+                }
+            }
+        }
+
         await db.SaveChangesAsync(ct);
     }
 

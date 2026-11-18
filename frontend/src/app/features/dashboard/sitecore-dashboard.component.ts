@@ -552,7 +552,6 @@ export class SitecoreDashboardComponent implements OnInit {
       tiles: [
         tile('payroll', 'Payroll', '/payroll', 'ic-indigo', 'Process salaries'),
         tile('payslips', 'Payslips', '/payslips', 'ic-green', 'Monthly pay stubs'),
-        tile('loans', 'Loans', '/loans', 'ic-purple', 'Staff loan requests'),
         tile('reimburse', 'Reimbursements', '/payroll', 'ic-orange', 'Expense claims'),
       ],
     },
@@ -560,7 +559,6 @@ export class SitecoreDashboardComponent implements OnInit {
       title: 'Approvals',
       tiles: [
         tile('leaveAppr', 'Leave Approvals', '/approvals', 'ic-teal', 'Approve/reject leave'),
-        tile('loanAppr', 'Loan Approvals', '/approvals', 'ic-amber', 'Review loan requests'),
         tile('attAppr', 'Attendance Requests', '/approvals', 'ic-purple', 'Regularise punches'),
         tile('docAppr', 'Documents Approval', '/approvals', 'ic-blue', 'Verify submissions'),
       ],

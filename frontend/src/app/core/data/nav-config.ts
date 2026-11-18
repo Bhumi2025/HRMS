@@ -22,17 +22,9 @@ const hrModules = (approvalBadge?: string): NavSection => ({
     { icon: 'onboarding', label: 'Onboarding', path: '/onboarding' },
     { icon: 'documents', label: 'Documents', path: '/documents' },
     { icon: 'approvals', label: 'Approvals', path: '/approvals', badge: approvalBadge },
-    { icon: 'bell', label: 'Announcements', path: '/me/announcements' },
-  ],
-});
-
-const masterSetup: NavSection = {
-  section: 'Master Setup',
-  items: [
-    { icon: 'settings', label: 'Settings', path: '/settings' },
     { icon: 'reports', label: 'Reports', path: '/reports' },
   ],
-};
+});
 
 /** Sidebar navigation per role — dynamically filtered by PermissionService. */
 export const NAV_CONFIG: Record<Role, NavSection[]> = {
@@ -45,10 +37,10 @@ export const NAV_CONFIG: Record<Role, NavSection[]> = {
       ],
     },
   ],
-  'Company Admin': [overview('/analytics'), hrModules(), masterSetup],
-  'HR Manager': [overview('/analytics'), hrModules(), masterSetup],
+  'Company Admin': [overview('/dashboard'), hrModules()],
+  'HR Manager': [overview('/dashboard'), hrModules()],
   Manager: [
-    overview('/analytics'),
+    overview('/dashboard'),
     {
       section: 'Management',
       items: [

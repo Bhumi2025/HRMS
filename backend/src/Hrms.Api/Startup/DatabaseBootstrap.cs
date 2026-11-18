@@ -133,6 +133,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
         await RunPunchAndTenantSettingsMigrationAsync(tenant, DefaultCompanyCode, defaultDbName, configuration, logger, ct);
         await DbSeeder.SeedAsync(tenant, hasher, isProduction, ct);
         await EnsureShiftTemplatesSeededAsync(tenant, logger, ct);
+        await EnsureNavigationItemsSeededAsync(tenant, logger, ct);
 
         // In production, ensure initial SuperAdmin user if configured via environment
         if (isProduction)
@@ -186,6 +187,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
                         await RunOneTimeKeyGroupCleanupMigrationAsync(tenantDb, company.Code, company.DatabaseName, logger, ct);
                         await RunPunchAndTenantSettingsMigrationAsync(tenantDb, company.Code, company.DatabaseName, configuration, logger, ct);
                         await EnsureShiftTemplatesSeededAsync(tenantDb, logger, ct);
+                        await EnsureNavigationItemsSeededAsync(tenantDb, logger, ct);
                         logger.LogInformation("Successfully updated schema on existing tenant database '{DatabaseName}'", company.DatabaseName);
                     }
                 }
@@ -585,6 +587,122 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to check or seed shift templates.");
+        }
+    }
+
+    private static async Task EnsureNavigationItemsSeededAsync(
+        HrmsDbContext db,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            // 1. Remove any legacy /loans, /erp, /kiosk, /announcements navigation items
+            var toRemove = await db.NavigationItems
+                .Where(n => n.Route.ToLower().Contains("/loans") ||
+                            n.Route.ToLower().Contains("/erp") ||
+                            n.Route.ToLower().Contains("/kiosk") ||
+                            n.Route.ToLower().Contains("announcement") ||
+                            n.Title.ToLower() == "loans" ||
+                            n.Code.ToLower() == "loan")
+                .ToListAsync(ct);
+
+            if (toRemove.Count > 0)
+            {
+                var removeIds = toRemove.Select(n => n.Id).ToList();
+                var permsToRemove = await db.RoleNavigations
+                    .Where(rn => removeIds.Contains(rn.NavigationItemId))
+                    .ToListAsync(ct);
+                db.RoleNavigations.RemoveRange(permsToRemove);
+                db.NavigationItems.RemoveRange(toRemove);
+                await db.SaveChangesAsync(ct);
+            }
+
+            // 2. Standard 14 navigation items matching Image 2
+            var standardItems = new (string Code, string Title, string Route, string Icon, int Order)[]
+            {
+                ("DASH", "Dashboard", "/dashboard", "dashboard", 1),
+                ("ANAL", "Analytics", "/analytics", "reports", 2),
+                ("COMP", "Company", "/company", "company", 3),
+                ("EMPL", "Employees", "/employees", "employees", 4),
+                ("PROF", "Profile", "/employee-profile", "user", 5),
+                ("SHIF", "Shift", "/shift", "clock", 6),
+                ("ATTD", "Attendance", "/attendance", "attendance", 7),
+                ("LEAV", "Leave", "/leave", "leave", 8),
+                ("PAYR", "Payroll", "/payroll", "payroll", 9),
+                ("PAYS", "Payslips", "/payslips", "payslip", 10),
+                ("ONBD", "Onboarding", "/onboarding", "onboarding", 11),
+                ("DOCS", "Documents", "/documents", "documents", 12),
+                ("APPR", "Approvals", "/approvals", "approvals", 13),
+                ("REPT", "Reports", "/reports", "reports", 14),
+            };
+
+            var existingNavs = await db.NavigationItems.ToListAsync(ct);
+            var existingByCode = existingNavs.ToDictionary(n => n.Code.ToUpperInvariant());
+
+            foreach (var (code, title, route, icon, order) in standardItems)
+            {
+                if (!existingByCode.TryGetValue(code, out var nav))
+                {
+                    nav = new NavigationItem
+                    {
+                        Code = code,
+                        Title = title,
+                        Route = route,
+                        Icon = icon,
+                        OrderIndex = order,
+                        IsActive = true
+                    };
+                    db.NavigationItems.Add(nav);
+                }
+                else
+                {
+                    nav.Title = title;
+                    nav.Route = route;
+                    nav.Icon = icon;
+                    nav.OrderIndex = order;
+                    nav.IsActive = true;
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+
+            // Grant full permissions to Super Admin, Company Admin, and HR Manager
+            var allCurrentNavs = await db.NavigationItems.ToListAsync(ct);
+            var rolesToGrant = await db.Roles
+                .Where(r => r.Code == "SuperAdmin" || r.Code == "CompanyAdmin" || r.Code == "HrManager" ||
+                            r.Name == "Super Admin" || r.Name == "Company Admin" || r.Name == "HR Manager")
+                .ToListAsync(ct);
+
+            var existingPerms = await db.RoleNavigations.ToListAsync(ct);
+            var permKeySet = existingPerms.Select(p => $"{p.RoleId}:{p.NavigationItemId}").ToHashSet();
+
+            foreach (var r in rolesToGrant)
+            {
+                foreach (var nav in allCurrentNavs)
+                {
+                    if (!permKeySet.Contains($"{r.Id}:{nav.Id}"))
+                    {
+                        db.RoleNavigations.Add(new RoleNavigation
+                        {
+                            RoleId = r.Id,
+                            NavigationItemId = nav.Id,
+                            IsFull = true,
+                            IsView = true,
+                            IsCreate = true,
+                            IsEdit = true,
+                            IsDelete = true
+                        });
+                    }
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Seeded 14 standard navigation items and permissions into tenant database.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to ensure standard navigation items seeded.");
         }
     }
 }

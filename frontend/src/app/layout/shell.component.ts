@@ -40,17 +40,12 @@ const MASTER_NAV_CATALOGUE: MasterNavItem[] = [
   { label: 'Shift', section: 'HR Modules', icon: 'clock', path: '/shift', empPath: '/shift' },
   { label: 'Attendance', section: 'HR Modules', icon: 'attendance', path: '/attendance', empPath: '/me/attendance' },
   { label: 'Leave', section: 'HR Modules', icon: 'leave', path: '/leave', empPath: '/me/leave' },
-  { label: 'Loans', section: 'HR Modules', icon: 'loans', path: '/loans', empPath: '/loans' },
   { label: 'Payroll', section: 'HR Modules', icon: 'payroll', path: '/payroll', empPath: '/payroll' },
   { label: 'Payslips', section: 'HR Modules', icon: 'payslip', path: '/payslips', empPath: '/me/payslips' },
   { label: 'Onboarding', section: 'HR Modules', icon: 'onboarding', path: '/onboarding', empPath: '/onboarding' },
   { label: 'Documents', section: 'HR Modules', icon: 'documents', path: '/documents', empPath: '/me/documents' },
   { label: 'Approvals', section: 'HR Modules', icon: 'approvals', path: '/approvals', empPath: '/approvals' },
-  { label: 'Announcements', section: 'HR Modules', icon: 'bell', path: '/announcements', empPath: '/me/announcements' },
-
-  // Master Setup
-  { label: 'Settings', section: 'Master Setup', icon: 'settings', path: '/settings', empPath: '/settings' },
-  { label: 'Reports', section: 'Master Setup', icon: 'reports', path: '/reports', empPath: '/reports' },
+  { label: 'Reports', section: 'HR Modules', icon: 'reports', path: '/reports', empPath: '/reports' },
 ];
 
 /**
@@ -119,12 +114,14 @@ export class ShellComponent implements OnInit, OnDestroy {
 
     const backendItems = this.backendNavItems();
 
-    // Helper to filter out ERP, Face Kiosk, Key Group, Navigation, Permissions, Roles from main menu bar
+    // Helper to filter out Loans, ERP, Face Kiosk, Key Group, Navigation, Permissions, Roles, Settings from main menu bar
     const isExcludedFromSidebar = (route?: string, title?: string): boolean => {
       const r = (route || '').toLowerCase();
       const t = (title || '').toLowerCase();
       if (r === '/erp' || t.includes('erp') || t.includes('erp integration')) return true;
       if (r === '/kiosk' || t.includes('kiosk') || t.includes('face kiosk')) return true;
+      if (r === '/loans' || t.includes('loan') || t.includes('loans')) return true;
+      if (t === 'announcements' || r.includes('announcement')) return true;
       if (
         t === 'key group' ||
         t === 'key groups' ||
@@ -133,6 +130,8 @@ export class ShellComponent implements OnInit, OnDestroy {
         t === 'permissions' ||
         t === 'role' ||
         t === 'roles' ||
+        t === 'settings' ||
+        r === '/settings' ||
         r.includes('#keygroup') ||
         r.includes('#navigation') ||
         r.includes('#permission') ||
@@ -150,11 +149,8 @@ export class ShellComponent implements OnInit, OnDestroy {
     const getSection = (item: any): string => {
       const title = (item.title || item.label || '').toLowerCase();
       const route = (item.route || item.path || '').toLowerCase();
-      if (title.includes('dash') || route.includes('dash')) {
+      if (title.includes('dash') || route.includes('dash') || title.includes('anal') || route.includes('anal')) {
         return 'Overview';
-      }
-      if (title.includes('setting') || route.includes('setting') || route.includes('report') || title.includes('report')) {
-        return 'Master Setup';
       }
       return 'HR Modules';
     };
@@ -194,7 +190,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     // Full catalogue with Overview, HR Modules, and Master Setup (Settings, Reports),
     // with ERP, Face Kiosk, Key Group, Navigation, Permissions, Roles excluded from the main menu bar.
     if (isCompanyAdmin) {
-      const sections = ['Overview', 'HR Modules', 'Master Setup'];
+      const sections = ['Overview', 'HR Modules'];
       const result: { section: string; items: { icon: IconName; label: string; path: string; badge?: string; queryParams?: Record<string, string>; isSubItem?: boolean }[] }[] = [];
 
       for (const sec of sections) {
@@ -242,7 +238,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     const hasMeaningfulBackendItems = backendItems.length > 1 || (backendItems.length === 1 && backendItems[0].route !== '/settings' && backendItems[0].title !== 'Settings');
 
     if (hasMeaningfulBackendItems) {
-      const sections = ['Overview', 'HR Modules', 'Master Setup'];
+      const sections = ['Overview', 'HR Modules'];
       const result: { section: string; items: { icon: IconName; label: string; path: string; badge?: string; queryParams?: Record<string, string>; isSubItem?: boolean }[] }[] = [];
 
       for (const sec of sections) {
@@ -273,7 +269,7 @@ export class ShellComponent implements OnInit, OnDestroy {
       return this.perms.hasModuleAccess(item.label);
     });
 
-    const sections = ['Overview', 'HR Modules', 'Master Setup'];
+    const sections = ['Overview', 'HR Modules'];
     const result: { section: string; items: { icon: IconName; label: string; path: string; badge?: string; queryParams?: Record<string, string>; isSubItem?: boolean }[] }[] = [];
 
     for (const sec of sections) {

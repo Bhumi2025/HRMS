@@ -1,22 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject } from '@angular/core';
-import { SessionService } from '../../core/services/session.service';
-import { AnalyticsAdminComponent } from './analytics-admin.component';
-import { AnalyticsHrComponent } from './analytics-hr.component';
+import { Component } from '@angular/core';
+import { TemplateDashboardComponent } from './template-dashboard.component';
 
-/** Routes `/analytics` to the role-appropriate dashboard (admin vs HR). */
+/** Routes `/analytics` to the original HR Manager template dashboard. */
 @Component({
   selector: 'app-analytics',
-  imports: [CommonModule, AnalyticsAdminComponent, AnalyticsHrComponent],
+  imports: [CommonModule, TemplateDashboardComponent],
   template: `
-    @if (isHr()) {
-      <app-analytics-hr />
-    } @else {
-      <app-analytics-admin />
-    }
+    <app-template-dashboard />
   `,
 })
-export class AnalyticsComponent {
-  private readonly session = inject(SessionService);
-  protected readonly isHr = computed(() => this.session.activeRole() === 'HR Manager');
-}
+export class AnalyticsComponent {}
