@@ -1181,17 +1181,36 @@ export class SuperAdminDashboardComponent implements OnInit {
       return;
     }
 
+    const payload: CreateCompanyRequest = {
+      name: this.createOrgForm.name.trim(),
+      code: this.createOrgForm.code?.trim() || undefined,
+      adminFullName: this.createOrgForm.adminFullName.trim(),
+      adminEmail: this.createOrgForm.adminEmail.trim(),
+      contactName: this.createOrgForm.contactName?.trim() || undefined,
+      contactEmail: this.createOrgForm.contactEmail?.trim() || undefined,
+      timeZone: this.createOrgForm.timeZone?.trim() || 'UTC',
+    };
+
     this.creatingOrg.set(true);
-    this.api.createTenantCompany(this.createOrgForm).subscribe({
+    this.api.createTenantCompany(payload).subscribe({
       next: () => {
         this.creatingOrg.set(false);
         this.showCreateOrgModal.set(false);
-        this.toast.show(`Organization '${this.createOrgForm.name}' provisioned successfully!`, 'success');
+        this.toast.show(`Organization '${payload.name}' provisioned successfully!`, 'success');
         this.refreshAll();
       },
       error: (err) => {
         this.creatingOrg.set(false);
-        const msg = err?.error?.title || err?.error?.message || 'Failed to create organization.';
+        const errObj = err?.error;
+        let msg = 'Failed to create organization.';
+        if (errObj?.errors && typeof errObj.errors === 'object') {
+          const details = Object.values(errObj.errors).flat().join(' ');
+          if (details) msg = details;
+        } else if (errObj?.message) {
+          msg = errObj.message;
+        } else if (errObj?.title) {
+          msg = errObj.title;
+        }
         this.toast.show(msg, 'danger');
       },
     });

@@ -1565,8 +1565,18 @@ export class CompanyComponent implements OnInit {
       return;
     }
 
+    const payload: CreateCompanyRequest = {
+      name: this.tenantCreateForm.name.trim(),
+      code: this.tenantCreateForm.code?.trim() || undefined,
+      adminFullName: this.tenantCreateForm.adminFullName.trim(),
+      adminEmail: this.tenantCreateForm.adminEmail.trim(),
+      contactName: this.tenantCreateForm.contactName?.trim() || undefined,
+      contactEmail: this.tenantCreateForm.contactEmail?.trim() || undefined,
+      timeZone: this.tenantCreateForm.timeZone?.trim() || 'UTC',
+    };
+
     this.savingTenant.set(true);
-    this.api.createTenantCompany(this.tenantCreateForm).subscribe({
+    this.api.createTenantCompany(payload).subscribe({
       next: (result) => {
         this.savingTenant.set(false);
         this.showCreateTenant.set(false);
@@ -1575,7 +1585,17 @@ export class CompanyComponent implements OnInit {
       },
       error: (error) => {
         this.savingTenant.set(false);
-        this.toast.show(error?.error?.title ?? 'Could not create the company.', 'danger');
+        const errObj = error?.error;
+        let msg = 'Could not create the company.';
+        if (errObj?.errors && typeof errObj.errors === 'object') {
+          const details = Object.values(errObj.errors).flat().join(' ');
+          if (details) msg = details;
+        } else if (errObj?.message) {
+          msg = errObj.message;
+        } else if (errObj?.title) {
+          msg = errObj.title;
+        }
+        this.toast.show(msg, 'danger');
       },
     });
   }
@@ -1618,8 +1638,16 @@ export class CompanyComponent implements OnInit {
       return;
     }
 
+    const payload: UpdateCompanyRequest = {
+      name: this.tenantEditForm.name.trim(),
+      adminFullName: this.tenantEditForm.adminFullName.trim(),
+      contactName: this.tenantEditForm.contactName?.trim() || undefined,
+      contactEmail: this.tenantEditForm.contactEmail?.trim() || undefined,
+      timeZone: this.tenantEditForm.timeZone?.trim() || undefined,
+    };
+
     this.savingTenant.set(true);
-    this.api.updateTenantCompany(c.id, this.tenantEditForm).subscribe({
+    this.api.updateTenantCompany(c.id, payload).subscribe({
       next: () => {
         this.savingTenant.set(false);
         this.showEditTenant.set(false);
@@ -1629,7 +1657,17 @@ export class CompanyComponent implements OnInit {
       },
       error: (error) => {
         this.savingTenant.set(false);
-        this.toast.show(error?.error?.title ?? 'Could not update the company.', 'danger');
+        const errObj = error?.error;
+        let msg = 'Could not update the company.';
+        if (errObj?.errors && typeof errObj.errors === 'object') {
+          const details = Object.values(errObj.errors).flat().join(' ');
+          if (details) msg = details;
+        } else if (errObj?.message) {
+          msg = errObj.message;
+        } else if (errObj?.title) {
+          msg = errObj.title;
+        }
+        this.toast.show(msg, 'danger');
       },
     });
   }

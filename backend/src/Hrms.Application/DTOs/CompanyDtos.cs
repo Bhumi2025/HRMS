@@ -46,6 +46,29 @@ public sealed record CompanyDetailDto(
     string? InvitationError,
     IReadOnlyList<ProvisioningLogDto> ProvisioningLogs);
 
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false)]
+public sealed class OptionalEmailAddressAttribute : ValidationAttribute
+{
+    private static readonly EmailAddressAttribute Inner = new();
+
+    protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
+    {
+        if (value is null)
+        {
+            return ValidationResult.Success;
+        }
+
+        if (value is string s && string.IsNullOrWhiteSpace(s))
+        {
+            return ValidationResult.Success;
+        }
+
+        return Inner.IsValid(value)
+            ? ValidationResult.Success
+            : new ValidationResult($"The {validationContext.DisplayName} field is not a valid e-mail address.");
+    }
+}
+
 public sealed record ProvisioningLogDto(string Step, bool Succeeded, string? Message, DateTime OccurredAtUtc);
 
 public sealed record CreateCompanyRequest(
@@ -54,14 +77,14 @@ public sealed record CreateCompanyRequest(
     [Required, MaxLength(160)] string AdminFullName,
     [Required, EmailAddress, MaxLength(160)] string AdminEmail,
     [MaxLength(160)] string? ContactName,
-    [EmailAddress, MaxLength(160)] string? ContactEmail,
+    [OptionalEmailAddress, MaxLength(160)] string? ContactEmail,
     [MaxLength(64)] string? TimeZone);
 
 public sealed record UpdateCompanyRequest(
     [MaxLength(200)] string? Name,
     [MaxLength(160)] string? AdminFullName,
     [MaxLength(160)] string? ContactName,
-    [EmailAddress, MaxLength(160)] string? ContactEmail,
+    [OptionalEmailAddress, MaxLength(160)] string? ContactEmail,
     [MaxLength(64)] string? TimeZone);
 
 /// <summary>Result of a create/retry provisioning attempt.</summary>

@@ -109,9 +109,9 @@ public sealed class CompanyManagementService : ICompanyManagementService
             Code = code,
             AdminFullName = request.AdminFullName.Trim(),
             AdminEmail = request.AdminEmail.Trim().ToLowerInvariant(),
-            ContactName = request.ContactName?.Trim(),
-            ContactEmail = request.ContactEmail?.Trim(),
-            TimeZone = request.TimeZone?.Trim(),
+            ContactName = string.IsNullOrWhiteSpace(request.ContactName) ? null : request.ContactName.Trim(),
+            ContactEmail = string.IsNullOrWhiteSpace(request.ContactEmail) ? null : request.ContactEmail.Trim().ToLowerInvariant(),
+            TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "UTC" : request.TimeZone.Trim(),
             Status = CompanyStatus.Provisioning,
         };
 
@@ -128,9 +128,9 @@ public sealed class CompanyManagementService : ICompanyManagementService
 
         if (!string.IsNullOrWhiteSpace(request.Name)) company.Name = request.Name.Trim();
         if (!string.IsNullOrWhiteSpace(request.AdminFullName)) company.AdminFullName = request.AdminFullName.Trim();
-        if (request.ContactName is not null) company.ContactName = request.ContactName.Trim();
-        if (request.ContactEmail is not null) company.ContactEmail = request.ContactEmail.Trim();
-        if (request.TimeZone is not null) company.TimeZone = request.TimeZone.Trim();
+        if (request.ContactName is not null) company.ContactName = string.IsNullOrWhiteSpace(request.ContactName) ? null : request.ContactName.Trim();
+        if (request.ContactEmail is not null) company.ContactEmail = string.IsNullOrWhiteSpace(request.ContactEmail) ? null : request.ContactEmail.Trim().ToLowerInvariant();
+        if (request.TimeZone is not null) company.TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "UTC" : request.TimeZone.Trim();
 
         _master.Companies.Update(company);
         await _master.SaveChangesAsync(ct);
