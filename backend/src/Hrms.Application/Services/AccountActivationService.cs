@@ -17,17 +17,20 @@ public sealed class AccountActivationService : IAccountActivationService
     private readonly ITenantDatabaseService _tenantDb;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _tokenService;
+    private readonly ITenantResolutionService? _tenantResolver;
 
     public AccountActivationService(
         IMasterUnitOfWork master,
         ITenantDatabaseService tenantDb,
         IPasswordHasher passwordHasher,
-        IJwtTokenService tokenService)
+        IJwtTokenService tokenService,
+        ITenantResolutionService? tenantResolver = null)
     {
         _master = master;
         _tenantDb = tenantDb;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
+        _tenantResolver = tenantResolver;
     }
 
     public async Task<ActivationInfoResponse> ValidateAsync(string token, CancellationToken ct = default)
@@ -97,6 +100,7 @@ public sealed class AccountActivationService : IAccountActivationService
         }
 
         await _master.SaveChangesAsync(ct);
+        _tenantResolver?.InvalidateCache(company.Id, company.Code);
         await _tenantDb.RecordLoginAsync(company.DatabaseName, user.Id, ct);
 
         var token = _tokenService.CreateToken(new TokenSubject(

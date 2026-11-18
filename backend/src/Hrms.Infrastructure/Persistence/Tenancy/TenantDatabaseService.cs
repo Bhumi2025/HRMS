@@ -310,27 +310,16 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Leav
                 .Include(e => e.Department)
                 .Include(e => e.Designation)
                 .OrderBy(e => e.EmployeeCode)
-                .Select(e => new
-                {
-                    e.Id,
-                    e.EmployeeCode,
-                    FullName = (e.FirstName + " " + e.LastName).Trim(),
-                    e.Email,
-                    Department = e.Department != null ? e.Department.Name : null,
-                    Designation = e.Designation != null ? e.Designation.Name : (!string.IsNullOrEmpty(e.JobTitle) ? e.JobTitle : null),
-                    Status = e.Status.ToString(),
-                    e.JoinDate
-                })
                 .ToListAsync(ct);
 
             return items.Select(e => new CompanyEmployeeSummaryDto(
                 e.Id,
                 e.EmployeeCode,
-                e.FullName,
+                $"{e.FirstName} {e.LastName}".Trim(),
                 e.Email,
-                e.Department,
-                e.Designation,
-                e.Status,
+                e.Department?.Name,
+                e.Designation?.Name ?? (string.IsNullOrWhiteSpace(e.JobTitle) ? null : e.JobTitle),
+                e.Status.ToString(),
                 new DateTime(e.JoinDate.Year, e.JoinDate.Month, e.JoinDate.Day, 0, 0, 0, DateTimeKind.Utc)
             )).ToList();
         }

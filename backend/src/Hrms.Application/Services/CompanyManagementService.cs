@@ -34,6 +34,7 @@ public sealed class CompanyManagementService : ICompanyManagementService
     private readonly IEmailSender _emailSender;
     private readonly AppOptions _app;
     private readonly ILogger<CompanyManagementService> _logger;
+    private readonly ITenantResolutionService? _tenantResolver;
 
     public CompanyManagementService(
         IMasterUnitOfWork master,
@@ -41,7 +42,8 @@ public sealed class CompanyManagementService : ICompanyManagementService
         IPasswordHasher passwordHasher,
         IEmailSender emailSender,
         IOptions<AppOptions> app,
-        ILogger<CompanyManagementService> logger)
+        ILogger<CompanyManagementService> logger,
+        ITenantResolutionService? tenantResolver = null)
     {
         _master = master;
         _tenantDb = tenantDb;
@@ -49,6 +51,7 @@ public sealed class CompanyManagementService : ICompanyManagementService
         _emailSender = emailSender;
         _app = app.Value;
         _logger = logger;
+        _tenantResolver = tenantResolver;
     }
 
     public async Task<IReadOnlyList<CompanyListItemDto>> ListAsync(string? search, CancellationToken ct = default)
@@ -139,6 +142,7 @@ public sealed class CompanyManagementService : ICompanyManagementService
         var company = await _master.Companies.GetByIdAsync(id, ct)
                       ?? throw NotFoundException.For("Company", id);
 
+        var oldCode = company.Code;
         if (!string.IsNullOrWhiteSpace(request.Name)) company.Name = request.Name.Trim();
         if (!string.IsNullOrWhiteSpace(request.AdminFullName)) company.AdminFullName = request.AdminFullName.Trim();
         if (request.ContactName is not null) company.ContactName = string.IsNullOrWhiteSpace(request.ContactName) ? null : request.ContactName.Trim();
@@ -147,6 +151,12 @@ public sealed class CompanyManagementService : ICompanyManagementService
 
         _master.Companies.Update(company);
         await _master.SaveChangesAsync(ct);
+
+        _tenantResolver?.InvalidateCache(company.Id, company.Code);
+        if (!string.Equals(oldCode, company.Code, StringComparison.OrdinalIgnoreCase))
+        {
+            _tenantResolver?.InvalidateCache(company.Id, oldCode);
+        }
 
         return await GetAsync(id, ct);
     }
@@ -167,6 +177,8 @@ public sealed class CompanyManagementService : ICompanyManagementService
         _master.Companies.Update(company);
         await _master.SaveChangesAsync(ct);
 
+        _tenantResolver?.InvalidateCache(company.Id, company.Code);
+
         return await GetAsync(id, ct);
     }
 
@@ -184,6 +196,8 @@ public sealed class CompanyManagementService : ICompanyManagementService
         company.SuspendedAtUtc = DateTime.UtcNow;
         _master.Companies.Update(company);
         await _master.SaveChangesAsync(ct);
+
+        _tenantResolver?.InvalidateCache(company.Id, company.Code);
 
         return await GetAsync(id, ct);
     }
@@ -256,6 +270,8 @@ public sealed class CompanyManagementService : ICompanyManagementService
 
         _master.Companies.Remove(company);
         await _master.SaveChangesAsync(ct);
+
+        _tenantResolver?.InvalidateCache(company.Id, company.Code);
     }
 
     // ── Provisioning workflow ──
@@ -330,6 +346,7 @@ public sealed class CompanyManagementService : ICompanyManagementService
             company.LastProvisioningError = null;
             _master.Companies.Update(company);
             await _master.SaveChangesAsync(ct);
+            _tenantResolver?.InvalidateCache(company.Id, company.Code);
             await LogAsync(company.Id, StepActivate, true, "Company activated.", ct);
 
             return new CompanyProvisioningResultDto(
@@ -351,6 +368,7 @@ public sealed class CompanyManagementService : ICompanyManagementService
             company.LastProvisioningError = message;
             _master.Companies.Update(company);
             await _master.SaveChangesAsync(ct);
+            _tenantResolver?.InvalidateCache(company.Id, company.Code);
             await LogAsync(company.Id, "provisioning", false, message, ct);
 
             return new CompanyProvisioningResultDto(
@@ -490,8 +508,8 @@ public sealed class CompanyManagementService : ICompanyManagementService
         c.CreatedAtUtc,
         c.ProvisionedAtUtc,
         c.LastProvisioningError,
-        invitation?.Status.ToString() ?? InvitationStatus.Pending.ToString(),
-        invitation?.SentAtUtc,
+        invitation?.Status.ToString() ?? (c.IsDefault ? InvitationStatus.Sent.ToString() : InvitationStatus.Pending.ToString()),
+        invitation?.SentAtUtc ?? (c.IsDefault ? c.CreatedAtUtc : null),
         invitation?.LastError);
 
     private static CompanyDetailDto ToDetail(Company c, CompanyInvitation? invitation, IReadOnlyList<ProvisioningLog> logs, IReadOnlyList<CompanyEmployeeSummaryDto>? employees = null) => new(
@@ -510,9 +528,9 @@ public sealed class CompanyManagementService : ICompanyManagementService
         c.ProvisionedAtUtc,
         c.SuspendedAtUtc,
         c.LastProvisioningError,
-        invitation?.Status.ToString() ?? InvitationStatus.Pending.ToString(),
-        invitation?.Email,
-        invitation?.SentAtUtc,
+        invitation?.Status.ToString() ?? (c.IsDefault ? InvitationStatus.Sent.ToString() : InvitationStatus.Pending.ToString()),
+        invitation?.Email ?? (c.IsDefault ? c.AdminEmail : null),
+        invitation?.SentAtUtc ?? (c.IsDefault ? c.CreatedAtUtc : null),
         invitation?.AcceptedAtUtc,
         invitation?.LastError,
         logs.Select(l => new ProvisioningLogDto(l.Step, l.Succeeded, l.Message, l.OccurredAtUtc)).ToList(),

@@ -1,11 +1,11 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, OnInit, AfterViewInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { of, catchError } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { SessionService } from '../../core/services/session.service';
-import { CompanyListItem, CompanyDetail, CreateCompanyRequest } from '../../core/api/api.models';
+import { CompanyListItem, CompanyDetail, CreateCompanyRequest, STANDARD_TIMEZONES } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 
@@ -94,7 +94,6 @@ import { ToastService } from '../../core/services/toast.service';
                 <th>Tenant Code</th>
                 <th>Administrator</th>
                 <th>Database</th>
-                <th style="text-align: center;">Status</th>
                 <th style="text-align: right; min-width: 180px;">Actions</th>
               </tr>
             </thead>
@@ -103,11 +102,13 @@ import { ToastService } from '../../core/services/toast.service';
                 <tr class="table-row">
                   <td>
                     <div class="org-cell">
-                      <div class="org-avatar">
+                      <div class="org-avatar" (click)="openCompanyDetails(c)" role="button" title="View {{ c.name }} details & employees" style="cursor: pointer;">
                         {{ c.name.charAt(0) }}
                       </div>
                       <div class="org-info">
-                        <div class="org-name">{{ c.name }}</div>
+                        <button type="button" class="org-name-btn" (click)="openCompanyDetails(c)" title="View {{ c.name }} details & employees">
+                          {{ c.name }}
+                        </button>
                         @if (c.isDefault) {
                           <span class="badge badge-default">Primary Default</span>
                         }
@@ -129,71 +130,36 @@ import { ToastService } from '../../core/services/toast.service';
                       {{ c.databaseName || 'HRMS (Default)' }}
                     </span>
                   </td>
-                  <td style="text-align: center;">
-                    @if ((c.status || '').toLowerCase() === 'active') {
-                      <span class="status-badge status-active">
-                        <span class="dot"></span> Active
-                      </span>
-                    } @else if ((c.status || '').toLowerCase() === 'suspended') {
-                      <span class="status-badge status-suspended">
-                        <span class="dot"></span> Suspended
-                      </span>
-                    } @else {
-                      <span class="status-badge status-provisioning">
-                        <span class="dot"></span> Provisioning
-                      </span>
-                    }
-                  </td>
                   <td style="text-align: right;">
                     <div class="actions-group">
-                      @if ((c.status || '').toLowerCase() === 'active') {
+                      @if (!c.isDefault) {
                         <button
-                          class="action-btn btn-danger-soft"
-                          (click)="suspendCompany(c)"
-                          [disabled]="c.isDefault"
-                          [attr.data-tooltip]="c.isDefault ? 'Primary tenant cannot be suspended' : 'Suspend Tenant'"
+                          type="button"
+                          class="btn-status-outline"
+                          [class.status-active]="(c.status || '').toLowerCase() === 'active'"
+                          [class.status-suspended]="(c.status || '').toLowerCase() === 'suspended'"
+                          (click)="toggleCompanyStatus(c)"
+                          [attr.data-tooltip]="(c.status || '').toLowerCase() === 'suspended' ? 'Click to Activate tenant' : 'Click to Suspend tenant'"
                         >
-                          Suspend
+                          {{ (c.status || '').toLowerCase() === 'suspended' ? 'Suspended' : 'Active' }}
                         </button>
-                      } @else {
-                        <button
-                          class="action-btn btn-success-soft"
-                          (click)="activateCompany(c)"
-                          data-tooltip="Activate Tenant"
-                        >
-                          Activate
-                        </button>
-                      }
-
-                      @if (c.invitationStatus !== 'Accepted') {
-                        <button
-                          class="action-btn btn-neutral"
-                          (click)="resendInvitation(c)"
-                          data-tooltip="Resend Admin Invitation Email"
-                        >
-                          <span [appIcon]="'mail'"></span>
-                          Invite
-                        </button>
-                      } @else {
-                        <span class="status-badge status-active" style="padding: 4px 8px; font-size: 11px;" data-tooltip="Invitation Accepted">
-                          <span class="dot"></span> Accepted
-                        </span>
                       }
 
                       <button
-                        class="action-btn btn-manage"
+                        class="action-btn btn-neutral"
                         (click)="openCompanyDetails(c)"
-                        [attr.data-tooltip]="'View details & employees for ' + c.name"
+                        data-tooltip="View Details & Employees"
                         title="View {{ c.name }} Details & Employees"
                       >
-                        <span [appIcon]="'arrow_right'"></span>
+                        <span [appIcon]="'eye'"></span>
+                        Details
                       </button>
                     </div>
                   </td>
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="6" class="empty-state">
+                  <td colspan="5" class="empty-state">
                     <div class="empty-icon">🏢</div>
                     <div class="empty-title">No tenant organizations found</div>
                     <div class="empty-desc">Try clearing your search query or filter</div>
@@ -205,199 +171,203 @@ import { ToastService } from '../../core/services/toast.service';
         </div>
       </div>
 
-      <!-- Company Details & Employees Modal -->
+      <!-- Company Details & Employees Modal (matching Image 2) -->
       @if (showDetailsModal()) {
-        <div class="modal-overlay" (click)="closeCompanyDetails()">
-          <div class="modal-card modal-large" (click)="$event.stopPropagation()">
+        <div class="modal-overlay open" (click)="closeCompanyDetails()">
+          <div class="modal modal-card" style="max-width: 860px; width: 100%;" (click)="$event.stopPropagation()">
             <!-- Modal Header -->
             <div class="modal-header">
-              <div class="detail-header-left">
-                <div class="detail-avatar">
-                  {{ selectedCompanyListItem()?.name?.charAt(0) || 'C' }}
-                </div>
-                <div>
-                  <div class="detail-title-row">
-                    <h3 class="detail-title">{{ selectedCompanyDetail()?.name || selectedCompanyListItem()?.name }}</h3>
-                    <span class="code-badge">{{ selectedCompanyDetail()?.code || selectedCompanyListItem()?.code }}</span>
-                    @if ((selectedCompanyDetail()?.status || selectedCompanyListItem()?.status || '').toLowerCase() === 'active') {
-                      <span class="status-badge status-active"><span class="dot"></span> Active</span>
-                    } @else {
-                      <span class="status-badge status-suspended"><span class="dot"></span> Suspended</span>
-                    }
-                    @if (selectedCompanyDetail()?.isDefault || selectedCompanyListItem()?.isDefault) {
-                      <span class="badge badge-default">Primary Default</span>
-                    }
-                  </div>
-                  <p class="modal-desc">
-                    Tenant details, dedicated database provisioning, administrator credentials, and active staff directory.
-                  </p>
-                </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text, #0f172a);">
+                  {{ selectedCompanyDetail()?.name || selectedCompanyListItem()?.name }}
+                </h3>
+                <span class="code-badge" style="background: rgba(37, 99, 235, 0.08); color: #2563eb; border-color: rgba(37, 99, 235, 0.25);">
+                  {{ selectedCompanyDetail()?.code || selectedCompanyListItem()?.code }}
+                </span>
+                @let st = (selectedCompanyDetail()?.status || selectedCompanyListItem()?.status || '').toLowerCase();
+                <span
+                  class="badge"
+                  [style.background]="st === 'active' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'"
+                  [style.color]="st === 'active' ? '#059669' : '#dc2626'"
+                  style="font-weight: 700; font-size: 11px; padding: 3px 10px; border-radius: 12px;"
+                >
+                  {{ selectedCompanyDetail()?.status || selectedCompanyListItem()?.status || 'Active' }}
+                </span>
+                @if (selectedCompanyDetail()?.isDefault || selectedCompanyListItem()?.isDefault) {
+                  <span class="badge badge-default">Primary Default</span>
+                }
               </div>
               <button class="btn-icon" (click)="closeCompanyDetails()" type="button" title="Close"><span [appIcon]="'x'"></span></button>
             </div>
 
             <!-- Modal Body -->
-            <div class="modal-body-scroll">
+            <div class="modal-body-scroll" style="max-height: 75vh; overflow-y: auto; padding: 20px 24px;">
               @if (loadingCompanyDetails()) {
-                <div class="modal-loading-state">
+                <div class="modal-loading-state" style="text-align: center; padding: 48px 16px;">
                   <span [appIcon]="'sync'" class="action-icon spin" style="font-size: 28px; color: var(--p, #2563eb);"></span>
                   <div style="font-weight: 700; margin-top: 12px;">Loading Company Details &amp; Employees...</div>
                   <div style="font-size: 12.5px; color: var(--muted, #64748b);">Querying dedicated tenant database</div>
                 </div>
               } @else if (selectedCompanyDetail()) {
                 @let d = selectedCompanyDetail()!;
-                
-                <!-- Quick Stats Cards Row -->
-                <div class="details-stats-grid">
-                  <div class="detail-stat-box">
-                    <div class="stat-label">Dedicated Database</div>
-                    <div class="stat-value text-blue">
-                      <span [appIcon]="'grid'"></span>
-                      {{ d.databaseName || 'HRMS (Default)' }}
-                    </div>
-                    <div class="stat-meta">Isolated SQL Database</div>
+
+                <!-- Company Details Grid Box (matches Image 2) -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; margin-bottom: 22px;">
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;">COMPANY CODE</div>
+                    <div style="font-weight: 700; font-size: 13.5px; color: #0f172a; margin-top: 2px;">{{ d.code }}</div>
                   </div>
-                  <div class="detail-stat-box">
-                    <div class="stat-label">Total Provisioned Staff</div>
-                    <div class="stat-value text-emerald">
-                      <span [appIcon]="'user'"></span>
-                      {{ d.employeeCount || d.employees?.length || 0 }} Employees
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;">STATUS</div>
+                    <div style="margin-top: 2px;">
+                      <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; font-weight: 700; font-size: 11px; padding: 2px 10px; border-radius: 12px;">
+                        {{ d.status }}
+                      </span>
                     </div>
-                    <div class="stat-meta">Live from tenant schema</div>
                   </div>
-                  <div class="detail-stat-box">
-                    <div class="stat-label">Administrator</div>
-                    <div class="stat-value text-slate">
-                      {{ d.adminFullName }}
-                    </div>
-                    <div class="stat-meta">{{ d.adminEmail }}</div>
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;">DEDICATED DATABASE</div>
+                    <div style="font-family: monospace; font-size: 13px; font-weight: 600; color: #2563eb; margin-top: 2px;">{{ d.databaseName || '—' }}</div>
                   </div>
-                  <div class="detail-stat-box">
-                    <div class="stat-label">Time Zone</div>
-                    <div class="stat-value text-slate">
-                      {{ d.timeZone || 'UTC' }}
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;">TIME ZONE</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #0f172a; margin-top: 2px;">{{ d.timeZone || 'UTC' }}</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;">ADMINISTRATOR</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #0f172a; margin-top: 2px;">{{ d.adminFullName }}</div>
+                    <div style="font-size: 12px; color: #64748b;">{{ d.adminEmail }}</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;">TOTAL STAFF</div>
+                    <div style="font-size: 13px; font-weight: 700; color: #10b981; margin-top: 2px;">
+                      {{ d.employees?.length || d.employeeCount || 0 }} Employees
                     </div>
-                    <div class="stat-meta">Provisioned: {{ d.provisionedAtUtc ? (d.provisionedAtUtc | date:'shortDate') : 'Pending' }}</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Live From Tenant Schema</div>
+                  </div>
+                  @if (d.contactName || d.contactEmail) {
+                    <div>
+                      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;">CONTACT PERSON</div>
+                      <div style="font-size: 13px; color: #0f172a; margin-top: 2px;">{{ d.contactName || '—' }} ({{ d.contactEmail || '—' }})</div>
+                    </div>
+                  }
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;">PROVISIONED AT</div>
+                    <div style="font-size: 12.5px; color: #0f172a; margin-top: 2px;">
+                      {{ d.provisionedAtUtc ? (d.provisionedAtUtc | date: 'medium') : '—' }}
+                    </div>
                   </div>
                 </div>
 
-                <!-- Section: Admin & HR Credentials -->
-                <div class="section-card">
-                  <div class="section-header">
-                    <div class="section-title">
+                <!-- Section: Company Employees (matches Image 2) -->
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <div style="font-weight: 700; font-size: 14px; color: #0f172a; display: flex; align-items: center; gap: 8px;">
                       <span [appIcon]="'user'"></span>
-                      <span>Administrator &amp; HR Credentials</span>
+                      <span>Company Employees</span>
+                      <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: #2563eb; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;">
+                        {{ d.employees?.length || 0 }} Total
+                      </span>
                     </div>
-                    <div class="section-badge">
-                      @if (d.invitationStatus === 'Accepted') {
-                        <span class="status-badge status-active"><span class="dot"></span> Invitation Accepted</span>
-                      } @else {
-                        <span class="status-badge status-provisioning"><span class="dot"></span> Invitation Sent (Pending Login)</span>
-                      }
-                    </div>
-                  </div>
-                  <div class="credentials-grid">
-                    <div class="credential-item">
-                      <div class="cred-label">Full Name</div>
-                      <div class="cred-value">{{ d.adminFullName }}</div>
-                    </div>
-                    <div class="credential-item">
-                      <div class="cred-label">Admin Email / Username</div>
-                      <div class="cred-value email-highlight">{{ d.adminEmail }}</div>
-                    </div>
-                    <div class="credential-item">
-                      <div class="cred-label">Platform Role</div>
-                      <div class="cred-value">Company Administrator / HR Lead</div>
-                    </div>
-                    <div class="credential-item">
-                      <div class="cred-label">Invitation Status</div>
-                      <div class="cred-value">
-                        <strong>{{ d.invitationStatus || 'Pending' }}</strong>
-                        @if (d.invitationSentAtUtc) {
-                          <span class="cred-sub"> (Sent {{ d.invitationSentAtUtc | date:'short' }})</span>
-                        }
-                      </div>
-                    </div>
-                    @if (d.contactName || d.contactEmail) {
-                      <div class="credential-item">
-                        <div class="cred-label">Contact Person</div>
-                        <div class="cred-value">{{ d.contactName || '—' }} ({{ d.contactEmail || '—' }})</div>
+                    @if (d.employees && d.employees.length > 5) {
+                      <div style="max-width: 220px;">
+                        <input
+                          type="text"
+                          class="search-input-sm"
+                          placeholder="Search employees..."
+                          [ngModel]="empModalSearch()"
+                          (ngModelChange)="onEmpModalSearchChange($event)"
+                        />
                       </div>
                     }
                   </div>
-                </div>
-
-                <!-- Section: Provisioned Employees Directory -->
-                <div class="section-card">
-                  <div class="section-header">
-                    <div class="section-title">
-                      <span [appIcon]="'company'"></span>
-                      <span>Provisioned Employees Directory</span>
-                      <span class="count-pill">{{ d.employees?.length || 0 }} Total</span>
-                    </div>
-                    <div class="section-desc">Employees registered and active inside <strong>{{ d.databaseName }}</strong></div>
-                  </div>
 
                   @if (d.employees && d.employees.length > 0) {
-                    <div class="table-responsive">
-                      <table class="employees-mini-table">
-                        <thead>
-                          <tr>
-                            <th>Code</th>
-                            <th>Employee Name</th>
-                            <th>Work Email</th>
-                            <th>Department</th>
-                            <th>Designation / Role</th>
-                            <th style="text-align: center;">Status</th>
-                            <th>Date of Joining</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (emp of d.employees; track emp.id) {
-                            <tr>
-                              <td>
-                                <span class="code-badge">{{ emp.employeeCode }}</span>
-                              </td>
-                              <td>
-                                <div class="emp-name-cell">
-                                  <div class="emp-avatar-sm">
-                                    {{ emp.fullName.charAt(0) }}
-                                  </div>
-                                  <span class="emp-name">{{ emp.fullName }}</span>
-                                </div>
-                              </td>
-                              <td class="emp-email">{{ emp.email }}</td>
-                              <td>
-                                @if (emp.department) {
-                                  <span class="dept-badge">{{ emp.department }}</span>
-                                } @else {
-                                  <span class="text-muted">—</span>
-                                }
-                              </td>
-                              <td>{{ emp.designation || 'Staff' }}</td>
-                              <td style="text-align: center;">
-                                @if (emp.status.toLowerCase() === 'active') {
-                                  <span class="status-badge status-active"><span class="dot"></span> Active</span>
-                                } @else if (emp.status.toLowerCase() === 'onleave') {
-                                  <span class="status-badge status-provisioning"><span class="dot"></span> On Leave</span>
-                                } @else {
-                                  <span class="status-badge status-suspended"><span class="dot"></span> {{ emp.status }}</span>
-                                }
-                              </td>
-                              <td>
-                                {{ emp.joinedDate ? (emp.joinedDate | date:'mediumDate') : '—' }}
-                              </td>
+                    @if (pagedModalEmployees().length > 0) {
+                      <div class="table-responsive" style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                        <table class="employees-mini-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                          <thead>
+                            <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                              <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Code</th>
+                              <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Employee Name</th>
+                              <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Work Email</th>
+                              <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Department</th>
+                              <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Role</th>
+                              <th style="padding: 10px 12px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Status</th>
                             </tr>
-                          }
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            @for (emp of pagedModalEmployees(); track emp.id) {
+                              <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 10px 12px; font-family: monospace; font-size: 12px; font-weight: 600;">
+                                  {{ emp.employeeCode }}
+                                </td>
+                                <td style="padding: 10px 12px; font-weight: 600; color: #0f172a;">
+                                  {{ emp.fullName }}
+                                </td>
+                                <td style="padding: 10px 12px; color: #64748b; font-size: 12px;">
+                                  {{ emp.email }}
+                                </td>
+                                <td style="padding: 10px 12px;">
+                                  @if (emp.department) {
+                                    <span class="badge" style="background: rgba(100, 116, 139, 0.1); color: #0f172a; font-size: 11px;">{{ emp.department }}</span>
+                                  } @else {
+                                    <span style="color: #94a3b8;">—</span>
+                                  }
+                                </td>
+                                <td style="padding: 10px 12px; color: #64748b; font-size: 12px;">
+                                  {{ emp.designation || 'Staff' }}
+                                </td>
+                                <td style="padding: 10px 12px; text-align: center;">
+                                  <span class="badge" [class.badge-success]="emp.status.toLowerCase() === 'active'" [class.badge-warning]="emp.status.toLowerCase() !== 'active'" style="font-size: 11px;">
+                                    {{ emp.status }}
+                                  </span>
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <!-- Pagination Controls -->
+                      <div class="modal-pagination-bar" style="margin-top: 12px;">
+                        <div class="pagination-info">
+                          Showing {{ empModalStartIndex() }} to {{ empModalEndIndex() }} of {{ filteredModalEmployees().length }} employees
+                        </div>
+                        <div class="pagination-buttons">
+                          <button
+                            type="button"
+                            class="page-nav-btn"
+                            [disabled]="empModalPage() <= 1"
+                            (click)="changeEmpModalPage(empModalPage() - 1)"
+                          >
+                            ‹ Previous
+                          </button>
+                          <span class="page-indicator">
+                            Page {{ empModalPage() }} of {{ empModalTotalPages() }}
+                          </span>
+                          <button
+                            type="button"
+                            class="page-nav-btn"
+                            [disabled]="empModalPage() >= empModalTotalPages()"
+                            (click)="changeEmpModalPage(empModalPage() + 1)"
+                          >
+                            Next ›
+                          </button>
+                        </div>
+                      </div>
+                    } @else {
+                      <div style="text-align: center; padding: 24px; color: #64748b; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        No employees match "{{ empModalSearch() }}"
+                      </div>
+                    }
                   } @else {
-                    <div class="empty-employees-box">
-                      <div class="empty-icon">👥</div>
-                      <div style="font-weight: 700; color: var(--text, #0f172a);">No employees created yet</div>
-                      <div style="font-size: 12.5px; color: var(--muted, #64748b); margin-top: 4px;">
-                        This tenant database currently has 0 employee records. The Company Admin can add staff via the HR Manager portal.
+                    <!-- Empty State matching Image 2 exactly -->
+                    <div style="text-align: center; padding: 40px 20px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+                      <div style="font-size: 32px; color: #3b286d; margin-bottom: 8px;">👥</div>
+                      <div style="font-weight: 700; color: #0f172a; font-size: 14px;">No Employees In This Company Yet</div>
+                      <div style="font-size: 12.5px; color: #64748b; margin-top: 4px;">
+                        Employees Created By The Company Admin Will Appear Here With Live Data From The Tenant Database.
                       </div>
                     </div>
                   }
@@ -405,30 +375,9 @@ import { ToastService } from '../../core/services/toast.service';
               }
             </div>
 
-            <!-- Modal Footer -->
-            <div class="modal-footer">
-              <div class="footer-left">
-                @if (selectedCompanyDetail()) {
-                  @let d = selectedCompanyDetail()!;
-                  @if (d.invitationStatus !== 'Accepted') {
-                    <button class="action-btn btn-neutral" (click)="resendInvitationFromModal(d)" type="button">
-                      <span [appIcon]="'mail'"></span> Resend Admin Invite
-                    </button>
-                  }
-                  @if (!d.isDefault) {
-                    @if (d.status === 'Active') {
-                      <button class="action-btn btn-danger-soft" (click)="suspendCompanyFromModal(d)" type="button">
-                        Suspend Company
-                      </button>
-                    } @else {
-                      <button class="action-btn btn-success-soft" (click)="activateCompanyFromModal(d)" type="button">
-                        Activate Company
-                      </button>
-                    }
-                  }
-                }
-              </div>
-              <button class="btn-cancel" type="button" (click)="closeCompanyDetails()">Close</button>
+            <!-- Modal Footer (Resend Invitation removed!) -->
+            <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end;">
+              <button class="btn-cancel" type="button" (click)="closeCompanyDetails()" style="min-width: 80px;">Close</button>
             </div>
           </div>
         </div>
@@ -436,8 +385,8 @@ import { ToastService } from '../../core/services/toast.service';
 
       <!-- Create Organization Modal -->
       @if (showCreateOrgModal()) {
-        <div class="modal-overlay" (click)="closeCreateOrgModal()">
-          <div class="modal-card" style="max-width: 580px;" (click)="$event.stopPropagation()">
+        <div class="modal-overlay open" (click)="closeCreateOrgModal()">
+          <div class="modal modal-card" style="max-width: 580px; width: 100%;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <div>
                 <h3 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 800;">New Organization &amp; Tenant Provisioning</h3>
@@ -458,7 +407,11 @@ import { ToastService } from '../../core/services/toast.service';
                 </div>
                 <div class="form-group">
                   <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px;">Time Zone</label>
-                  <input class="form-input" type="text" [(ngModel)]="createOrgForm.timeZone" placeholder="e.g. Asia/Dubai" />
+                  <select class="form-input" [(ngModel)]="createOrgForm.timeZone" style="width: 100%; height: 38px;">
+                    @for (tz of standardTimezones; track tz.value) {
+                      <option [value]="tz.value">{{ tz.label }}</option>
+                    }
+                  </select>
                 </div>
               </div>
 
@@ -699,6 +652,22 @@ import { ToastService } from '../../core/services/toast.service';
         color: var(--text, #0f172a);
         font-size: 13.5px;
       }
+      .org-name-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        font-weight: 700;
+        color: var(--text, #0f172a);
+        font-size: 13.5px;
+        cursor: pointer;
+        text-align: left;
+        transition: color 0.15s;
+        display: block;
+      }
+      .org-name-btn:hover {
+        color: #2563eb;
+        text-decoration: underline;
+      }
       .badge-default {
         display: inline-block;
         font-size: 10px;
@@ -827,6 +796,90 @@ import { ToastService } from '../../core/services/toast.service';
         background: var(--border, #e2e8f0);
       }
 
+      .btn-status-outline {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 14px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 700;
+        cursor: pointer;
+        background: #ffffff;
+        transition: all 0.15s ease;
+      }
+      .btn-status-outline.status-active {
+        border: 1.5px solid #10b981;
+        color: #059669;
+        background: rgba(16, 185, 129, 0.05);
+      }
+      .btn-status-outline.status-active:hover {
+        background: #10b981;
+        color: #ffffff;
+      }
+      .btn-status-outline.status-suspended {
+        border: 1.5px solid #ef4444;
+        color: #dc2626;
+        background: rgba(239, 68, 68, 0.05);
+      }
+      .btn-status-outline.status-suspended:hover {
+        background: #ef4444;
+        color: #ffffff;
+      }
+
+      .modal-pagination-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 18px;
+        border-top: 1px solid var(--border, #e2e8f0);
+        background: var(--bg, #f8fafc);
+        font-size: 12px;
+        color: var(--muted, #64748b);
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .pagination-buttons {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .page-nav-btn {
+        padding: 4px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border, #cbd5e1);
+        background: var(--surface, #ffffff);
+        color: var(--text, #1e293b);
+        font-size: 11.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .page-nav-btn:hover:not(:disabled) {
+        border-color: #2563eb;
+        color: #2563eb;
+      }
+      .page-nav-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .page-indicator {
+        font-weight: 700;
+        color: var(--text, #0f172a);
+        font-size: 12px;
+      }
+      .search-input-sm {
+        padding: 5px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border, #cbd5e1);
+        font-size: 12px;
+        outline: none;
+        width: 180px;
+      }
+      .search-input-sm:focus {
+        border-color: #2563eb;
+      }
+
       .btn-manage {
         background: transparent;
         color: var(--p, #2563eb);
@@ -861,11 +914,19 @@ import { ToastService } from '../../core/services/toast.service';
         inset: 0;
         background: rgba(15, 23, 42, 0.65);
         backdrop-filter: blur(5px);
-        z-index: 9999;
+        z-index: 99999;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 20px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+      .modal-overlay.open {
+        opacity: 1 !important;
+        pointer-events: all !important;
+        visibility: visible !important;
       }
       .modal-card {
         background: var(--surface, #ffffff);
@@ -874,6 +935,8 @@ import { ToastService } from '../../core/services/toast.service';
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         width: 100%;
         overflow: hidden;
+        opacity: 1 !important;
+        transform: scale(1) translateY(0) !important;
         animation: modalIn 0.2s ease-out;
       }
       .modal-large {
@@ -1176,11 +1239,14 @@ import { ToastService } from '../../core/services/toast.service';
     `,
   ],
 })
-export class SuperAdminDashboardComponent implements OnInit, AfterViewInit {
+export class SuperAdminDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly session = inject(SessionService);
+
+  protected readonly standardTimezones = STANDARD_TIMEZONES;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   protected readonly isRefreshing = signal<boolean>(false);
   protected readonly showCreateOrgModal = signal<boolean>(false);
@@ -1204,6 +1270,74 @@ export class SuperAdminDashboardComponent implements OnInit, AfterViewInit {
   protected readonly loadingCompanyDetails = signal<boolean>(false);
   protected readonly selectedCompanyListItem = signal<CompanyListItem | null>(null);
   protected readonly selectedCompanyDetail = signal<CompanyDetail | null>(null);
+
+  // Modal Employee Pagination
+  protected readonly empModalPage = signal<number>(1);
+  protected readonly empModalPageSize = signal<number>(5);
+  protected readonly empModalSearch = signal<string>('');
+
+  protected readonly filteredModalEmployees = computed(() => {
+    const list = this.selectedCompanyDetail()?.employees || [];
+    const q = this.empModalSearch().toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(
+      (e) =>
+        e.fullName?.toLowerCase().includes(q) ||
+        e.employeeCode?.toLowerCase().includes(q) ||
+        e.email?.toLowerCase().includes(q) ||
+        (e.department && e.department.toLowerCase().includes(q)) ||
+        (e.designation && e.designation.toLowerCase().includes(q))
+    );
+  });
+
+  protected readonly empModalTotalPages = computed(() => {
+    const count = this.filteredModalEmployees().length;
+    const size = this.empModalPageSize();
+    return Math.max(1, Math.ceil(count / size));
+  });
+
+  protected readonly pagedModalEmployees = computed(() => {
+    const list = this.filteredModalEmployees();
+    const page = this.empModalPage();
+    const size = this.empModalPageSize();
+    const start = (page - 1) * size;
+    return list.slice(start, start + size);
+  });
+
+  protected readonly empModalStartIndex = computed(() => {
+    const total = this.filteredModalEmployees().length;
+    if (total === 0) return 0;
+    return (this.empModalPage() - 1) * this.empModalPageSize() + 1;
+  });
+
+  protected readonly empModalEndIndex = computed(() => {
+    const total = this.filteredModalEmployees().length;
+    return Math.min(this.empModalPage() * this.empModalPageSize(), total);
+  });
+
+  protected changeEmpModalPage(page: number): void {
+    if (page >= 1 && page <= this.empModalTotalPages()) {
+      this.empModalPage.set(page);
+    }
+  }
+
+  protected onEmpModalSearchChange(val: string): void {
+    this.empModalSearch.set(val);
+    this.empModalPage.set(1);
+  }
+
+  protected toggleCompanyStatus(company: CompanyListItem): void {
+    if (company.isDefault) {
+      this.toast.show('The primary default company cannot be suspended', 'warning');
+      return;
+    }
+    const isSuspended = (company.status || '').toLowerCase() === 'suspended';
+    if (isSuspended) {
+      this.activateCompany(company);
+    } else {
+      this.suspendCompany(company);
+    }
+  }
 
   protected readonly selectedTenantCode = computed(() => {
     const code = this.session.user()?.companyCode;
@@ -1265,6 +1399,28 @@ export class SuperAdminDashboardComponent implements OnInit, AfterViewInit {
   ngOnInit(): void {
     this.searchQuery.set('');
     this.refreshAll();
+
+    // Dynamically update tenant organizations
+    this.pollTimer = setInterval(() => {
+      if (!this.showDetailsModal() && !this.showCreateOrgModal()) {
+        this.api
+          .tenantCompanies()
+          .pipe(catchError(() => of([] as CompanyListItem[])))
+          .subscribe({
+            next: (list) => {
+              this.companies.set(list || []);
+            },
+            error: () => {},
+          });
+      }
+    }, 15000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 
   ngAfterViewInit(): void {
@@ -1326,6 +1482,8 @@ export class SuperAdminDashboardComponent implements OnInit, AfterViewInit {
   protected openCompanyDetails(company: CompanyListItem): void {
     this.selectedCompanyListItem.set(company);
     this.selectedCompanyDetail.set(null);
+    this.empModalPage.set(1);
+    this.empModalSearch.set('');
     this.showDetailsModal.set(true);
     this.loadingCompanyDetails.set(true);
 
