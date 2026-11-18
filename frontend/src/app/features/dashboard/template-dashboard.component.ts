@@ -88,7 +88,28 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
 
   protected readonly previousWeekNumber = computed(() => {
     const w = this.selectedWeek();
-    return w > 1 ? w - 1 : 4;
+    return w > 1 ? w - 1 : 1;
+  });
+
+  protected readonly weekInsights = computed(() => {
+    const bars = this.activeWeekBars();
+    const totalPresent = bars.reduce((s: number, b: any) => s + (b.present || 0), 0);
+    const totalLate = bars.reduce((s: number, b: any) => s + (b.late || 0), 0);
+    const totalAbsent = bars.reduce((s: number, b: any) => s + (b.absent || 0), 0);
+    const totalPrevPresent = bars.reduce((s: number, b: any) => s + (b.prevPresent || 0), 0);
+
+    const diff = totalPresent - totalPrevPresent;
+    const diffPct = totalPrevPresent > 0 ? Math.round((diff / totalPrevPresent) * 100) : 0;
+
+    return {
+      totalPresent: totalPresent + totalLate,
+      totalOnTime: totalPresent,
+      totalLate,
+      totalAbsent,
+      diff,
+      diffPct,
+      hasPrevData: totalPrevPresent > 0,
+    };
   });
 
   protected readonly activeWeekBars = computed(() => {

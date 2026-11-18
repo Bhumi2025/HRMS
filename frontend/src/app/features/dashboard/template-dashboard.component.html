@@ -225,6 +225,32 @@
               }
             </div>
 
+            <!-- Weekly Attendance Insights Strip (Utilizes the highlighted space) -->
+            <div class="attendance-insights-strip">
+              <div class="insight-pill pill-present">
+                <span class="pill-badge">Present</span>
+                <span class="pill-count">{{ weekInsights().totalPresent }} Staff</span>
+              </div>
+              <div class="insight-pill pill-ontime">
+                <span class="pill-badge">On-Time</span>
+                <span class="pill-count">{{ weekInsights().totalOnTime }}</span>
+              </div>
+              <div class="insight-pill pill-late">
+                <span class="pill-badge">Late</span>
+                <span class="pill-count">{{ weekInsights().totalLate }}</span>
+              </div>
+              <div class="insight-pill pill-comparison">
+                <span class="pill-badge">vs W{{ previousWeekNumber() }}</span>
+                @if (selectedWeek() > 1 && weekInsights().hasPrevData) {
+                  <span class="pill-count" [class.comp-up]="weekInsights().diff >= 0" [class.comp-down]="weekInsights().diff < 0">
+                    {{ weekInsights().diff >= 0 ? '↑ +' : '↓ ' }}{{ weekInsights().diff }} ({{ weekInsights().diffPct >= 0 ? '+' : '' }}{{ weekInsights().diffPct }}%)
+                  </span>
+                } @else {
+                  <span class="pill-count comp-baseline">Baseline Week</span>
+                }
+              </div>
+            </div>
+
             <!-- Month Progression Rail (Bottom Heartbeat Indicator with Activated Button) -->
             <div class="month-progression-rail">
               <div class="rail-left">
