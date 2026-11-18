@@ -210,26 +210,18 @@ function emptyTenantForm(): CreateCompanyRequest {
                         <span class="badge" [ngClass]="inviteBadge(c.invitationStatus)">{{ c.invitationStatus }}</span>
                       </td>
                       <td style="padding: 14px 16px; text-align: right;">
-                        <div style="display: inline-flex; align-items: center; gap: 6px;">
+                        <div style="display: inline-flex; align-items: center; gap: 8px;">
                           @if (!c.isDefault) {
                             <button
                               type="button"
-                              class="tenant-status-switch"
-                              [class.active]="c.status !== 'Suspended'"
-                              [class.suspended]="c.status === 'Suspended'"
+                              class="btn-status-outline"
+                              [class.status-active]="c.status !== 'Suspended'"
+                              [class.status-suspended]="c.status === 'Suspended'"
                               (click)="toggleTenantStatus(c)"
                               [attr.data-tooltip]="c.status === 'Suspended' ? 'Click to Activate tenant' : 'Click to Suspend tenant'"
                               [disabled]="busyTenantId() === c.id"
                             >
-                              <span class="switch-track">
-                                <span class="switch-thumb"></span>
-                              </span>
-                              <span class="switch-label">{{ c.status === 'Suspended' ? 'Suspended' : 'Active' }}</span>
-                            </button>
-                          }
-                          @if (c.invitationStatus !== 'Accepted') {
-                            <button class="tbl-btn" data-tooltip="Resend Invitation" (click)="resendTenant(c)" [disabled]="busyTenantId() === c.id">
-                              <span [appIcon]="'mail'"></span>
+                              {{ c.status === 'Suspended' ? 'Suspended' : 'Active' }}
                             </button>
                           }
                           <button class="tbl-btn" data-tooltip="Company Details & Employees" (click)="viewTenant(c)" [disabled]="busyTenantId() === c.id">
@@ -1062,11 +1054,8 @@ function emptyTenantForm(): CreateCompanyRequest {
                 }
               </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="display: flex; justify-content: flex-end;">
               <button class="btn btn-outline" (click)="closeTenantDetail()">Close</button>
-              <button class="btn btn-primary" (click)="resendDetail()" [disabled]="!d.databaseName">
-                Resend Invitation
-              </button>
             </div>
           </div>
         </div>
@@ -1379,60 +1368,35 @@ function emptyTenantForm(): CreateCompanyRequest {
       text-decoration: underline;
       color: var(--p-hover, #1d4ed8);
     }
-    .tenant-status-switch {
+    .btn-status-outline {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 3px 8px 3px 4px;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      background: var(--surface);
+      justify-content: center;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
       cursor: pointer;
-      font-size: 11px;
-      font-weight: 600;
-      transition: all .2s ease;
-    }
-    .tenant-status-switch:hover {
-      border-color: var(--p);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-    .tenant-status-switch .switch-track {
-      width: 26px;
-      height: 15px;
-      background: #cbd5e1;
-      border-radius: 10px;
-      position: relative;
-      transition: background .2s ease;
-      display: inline-block;
-    }
-    .tenant-status-switch .switch-thumb {
-      width: 11px;
-      height: 11px;
       background: #ffffff;
-      border-radius: 50%;
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      transition: transform .2s ease;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+      transition: all 0.15s ease;
     }
-    .tenant-status-switch.active .switch-track {
-      background: #10b981;
-    }
-    .tenant-status-switch.active .switch-thumb {
-      transform: translateX(11px);
-    }
-    .tenant-status-switch.active .switch-label {
+    .btn-status-outline.status-active {
+      border: 1.5px solid #10b981;
       color: #059669;
+      background: rgba(16, 185, 129, 0.05);
     }
-    .tenant-status-switch.suspended .switch-track {
-      background: #f59e0b;
+    .btn-status-outline.status-active:hover {
+      background: #10b981;
+      color: #ffffff;
     }
-    .tenant-status-switch.suspended .switch-thumb {
-      transform: translateX(0);
+    .btn-status-outline.status-suspended {
+      border: 1.5px solid #ef4444;
+      color: #dc2626;
+      background: rgba(239, 68, 68, 0.05);
     }
-    .tenant-status-switch.suspended .switch-label {
-      color: #d97706;
+    .btn-status-outline.status-suspended:hover {
+      background: #ef4444;
+      color: #ffffff;
     }
   `],
 })
