@@ -538,109 +538,103 @@
     justify-content: space-between;
     position: relative;
     padding-top: 4px;
-    min-height: 160px;
+    min-height: 155px;
     flex: 1;
   }
 
-  .month-line-chart-container {
+  .week-line-chart-container {
     position: relative;
     width: 100%;
-    height: 122px;
-    margin-bottom: 4px;
+    height: 118px;
+    margin-bottom: 2px;
   }
 
-  .month-line-chart-svg {
+  .week-line-chart-svg {
     width: 100%;
     height: 100%;
     overflow: visible;
 
-    .scale-text {
-      font-size: 8px;
+    .scale-label {
+      font-size: 8.5px;
       font-weight: 600;
       fill: #94a3b8;
     }
 
-    .week-zone-label {
-      font-size: 8.5px;
+    // Last Week Reference Line (Soft, thin, dashed)
+    .line-last-week {
+      stroke: #94a3b8;
+      stroke-width: 1.6;
+      stroke-dasharray: 4 3;
+      opacity: 0.5;
+    }
+
+    .dot-last-week {
+      fill: #94a3b8;
+      opacity: 0.55;
+    }
+
+    // This Week Line (Vibrant, clean, prominent)
+    .line-this-week {
+      stroke: #2563eb;
+      stroke-width: 2.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 2px 4px rgba(37, 99, 235, 0.28));
+      transition: all 0.3s ease;
+    }
+
+    .node-count-badge {
+      font-size: 9.5px;
+      font-weight: 800;
+      fill: #1e293b;
+
+      &.count-today {
+        fill: #2563eb;
+      }
+    }
+
+    .dot-this-week {
+      fill: #ffffff;
+      stroke: #2563eb;
+      stroke-width: 2.2;
+      transition: all 0.15s ease;
+
+      &.dot-today {
+        fill: #2563eb;
+        stroke: #ffffff;
+        stroke-width: 2;
+      }
+    }
+
+    .today-halo {
+      fill: none;
+      stroke: #2563eb;
+      stroke-width: 1.5;
+      opacity: 0.45;
+      animation: heartbeatPulse 1.4s infinite ease-in-out;
+    }
+
+    .x-axis-day {
+      font-size: 9px;
       font-weight: 700;
       fill: #64748b;
-      letter-spacing: 0.2px;
+      letter-spacing: 0.3px;
 
-      &.week-label-active {
+      &.text-today {
         fill: #2563eb;
         font-weight: 800;
       }
     }
 
-    .week-active-band {
-      fill: #eff6ff;
-      opacity: 0.75;
-      rx: 4;
-      stroke: #bfdbfe;
-      stroke-width: 1;
-      stroke-dasharray: 2 2;
-    }
-
-    // Previous Month Curve (Smaller, Thinner, Muted Baseline)
-    .line-prev-month {
-      stroke: #94a3b8;
-      stroke-width: 1.6;
-      stroke-dasharray: 4 3;
-      opacity: 0.55;
-      transition: all 0.3s ease;
-    }
-
-    .dot-prev-month {
+    .x-axis-date {
+      font-size: 8.5px;
+      font-weight: 500;
       fill: #94a3b8;
-      opacity: 0.6;
-    }
 
-    // Current Month Curve (Bigger, Thicker, Vibrant & Highlighted)
-    .line-current-month {
-      stroke: #2563eb;
-      stroke-width: 3.2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      transition: stroke-dashoffset 0.5s ease;
-    }
-
-    .dot-current-month {
-      fill: #ffffff;
-      stroke: #2563eb;
-      stroke-width: 2.2;
-      cursor: pointer;
-      transition: transform 0.15s ease, r 0.15s ease;
-
-      &:hover {
-        r: 5;
-        stroke-width: 3;
-      }
-
-      &.dot-today {
+      &.text-today {
         fill: #2563eb;
-        stroke: #ffffff;
-        stroke-width: 2.5;
+        font-weight: 700;
       }
-    }
-
-    .today-pulse-halo {
-      fill: none;
-      stroke: #2563eb;
-      stroke-width: 1.5;
-      opacity: 0.6;
-      animation: heartbeatPulse 1.4s infinite ease-in-out;
-    }
-
-    .today-tag-bg {
-      fill: #10b981;
-      box-shadow: 0 1px 3px rgba(16, 185, 129, 0.4);
-    }
-
-    .today-tag-text {
-      font-size: 7.5px;
-      font-weight: 800;
-      fill: #ffffff;
-      letter-spacing: 0.4px;
     }
   }
 

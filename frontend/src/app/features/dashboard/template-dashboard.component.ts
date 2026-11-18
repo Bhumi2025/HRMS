@@ -41,11 +41,10 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly currentNoticeIndex = signal(0);
   protected readonly currentTime = signal(new Date());
 
-  // Attendance Graph Multi-Week & Full Month Signals
-  protected readonly selectedWeek = signal<number>(0); // 0 = All Month, 1..4 = Individual Weeks
+  // Attendance Graph Week-Wise Signals
+  protected readonly selectedWeek = signal<number>(this.getCalendarWeek(new Date()));
   protected readonly isAutoCycling = signal<boolean>(false);
   private cycleTimer: ReturnType<typeof setInterval> | null = null;
-  protected readonly hoveredPoint = signal<any | null>(null);
 
   // Data signals
   protected readonly notices = signal<NoticeBoardItem[]>([]);
@@ -87,118 +86,90 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(this.currentTime());
   });
 
-  protected readonly previousMonthName = computed(() => {
+  protected readonly previousWeekNumber = computed(() => {
+    const w = this.selectedWeek();
+    return w > 1 ? w - 1 : 1;
+  });
+
+  protected readonly weekDateRanges = computed(() => {
     const now = this.currentTime();
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    return new Intl.DateTimeFormat('en-US', { month: 'short' }).format(prev);
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    return [
+      { week: 1, label: 'Week 1', range: '1–7' },
+      { week: 2, label: 'Week 2', range: '8–14' },
+      { week: 3, label: 'Week 3', range: '15–21' },
+      { week: 4, label: 'Week 4', range: `22–${lastDay}` },
+    ];
   });
 
-  protected readonly chartMaxScale = computed(() => {
-    const list = this.attendanceGraph();
-    let max = 0;
-    for (const p of list) {
-      max = Math.max(max, p.present || 0, p.prevPresent || 0);
-    }
-    return Math.max(max, 8);
-  });
-
-  protected readonly chartPoints = computed(() => {
-    const list = this.attendanceGraph();
-    const total = list.length || 30;
-    const maxVal = this.chartMaxScale();
+  protected readonly weekPoints = computed(() => {
+    const all = this.attendanceGraph();
+    const w = this.selectedWeek();
     const now = this.currentTime();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-    return list.map((p, idx) => {
-      const day = idx + 1;
-      const x = 28 + (idx / Math.max(1, total - 1)) * 644;
-      const yCurrent = Math.round(100 - ((p.present || 0) / maxVal) * 82);
-      const yPrev = Math.round(100 - ((p.prevPresent || 0) / maxVal) * 82);
+    const weekList = all.filter((p) => p.weekNumber === w);
+    const source = weekList.length === 7 ? weekList : all.slice((w - 1) * 7, w * 7);
+    const finalSource = source.length > 0 ? source : all.slice(0, 7);
+
+    let maxVal = 8;
+    for (const p of finalSource) {
+      maxVal = Math.max(maxVal, p.present || 0, p.prevPresent || 0);
+    }
+
+    return finalSource.map((p, idx) => {
+      const dayNum = p.date ? parseInt(p.date.split('-')[2], 10) : (w - 1) * 7 + idx + 1;
+      const x = 50 + idx * 92;
+      const yCurrent = Math.round(90 - ((p.present || 0) / maxVal) * 70);
+      const yPrev = Math.round(90 - ((p.prevPresent || 0) / maxVal) * 70);
       const isToday = p.date ? p.date === todayStr : false;
-      const isRecorded = p.date ? p.date <= todayStr : false;
 
       return {
-        day,
-        dayOfWeek: p.label || '',
-        date: p.date || '',
-        weekNumber: p.weekNumber || Math.min(4, Math.floor((day - 1) / 7) + 1),
+        idx,
+        dayOfWeek: (p.label || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][idx]).toUpperCase(),
+        dayNumber: dayNum,
+        date: p.date,
         present: p.present || 0,
         late: p.late || 0,
         absent: p.absent || 0,
         prevPresent: p.prevPresent || 0,
         isToday,
-        isRecorded,
-        x: Math.round(x * 10) / 10,
+        x,
         yCurrent,
         yPrev,
       };
     });
   });
 
-  protected readonly currentMonthLinePath = computed(() => {
-    const points = this.chartPoints();
-    if (points.length === 0) return '';
-    return points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.yCurrent}`).join(' ');
+  protected readonly weekLinePath = computed(() => {
+    const pts = this.weekPoints();
+    if (pts.length === 0) return '';
+    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yCurrent}`).join(' ');
   });
 
-  protected readonly currentMonthAreaPath = computed(() => {
-    const points = this.chartPoints();
-    if (points.length === 0) return '';
-    const first = points[0];
-    const last = points[points.length - 1];
-    const lineSegments = points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.yCurrent}`).join(' ');
-    return `${lineSegments} L ${last.x} 104 L ${first.x} 104 Z`;
+  protected readonly weekAreaPath = computed(() => {
+    const pts = this.weekPoints();
+    if (pts.length === 0) return '';
+    const first = pts[0];
+    const last = pts[pts.length - 1];
+    const lineSegments = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yCurrent}`).join(' ');
+    return `${lineSegments} L ${last.x} 92 L ${first.x} 92 Z`;
   });
 
-  protected readonly prevMonthLinePath = computed(() => {
-    const points = this.chartPoints();
-    if (points.length === 0) return '';
-    return points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.yPrev}`).join(' ');
-  });
-
-  protected readonly weekDividers = computed(() => {
-    const points = this.chartPoints();
-    if (points.length < 28) return [172, 328, 483];
-    const xW1to2 = Math.round((points[6].x + points[7].x) / 2);
-    const xW2to3 = Math.round((points[13].x + points[14].x) / 2);
-    const xW3to4 = Math.round((points[20].x + points[21].x) / 2);
-    return [xW1to2, xW2to3, xW3to4];
-  });
-
-  protected readonly weekZones = computed(() => {
-    const div = this.weekDividers();
-    const startX = 28;
-    const endX = 672;
-    const x1 = div[0] || 172;
-    const x2 = div[1] || 328;
-    const x3 = div[2] || 483;
-    return [
-      { week: 1, label: 'Week 1', range: '1–7', x: startX, width: x1 - startX },
-      { week: 2, label: 'Week 2', range: '8–14', x: x1, width: x2 - x1 },
-      { week: 3, label: 'Week 3', range: '15–21', isCurrent: true, x: x2, width: x3 - x2 },
-      { week: 4, label: 'Week 4', range: '22–30', x: x3, width: endX - x3 },
-    ];
-  });
-
-  protected readonly activeWeekZone = computed(() => {
-    const w = this.selectedWeek();
-    if (w === 0) return null;
-    return this.weekZones().find((z) => z.week === w) || null;
-  });
-
-  protected readonly todayPoint = computed(() => {
-    return this.chartPoints().find((p) => p.isToday) || null;
+  protected readonly prevWeekLinePath = computed(() => {
+    const pts = this.weekPoints();
+    if (pts.length === 0) return '';
+    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yPrev}`).join(' ');
   });
 
   protected readonly weekInsights = computed(() => {
-    const all = this.chartPoints();
-    const w = this.selectedWeek();
-    const filtered = w === 0 ? all : all.filter((p) => p.weekNumber === w);
-
-    const totalPresent = filtered.reduce((s: number, b: any) => s + (b.present || 0), 0);
-    const totalLate = filtered.reduce((s: number, b: any) => s + (b.late || 0), 0);
-    const totalAbsent = filtered.reduce((s: number, b: any) => s + (b.absent || 0), 0);
-    const totalPrevPresent = filtered.reduce((s: number, b: any) => s + (b.prevPresent || 0), 0);
+    const pts = this.weekPoints();
+    const totalPresent = pts.reduce((s: number, b: any) => s + (b.present || 0), 0);
+    const totalLate = pts.reduce((s: number, b: any) => s + (b.late || 0), 0);
+    const totalAbsent = pts.reduce((s: number, b: any) => s + (b.absent || 0), 0);
+    const totalPrevPresent = pts.reduce((s: number, b: any) => s + (b.prevPresent || 0), 0);
 
     const diff = totalPresent - totalPrevPresent;
     const diffPct = totalPrevPresent > 0 ? Math.round((diff / totalPrevPresent) * 100) : 0;
@@ -211,8 +182,7 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
       diff,
       diffPct,
       hasPrevData: totalPrevPresent > 0,
-      isMonthView: w === 0,
-      selectedWeek: w,
+      selectedWeek: this.selectedWeek(),
     };
   });
 
@@ -369,11 +339,7 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     if (this.isAutoCycling()) {
       this.stopAutoCycle();
     }
-    if (this.selectedWeek() === week) {
-      this.selectedWeek.set(0); // Toggle to Full Month
-    } else {
-      this.selectedWeek.set(week);
-    }
+    this.selectedWeek.set(week);
   }
 
   toggleAutoCycle(): void {
@@ -389,8 +355,8 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     if (this.cycleTimer) clearInterval(this.cycleTimer);
     this.cycleTimer = setInterval(() => {
       this.zone.run(() => {
-        // Cycle: 1 -> 2 -> 3 -> 4 -> 0 (All Month) -> 1
-        this.selectedWeek.update((w) => (w >= 4 ? 0 : w + 1));
+        // Cycle: 1 -> 2 -> 3 -> 4 -> 1
+        this.selectedWeek.update((w) => (w % 4) + 1);
       });
     }, 2800);
   }

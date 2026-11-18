@@ -115,198 +115,170 @@
           </div>
         </div>
 
-        <!-- 2. Attendance Overview Card (Full Month Line Chart with Week-Wise Divisions) -->
+        <!-- 2. Attendance Overview Card (Week-Wise Line Graph - Simple & Clean) -->
         <div class="dash-widget attendance-widget">
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator"></span>
               <div class="header-title-box">
                 <h3 class="widget-title-nowrap">Attendance Overview</h3>
-                <span class="month-pill">{{ currentMonthName() }} · {{ selectedWeek() === 0 ? 'Full Month' : 'Week ' + selectedWeek() }}</span>
+                <span class="month-pill">{{ currentMonthName() }} · Week {{ selectedWeek() }}</span>
               </div>
             </div>
 
-            <!-- Week Switcher Tabs (All Month + Weeks 1-4) -->
+            <!-- Week Switcher Tabs (Week 1 to Week 4) -->
             <div class="week-pills-bar">
+              @for (w of weekDateRanges(); track w.week) {
               <button
                 type="button"
                 class="week-pill-btn"
-                [class.active]="selectedWeek() === 0"
-                (click)="selectWeek(0)"
-                title="View Full Month Overview"
+                [class.active]="selectedWeek() === w.week"
+                [class.current]="currentCalendarWeek() === w.week"
+                (click)="selectWeek(w.week)"
+                [title]="w.label + ' (' + w.range + ')'"
               >
-                <span class="pill-w">Full Month</span>
-              </button>
-              @for (w of [1, 2, 3, 4]; track w) {
-              <button
-                type="button"
-                class="week-pill-btn"
-                [class.active]="selectedWeek() === w"
-                [class.current]="currentCalendarWeek() === w"
-                (click)="selectWeek(w)"
-                [title]="'Highlight Week ' + w + (currentCalendarWeek() === w ? ' (Current Active Week)' : '')"
-              >
-                <span class="pill-w">W{{ w }}</span>
-                @if (currentCalendarWeek() === w) {
+                <span class="pill-w">Week {{ w.week }}</span>
+                @if (currentCalendarWeek() === w.week) {
                 <span class="live-dot" title="Current Active Week"></span>
                 }
               </button>
               }
             </div>
 
-            <!-- Legend clearly showing Current vs Previous Month -->
+            <!-- Simple Clean Legend -->
             <div class="header-actions">
               <div class="graph-legend">
-                <span class="legend-item"><span class="line-badge badge-cur"></span> Current (Nov)</span>
-                <span class="legend-item"><span class="line-badge badge-prev"></span> Prev ({{ previousMonthName() }})</span>
+                <span class="legend-item"><span class="line-badge badge-cur"></span> This Week</span>
+                <span class="legend-item"><span class="line-badge badge-prev"></span> Last Week</span>
               </div>
               <a routerLink="/attendance" class="view-link">Detailed Log ›</a>
             </div>
           </div>
 
           <div class="widget-body attendance-graph-content">
-            <!-- Full Month SVG Line Chart with Week-Wise Divisions -->
-            <div class="month-line-chart-container">
-              <svg class="month-line-chart-svg" viewBox="0 0 700 120" preserveAspectRatio="none">
+            <!-- Simple 7-Day Week Line Chart -->
+            <div class="week-line-chart-container">
+              <svg class="week-line-chart-svg" viewBox="0 0 650 118" preserveAspectRatio="none">
                 <defs>
-                  <!-- Gradient for Current Month Area -->
-                  <linearGradient id="currentMonthGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#2563eb" stop-opacity="0.25" />
-                    <stop offset="70%" stop-color="#2563eb" stop-opacity="0.05" />
+                  <!-- Smooth Area Gradient for This Week -->
+                  <linearGradient id="weekAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#2563eb" stop-opacity="0.20" />
+                    <stop offset="80%" stop-color="#2563eb" stop-opacity="0.03" />
                     <stop offset="100%" stop-color="#2563eb" stop-opacity="0.0" />
                   </linearGradient>
-
-                  <!-- Filter for Glowing Highlight on Current Line -->
-                  <filter id="currentGlow" x="-10%" y="-10%" width="120%" height="120%">
-                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#2563eb" flood-opacity="0.3" />
-                  </filter>
                 </defs>
 
-                <!-- Subtle Horizontal Grid Lines (Scale: 8, 4, 0) -->
-                <line x1="28" y1="18" x2="672" y2="18" class="grid-line" stroke="#f1f5f9" stroke-dasharray="3 3" />
-                <text x="686" y="21" class="scale-text">8</text>
+                <!-- Subtle Horizontal Guide Lines -->
+                <line x1="40" y1="20" x2="610" y2="20" class="guide-grid-line" stroke="#f1f5f9" stroke-dasharray="3 3" />
+                <text x="625" y="23" class="scale-label">8</text>
 
-                <line x1="28" y1="59" x2="672" y2="59" class="grid-line" stroke="#f1f5f9" stroke-dasharray="3 3" />
-                <text x="686" y="62" class="scale-text">4</text>
+                <line x1="40" y1="56" x2="610" y2="56" class="guide-grid-line" stroke="#f1f5f9" stroke-dasharray="3 3" />
+                <text x="625" y="59" class="scale-label">4</text>
 
-                <line x1="28" y1="100" x2="672" y2="100" class="grid-baseline" stroke="#e2e8f0" stroke-width="1" />
-                <text x="686" y="103" class="scale-text">0</text>
+                <line x1="40" y1="92" x2="610" y2="92" class="guide-baseline" stroke="#e2e8f0" stroke-width="1" />
+                <text x="625" y="95" class="scale-label">0</text>
 
-                <!-- Week Sections Vertical Dividers & Week Labels -->
-                @for (z of weekZones(); track z.week) {
-                  @if (selectedWeek() === z.week) {
-                    <rect
-                      [attr.x]="z.x"
-                      y="14"
-                      [attr.width]="z.width"
-                      height="86"
-                      class="week-active-band"
-                    />
-                  }
-
-                  <text
-                    [attr.x]="z.x + (z.width / 2)"
-                    y="12"
-                    text-anchor="middle"
-                    class="week-zone-label"
-                    [class.week-label-active]="selectedWeek() === z.week || (selectedWeek() === 0 && z.isCurrent)"
-                  >
-                    {{ z.label }} ({{ z.range }})
-                  </text>
-                }
-
-                @for (sepX of weekDividers(); track sepX) {
-                  <line
-                    [attr.x1]="sepX"
-                    y1="14"
-                    [attr.x2]="sepX"
-                    y2="100"
-                    class="week-divider-line"
-                    stroke="#cbd5e1"
-                    stroke-dasharray="2 3"
-                    stroke-width="1"
-                  />
-                }
-
-                <!-- 1. PREVIOUS MONTH LINE (Smaller, Thinner, Muted Dashed Baseline) -->
+                <!-- 1. LAST WEEK LINE (Soft Thinner Dashed Reference) -->
                 <path
-                  [attr.d]="prevMonthLinePath()"
-                  class="line-prev-month"
+                  [attr.d]="prevWeekLinePath()"
+                  class="line-last-week"
                   fill="none"
                 />
 
-                @for (pt of chartPoints(); track 'prev-' + pt.day) {
+                @for (pt of weekPoints(); track 'prev-' + pt.idx) {
                   <circle
                     [attr.cx]="pt.x"
                     [attr.cy]="pt.yPrev"
-                    r="2"
-                    class="dot-prev-month"
+                    r="2.5"
+                    class="dot-last-week"
                   />
                 }
 
-                <!-- 2. CURRENT MONTH AREA FILL & BOLD HIGHLIGHTED LINE -->
+                <!-- 2. THIS WEEK AREA & CLEAN VIBRANT LINE -->
                 <path
-                  [attr.d]="currentMonthAreaPath()"
-                  fill="url(#currentMonthGradient)"
-                  class="area-current-month"
+                  [attr.d]="weekAreaPath()"
+                  fill="url(#weekAreaGradient)"
+                  class="area-this-week"
                 />
 
                 <path
-                  [attr.d]="currentMonthLinePath()"
-                  class="line-current-month"
+                  [attr.d]="weekLinePath()"
+                  class="line-this-week"
                   fill="none"
-                  filter="url(#currentGlow)"
                 />
 
-                <!-- Current Month Data Nodes -->
-                @for (pt of chartPoints(); track 'cur-' + pt.day) {
-                  @if (pt.isRecorded) {
+                <!-- Data Nodes, Count Badges & Day Labels for all 7 Days -->
+                @for (pt of weekPoints(); track 'cur-' + pt.idx) {
+                  @if (pt.isToday) {
+                    <line
+                      [attr.x1]="pt.x"
+                      y1="18"
+                      [attr.x2]="pt.x"
+                      y2="92"
+                      class="today-col-line"
+                      stroke="#2563eb"
+                      stroke-dasharray="2 2"
+                      stroke-width="1.2"
+                      opacity="0.4"
+                    />
+                  }
+
+                  <!-- Number Count Badge directly above node -->
+                  <text
+                    [attr.x]="pt.x"
+                    [attr.y]="pt.yCurrent - 7"
+                    text-anchor="middle"
+                    class="node-count-badge"
+                    [class.count-today]="pt.isToday"
+                  >
+                    {{ pt.present }}
+                  </text>
+
+                  <!-- Node Circle -->
+                  <circle
+                    [attr.cx]="pt.x"
+                    [attr.cy]="pt.yCurrent"
+                    [attr.r]="pt.isToday ? 5 : 3.5"
+                    class="dot-this-week"
+                    [class.dot-today]="pt.isToday"
+                  />
+
+                  @if (pt.isToday) {
                     <circle
                       [attr.cx]="pt.x"
                       [attr.cy]="pt.yCurrent"
-                      [attr.r]="pt.isToday ? 4.5 : 3"
-                      class="dot-current-month"
-                      [class.dot-today]="pt.isToday"
-                      (mouseenter)="hoveredPoint.set(pt)"
-                      (mouseleave)="hoveredPoint.set(null)"
+                      r="9"
+                      class="today-halo"
                     />
                   }
-                }
 
-                <!-- TODAY BEACON & BADGE (Nov 18) -->
-                @if (todayPoint(); as td) {
-                  <circle
-                    [attr.cx]="td.x"
-                    [attr.cy]="td.yCurrent"
-                    r="7.5"
-                    class="today-pulse-halo"
-                  />
-                  <g class="today-tag-group">
-                    <rect
-                      [attr.x]="td.x - 22"
-                      [attr.y]="td.yCurrent - 15"
-                      width="44"
-                      height="12"
-                      rx="3"
-                      class="today-tag-bg"
-                    />
-                    <text
-                      [attr.x]="td.x"
-                      [attr.y]="td.yCurrent - 6"
-                      text-anchor="middle"
-                      class="today-tag-text"
-                    >
-                      TODAY: {{ td.present }}
-                    </text>
-                  </g>
+                  <!-- X-Axis Labels: Day Name and Date Number -->
+                  <text
+                    [attr.x]="pt.x"
+                    y="104"
+                    text-anchor="middle"
+                    class="x-axis-day"
+                    [class.text-today]="pt.isToday"
+                  >
+                    {{ pt.dayOfWeek }}
+                  </text>
+                  <text
+                    [attr.x]="pt.x"
+                    y="114"
+                    text-anchor="middle"
+                    class="x-axis-date"
+                    [class.text-today]="pt.isToday"
+                  >
+                    Nov {{ pt.dayNumber }}
+                  </text>
                 }
               </svg>
             </div>
 
-            <!-- Weekly / Monthly Attendance Insights Strip -->
+            <!-- Weekly Attendance Insights Strip -->
             <div class="attendance-insights-strip">
               <div class="insight-pill pill-present">
-                <span class="pill-badge">{{ weekInsights().isMonthView ? 'Total Present' : 'W' + weekInsights().selectedWeek + ' Present' }}</span>
+                <span class="pill-badge">Week {{ weekInsights().selectedWeek }} Present</span>
                 <span class="pill-count">{{ weekInsights().totalPresent }} Staff</span>
               </div>
               <div class="insight-pill pill-ontime">
@@ -318,7 +290,7 @@
                 <span class="pill-count">{{ weekInsights().totalLate }}</span>
               </div>
               <div class="insight-pill pill-comparison">
-                <span class="pill-badge">vs Prev Month</span>
+                <span class="pill-badge">vs Last Week</span>
                 @if (weekInsights().hasPrevData) {
                   <span class="pill-count" [class.comp-up]="weekInsights().diff >= 0" [class.comp-down]="weekInsights().diff < 0">
                     {{ weekInsights().diff >= 0 ? '↑ +' : '↓ ' }}{{ weekInsights().diff }} ({{ weekInsights().diffPct >= 0 ? '+' : '' }}{{ weekInsights().diffPct }}%)
@@ -334,15 +306,10 @@
               <div class="rail-left">
                 <span class="rail-title">{{ currentMonthName() }} Flow:</span>
                 <div class="rail-steps">
-                  <button type="button" class="rail-step-btn" [class.step-active]="selectedWeek() === 0" (click)="selectWeek(0)" title="Full Month View">
-                    <span class="step-dot"></span>
-                    <span class="step-label">All</span>
-                  </button>
-                  <div class="step-line" [class.line-filled]="selectedWeek() >= 1"></div>
                   @for (w of [1, 2, 3, 4]; track w) {
                   <button type="button" class="rail-step-btn" [class.step-active]="selectedWeek() === w"
                     [class.step-current]="currentCalendarWeek() === w" [class.step-past]="w < currentCalendarWeek()"
-                    (click)="selectWeek(w)" [title]="'Highlight Week ' + w + (w === currentCalendarWeek() ? ' (Current Active Week)' : '')">
+                    (click)="selectWeek(w)" [title]="'View Week ' + w + (w === currentCalendarWeek() ? ' (Current Active Week)' : '')">
                     <span class="step-dot"></span>
                     <span class="step-label">Week {{ w }}</span>
                   </button>
@@ -359,12 +326,12 @@
                 class="fresh-start-btn"
                 [class.active-cycling]="isAutoCycling()"
                 (click)="toggleAutoCycle()"
-                [title]="isAutoCycling() ? 'Click to pause automatic month sweep' : 'Click to sweep through Weeks 1 to 4 across the monthly line chart'"
+                [title]="isAutoCycling() ? 'Click to pause automatic week cycle' : 'Click to cycle through Weeks 1 to 4'"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" [class.spin-svg]="isAutoCycling()">
                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
                 </svg>
-                <span>{{ isAutoCycling() ? 'Pause Sweep' : 'Fresh Month Pulse' }}</span>
+                <span>{{ isAutoCycling() ? 'Pause Cycle' : 'Fresh Month Pulse' }}</span>
                 @if (isAutoCycling()) {
                 <span class="pulse-live-pip"></span>
                 }
