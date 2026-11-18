@@ -254,7 +254,7 @@ export class CompaniesComponent implements OnInit {
       return;
     }
 
-    const reactivating = company.status === 'Suspended';
+    const reactivating = (company.status || '').toLowerCase() === 'suspended';
     this.busyId.set(company.id);
     const request = reactivating
       ? this.api.activateTenantCompany(company.id)

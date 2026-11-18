@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
@@ -10,6 +10,7 @@ import {
   CreateCompanyRequest,
   SaveCompanySettingsRequest,
   UpdateCompanyRequest,
+  STANDARD_TIMEZONES,
 } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { PermissionService } from '../../core/services/permission.service';
@@ -81,53 +82,25 @@ function emptyTenantForm(): CreateCompanyRequest {
   imports: [CommonModule, FormsModule, IconDirective],
   template: `
     <div class="company-page">
-      @if (isSuperAdmin() && activeTab() === 'directory') {
-        <!-- Top Action Bar -->
-        <div class="flex justify-end items-center" style="margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-          <div class="flex gap-2">
-            <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="loadTenantCompanies()">
-              <span [appIcon]="'sync'"></span> Refresh
-            </button>
-            <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="openCreateTenant()">
-              <span [appIcon]="'plus'"></span> New Company
-            </button>
+      @if (!isSuperAdmin()) {
+        <!-- Top Navigation Tabs (For regular tenant: Company Profile, Departments, Designations, Holiday) -->
+        <div class="card p-0" style="margin-bottom: 16px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
+          <div style="display: flex; gap: 4px; border-bottom: 1px solid var(--border); background: var(--surface); padding: 4px 16px 0 16px;">
+            @for (tab of displayTabs(); track tab.id) {
+              <button
+                class="tab-btn"
+                [class.active]="activeTab() === tab.id"
+                (click)="selectTab(tab.id)"
+                style="padding: 12px 22px; font-weight: 700; font-size: 13.5px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent; transition: all .15s;"
+                [style.border-bottom-color]="activeTab() === tab.id ? 'var(--p)' : 'transparent'"
+                [style.color]="activeTab() === tab.id ? 'var(--p)' : 'var(--muted)'"
+              >
+                {{ tab.label }}
+              </button>
+            }
           </div>
         </div>
       }
-
-      <!-- Activation link banner for Super Admin -->
-      @if (isSuperAdmin() && activationUrl()) {
-        <div class="alert alert-warning" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-            <strong>Activation link (share with the company admin — email delivery is disabled in this environment)</strong>
-            <button class="btn btn-ghost btn-sm" (click)="dismissActivationLink()"><span [appIcon]="'x'"></span></button>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <input class="form-control" type="text" [value]="activationUrl()!" readonly style="flex: 1; min-width: 260px;" />
-            <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="copyActivationLink()">
-              <span [appIcon]="'link'"></span> Copy
-            </button>
-          </div>
-        </div>
-      }
-
-      <!-- Top Navigation Tabs (Directory/Companies, Departments, Designations, Holiday) -->
-      <div class="card p-0" style="margin-bottom: 20px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
-        <div style="display: flex; gap: 4px; border-bottom: 1px solid var(--border); background: var(--surface); padding: 4px 16px 0 16px;">
-          @for (tab of displayTabs(); track tab.id) {
-            <button
-              class="tab-btn"
-              [class.active]="activeTab() === tab.id"
-              (click)="selectTab(tab.id)"
-              style="padding: 12px 22px; font-weight: 700; font-size: 13.5px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent; transition: all .15s;"
-              [style.border-bottom-color]="activeTab() === tab.id ? 'var(--p)' : 'transparent'"
-              [style.color]="activeTab() === tab.id ? 'var(--p)' : 'var(--muted)'"
-            >
-              {{ tab.label }}
-            </button>
-          }
-        </div>
-      </div>
 
       <!-- Main Card Container -->
       <div class="card p-0" style="border-radius: 10px; overflow: visible; border: 1px solid var(--border);">
@@ -138,10 +111,15 @@ function emptyTenantForm(): CreateCompanyRequest {
           </h4>
 
           @if (isSuperAdmin() && activeTab() === 'directory') {
-            <!-- Super Admin Tenant Companies Search Header -->
-            <div class="input-group" style="max-width: 280px;">
-              <span class="input-icon" [appIcon]="'search'"></span>
-              <input class="form-control" type="text" placeholder="Search name, code, email..." [ngModel]="tenantSearch()" (ngModelChange)="tenantSearch.set($event)" />
+            <!-- Super Admin Tenant Companies Search Header + New Company Button -->
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <div class="input-group" style="max-width: 280px;">
+                <span class="input-icon" [appIcon]="'search'"></span>
+                <input class="form-control" type="text" placeholder="Search name, code, email..." [ngModel]="tenantSearch()" (ngModelChange)="tenantSearch.set($event)" />
+              </div>
+              <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="openCreateTenant()">
+                <span [appIcon]="'plus'"></span> New Company
+              </button>
             </div>
           } @else if (activeTab() === 'profile') {
             <!-- Bottom Save button is used -->
@@ -179,7 +157,6 @@ function emptyTenantForm(): CreateCompanyRequest {
               <thead>
                 <tr style="background: var(--bg); border-bottom: 1px solid var(--border);">
                   <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Company</th>
-                  <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Status</th>
                   <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Dedicated Database</th>
                   <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Administrator</th>
                   <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Invitation</th>
@@ -189,26 +166,30 @@ function emptyTenantForm(): CreateCompanyRequest {
               <tbody>
                 @if (tenantLoading()) {
                   <tr>
-                    <td colspan="6" style="text-align: center; padding: 32px; color: var(--muted);">Loading tenant companies…</td>
+                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">Loading tenant companies…</td>
                   </tr>
                 } @else if (tenantCompanies().length === 0) {
                   <tr>
-                    <td colspan="6" style="text-align: center; padding: 32px; color: var(--muted);">No companies yet. Create one to provision its dedicated database.</td>
+                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">No companies yet. Create one to provision its dedicated database.</td>
                   </tr>
                 } @else {
                   @for (c of filteredTenantCompanies(); track c.id) {
                     <tr style="border-bottom: 1px solid var(--border);">
                       <td style="padding: 14px 16px;">
-                        <div style="font-weight: 700; font-size: 14px; color: var(--text);">{{ c.name }}</div>
+                        <button
+                          type="button"
+                          class="company-name-link"
+                          (click)="viewTenant(c)"
+                          title="View {{ c.name }} details & employees"
+                        >
+                          {{ c.name }}
+                        </button>
                         <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
                           <span class="badge" style="background: var(--p-soft); color: var(--p); font-weight: 700;">{{ c.code }}</span>
                           @if (c.isDefault) {
                             <span class="badge badge-info">Default</span>
                           }
                         </div>
-                      </td>
-                      <td style="padding: 14px 16px;">
-                        <span class="badge" [ngClass]="statusBadge(c.status)">{{ c.status }}</span>
                       </td>
                       <td style="padding: 14px 16px; font-size: 13px; font-family: monospace; color: var(--muted);">
                         {{ c.databaseName || '—' }}
@@ -221,8 +202,21 @@ function emptyTenantForm(): CreateCompanyRequest {
                         <span class="badge" [ngClass]="inviteBadge(c.invitationStatus)">{{ c.invitationStatus }}</span>
                       </td>
                       <td style="padding: 14px 16px; text-align: right;">
-                        <div style="display: inline-flex; gap: 6px;">
-                          <button class="tbl-btn" data-tooltip="Details & Logs" (click)="viewTenant(c)" [disabled]="busyTenantId() === c.id">
+                        <div style="display: inline-flex; align-items: center; gap: 8px;">
+                          @if (!c.isDefault) {
+                            <button
+                              type="button"
+                              class="btn-status-outline"
+                              [class.status-active]="c.status !== 'Suspended'"
+                              [class.status-suspended]="c.status === 'Suspended'"
+                              (click)="toggleTenantStatus(c)"
+                              [attr.data-tooltip]="c.status === 'Suspended' ? 'Click to Activate tenant' : 'Click to Suspend tenant'"
+                              [disabled]="busyTenantId() === c.id"
+                            >
+                              {{ c.status === 'Suspended' ? 'Suspended' : 'Active' }}
+                            </button>
+                          }
+                          <button class="tbl-btn" data-tooltip="Company Details & Employees" (click)="viewTenant(c)" [disabled]="busyTenantId() === c.id">
                             <span [appIcon]="'eye'"></span>
                           </button>
                           <button class="tbl-btn" data-tooltip="Edit Company" (click)="editTenant(c)" [disabled]="busyTenantId() === c.id">
@@ -233,26 +227,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                               <span [appIcon]="'sync'"></span>
                             </button>
                           }
-                          @if (c.invitationStatus === 'Accepted') {
-                            <button class="tbl-btn success" data-tooltip="Admin Invitation Accepted" disabled style="opacity: 0.6; cursor: default;">
-                              <span [appIcon]="'check'"></span>
-                            </button>
-                          } @else {
-                            <button class="tbl-btn" data-tooltip="Resend Invitation" (click)="resendTenant(c)" [disabled]="busyTenantId() === c.id">
-                              <span [appIcon]="'mail'"></span>
-                            </button>
-                          }
                           @if (!c.isDefault) {
-                            <button
-                              class="tbl-btn"
-                              [class.danger]="c.status !== 'Suspended'"
-                              [class.success]="c.status === 'Suspended'"
-                              [attr.data-tooltip]="c.status === 'Suspended' ? 'Activate' : 'Suspend'"
-                              (click)="toggleTenantStatus(c)"
-                              [disabled]="busyTenantId() === c.id"
-                            >
-                              <span [appIcon]="c.status === 'Suspended' ? 'check' : 'lock'"></span>
-                            </button>
                             <button
                               class="tbl-btn danger"
                               data-tooltip="Delete Company & Database"
@@ -807,7 +782,11 @@ function emptyTenantForm(): CreateCompanyRequest {
               </div>
               <div class="form-group">
                 <label class="form-label">Time Zone</label>
-                <input class="form-control" type="text" [(ngModel)]="tenantCreateForm.timeZone" placeholder="e.g. Asia/Dubai" />
+                <select class="form-control" [(ngModel)]="tenantCreateForm.timeZone">
+                  @for (tz of standardTimezones; track tz.value) {
+                    <option [value]="tz.value">{{ tz.label }}</option>
+                  }
+                </select>
               </div>
             </div>
             <div class="grid grid-2" style="gap: 12px; margin-bottom: 12px;">
@@ -873,7 +852,11 @@ function emptyTenantForm(): CreateCompanyRequest {
             </div>
             <div class="form-group">
               <label class="form-label">Time Zone</label>
-              <input class="form-control" type="text" [(ngModel)]="tenantEditForm.timeZone" placeholder="e.g. Asia/Dubai" />
+              <select class="form-control" [(ngModel)]="tenantEditForm.timeZone">
+                @for (tz of standardTimezones; track tz.value) {
+                  <option [value]="tz.value">{{ tz.label }}</option>
+                }
+              </select>
             </div>
           </div>
           <div class="modal-footer">
@@ -886,20 +869,28 @@ function emptyTenantForm(): CreateCompanyRequest {
       </div>
     }
 
-    <!-- MODAL: SUPER ADMIN TENANT DETAILS & PROVISIONING LOGS -->
+    <!-- MODAL: SUPER ADMIN TENANT DETAILS & EMPLOYEES -->
     @if (showTenantDetail()) {
       @if (tenantDetail(); as d) {
         <div class="modal-overlay open" (click)="closeTenantDetail()">
-          <div class="modal" style="max-width: 680px;" (click)="$event.stopPropagation()">
+          <div class="modal" style="max-width: 860px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <div style="font-size: 1.1rem; font-weight: 700;">{{ d.name }} — Company Details</div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="font-size: 1.15rem; font-weight: 700; color: var(--text);">{{ d.name }}</div>
+                <span class="badge" style="background: var(--p-soft); color: var(--p); font-weight: 700;">{{ d.code }}</span>
+                <span class="badge" [ngClass]="statusBadge(d.status)">{{ d.status }}</span>
+                @if (d.isDefault) {
+                  <span class="badge badge-info">Default</span>
+                }
+              </div>
               <button class="btn btn-ghost btn-sm" (click)="closeTenantDetail()"><span [appIcon]="'x'"></span></button>
             </div>
-            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
-              <div class="grid grid-2" style="gap: 12px; margin-bottom: 16px; background: var(--bg); padding: 14px; border-radius: 8px;">
+            <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+              <!-- Company Details Grid -->
+              <div class="grid grid-2" style="gap: 12px; margin-bottom: 20px; background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
                 <div>
                   <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Company Code</div>
-                  <div style="font-weight: 700; font-size: 13px;">{{ d.code }}</div>
+                  <div style="font-weight: 700; font-size: 13.5px; color: var(--text);">{{ d.code }}</div>
                 </div>
                 <div>
                   <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Status</div>
@@ -907,19 +898,31 @@ function emptyTenantForm(): CreateCompanyRequest {
                 </div>
                 <div>
                   <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Dedicated Database</div>
-                  <div style="font-family: monospace; font-size: 12px; color: var(--text);">{{ d.databaseName || '—' }}</div>
+                  <div style="font-family: monospace; font-size: 12.5px; font-weight: 600; color: var(--p);">{{ d.databaseName || '—' }}</div>
                 </div>
                 <div>
-                  <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Admin Email</div>
-                  <div style="font-size: 13px;">{{ d.adminEmail }}</div>
+                  <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Time Zone</div>
+                  <div style="font-size: 13px; font-weight: 600; color: var(--text);">{{ d.timeZone || 'UTC' }}</div>
                 </div>
                 <div>
-                  <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Invitation Status</div>
-                  <div><span class="badge" [ngClass]="inviteBadge(d.invitationStatus)">{{ d.invitationStatus }}</span></div>
+                  <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Administrator</div>
+                  <div style="font-size: 13px; font-weight: 600; color: var(--text);">{{ d.adminFullName }}</div>
+                  <div style="font-size: 11.5px; color: var(--muted);">{{ d.adminEmail }}</div>
                 </div>
+                <div>
+                  <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Total Staff</div>
+                  <div style="font-size: 13px; font-weight: 700; color: #10b981;">{{ d.employees?.length || d.employeeCount || 0 }} Employees</div>
+                  <div style="font-size: 11.5px; color: var(--muted);">Live from tenant schema</div>
+                </div>
+                @if (d.contactName || d.contactEmail) {
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Contact Person</div>
+                    <div style="font-size: 13px; color: var(--text);">{{ d.contactName || '—' }} ({{ d.contactEmail || '—' }})</div>
+                  </div>
+                }
                 <div>
                   <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Provisioned At</div>
-                  <div style="font-size: 12px;">{{ d.provisionedAtUtc ? (d.provisionedAtUtc | date: 'medium') : '—' }}</div>
+                  <div style="font-size: 12.5px; color: var(--text);">{{ d.provisionedAtUtc ? (d.provisionedAtUtc | date: 'medium') : '—' }}</div>
                 </div>
               </div>
 
@@ -929,45 +932,122 @@ function emptyTenantForm(): CreateCompanyRequest {
                 </div>
               }
 
-              <div style="font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--text);">
-                Provisioning Log
-              </div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Step</th>
-                      <th>Result</th>
-                      <th>Message</th>
-                      <th>When</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (log of d.provisioningLogs; track log.occurredAtUtc + log.step) {
-                      <tr>
-                        <td style="font-weight: 600; font-size: 13px;">{{ log.step }}</td>
-                        <td>
-                          <span class="badge" [ngClass]="log.succeeded ? 'badge-success' : 'badge-danger'">
-                            {{ log.succeeded ? 'OK' : 'Failed' }}
-                          </span>
-                        </td>
-                        <td style="font-size: 12px; color: var(--muted);">{{ log.message || '—' }}</td>
-                        <td style="font-size: 12px; color: var(--muted);">{{ log.occurredAtUtc | date: 'short' }}</td>
-                      </tr>
-                    } @empty {
-                      <tr>
-                        <td colspan="4" style="text-align: center; color: var(--muted); padding: 16px;">No logs available.</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
+              <!-- Paginated Company Employees Directory -->
+              <div style="margin-top: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                  <div style="font-weight: 700; font-size: 14px; color: var(--text); display: flex; align-items: center; gap: 8px;">
+                    <span [appIcon]="'user'"></span>
+                    <span>Company Employees</span>
+                    <span class="badge" style="background: var(--p-soft); color: var(--p); font-size: 11px; font-weight: 700;">
+                      {{ d.employees?.length || 0 }} Total
+                    </span>
+                  </div>
+                  @if (d.employees && d.employees.length > 5) {
+                    <div style="max-width: 220px;">
+                      <input
+                        class="form-control"
+                        type="text"
+                        placeholder="Search employees..."
+                        style="padding: 4px 10px; font-size: 12px; height: 32px;"
+                        [ngModel]="tenantEmpSearch()"
+                        (ngModelChange)="onTenantEmpSearchChange($event)"
+                      />
+                    </div>
+                  }
+                </div>
+
+                @if (d.employees && d.employees.length > 0) {
+                  @if (tenantPagedEmployees().length > 0) {
+                    <div class="table-wrap" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+                      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead>
+                          <tr style="background: var(--bg); border-bottom: 1px solid var(--border);">
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Code</th>
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Name</th>
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Email</th>
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Department</th>
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Role</th>
+                            <th style="padding: 10px 12px; text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (emp of tenantPagedEmployees(); track emp.id) {
+                            <tr style="border-bottom: 1px solid var(--border);">
+                              <td style="padding: 10px 12px; font-family: monospace; font-size: 12px; font-weight: 600;">
+                                {{ emp.employeeCode }}
+                              </td>
+                              <td style="padding: 10px 12px; font-weight: 600; color: var(--text);">
+                                {{ emp.fullName }}
+                              </td>
+                              <td style="padding: 10px 12px; color: var(--muted); font-size: 12px;">
+                                {{ emp.email }}
+                              </td>
+                              <td style="padding: 10px 12px;">
+                                @if (emp.department) {
+                                  <span class="badge" style="background: rgba(100, 116, 139, 0.1); color: var(--text); font-size: 11px;">{{ emp.department }}</span>
+                                } @else {
+                                  <span style="color: var(--muted);">—</span>
+                                }
+                              </td>
+                              <td style="padding: 10px 12px; color: var(--muted); font-size: 12px;">
+                                {{ emp.designation || 'Staff' }}
+                              </td>
+                              <td style="padding: 10px 12px; text-align: center;">
+                                <span class="badge" [class.badge-success]="emp.status.toLowerCase() === 'active'" [class.badge-warning]="emp.status.toLowerCase() !== 'active'" style="font-size: 11px;">
+                                  {{ emp.status }}
+                                </span>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <!-- Pagination Controls -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; gap: 8px;">
+                      <div>
+                        Showing {{ tenantEmpStartIndex() }} to {{ tenantEmpEndIndex() }} of {{ tenantFilteredEmployees().length }} employees
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <button
+                          type="button"
+                          class="btn btn-outline btn-sm"
+                          style="padding: 4px 12px; font-size: 12px;"
+                          [disabled]="tenantEmpPage() <= 1"
+                          (click)="changeTenantEmpPage(tenantEmpPage() - 1)"
+                        >
+                          ‹ Previous
+                        </button>
+                        <span style="font-weight: 600; color: var(--text); padding: 0 4px;">
+                          Page {{ tenantEmpPage() }} of {{ tenantEmpTotalPages() }}
+                        </span>
+                        <button
+                          type="button"
+                          class="btn btn-outline btn-sm"
+                          style="padding: 4px 12px; font-size: 12px;"
+                          [disabled]="tenantEmpPage() >= tenantEmpTotalPages()"
+                          (click)="changeTenantEmpPage(tenantEmpPage() + 1)"
+                        >
+                          Next ›
+                        </button>
+                      </div>
+                    </div>
+                  } @else {
+                    <div style="text-align: center; padding: 24px; color: var(--muted); background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+                      No employees match "{{ tenantEmpSearch() }}"
+                    </div>
+                  }
+                } @else {
+                  <div style="text-align: center; padding: 32px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border); color: var(--muted);">
+                    <div style="font-size: 26px; margin-bottom: 6px;">👥</div>
+                    <div style="font-weight: 600; color: var(--text); font-size: 13.5px;">No employees in this company yet</div>
+                    <div style="font-size: 12px; margin-top: 4px;">Employees created by the company admin will appear here with live data from the tenant database.</div>
+                  </div>
+                }
               </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="display: flex; justify-content: flex-end;">
               <button class="btn btn-outline" (click)="closeTenantDetail()">Close</button>
-              <button class="btn btn-primary" (click)="resendDetail()" [disabled]="!d.databaseName">
-                Resend Invitation
-              </button>
             </div>
           </div>
         </div>
@@ -1265,14 +1345,62 @@ function emptyTenantForm(): CreateCompanyRequest {
       padding: 5px 9px !important;
       border-radius: 5px !important;
     }
+    .company-name-link {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--p);
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      text-align: left;
+      transition: color .15s;
+    }
+    .company-name-link:hover {
+      text-decoration: underline;
+      color: var(--p-hover, #1d4ed8);
+    }
+    .btn-status-outline {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #ffffff;
+      transition: all 0.15s ease;
+    }
+    .btn-status-outline.status-active {
+      border: 1.5px solid #10b981;
+      color: #059669;
+      background: rgba(16, 185, 129, 0.05);
+    }
+    .btn-status-outline.status-active:hover {
+      background: #10b981;
+      color: #ffffff;
+    }
+    .btn-status-outline.status-suspended {
+      border: 1.5px solid #ef4444;
+      color: #dc2626;
+      background: rgba(239, 68, 68, 0.05);
+    }
+    .btn-status-outline.status-suspended:hover {
+      background: #ef4444;
+      color: #ffffff;
+    }
   `],
 })
-export class CompanyComponent implements OnInit {
+export class CompanyComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
   private readonly session = inject(SessionService);
   private readonly route = inject(ActivatedRoute);
   protected readonly perms = inject(PermissionService);
+
+  protected readonly standardTimezones = STANDARD_TIMEZONES;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   protected readonly isSuperAdmin = computed(() => this.session.activeRole() === 'Super Admin');
 
@@ -1364,6 +1492,61 @@ export class CompanyComponent implements OnInit {
   protected readonly busyTenantId = signal<string | null>(null);
   protected readonly activationUrl = signal<string | null>(null);
 
+  // Tenant Company Employees Pagination in Modal
+  protected readonly tenantEmpPage = signal<number>(1);
+  protected readonly tenantEmpPageSize = signal<number>(5);
+  protected readonly tenantEmpSearch = signal<string>('');
+
+  protected readonly tenantFilteredEmployees = computed(() => {
+    const list = this.tenantDetail()?.employees || [];
+    const q = this.tenantEmpSearch().toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(
+      (e) =>
+        e.fullName?.toLowerCase().includes(q) ||
+        e.employeeCode?.toLowerCase().includes(q) ||
+        e.email?.toLowerCase().includes(q) ||
+        (e.department && e.department.toLowerCase().includes(q)) ||
+        (e.designation && e.designation.toLowerCase().includes(q))
+    );
+  });
+
+  protected readonly tenantEmpTotalPages = computed(() => {
+    const count = this.tenantFilteredEmployees().length;
+    const size = this.tenantEmpPageSize();
+    return Math.max(1, Math.ceil(count / size));
+  });
+
+  protected readonly tenantPagedEmployees = computed(() => {
+    const list = this.tenantFilteredEmployees();
+    const page = this.tenantEmpPage();
+    const size = this.tenantEmpPageSize();
+    const start = (page - 1) * size;
+    return list.slice(start, start + size);
+  });
+
+  protected readonly tenantEmpStartIndex = computed(() => {
+    const total = this.tenantFilteredEmployees().length;
+    if (total === 0) return 0;
+    return (this.tenantEmpPage() - 1) * this.tenantEmpPageSize() + 1;
+  });
+
+  protected readonly tenantEmpEndIndex = computed(() => {
+    const total = this.tenantFilteredEmployees().length;
+    return Math.min(this.tenantEmpPage() * this.tenantEmpPageSize(), total);
+  });
+
+  protected changeTenantEmpPage(page: number): void {
+    if (page >= 1 && page <= this.tenantEmpTotalPages()) {
+      this.tenantEmpPage.set(page);
+    }
+  }
+
+  protected onTenantEmpSearchChange(val: string): void {
+    this.tenantEmpSearch.set(val);
+    this.tenantEmpPage.set(1);
+  }
+
   protected tenantCreateForm: CreateCompanyRequest = emptyTenantForm();
   protected tenantEditForm: UpdateCompanyRequest = {
     name: '',
@@ -1405,6 +1588,23 @@ export class CompanyComponent implements OnInit {
     if (this.isSuperAdmin()) {
       this.activeTab.set('directory');
       this.loadTenantCompanies();
+
+      // Dynamically poll tenant status and provisioning updates
+      this.pollTimer = setInterval(() => {
+        if (
+          this.activeTab() === 'directory' &&
+          !this.showTenantDetail() &&
+          !this.showCreateTenant() &&
+          !this.showEditTenant() &&
+          !this.showDeleteTenantConfirm()
+        ) {
+          this.api.tenantCompanies().subscribe({
+            next: (list) => this.tenantCompanies.set(list || []),
+            error: () => { },
+          });
+        }
+      }, 15000);
+
       this.route.queryParams.subscribe((params) => {
         if (params['action'] === 'new' || params['create'] === 'true') {
           this.openCreateTenant();
@@ -1432,6 +1632,13 @@ export class CompanyComponent implements OnInit {
     this.loadBackendData();
   }
 
+  ngOnDestroy(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
   protected selectTab(tab: CompanyTab): void {
     this.activeTab.set(tab);
     this.currentPage.set(1);
@@ -1445,7 +1652,7 @@ export class CompanyComponent implements OnInit {
 
   protected currentHeaderTitle(): string {
     switch (this.activeTab()) {
-      case 'directory': return 'Registered Companies & Databases';
+      case 'directory': return 'Company Onboarding';
       case 'profile': return 'Company Profile & Branding';
       case 'departments': return 'Departments';
       case 'designations': return 'Designations';
@@ -1665,7 +1872,7 @@ export class CompanyComponent implements OnInit {
           timeZone: d.timeZone ?? '',
         };
       },
-      error: () => {},
+      error: () => { },
     });
   }
 
@@ -1752,6 +1959,8 @@ export class CompanyComponent implements OnInit {
 
   protected viewTenant(company: CompanyListItem): void {
     this.busyTenantId.set(company.id);
+    this.tenantEmpPage.set(1);
+    this.tenantEmpSearch.set('');
     this.api.tenantCompany(company.id).subscribe({
       next: (detail) => {
         this.busyTenantId.set(null);
@@ -1818,7 +2027,7 @@ export class CompanyComponent implements OnInit {
       return;
     }
 
-    const reactivating = company.status === 'Suspended';
+    const reactivating = (company.status || '').toLowerCase() === 'suspended';
     this.busyTenantId.set(company.id);
     const request = reactivating
       ? this.api.activateTenantCompany(company.id)
@@ -2375,7 +2584,7 @@ export class CompanyComponent implements OnInit {
             this.companies.set([]);
           }
         },
-        error: () => {},
+        error: () => { },
       });
     }
 
@@ -2392,7 +2601,7 @@ export class CompanyComponent implements OnInit {
           }))
         );
       },
-      error: () => {},
+      error: () => { },
     });
 
     this.api.designations().subscribe({
@@ -2409,7 +2618,7 @@ export class CompanyComponent implements OnInit {
           }))
         );
       },
-      error: () => {},
+      error: () => { },
     });
 
     this.api.holidays().subscribe({
@@ -2425,7 +2634,7 @@ export class CompanyComponent implements OnInit {
           }))
         );
       },
-      error: () => {},
+      error: () => { },
     });
   }
 }

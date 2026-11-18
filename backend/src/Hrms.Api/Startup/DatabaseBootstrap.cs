@@ -242,6 +242,23 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
         }
 
         await master.SaveChangesAsync(ct);
+
+        var defaultInvitation = await master.Invitations.GetLatestForCompanyAsync(company.Id, ct);
+        if (defaultInvitation is null)
+        {
+            var inv = new CompanyInvitation
+            {
+                CompanyId = company.Id,
+                Email = company.AdminEmail,
+                Status = InvitationStatus.Sent,
+                TokenHash = Hrms.Application.Common.Tenancy.TenantNaming.HashToken(Hrms.Application.Common.Tenancy.TenantNaming.CreateToken()),
+                ExpiresAtUtc = DateTime.UtcNow.AddYears(1),
+                SentAtUtc = DateTime.UtcNow,
+            };
+            await master.Invitations.AddAsync(inv, ct);
+            await master.SaveChangesAsync(ct);
+        }
+
         logger.LogInformation("Registered default company '{Code}' backed by database {Database}.", DefaultCompanyCode, databaseName);
     }
 

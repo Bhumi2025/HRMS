@@ -218,6 +218,8 @@ public sealed class TenantResolutionService : ITenantResolutionService
         {
             _cache.Remove($"tenant:code:{TenantNaming.SlugifyCode(code)}");
             _cache.Remove($"tenant:branding:{TenantNaming.SlugifyCode(code)}");
+            _cache.Remove($"tenant:code:{code.Trim().ToLowerInvariant()}");
+            _cache.Remove($"tenant:code:{code.Trim().ToUpperInvariant()}");
         }
         _cache.Remove("tenant:default");
     }
