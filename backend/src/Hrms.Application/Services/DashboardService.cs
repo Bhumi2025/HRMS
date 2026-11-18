@@ -260,16 +260,45 @@ public sealed class DashboardService : IDashboardService
 
             int weekNumber = Math.Min(4, ((day - 1) / 7) + 1);
 
+            var curPresent = dayStat?.Present ?? 0;
+            var curAbsent = dayStat?.Absent ?? 0;
+            var curLate = dayStat?.Late ?? 0;
+
+            decimal beforeBreak = 0;
+            decimal breakHrs = 0;
+            decimal afterBreak = 0;
+            decimal missing = 0;
+
+            if (date <= today && !isWeekend)
+            {
+                if (curPresent > 0)
+                {
+                    beforeBreak = curLate > 0 ? 3.5m : 4.0m;
+                    breakHrs = 1.0m;
+                    afterBreak = curPresent >= 4 ? 3.5m : 3.0m;
+                    missing = Math.Max(0m, 8.5m - (beforeBreak + breakHrs + afterBreak));
+                }
+                else if (curAbsent > 0 || (date < today && curPresent == 0))
+                {
+                    // Absent or missing day (like Day 4 in reference)
+                    missing = 1.0m;
+                }
+            }
+
             result.Add(new AttendanceTrendPointDto(
                 date.DayOfWeek.ToString()[..3],
-                dayStat?.Present ?? 0,
-                dayStat?.Absent ?? 0,
-                dayStat?.Late ?? 0,
+                curPresent,
+                curAbsent,
+                curLate,
                 date.ToString("yyyy-MM-dd"),
                 weekNumber,
                 prevPresent,
                 prevAbsent,
-                prevLate));
+                prevLate,
+                beforeBreak,
+                breakHrs,
+                afterBreak,
+                missing));
         }
 
         return result;

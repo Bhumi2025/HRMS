@@ -19,6 +19,36 @@ import {
   LeaveBalance,
 } from '../../core/api/api.models';
 
+export interface TimelogBarItem {
+  idx: number;
+  dayNumber: number;
+  dayLabel: string;
+  date: string;
+  formattedDate: string;
+  isToday: boolean;
+  beforeBreak: number;
+  breakHrs: number;
+  afterBreak: number;
+  missing: number;
+  totalHours: number;
+  present: number;
+  late: number;
+  absent: number;
+  cx: number;
+  barX: number;
+  barWidth: number;
+  hBefore: number;
+  yBefore: number;
+  hBreak: number;
+  yBreak: number;
+  hAfter: number;
+  yAfter: number;
+  hMissing: number;
+  yMissing: number;
+  topY: number;
+  totalHeight: number;
+}
+
 @Component({
   selector: 'app-template-dashboard',
   imports: [CommonModule, RouterLink],
@@ -64,18 +94,8 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     return list;
   });
 
-  // Reference Line Chart State & Tooltip
-  protected readonly hoveredChartPoint = signal<{
-    idx: number;
-    date: string;
-    formattedDate: string;
-    dayOfWeek: string;
-    present: number;
-    late: number;
-    absent: number;
-    x: number;
-    y: number;
-  } | null>(null);
+  // Reference Bar Chart Hover State
+  protected readonly hoveredBar = signal<TimelogBarItem | null>(null);
 
   // Data signals
   protected readonly notices = signal<NoticeBoardItem[]>([]);
@@ -108,84 +128,146 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(this.currentTime());
   });
 
-  protected readonly chartMaxScale = computed(() => {
+  protected readonly chartMaxScale = computed<number>(() => {
     const list = this.attendanceGraph();
     let max = 0;
     for (const p of list) {
-      max = Math.max(max, p.present || 0);
+      const tot = (p.beforeBreakHours || 0) + (p.breakHours || 0) + (p.afterBreakHours || 0) + (p.missingHours || 0);
+      max = Math.max(max, tot);
     }
-    const total = this.totalHeadcount();
-    const peak = Math.max(max, total, 4);
-    return peak <= 4 ? 4 : (peak <= 8 ? 8 : (peak <= 12 ? 12 : Math.ceil(peak / 5) * 5));
+    if (max <= 1.5) return 1.5;
+    if (max <= 4) return 4;
+    if (max <= 8) return 8;
+    if (max <= 10) return 10;
+    return Math.ceil(max / 2) * 2;
   });
 
-  protected readonly chartYScaleSteps = computed(() => {
+  protected readonly chartYScaleSteps = computed<number[]>(() => {
     const max = this.chartMaxScale();
-    const step = max <= 8 ? 1 : (max <= 16 ? 2 : Math.ceil(max / 8));
-    const steps: number[] = [];
-    for (let v = 0; v <= max; v += step) {
-      steps.push(v);
+    if (max === 1.5) {
+      return [1.5, 1, 0.5, 0];
     }
-    if (steps[steps.length - 1] < max) {
-      steps.push(max);
+    if (max <= 4) {
+      return [4, 3, 2, 1, 0];
     }
-    return steps.reverse();
+    if (max <= 8) {
+      return [8, 6, 4, 2, 0];
+    }
+    if (max <= 10) {
+      return [10, 8, 6, 4, 2, 0];
+    }
+    const step = max / 4;
+    return [max, max - step, max - 2 * step, max - 3 * step, 0].map((v) => Math.round(v * 10) / 10);
   });
 
-  protected readonly attendanceChartPoints = computed(() => {
+  protected getYCoord(val: number): number {
+    const maxVal = this.chartMaxScale() || 1.5;
+    const topY = 22;
+    const baselineY = 152;
+    const plotHeight = baselineY - topY;
+    return Math.round((baselineY - (val / maxVal) * plotHeight) * 10) / 10;
+  }
+
+  protected readonly timelogBars = computed<TimelogBarItem[]>(() => {
     const list = this.attendanceGraph();
     if (!list || list.length === 0) return [];
+
     const totalDays = list.length;
-    const maxVal = this.chartMaxScale() || 1;
-    const boxLeft = 42;
-    const boxWidth = 710;
-    const boxTop = 16;
-    const boxHeight = 145;
-    const stepX = boxWidth / totalDays;
+    const maxVal = this.chartMaxScale() || 1.5;
+    const plotLeft = 40;
+    const plotRight = 745;
+    const plotWidth = plotRight - plotLeft;
+    const topY = 22;
+    const baselineY = 152;
+    const plotHeight = baselineY - topY;
+    const scale = plotHeight / maxVal;
+    const stepX = plotWidth / totalDays;
+    const barWidth = Math.min(18, Math.max(9, Math.round(stepX * 0.55 * 10) / 10));
+
+    const todayDate = this.currentTime();
+    const todayY = todayDate.getFullYear();
+    const todayM = todayDate.getMonth() + 1;
+    const todayD = todayDate.getDate();
 
     return list.map((p, idx) => {
-      const x = boxLeft + (idx + 0.5) * stepX;
-      const present = p.present || 0;
-      const y = (boxTop + boxHeight) - (present / maxVal) * boxHeight;
+      const cx = Math.round((plotLeft + (idx + 0.5) * stepX) * 10) / 10;
+      const barX = Math.round((cx - barWidth / 2) * 10) / 10;
 
+      let dayNumber = idx + 1;
+      let isToday = false;
       let formattedDate = '';
+
       if (p.date) {
         const parts = p.date.split('-');
         if (parts.length === 3) {
-          formattedDate = `${parseInt(parts[1], 10)}/${parseInt(parts[2], 10)}/${parts[0]}`;
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          const d = parseInt(parts[2], 10);
+          dayNumber = d;
+          isToday = y === todayY && m === todayM && d === todayD;
+          const dt = new Date(y, m - 1, d);
+          formattedDate =
+            new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(dt) +
+            ` (${p.label || ''})`;
         }
       }
       if (!formattedDate) {
         const [yStr, mStr] = this.selectedMonthKey().split('-');
-        formattedDate = `${parseInt(mStr, 10)}/${idx + 1}/${yStr}`;
+        formattedDate = `${mStr}/${dayNumber}/${yStr}`;
       }
+
+      const beforeBreak = p.beforeBreakHours || 0;
+      const breakHrs = p.breakHours || 0;
+      const afterBreak = p.afterBreakHours || 0;
+      const missing = p.missingHours || 0;
+      const totalHours = Math.round((beforeBreak + breakHrs + afterBreak + missing) * 10) / 10;
+
+      const hBefore = Math.round(beforeBreak * scale * 10) / 10;
+      const yBefore = baselineY - hBefore;
+
+      const hBreak = Math.round(breakHrs * scale * 10) / 10;
+      const yBreak = yBefore - hBreak;
+
+      const hAfter = Math.round(afterBreak * scale * 10) / 10;
+      const yAfter = yBreak - hAfter;
+
+      const hMissing = Math.round(missing * scale * 10) / 10;
+      const yMissing = yAfter - hMissing;
+
+      const totalHeight = hBefore + hBreak + hAfter + hMissing;
+      const barTopY = baselineY - totalHeight;
 
       return {
         idx,
+        dayNumber,
+        dayLabel: p.label || '',
         date: p.date || '',
         formattedDate,
-        dayOfWeek: p.label || '',
-        present,
+        isToday,
+        beforeBreak,
+        breakHrs,
+        afterBreak,
+        missing,
+        totalHours,
+        present: p.present || 0,
         late: p.late || 0,
         absent: p.absent || 0,
-        x: Math.round(x * 10) / 10,
-        y: Math.round(y * 10) / 10,
+        cx,
+        barX,
+        barWidth,
+        hBefore,
+        yBefore,
+        hBreak,
+        yBreak,
+        hAfter,
+        yAfter,
+        hMissing,
+        yMissing,
+        topY: barTopY,
+        totalHeight,
       };
     });
   });
-
-  protected readonly chartLinePath = computed(() => {
-    const pts = this.attendanceChartPoints();
-    if (pts.length === 0) return '';
-    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-  });
-
-  protected getYCoord(val: number): number {
-    const maxVal = this.chartMaxScale() || 1;
-    const boxTop = 16;
-    const boxHeight = 145;
-    return Math.round(((boxTop + boxHeight) - (val / maxVal) * boxHeight) * 10) / 10;
-  }
 
   protected readonly currentNotice = computed(() => {
     const list = this.notices();
@@ -251,7 +333,14 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
         this.upcomingHolidays.set(data.upcomingHolidays || []);
         this.myTasks.set(data.myTasks || []);
         this.pendingApprovals.set(data.pendingApprovals || []);
-        this.attendanceGraph.set(data.attendanceGraph || []);
+        
+        // Only overwrite attendanceGraph if current month is selected; otherwise keep selected month
+        const now = this.currentTime();
+        const defaultMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        if (this.selectedMonthKey() === defaultMonthKey) {
+          this.attendanceGraph.set(data.attendanceGraph || []);
+        }
+        
         this.leaveBalances.set(data.leaveBalances || []);
         this.loading.set(false);
       },
@@ -335,22 +424,12 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     return this.celebrations().filter((c) => c.type === tab).length;
   }
 
-  onPointEnter(pt: {
-    idx: number;
-    date: string;
-    formattedDate: string;
-    dayOfWeek: string;
-    present: number;
-    late: number;
-    absent: number;
-    x: number;
-    y: number;
-  }): void {
-    this.hoveredChartPoint.set(pt);
+  onBarEnter(item: TimelogBarItem): void {
+    this.hoveredBar.set(item);
   }
 
-  onPointLeave(): void {
-    this.hoveredChartPoint.set(null);
+  onBarLeave(): void {
+    this.hoveredBar.set(null);
   }
 
   onMonthChange(event: Event): void {

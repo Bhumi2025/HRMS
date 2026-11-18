@@ -21,7 +21,11 @@ public sealed record AttendanceTrendPointDto(
     int WeekNumber = 1,
     int PrevPresent = 0,
     int PrevAbsent = 0,
-    int PrevLate = 0);
+    int PrevLate = 0,
+    decimal BeforeBreakHours = 0,
+    decimal BreakHours = 0,
+    decimal AfterBreakHours = 0,
+    decimal MissingHours = 0);
 
 public sealed record ActivityDto(
     Guid EmployeeId,
