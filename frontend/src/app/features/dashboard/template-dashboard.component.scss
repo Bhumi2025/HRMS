@@ -501,26 +501,33 @@
   .graph-legend {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
     font-size: 10.5px;
-    color: var(--muted, #6b7280);
+    color: var(--muted, #64748b);
 
     .legend-item {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
       white-space: nowrap;
     }
-    .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      &.dot-present { background: #2563eb; }
-      &.dot-late { background: #f59e0b; }
-      &.dot-absent { background: #ef4444; }
-      &.dot-prev-ghost {
-        background: rgba(148, 163, 184, 0.45);
-        border: 1px dashed #64748b;
+
+    .line-badge {
+      display: inline-block;
+      width: 16px;
+      height: 3px;
+      border-radius: 2px;
+
+      &.badge-cur {
+        background: #2563eb;
+        height: 3px;
+        box-shadow: 0 1px 3px rgba(37, 99, 235, 0.4);
+      }
+
+      &.badge-prev {
+        background: #94a3b8;
+        height: 2px;
+        border-top: 1px dashed #64748b;
       }
     }
   }
@@ -530,205 +537,110 @@
     flex-direction: column;
     justify-content: space-between;
     position: relative;
-    padding-top: 8px;
-    min-height: 155px;
+    padding-top: 4px;
+    min-height: 160px;
+    flex: 1;
   }
 
-  .chart-guide-lines {
-    position: absolute;
-    top: 14px;
-    left: 0;
-    right: 0;
-    height: 98px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    pointer-events: none;
-    opacity: 0.35;
+  .month-line-chart-container {
+    position: relative;
+    width: 100%;
+    height: 122px;
+    margin-bottom: 4px;
+  }
 
-    .guide-line {
-      width: 100%;
-      border-bottom: 1px dashed #cbd5e1;
-      position: relative;
-    }
+  .month-line-chart-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
 
-    .guide-num {
-      position: absolute;
-      right: 4px;
-      top: -7px;
-      font-size: 8.5px;
+    .scale-text {
+      font-size: 8px;
       font-weight: 600;
-      color: #94a3b8;
-    }
-  }
-
-  .graph-bars {
-    display: flex;
-    justify-content: space-around;
-    align-items: flex-end;
-    height: 98px;
-    border-bottom: 1px solid var(--border, #e5e7eb);
-    padding-bottom: 4px;
-
-    .bar-col {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      flex: 1;
-      height: 100%;
-      justify-content: flex-end;
-      position: relative;
-
-      &.is-today {
-        .active-week-stack {
-          filter: drop-shadow(0 2px 5px rgba(37, 99, 235, 0.35));
-        }
-      }
+      fill: #94a3b8;
     }
 
-    .bar-headcount-badge {
-      font-size: 9.5px;
+    .week-zone-label {
+      font-size: 8.5px;
       font-weight: 700;
-      color: #475569;
-      margin-bottom: 2px;
-      line-height: 1;
+      fill: #64748b;
+      letter-spacing: 0.2px;
 
-      &.badge-today {
-        color: #2563eb;
-      }
-    }
-
-    .today-pulse-indicator {
-      position: absolute;
-      top: -12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
-      .today-badge-text {
-        font-size: 8px;
+      &.week-label-active {
+        fill: #2563eb;
         font-weight: 800;
-        letter-spacing: 0.5px;
-        background: #10b981;
-        color: #ffffff;
-        padding: 1px 4px;
-        border-radius: 3px;
-        box-shadow: 0 1px 3px rgba(16, 185, 129, 0.35);
       }
     }
 
-    .bar-pair-container {
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      gap: 3px;
-      height: 80%;
-      width: 100%;
+    .week-active-band {
+      fill: #eff6ff;
+      opacity: 0.75;
+      rx: 4;
+      stroke: #bfdbfe;
+      stroke-width: 1;
+      stroke-dasharray: 2 2;
     }
 
-    // Ghost Previous Week ("the previous week portion will slightly show back in small")
-    .ghost-prev-stack {
-      width: 10px;
-      display: flex;
-      flex-direction: column-reverse;
-      gap: 1.5px;
-      height: 100%;
-      justify-content: flex-start;
-      opacity: 0.42;
-      border-radius: 3px;
-      transition: all 0.25s ease;
+    // Previous Month Curve (Smaller, Thinner, Muted Baseline)
+    .line-prev-month {
+      stroke: #94a3b8;
+      stroke-width: 1.6;
+      stroke-dasharray: 4 3;
+      opacity: 0.55;
+      transition: all 0.3s ease;
+    }
+
+    .dot-prev-month {
+      fill: #94a3b8;
+      opacity: 0.6;
+    }
+
+    // Current Month Curve (Bigger, Thicker, Vibrant & Highlighted)
+    .line-current-month {
+      stroke: #2563eb;
+      stroke-width: 3.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: stroke-dashoffset 0.5s ease;
+    }
+
+    .dot-current-month {
+      fill: #ffffff;
+      stroke: #2563eb;
+      stroke-width: 2.2;
+      cursor: pointer;
+      transition: transform 0.15s ease, r 0.15s ease;
 
       &:hover {
-        opacity: 0.75;
+        r: 5;
+        stroke-width: 3;
       }
 
-      .seg {
-        border-radius: 2px;
-        min-height: 3px;
-        &.seg-prev-present {
-          background: #93c5fd;
-          border: 1px dashed #3b82f6;
-        }
-        &.seg-prev-late {
-          background: #fde68a;
-          border: 1px dashed #d97706;
-        }
-        &.seg-prev-absent {
-          background: #fca5a5;
-          border: 1px dashed #dc2626;
-        }
-        &.seg-ghost-empty {
-          height: 2px;
-          background: #e2e8f0;
-        }
+      &.dot-today {
+        fill: #2563eb;
+        stroke: #ffffff;
+        stroke-width: 2.5;
       }
     }
 
-    // Active Highlighted Week
-    .active-week-stack {
-      width: 18px;
-      display: flex;
-      flex-direction: column-reverse;
-      gap: 2px;
-      height: 100%;
-      justify-content: flex-start;
-      border-radius: 4px;
-      transition: all 0.25s ease;
-
-      &.today-bar {
-        transform: scale(1.04);
-      }
-
-      .seg {
-        border-radius: 3px;
-        min-height: 4px;
-        transition: height 0.3s ease;
-        &.seg-present {
-          background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
-        }
-        &.seg-late {
-          background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
-        }
-        &.seg-absent {
-          background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
-        }
-        &.seg-empty {
-          height: 3px;
-          background: var(--border, #e2e8f0);
-          border-radius: 2px;
-        }
-      }
+    .today-pulse-halo {
+      fill: none;
+      stroke: #2563eb;
+      stroke-width: 1.5;
+      opacity: 0.6;
+      animation: heartbeatPulse 1.4s infinite ease-in-out;
     }
 
-    .bar-label-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-top: 3px;
-      gap: 1px;
+    .today-tag-bg {
+      fill: #10b981;
+      box-shadow: 0 1px 3px rgba(16, 185, 129, 0.4);
+    }
 
-      .bar-label {
-        font-size: 10px;
-        font-weight: 700;
-        color: var(--muted, #6b7280);
-        text-transform: uppercase;
-
-        &.label-today {
-          color: #2563eb;
-          font-weight: 800;
-        }
-      }
-
-      .bar-day-num {
-        font-size: 9.5px;
-        color: var(--muted, #9ca3af);
-        font-weight: 500;
-
-        &.num-today {
-          color: #2563eb;
-          font-weight: 700;
-        }
-      }
+    .today-tag-text {
+      font-size: 7.5px;
+      font-weight: 800;
+      fill: #ffffff;
+      letter-spacing: 0.4px;
     }
   }
 

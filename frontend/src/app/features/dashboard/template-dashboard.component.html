@@ -115,23 +115,37 @@
           </div>
         </div>
 
-        <!-- 2. Attendance Overview Card (Multi-Week Flow & Ghost Comparison) -->
+        <!-- 2. Attendance Overview Card (Full Month Line Chart with Week-Wise Divisions) -->
         <div class="dash-widget attendance-widget">
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator"></span>
               <div class="header-title-box">
                 <h3 class="widget-title-nowrap">Attendance Overview</h3>
-                <span class="month-pill">{{ currentMonthName() }} · Week {{ selectedWeek() }}</span>
+                <span class="month-pill">{{ currentMonthName() }} · {{ selectedWeek() === 0 ? 'Full Month' : 'Week ' + selectedWeek() }}</span>
               </div>
             </div>
 
-            <!-- Week Switcher Pills (Top Pulse button removed as requested) -->
+            <!-- Week Switcher Tabs (All Month + Weeks 1-4) -->
             <div class="week-pills-bar">
+              <button
+                type="button"
+                class="week-pill-btn"
+                [class.active]="selectedWeek() === 0"
+                (click)="selectWeek(0)"
+                title="View Full Month Overview"
+              >
+                <span class="pill-w">Full Month</span>
+              </button>
               @for (w of [1, 2, 3, 4]; track w) {
-              <button type="button" class="week-pill-btn" [class.active]="selectedWeek() === w"
-                [class.current]="currentCalendarWeek() === w" (click)="selectWeek(w)"
-                [title]="'View Week ' + w + (currentCalendarWeek() === w ? ' (Current Active Week)' : '')">
+              <button
+                type="button"
+                class="week-pill-btn"
+                [class.active]="selectedWeek() === w"
+                [class.current]="currentCalendarWeek() === w"
+                (click)="selectWeek(w)"
+                [title]="'Highlight Week ' + w + (currentCalendarWeek() === w ? ' (Current Active Week)' : '')"
+              >
                 <span class="pill-w">W{{ w }}</span>
                 @if (currentCalendarWeek() === w) {
                 <span class="live-dot" title="Current Active Week"></span>
@@ -140,95 +154,159 @@
               }
             </div>
 
+            <!-- Legend clearly showing Current vs Previous Month -->
             <div class="header-actions">
               <div class="graph-legend">
-                <span class="legend-item"><span class="dot dot-present"></span> Present</span>
-                <span class="legend-item"><span class="dot dot-late"></span> Late</span>
-                <span class="legend-item"><span class="dot dot-absent"></span> Absent</span>
-                <span class="legend-item"><span class="dot dot-prev-ghost"></span> Last Week (W{{ previousWeekNumber() }})</span>
+                <span class="legend-item"><span class="line-badge badge-cur"></span> Current (Nov)</span>
+                <span class="legend-item"><span class="line-badge badge-prev"></span> Prev ({{ previousMonthName() }})</span>
               </div>
               <a routerLink="/attendance" class="view-link">Detailed Log ›</a>
             </div>
           </div>
 
           <div class="widget-body attendance-graph-content">
-            <!-- Subtle Guide Lines with Scale Numbers -->
-            <div class="chart-guide-lines">
-              <div class="guide-line"><span class="guide-num">8</span></div>
-              <div class="guide-line"><span class="guide-num">4</span></div>
-              <div class="guide-line"><span class="guide-num">0</span></div>
-            </div>
+            <!-- Full Month SVG Line Chart with Week-Wise Divisions -->
+            <div class="month-line-chart-container">
+              <svg class="month-line-chart-svg" viewBox="0 0 700 120" preserveAspectRatio="none">
+                <defs>
+                  <!-- Gradient for Current Month Area -->
+                  <linearGradient id="currentMonthGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#2563eb" stop-opacity="0.25" />
+                    <stop offset="70%" stop-color="#2563eb" stop-opacity="0.05" />
+                    <stop offset="100%" stop-color="#2563eb" stop-opacity="0.0" />
+                  </linearGradient>
 
-            <!-- Graph Bars Area -->
-            <div class="graph-bars">
-              @for (bar of activeWeekBars(); track bar.label + (bar.date || '')) {
-              <div class="bar-col" [class.is-today]="bar.isToday">
-                @if (bar.isToday) {
-                <div class="today-pulse-indicator" title="Today">
-                  <span class="today-badge-text">TODAY</span>
-                </div>
+                  <!-- Filter for Glowing Highlight on Current Line -->
+                  <filter id="currentGlow" x="-10%" y="-10%" width="120%" height="120%">
+                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#2563eb" flood-opacity="0.3" />
+                  </filter>
+                </defs>
+
+                <!-- Subtle Horizontal Grid Lines (Scale: 8, 4, 0) -->
+                <line x1="28" y1="18" x2="672" y2="18" class="grid-line" stroke="#f1f5f9" stroke-dasharray="3 3" />
+                <text x="686" y="21" class="scale-text">8</text>
+
+                <line x1="28" y1="59" x2="672" y2="59" class="grid-line" stroke="#f1f5f9" stroke-dasharray="3 3" />
+                <text x="686" y="62" class="scale-text">4</text>
+
+                <line x1="28" y1="100" x2="672" y2="100" class="grid-baseline" stroke="#e2e8f0" stroke-width="1" />
+                <text x="686" y="103" class="scale-text">0</text>
+
+                <!-- Week Sections Vertical Dividers & Week Labels -->
+                @for (z of weekZones(); track z.week) {
+                  @if (selectedWeek() === z.week) {
+                    <rect
+                      [attr.x]="z.x"
+                      y="14"
+                      [attr.width]="z.width"
+                      height="86"
+                      class="week-active-band"
+                    />
+                  }
+
+                  <text
+                    [attr.x]="z.x + (z.width / 2)"
+                    y="12"
+                    text-anchor="middle"
+                    class="week-zone-label"
+                    [class.week-label-active]="selectedWeek() === z.week || (selectedWeek() === 0 && z.isCurrent)"
+                  >
+                    {{ z.label }} ({{ z.range }})
+                  </text>
                 }
 
-                <!-- Total Count Badge above bar for instant clarity -->
-                <div class="bar-headcount-badge" [class.badge-today]="bar.isToday">
-                  {{ (bar.present || 0) + (bar.late || 0) }}
-                </div>
+                @for (sepX of weekDividers(); track sepX) {
+                  <line
+                    [attr.x1]="sepX"
+                    y1="14"
+                    [attr.x2]="sepX"
+                    y2="100"
+                    class="week-divider-line"
+                    stroke="#cbd5e1"
+                    stroke-dasharray="2 3"
+                    stroke-width="1"
+                  />
+                }
 
-                <!-- Side-by-side / Layered: Ghost Previous Week (Small) + Active Week (Highlighted) -->
-                <div class="bar-pair-container">
-                  <!-- 1. PREVIOUS WEEK GHOST BAR ("slightly show back in small") -->
-                  <div class="bar-stack ghost-prev-stack"
-                    [title]="'Previous Week (W' + previousWeekNumber() + ') - Present: ' + (bar.prevPresent || 0) + ', Late: ' + (bar.prevLate || 0) + ', Absent: ' + (bar.prevAbsent || 0)">
-                    @if (bar.prevPresent > 0) {
-                    <div class="seg seg-prev-present" [style.height.%]="getBarHeight(bar.prevPresent, true)"></div>
-                    }
-                    @if (bar.prevLate > 0) {
-                    <div class="seg seg-prev-late" [style.height.%]="getBarHeight(bar.prevLate, true)"></div>
-                    }
-                    @if (bar.prevAbsent > 0) {
-                    <div class="seg seg-prev-absent" [style.height.%]="getBarHeight(bar.prevAbsent, true)"></div>
-                    }
-                    @if (!bar.prevPresent && !bar.prevLate && !bar.prevAbsent) {
-                    <div class="seg seg-ghost-empty"></div>
-                    }
-                  </div>
+                <!-- 1. PREVIOUS MONTH LINE (Smaller, Thinner, Muted Dashed Baseline) -->
+                <path
+                  [attr.d]="prevMonthLinePath()"
+                  class="line-prev-month"
+                  fill="none"
+                />
 
-                  <!-- 2. ACTIVE WEEK HIGHLIGHTED BAR (Solid Full Size) -->
-                  <div class="bar-stack active-week-stack" [class.today-bar]="bar.isToday"
-                    title="Week {{ selectedWeek() }} ({{ bar.label }}): {{ bar.present }} Present, {{ bar.late }} Late, {{ bar.absent }} Absent">
-                    @if (bar.present > 0) {
-                    <div class="seg seg-present" [style.height.%]="getBarHeight(bar.present)"
-                      [title]="'Present: ' + bar.present"></div>
-                    }
-                    @if (bar.late > 0) {
-                    <div class="seg seg-late" [style.height.%]="getBarHeight(bar.late)" [title]="'Late: ' + bar.late">
-                    </div>
-                    }
-                    @if (bar.absent > 0) {
-                    <div class="seg seg-absent" [style.height.%]="getBarHeight(bar.absent)"
-                      [title]="'Absent: ' + bar.absent"></div>
-                    }
-                    @if (bar.present === 0 && bar.late === 0 && bar.absent === 0) {
-                    <div class="seg seg-empty" title="No attendance records"></div>
-                    }
-                  </div>
-                </div>
+                @for (pt of chartPoints(); track 'prev-' + pt.day) {
+                  <circle
+                    [attr.cx]="pt.x"
+                    [attr.cy]="pt.yPrev"
+                    r="2"
+                    class="dot-prev-month"
+                  />
+                }
 
-                <!-- Date & Day Label -->
-                <div class="bar-label-wrap">
-                  <span class="bar-label" [class.label-today]="bar.isToday">{{ bar.label }}</span>
-                  @if (bar.dayNumber) {
-                  <span class="bar-day-num" [class.num-today]="bar.isToday">Nov {{ bar.dayNumber }}</span>
+                <!-- 2. CURRENT MONTH AREA FILL & BOLD HIGHLIGHTED LINE -->
+                <path
+                  [attr.d]="currentMonthAreaPath()"
+                  fill="url(#currentMonthGradient)"
+                  class="area-current-month"
+                />
+
+                <path
+                  [attr.d]="currentMonthLinePath()"
+                  class="line-current-month"
+                  fill="none"
+                  filter="url(#currentGlow)"
+                />
+
+                <!-- Current Month Data Nodes -->
+                @for (pt of chartPoints(); track 'cur-' + pt.day) {
+                  @if (pt.isRecorded) {
+                    <circle
+                      [attr.cx]="pt.x"
+                      [attr.cy]="pt.yCurrent"
+                      [attr.r]="pt.isToday ? 4.5 : 3"
+                      class="dot-current-month"
+                      [class.dot-today]="pt.isToday"
+                      (mouseenter)="hoveredPoint.set(pt)"
+                      (mouseleave)="hoveredPoint.set(null)"
+                    />
                   }
-                </div>
-              </div>
-              }
+                }
+
+                <!-- TODAY BEACON & BADGE (Nov 18) -->
+                @if (todayPoint(); as td) {
+                  <circle
+                    [attr.cx]="td.x"
+                    [attr.cy]="td.yCurrent"
+                    r="7.5"
+                    class="today-pulse-halo"
+                  />
+                  <g class="today-tag-group">
+                    <rect
+                      [attr.x]="td.x - 22"
+                      [attr.y]="td.yCurrent - 15"
+                      width="44"
+                      height="12"
+                      rx="3"
+                      class="today-tag-bg"
+                    />
+                    <text
+                      [attr.x]="td.x"
+                      [attr.y]="td.yCurrent - 6"
+                      text-anchor="middle"
+                      class="today-tag-text"
+                    >
+                      TODAY: {{ td.present }}
+                    </text>
+                  </g>
+                }
+              </svg>
             </div>
 
-            <!-- Weekly Attendance Insights Strip (Utilizes the highlighted space) -->
+            <!-- Weekly / Monthly Attendance Insights Strip -->
             <div class="attendance-insights-strip">
               <div class="insight-pill pill-present">
-                <span class="pill-badge">Present</span>
+                <span class="pill-badge">{{ weekInsights().isMonthView ? 'Total Present' : 'W' + weekInsights().selectedWeek + ' Present' }}</span>
                 <span class="pill-count">{{ weekInsights().totalPresent }} Staff</span>
               </div>
               <div class="insight-pill pill-ontime">
@@ -240,13 +318,13 @@
                 <span class="pill-count">{{ weekInsights().totalLate }}</span>
               </div>
               <div class="insight-pill pill-comparison">
-                <span class="pill-badge">vs W{{ previousWeekNumber() }}</span>
-                @if (selectedWeek() > 1 && weekInsights().hasPrevData) {
+                <span class="pill-badge">vs Prev Month</span>
+                @if (weekInsights().hasPrevData) {
                   <span class="pill-count" [class.comp-up]="weekInsights().diff >= 0" [class.comp-down]="weekInsights().diff < 0">
                     {{ weekInsights().diff >= 0 ? '↑ +' : '↓ ' }}{{ weekInsights().diff }} ({{ weekInsights().diffPct >= 0 ? '+' : '' }}{{ weekInsights().diffPct }}%)
                   </span>
                 } @else {
-                  <span class="pill-count comp-baseline">Baseline Week</span>
+                  <span class="pill-count comp-baseline">Baseline</span>
                 }
               </div>
             </div>
@@ -256,10 +334,15 @@
               <div class="rail-left">
                 <span class="rail-title">{{ currentMonthName() }} Flow:</span>
                 <div class="rail-steps">
+                  <button type="button" class="rail-step-btn" [class.step-active]="selectedWeek() === 0" (click)="selectWeek(0)" title="Full Month View">
+                    <span class="step-dot"></span>
+                    <span class="step-label">All</span>
+                  </button>
+                  <div class="step-line" [class.line-filled]="selectedWeek() >= 1"></div>
                   @for (w of [1, 2, 3, 4]; track w) {
                   <button type="button" class="rail-step-btn" [class.step-active]="selectedWeek() === w"
                     [class.step-current]="currentCalendarWeek() === w" [class.step-past]="w < currentCalendarWeek()"
-                    (click)="selectWeek(w)" [title]="'View Week ' + w + (w === currentCalendarWeek() ? ' (Current Active Week)' : '')">
+                    (click)="selectWeek(w)" [title]="'Highlight Week ' + w + (w === currentCalendarWeek() ? ' (Current Active Week)' : '')">
                     <span class="step-dot"></span>
                     <span class="step-label">Week {{ w }}</span>
                   </button>
@@ -276,12 +359,12 @@
                 class="fresh-start-btn"
                 [class.active-cycling]="isAutoCycling()"
                 (click)="toggleAutoCycle()"
-                [title]="isAutoCycling() ? 'Click to pause automatic month cycle' : 'Click to cycle through Weeks 1 to 4 to review monthly attendance progression'"
+                [title]="isAutoCycling() ? 'Click to pause automatic month sweep' : 'Click to sweep through Weeks 1 to 4 across the monthly line chart'"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" [class.spin-svg]="isAutoCycling()">
                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
                 </svg>
-                <span>{{ isAutoCycling() ? 'Pause Cycle' : 'Fresh Month Pulse' }}</span>
+                <span>{{ isAutoCycling() ? 'Pause Sweep' : 'Fresh Month Pulse' }}</span>
                 @if (isAutoCycling()) {
                 <span class="pulse-live-pip"></span>
                 }

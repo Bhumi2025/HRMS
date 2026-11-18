@@ -41,10 +41,11 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly currentNoticeIndex = signal(0);
   protected readonly currentTime = signal(new Date());
 
-  // Attendance Graph Multi-Week & Heartbeat Signals
-  protected readonly selectedWeek = signal<number>(this.getCalendarWeek(new Date()));
+  // Attendance Graph Multi-Week & Full Month Signals
+  protected readonly selectedWeek = signal<number>(0); // 0 = All Month, 1..4 = Individual Weeks
   protected readonly isAutoCycling = signal<boolean>(false);
   private cycleTimer: ReturnType<typeof setInterval> | null = null;
+  protected readonly hoveredPoint = signal<any | null>(null);
 
   // Data signals
   protected readonly notices = signal<NoticeBoardItem[]>([]);
@@ -83,57 +84,136 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   });
 
   protected readonly currentMonthName = computed(() => {
-    return new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(this.currentTime());
+    return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(this.currentTime());
   });
 
-  protected readonly previousWeekNumber = computed(() => {
+  protected readonly previousMonthName = computed(() => {
+    const now = this.currentTime();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return new Intl.DateTimeFormat('en-US', { month: 'short' }).format(prev);
+  });
+
+  protected readonly chartMaxScale = computed(() => {
+    const list = this.attendanceGraph();
+    let max = 0;
+    for (const p of list) {
+      max = Math.max(max, p.present || 0, p.prevPresent || 0);
+    }
+    return Math.max(max, 8);
+  });
+
+  protected readonly chartPoints = computed(() => {
+    const list = this.attendanceGraph();
+    const total = list.length || 30;
+    const maxVal = this.chartMaxScale();
+    const now = this.currentTime();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    return list.map((p, idx) => {
+      const day = idx + 1;
+      const x = 28 + (idx / Math.max(1, total - 1)) * 644;
+      const yCurrent = Math.round(100 - ((p.present || 0) / maxVal) * 82);
+      const yPrev = Math.round(100 - ((p.prevPresent || 0) / maxVal) * 82);
+      const isToday = p.date ? p.date === todayStr : false;
+      const isRecorded = p.date ? p.date <= todayStr : false;
+
+      return {
+        day,
+        dayOfWeek: p.label || '',
+        date: p.date || '',
+        weekNumber: p.weekNumber || Math.min(4, Math.floor((day - 1) / 7) + 1),
+        present: p.present || 0,
+        late: p.late || 0,
+        absent: p.absent || 0,
+        prevPresent: p.prevPresent || 0,
+        isToday,
+        isRecorded,
+        x: Math.round(x * 10) / 10,
+        yCurrent,
+        yPrev,
+      };
+    });
+  });
+
+  protected readonly currentMonthLinePath = computed(() => {
+    const points = this.chartPoints();
+    if (points.length === 0) return '';
+    return points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.yCurrent}`).join(' ');
+  });
+
+  protected readonly currentMonthAreaPath = computed(() => {
+    const points = this.chartPoints();
+    if (points.length === 0) return '';
+    const first = points[0];
+    const last = points[points.length - 1];
+    const lineSegments = points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.yCurrent}`).join(' ');
+    return `${lineSegments} L ${last.x} 104 L ${first.x} 104 Z`;
+  });
+
+  protected readonly prevMonthLinePath = computed(() => {
+    const points = this.chartPoints();
+    if (points.length === 0) return '';
+    return points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.yPrev}`).join(' ');
+  });
+
+  protected readonly weekDividers = computed(() => {
+    const points = this.chartPoints();
+    if (points.length < 28) return [172, 328, 483];
+    const xW1to2 = Math.round((points[6].x + points[7].x) / 2);
+    const xW2to3 = Math.round((points[13].x + points[14].x) / 2);
+    const xW3to4 = Math.round((points[20].x + points[21].x) / 2);
+    return [xW1to2, xW2to3, xW3to4];
+  });
+
+  protected readonly weekZones = computed(() => {
+    const div = this.weekDividers();
+    const startX = 28;
+    const endX = 672;
+    const x1 = div[0] || 172;
+    const x2 = div[1] || 328;
+    const x3 = div[2] || 483;
+    return [
+      { week: 1, label: 'Week 1', range: '1–7', x: startX, width: x1 - startX },
+      { week: 2, label: 'Week 2', range: '8–14', x: x1, width: x2 - x1 },
+      { week: 3, label: 'Week 3', range: '15–21', isCurrent: true, x: x2, width: x3 - x2 },
+      { week: 4, label: 'Week 4', range: '22–30', x: x3, width: endX - x3 },
+    ];
+  });
+
+  protected readonly activeWeekZone = computed(() => {
     const w = this.selectedWeek();
-    return w > 1 ? w - 1 : 1;
+    if (w === 0) return null;
+    return this.weekZones().find((z) => z.week === w) || null;
+  });
+
+  protected readonly todayPoint = computed(() => {
+    return this.chartPoints().find((p) => p.isToday) || null;
   });
 
   protected readonly weekInsights = computed(() => {
-    const bars = this.activeWeekBars();
-    const totalPresent = bars.reduce((s: number, b: any) => s + (b.present || 0), 0);
-    const totalLate = bars.reduce((s: number, b: any) => s + (b.late || 0), 0);
-    const totalAbsent = bars.reduce((s: number, b: any) => s + (b.absent || 0), 0);
-    const totalPrevPresent = bars.reduce((s: number, b: any) => s + (b.prevPresent || 0), 0);
+    const all = this.chartPoints();
+    const w = this.selectedWeek();
+    const filtered = w === 0 ? all : all.filter((p) => p.weekNumber === w);
+
+    const totalPresent = filtered.reduce((s: number, b: any) => s + (b.present || 0), 0);
+    const totalLate = filtered.reduce((s: number, b: any) => s + (b.late || 0), 0);
+    const totalAbsent = filtered.reduce((s: number, b: any) => s + (b.absent || 0), 0);
+    const totalPrevPresent = filtered.reduce((s: number, b: any) => s + (b.prevPresent || 0), 0);
 
     const diff = totalPresent - totalPrevPresent;
     const diffPct = totalPrevPresent > 0 ? Math.round((diff / totalPrevPresent) * 100) : 0;
 
     return {
-      totalPresent: totalPresent + totalLate,
-      totalOnTime: totalPresent,
+      totalPresent,
+      totalOnTime: Math.max(0, totalPresent - totalLate),
       totalLate,
       totalAbsent,
       diff,
       diffPct,
       hasPrevData: totalPrevPresent > 0,
+      isMonthView: w === 0,
+      selectedWeek: w,
     };
-  });
-
-  protected readonly activeWeekBars = computed(() => {
-    const all = this.attendanceGraph();
-    const w = this.selectedWeek();
-    const now = this.currentTime();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    // Filter points for the selected week
-    const weekPoints = all.filter((p) => p.weekNumber === w);
-    const source = weekPoints.length > 0 ? weekPoints : all.slice(0, 7);
-
-    return source.map((p) => {
-      const isToday = p.date ? p.date === todayStr : false;
-      const dayNum = p.date ? parseInt(p.date.split('-')[2], 10) : undefined;
-      return {
-        ...p,
-        isToday,
-        dayNumber: dayNum,
-        prevPresent: p.prevPresent ?? 0,
-        prevLate: p.prevLate ?? 0,
-        prevAbsent: p.prevAbsent ?? 0,
-      };
-    });
   });
 
   protected readonly currentNotice = computed(() => {
@@ -289,7 +369,11 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     if (this.isAutoCycling()) {
       this.stopAutoCycle();
     }
-    this.selectedWeek.set(week);
+    if (this.selectedWeek() === week) {
+      this.selectedWeek.set(0); // Toggle to Full Month
+    } else {
+      this.selectedWeek.set(week);
+    }
   }
 
   toggleAutoCycle(): void {
@@ -305,9 +389,10 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     if (this.cycleTimer) clearInterval(this.cycleTimer);
     this.cycleTimer = setInterval(() => {
       this.zone.run(() => {
-        this.selectedWeek.update((w) => (w % 4) + 1);
+        // Cycle: 1 -> 2 -> 3 -> 4 -> 0 (All Month) -> 1
+        this.selectedWeek.update((w) => (w >= 4 ? 0 : w + 1));
       });
-    }, 3200);
+    }, 2800);
   }
 
   private stopAutoCycle(): void {
