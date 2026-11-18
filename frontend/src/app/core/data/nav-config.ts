@@ -23,6 +23,7 @@ const hrModules = (approvalBadge?: string): NavSection => ({
     { icon: 'documents', label: 'Documents', path: '/documents' },
     { icon: 'approvals', label: 'Approvals', path: '/approvals', badge: approvalBadge },
     { icon: 'reports', label: 'Reports', path: '/reports' },
+    { icon: 'settings', label: 'Settings', path: '/settings' },
   ],
 });
 

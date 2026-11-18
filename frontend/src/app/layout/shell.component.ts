@@ -46,6 +46,7 @@ const MASTER_NAV_CATALOGUE: MasterNavItem[] = [
   { label: 'Documents', section: 'HR Modules', icon: 'documents', path: '/documents', empPath: '/me/documents' },
   { label: 'Approvals', section: 'HR Modules', icon: 'approvals', path: '/approvals', empPath: '/approvals' },
   { label: 'Reports', section: 'HR Modules', icon: 'reports', path: '/reports', empPath: '/reports' },
+  { label: 'Settings', section: 'HR Modules', icon: 'settings', path: '/settings', empPath: '/settings' },
 ];
 
 /**
@@ -114,7 +115,7 @@ export class ShellComponent implements OnInit, OnDestroy {
 
     const backendItems = this.backendNavItems();
 
-    // Helper to filter out Loans, ERP, Face Kiosk, Key Group, Navigation, Permissions, Roles, Settings from main menu bar
+    // Helper to filter out Loans, ERP, Face Kiosk, Key Group, Navigation, Permissions, Roles from main menu bar
     const isExcludedFromSidebar = (route?: string, title?: string): boolean => {
       const r = (route || '').toLowerCase();
       const t = (title || '').toLowerCase();
@@ -130,8 +131,6 @@ export class ShellComponent implements OnInit, OnDestroy {
         t === 'permissions' ||
         t === 'role' ||
         t === 'roles' ||
-        t === 'settings' ||
-        r === '/settings' ||
         r.includes('#keygroup') ||
         r.includes('#navigation') ||
         r.includes('#permission') ||

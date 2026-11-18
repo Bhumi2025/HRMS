@@ -173,6 +173,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Leav
             ("DOCS", "Documents", "/documents", "documents", 12),
             ("APPR", "Approvals", "/approvals", "approvals", 13),
             ("REPT", "Reports", "/reports", "reports", 14),
+            ("SETT", "Settings", "/settings", "settings", 15),
         };
 
         var existingNavs = await db.NavigationItems.ToListAsync(ct);
