@@ -42,4 +42,5 @@ public sealed record PayrollSummaryDto(
     decimal TotalAllowances,
     decimal TotalDeductions,
     decimal NetPayable,
-    int EmployeeCount);
+    int EmployeeCount,
+    decimal BasicSalary = 0m);

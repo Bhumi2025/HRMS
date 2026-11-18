@@ -44,20 +44,13 @@ public sealed class ApprovalService : IApprovalService
 
     public async Task<ApprovalDto> CreateAsync(CreateApprovalRequest request, CancellationToken ct = default)
     {
-        var employee = (request.EmployeeId.HasValue && request.EmployeeId.Value != Guid.Empty)
-            ? await _uow.Employees.GetByIdAsync(request.EmployeeId.Value, ct)
-            : null;
-
-        if (employee is null)
-        {
-            var firstId = await ResolveEmployeeIdAsync(null, ct);
-            employee = await _uow.Employees.GetByIdAsync(firstId, ct)
-                ?? throw NotFoundException.For("Employee", firstId);
-        }
+        var employeeId = await ResolveEmployeeIdAsync(request.EmployeeId, ct);
+        _ = await _uow.Employees.GetByIdAsync(employeeId, ct)
+            ?? throw NotFoundException.For("Employee", employeeId);
 
         var approval = new ApprovalRequest
         {
-            EmployeeId = employee.Id,
+            EmployeeId = employeeId,
             Type = request.Type,
             Title = request.Title.Trim(),
             Details = request.Details.Trim(),
@@ -67,6 +60,19 @@ public sealed class ApprovalService : IApprovalService
         };
 
         await _uow.Approvals.AddAsync(approval, ct);
+
+        var emp = await _uow.Employees.GetByIdAsync(employeeId, ct);
+        var empName = emp != null ? $"{emp.FirstName} {emp.LastName}".Trim() : "Employee";
+        await _uow.Notifications.AddAsync(new Notification
+        {
+            IconKey = "documents",
+            Title = "New Approval Request",
+            Message = $"{empName} submitted {approval.Title}: {approval.Details}",
+            TimeLabel = "Just now",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        }, ct);
+
         await _uow.SaveChangesAsync(ct);
 
         var loaded = await _uow.Approvals.GetWithEmployeeAsync(approval.Id, ct)
@@ -83,12 +89,29 @@ public sealed class ApprovalService : IApprovalService
         var approval = await _uow.Approvals.GetWithEmployeeAsync(id, ct)
                        ?? throw NotFoundException.For("Approval request", id);
 
+        if (approval.Status != ApprovalStatus.Pending)
+        {
+            throw new ConflictException("This approval has already been decided.");
+        }
+
         approval.Status = approved ? ApprovalStatus.Approved : ApprovalStatus.Rejected;
         approval.DecidedAtUtc = DateTime.UtcNow;
         approval.DecidedByUserId = _currentUser.UserId;
         approval.DecisionNote = request?.Note;
 
         _uow.Approvals.Update(approval);
+
+        var empName = approval.Employee != null ? $"{approval.Employee.FirstName} {approval.Employee.LastName}".Trim() : "Employee";
+        await _uow.Notifications.AddAsync(new Notification
+        {
+            IconKey = approved ? "check" : "x",
+            Title = approved ? "Approval Request Approved" : "Approval Request Rejected",
+            Message = $"{approval.Title} request for {empName} was {(approved ? "approved" : "rejected")}.",
+            TimeLabel = "Just now",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        }, ct);
+
         await _uow.SaveChangesAsync(ct);
         return ToDto(approval);
     }

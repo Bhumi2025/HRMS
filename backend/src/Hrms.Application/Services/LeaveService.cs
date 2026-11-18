@@ -121,6 +121,19 @@ public sealed class LeaveService : ILeaveService
         };
 
         await _uow.LeaveRequests.AddAsync(leave, ct);
+
+        var emp = await _uow.Employees.GetByIdAsync(employeeId, ct);
+        var empName = emp != null ? $"{emp.FirstName} {emp.LastName}".Trim() : "Employee";
+        await _uow.Notifications.AddAsync(new Notification
+        {
+            IconKey = "check",
+            Title = "New Leave Request",
+            Message = $"{empName} applied for {leave.Days} day(s) of {type.Name} ({leave.FromDate:MMM d} - {leave.ToDate:MMM d}).",
+            TimeLabel = "Just now",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        }, ct);
+
         await _uow.SaveChangesAsync(ct);
 
         return await LoadDtoAsync(leave.Id, ct);
@@ -142,6 +155,18 @@ public sealed class LeaveService : ILeaveService
         leave.DecisionNote = request?.Note;
 
         _uow.LeaveRequests.Update(leave);
+
+        var empName = leave.Employee != null ? $"{leave.Employee.FirstName} {leave.Employee.LastName}".Trim() : "Employee";
+        await _uow.Notifications.AddAsync(new Notification
+        {
+            IconKey = approved ? "check" : "x",
+            Title = approved ? "Leave Approved" : "Leave Rejected",
+            Message = $"Leave request for {empName} ({leave.Days} day{(leave.Days > 1 ? "s" : "")}) was {(approved ? "approved" : "rejected")}.",
+            TimeLabel = "Just now",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        }, ct);
+
         await _uow.SaveChangesAsync(ct);
         return ToRequestDto(leave);
     }

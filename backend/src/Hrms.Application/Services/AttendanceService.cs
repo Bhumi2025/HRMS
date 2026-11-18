@@ -155,7 +155,19 @@ public sealed class AttendanceService : IAttendanceService
             SubmittedAtUtc = DateTime.UtcNow,
         };
 
+        var emp = await _uow.Employees.GetByIdAsync(employeeId, ct);
+        var empName = emp != null ? $"{emp.FirstName} {emp.LastName}".Trim() : "Employee";
+
         await _uow.Regularizations.AddAsync(entity, ct);
+        await _uow.Notifications.AddAsync(new Notification
+        {
+            IconKey = "clock",
+            Title = "Attendance Regularization",
+            Message = $"{empName} submitted a regularization request for {request.Date:MMM d, yyyy}: {request.Reason}",
+            TimeLabel = "Just now",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        }, ct);
         await _uow.SaveChangesAsync(ct);
 
         var loaded = await _uow.Regularizations.GetWithEmployeeAsync(entity.Id, ct)
@@ -211,6 +223,17 @@ public sealed class AttendanceService : IAttendanceService
                 _uow.Attendance.Update(record);
             }
         }
+
+        var empName = entity.Employee != null ? $"{entity.Employee.FirstName} {entity.Employee.LastName}".Trim() : "Employee";
+        await _uow.Notifications.AddAsync(new Notification
+        {
+            IconKey = approved ? "check" : "x",
+            Title = approved ? "Regularization Approved" : "Regularization Rejected",
+            Message = $"Attendance regularization for {empName} on {entity.Date:MMM d, yyyy} was {(approved ? "approved" : "rejected")}.",
+            TimeLabel = "Just now",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        }, ct);
 
         await _uow.SaveChangesAsync(ct);
         return ToRegularizationDto(entity);
@@ -521,6 +544,16 @@ public sealed class AttendanceService : IAttendanceService
 
             _uow.Attendance.Update(attendanceRecord);
         }
+
+        await _uow.Notifications.AddAsync(new Notification
+        {
+            IconKey = "clock",
+            Title = punchType == PunchType.ClockIn ? "Clock In Activity" : (punchType == PunchType.ClockOut ? "Clock Out Activity" : "Break Activity"),
+            Message = $"{employee.FirstName} {employee.LastName} ({employee.EmployeeCode}) recorded {punchType} at {localNow:hh:mm tt}.",
+            TimeLabel = "Just now",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        }, ct);
 
         try
         {

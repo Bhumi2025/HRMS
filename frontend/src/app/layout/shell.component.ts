@@ -15,7 +15,6 @@ import { ToastService } from '../core/services/toast.service';
 import { UiService } from '../core/services/ui.service';
 import { PermissionService } from '../core/services/permission.service';
 import { NotificationStateService, DetailedNotification } from '../core/services/notification-state.service';
-import { SafeHtmlPipe } from '../shared/safe-html.pipe';
 import { FacePunchModalComponent } from '../shared/face-punch-modal.component';
 
 interface MasterNavItem {
@@ -62,7 +61,7 @@ const MASTER_NAV_CATALOGUE: MasterNavItem[] = [
  */
 @Component({
   selector: 'app-shell',
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, IconDirective, SafeHtmlPipe, FacePunchModalComponent],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, IconDirective, FacePunchModalComponent],
   templateUrl: './shell.component.html',
 })
 export class ShellComponent implements OnInit, OnDestroy {

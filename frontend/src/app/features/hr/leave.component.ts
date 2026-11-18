@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
 import { EmployeeListItem } from '../../core/api/api.models';
@@ -8,6 +9,7 @@ import { PermissionService } from '../../core/services/permission.service';
 import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
+import { NotificationStateService } from '../../core/services/notification-state.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 
 interface LeaveRequest {
@@ -307,21 +309,16 @@ interface LeaveType {
           <button class="btn btn-ghost btn-sm" (click)="ui.close('applyModal')"><span [appIcon]="'x'"></span></button>
         </div>
         <div class="modal-body">
-          @if (isAdmin()) {
-            <div class="form-group">
-              <label class="form-label">Employee <span style="color: var(--danger)">*</span></label>
-              <select 
-                class="form-control" 
-                [ngModel]="applyEmployeeId()" 
-                (ngModelChange)="applyEmployeeId.set($event)"
-              >
-                <option value="">Select Employee...</option>
-                @for (emp of employees(); track emp.id) {
-                  <option [value]="emp.id">{{ emp.fullName }} ({{ emp.department }})</option>
-                }
-              </select>
-            </div>
-          }
+          <div class="form-group">
+            <label class="form-label">Employee / Applicant</label>
+            <input 
+              class="form-control" 
+              type="text" 
+              [value]="applicantName()" 
+              readonly 
+              style="background: var(--bg); cursor: not-allowed; font-weight: 600;" 
+            />
+          </div>
           <div class="form-group">
             <label class="form-label">Leave Type <span style="color: var(--danger)">*</span></label>
             <app-select [options]="applyTypeOptions()" [value]="applyType()" (valueChange)="applyType.set($event)" width="100%" />
@@ -411,10 +408,17 @@ export class LeaveComponent implements OnInit, AfterViewInit {
   private readonly toast = inject(ToastService);
   private readonly session = inject(SessionService);
   private readonly api = inject(ApiService);
+  private readonly notifState = inject(NotificationStateService);
+  private readonly route = inject(ActivatedRoute);
 
   private readonly role = this.session.activeRole();
   protected readonly isAdmin = signal(this.role === 'Super Admin' || this.role === 'Company Admin' || this.role === 'HR Manager');
   protected readonly isSuperAdmin = signal(this.role === 'Super Admin');
+
+  protected readonly applicantName = computed(() => {
+    const user = this.session.user();
+    return user?.name || (this.role === 'HR Manager' ? 'Priya Sharma (HR Executive)' : 'HR Manager');
+  });
 
   protected readonly search = signal('');
   protected readonly typeFilter = signal('');
@@ -490,6 +494,12 @@ export class LeaveComponent implements OnInit, AfterViewInit {
     this.loadTypes();
     this.loadRequests();
     this.loadEmployees();
+
+    this.route.queryParamMap.subscribe((params) => {
+      if (params.get('action') === 'apply') {
+        this.ui.open('applyModal');
+      }
+    });
   }
 
   ngAfterViewInit(): void {
@@ -643,6 +653,7 @@ export class LeaveComponent implements OnInit, AfterViewInit {
         this.requests.update((list) =>
           list.map((x) => (x === r ? { ...x, s: updated.status as LeaveRequest['s'] } : x)),
         );
+        this.notifState.refresh();
         this.toast.show(status === 'Approved' ? 'Leave approved!' : 'Leave rejected', status === 'Approved' ? 'success' : 'danger');
       },
       error: (error) => this.toast.show(error?.error?.detail || error?.error?.message || error?.error?.title || 'Could not update the leave request.', 'danger'),
@@ -732,7 +743,7 @@ export class LeaveComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    const employeeId = this.isAdmin() && this.applyEmployeeId() ? this.applyEmployeeId() : null;
+    const employeeId = this.session.user()?.employeeId || null;
 
     this.api
       .createLeaveRequest({
@@ -746,6 +757,7 @@ export class LeaveComponent implements OnInit, AfterViewInit {
         next: () => {
           this.ui.close('applyModal');
           this.toast.show('Leave request submitted!');
+          this.notifState.refresh();
           this.applyReason.set('');
           this.applyFrom.set('');
           this.applyTo.set('');

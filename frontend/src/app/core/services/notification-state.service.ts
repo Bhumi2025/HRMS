@@ -25,11 +25,29 @@ export class NotificationStateService {
   readonly notifications = signal<DetailedNotification[]>([]);
   readonly unreadCount = computed(() => this.notifications().filter((n) => n.unread).length);
 
+  private pollInterval: any = null;
+
   constructor() {
+    this.load();
+    if (typeof window !== 'undefined') {
+      this.pollInterval = setInterval(() => {
+        if (this.session.isAuthenticated()) {
+          this.load();
+        }
+      }, 10000);
+    }
+  }
+
+  refresh(): void {
     this.load();
   }
 
   load(): void {
+    if (!this.session.isAuthenticated()) {
+      this.notifications.set([]);
+      return;
+    }
+
     this.api.notifications().subscribe({
       next: (items) => {
         const isEmp = this.session.activeRole() === 'Employee';

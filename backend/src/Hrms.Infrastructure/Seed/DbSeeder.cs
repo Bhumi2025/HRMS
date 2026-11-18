@@ -382,6 +382,40 @@ public static class DbSeeder
             return;
         }
 
+        // Backfill DateOfBirth and personal details for all employees
+        var allEmps = await db.Employees.ToListAsync(ct);
+        foreach (var emp in allEmps)
+        {
+            if (emp.DateOfBirth == null)
+            {
+                switch (emp.EmployeeCode)
+                {
+                    case "EMP-1001": emp.DateOfBirth = new DateOnly(1990, 6, 15); break;
+                    case "EMP-1002": emp.DateOfBirth = new DateOnly(1988, 11, 24); break;
+                    case "EMP-1003": emp.DateOfBirth = new DateOnly(1994, 3, 12); break;
+                    case "EMP-1004": emp.DateOfBirth = new DateOnly(1985, 7, 19); break;
+                    case "EMP-1005": emp.DateOfBirth = new DateOnly(1992, today.Month, today.Day); break; // Today is Birthday!
+                    case "EMP-1006": emp.DateOfBirth = new DateOnly(1991, 8, 30); break;
+                    case "EMP-1007": emp.DateOfBirth = new DateOnly(1995, 12, 5); break;
+                    case "EMP-1008": emp.DateOfBirth = new DateOnly(1987, 4, 22); break;
+                    default: emp.DateOfBirth = new DateOnly(1993, 11, 10); break;
+                }
+            }
+        }
+
+        // Ensure active initial notifications exist in the database
+        if (!await db.Notifications.AnyAsync(ct))
+        {
+            db.Notifications.AddRange(
+                NewNotification("party", "Birthday Today 🎂", "Emma Wilson celebrates her birthday today! Send your best wishes.", "Just now", false),
+                NewNotification("check", "Leave Request Submitted", "Sarah Mitchell requested Annual Leave from Nov 20 to Nov 24.", "10 min ago", false),
+                NewNotification("alert", "Attendance Notice", "Tom Bradley marked absent today.", "25 min ago", false),
+                NewNotification("documents", "New Approval Request", "Ravi Kumar submitted an overtime request for 4.5 hours.", "1 hr ago", false),
+                NewNotification("documents", "Document Expiry Alert", "Carlos Rivera's passport expires in 5 days.", "3 hr ago", false),
+                NewNotification("check", "Payroll Processed", "November 2026 payroll has been calculated.", "1 day ago", true),
+                NewNotification("bell", "Policy Announcement", "New leave policy is effective next month.", "2 days ago", true));
+        }
+
         // Backfill overtime hours for approvals created before the field existed.
         var overtime = await db.ApprovalRequests
             .Where(a => a.Type == ApprovalType.Overtime && a.OvertimeHours == null)

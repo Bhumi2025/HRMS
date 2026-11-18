@@ -17,7 +17,6 @@ const hrModules = (approvalBadge?: string): NavSection => ({
     { icon: 'clock', label: 'Shift', path: '/shift' },
     { icon: 'attendance', label: 'Attendance', path: '/attendance' },
     { icon: 'leave', label: 'Leave', path: '/leave' },
-    { icon: 'loans', label: 'Loans', path: '/loans' },
     { icon: 'payroll', label: 'Payroll', path: '/payroll' },
     { icon: 'payslip', label: 'Payslips', path: '/payslips' },
     { icon: 'onboarding', label: 'Onboarding', path: '/onboarding' },

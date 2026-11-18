@@ -78,6 +78,7 @@ export interface EmployeeDetail {
   designation?: string | null;
   branchId?: string | null;
   branch?: string | null;
+  reportingManagerId?: string | null;
   reportingManager?: string | null;
   jobTitle: string;
   grade: string;
@@ -220,6 +221,7 @@ export interface PayrollSummary {
   totalDeductions: number;
   netPayable: number;
   employeeCount: number;
+  basicSalary?: number;
 }
 
 export interface Loan {
@@ -982,7 +984,7 @@ export interface SaveRolePermissionsRequest {
 
 export interface SaveKeyStoreRequest {
   id?: string | null;
-  keyGroupId: string;
+  keyGroupId?: string | null;
   key: string;
   value: string;
   subValue?: string | null;

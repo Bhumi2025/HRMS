@@ -133,8 +133,8 @@ export const routes: Routes = [
       },
       {
         path: 'loans',
-        data: { title: 'Loans & Advances' },
-        loadComponent: () => import('./features/hr/loans.component').then((m) => m.LoansComponent),
+        redirectTo: 'dashboard',
+        pathMatch: 'full',
       },
       {
         path: 'reports',

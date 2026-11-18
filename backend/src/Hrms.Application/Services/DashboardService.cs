@@ -456,7 +456,9 @@ public sealed class DashboardService : IDashboardService
 
             if (emp.DateOfBirth is { } dob && dob.Month == today.Month)
             {
-                celebrations.Add(new CelebrationDto(emp.Id, name, emp.EmployeeCode, dept, "Birthday", $"Birthday on {new DateTime(today.Year, dob.Month, dob.Day):MMM d}", null));
+                var isToday = dob.Day == today.Day;
+                var label = isToday ? "Birthday Today! 🎂" : $"Birthday on {new DateTime(today.Year, dob.Month, dob.Day):MMM d}";
+                celebrations.Add(new CelebrationDto(emp.Id, name, emp.EmployeeCode, dept, "Birthday", label, null));
             }
 
             if (emp.JoinDate.Month == today.Month && emp.JoinDate.Year < today.Year)
@@ -477,9 +479,14 @@ public sealed class DashboardService : IDashboardService
         var holidayDtos = holidays.Select(h => new HolidayDto(h.Id, h.Name, h.Date, h.Date.DayOfWeek.ToString(), h.Type.ToString())).ToList();
 
         // 5. Tasks - prioritize active/pending tasks
+        var tasksQuery = _uow.Tasks.Query();
+        var hasEmpTasks = targetEmpId != Guid.Empty && await _uow.Tasks.AnyAsync(_uow.Tasks.Query().Where(t => t.EmployeeId == targetEmpId), ct);
+        if (hasEmpTasks)
+        {
+            tasksQuery = tasksQuery.Where(t => t.EmployeeId == targetEmpId);
+        }
         var tasks = await _uow.Tasks.ToListAsync(
-            _uow.Tasks.Query()
-                .Where(t => targetEmpId == Guid.Empty || t.EmployeeId == targetEmpId)
+            tasksQuery
                 .OrderBy(t => t.Status == TaskItemStatus.Completed ? 1 : 0)
                 .ThenBy(t => t.DueDate)
                 .Take(6), ct);

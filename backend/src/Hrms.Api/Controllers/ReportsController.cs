@@ -7,6 +7,7 @@ namespace Hrms.Api.Controllers;
 
 [ApiController]
 [Route("api/reports")]
+[Authorize]
 [Tags("Reports")]
 public sealed class ReportsController : ControllerBase
 {

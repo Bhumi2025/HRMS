@@ -46,8 +46,15 @@ public sealed class DocumentService : IDocumentService
         CancellationToken ct = default)
     {
         var documents = await _uow.Documents.SearchAsync(employeeId, search, type, status, ct);
+        if (employeeId.HasValue && employeeId.Value != Guid.Empty)
+        {
+            return documents
+                .Where(d => !d.IsCompanyDocument)
+                .Select(ToDto)
+                .ToList();
+        }
+
         return documents
-            .Where(d => !d.IsCompanyDocument)
             .Select(ToDto)
             .ToList();
     }
@@ -90,6 +97,24 @@ public sealed class DocumentService : IDocumentService
         }
 
         await _uow.Documents.AddAsync(document, ct);
+
+        var emp = !request.IsCompanyDocument && request.EmployeeId.HasValue
+            ? await _uow.Employees.GetByIdAsync(request.EmployeeId.Value, ct)
+            : null;
+        var empName = emp != null ? $"{emp.FirstName} {emp.LastName}".Trim() : "Company";
+
+        await _uow.Notifications.AddAsync(new Notification
+        {
+            IconKey = "documents",
+            Title = request.IsCompanyDocument ? "Company Document Added" : "Employee Document Uploaded",
+            Message = request.IsCompanyDocument
+                ? $"New company document '{document.Name}' was uploaded."
+                : $"Document '{document.Name}' ({document.Type}) was uploaded for {empName}.",
+            TimeLabel = "Just now",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        }, ct);
+
         await _uow.SaveChangesAsync(ct);
 
         var loaded = await _uow.Documents.GetWithEmployeeAsync(document.Id, ct)

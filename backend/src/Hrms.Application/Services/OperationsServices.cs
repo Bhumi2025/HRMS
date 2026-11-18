@@ -324,8 +324,20 @@ public sealed class TaskService : ITaskService
         _uow.Tasks.Update(task);
         await _uow.SaveChangesAsync(ct);
 
-        var loaded = await ListAsync(task.EmployeeId, ct);
-        return loaded.First(t => t.Id == task.Id);
+        var emp = task.EmployeeId != Guid.Empty ? await _uow.Employees.GetByIdAsync(task.EmployeeId, ct) : null;
+        var empName = emp != null ? $"{emp.FirstName} {emp.LastName}".Trim() : "You";
+
+        return new TaskDto(
+            task.Id,
+            task.EmployeeId,
+            empName,
+            task.Title,
+            task.Description,
+            task.DueDate,
+            Formatting.ShortDate(task.DueDate),
+            task.Status.ToString(),
+            task.Priority.ToString(),
+            task.AssignedBy);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)

@@ -5,6 +5,7 @@ import { ApiService } from '../../core/api/api.service';
 import { PermissionService } from '../../core/services/permission.service';
 import { SessionService } from '../../core/services/session.service';
 import { PunchService } from '../../core/services/punch.service';
+import { NotificationStateService } from '../../core/services/notification-state.service';
 import {
   DashboardTemplateData,
   NoticeBoardItem,
@@ -30,10 +31,12 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly session = inject(SessionService);
   protected readonly punchService = inject(PunchService);
   protected readonly perms = inject(PermissionService);
+  protected readonly notifState = inject(NotificationStateService);
   private readonly api = inject(ApiService);
   private readonly zone = inject(NgZone);
 
   private clockInterval: ReturnType<typeof setInterval> | null = null;
+  private refreshInterval: ReturnType<typeof setInterval> | null = null;
 
   protected readonly loading = signal(true);
   protected readonly activeCelebrationTab = signal<'Birthday' | 'WorkAnniversary' | 'NewJoinee'>('Birthday');
@@ -54,6 +57,8 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly leaveBalances = signal<LeaveBalance[]>([]);
 
   // Computed properties
+  protected readonly role = computed(() => this.session.activeRole());
+
   protected readonly userName = computed(() => {
     const role = this.session.activeRole();
     return role === 'Super Admin' ? 'Admin' : role;
@@ -96,6 +101,10 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
       this.clockInterval = setInterval(() => {
         this.zone.run(() => this.currentTime.set(new Date()));
       }, 1000);
+
+      this.refreshInterval = setInterval(() => {
+        this.zone.run(() => this.loadData());
+      }, 15000);
     });
 
     this.loadData();
@@ -106,10 +115,13 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
       clearInterval(this.clockInterval);
       this.clockInterval = null;
     }
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+    }
   }
 
   loadData(): void {
-    this.loading.set(true);
     this.api.dashboardTemplateData().subscribe({
       next: (data: DashboardTemplateData) => {
         this.notices.set(data.notices || []);
@@ -149,23 +161,39 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
 
   clockIn(): void {
     this.punchService.requestClockIn();
+    setTimeout(() => {
+      this.loadData();
+      this.notifState.refresh();
+    }, 1200);
   }
 
   clockOut(): void {
     this.punchService.requestClockOut();
+    setTimeout(() => {
+      this.loadData();
+      this.notifState.refresh();
+    }, 1200);
   }
 
   toggleBreak(): void {
     this.punchService.toggleBreak();
+    setTimeout(() => {
+      this.loadData();
+      this.notifState.refresh();
+    }, 1200);
   }
 
   approveRequest(id: string): void {
     this.api.approveApproval(id).subscribe({
       next: () => {
         this.pendingApprovals.update((list) => list.filter((a) => a.id !== id));
+        this.notifState.refresh();
+        this.loadData();
       },
       error: () => {
         this.pendingApprovals.update((list) => list.filter((a) => a.id !== id));
+        this.notifState.refresh();
+        this.loadData();
       },
     });
   }
@@ -174,21 +202,37 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     this.api.rejectApproval(id).subscribe({
       next: () => {
         this.pendingApprovals.update((list) => list.filter((a) => a.id !== id));
+        this.notifState.refresh();
+        this.loadData();
       },
       error: () => {
         this.pendingApprovals.update((list) => list.filter((a) => a.id !== id));
+        this.notifState.refresh();
+        this.loadData();
       },
     });
   }
 
+  countForTab(tab: 'Birthday' | 'WorkAnniversary' | 'NewJoinee'): number {
+    return this.celebrations().filter((c) => c.type === tab).length;
+  }
+
+  getBarHeight(count: number): number {
+    if (!count || count <= 0) return 0;
+    const max = Math.max(this.totalHeadcount(), 6);
+    return Math.min(100, Math.max(16, Math.round((count / max) * 100)));
+  }
+
   toggleTask(task: TaskItem): void {
     const newStatus = task.status === 'Completed' ? 'Pending' : 'Completed';
-    this.api.updateTaskStatus(task.id, newStatus as any).subscribe({
+    task.status = newStatus;
+    this.api.updateTaskStatus(task.id, newStatus).subscribe({
       next: (updated) => {
-        this.myTasks.update((list) => list.map((t) => (t.id === task.id ? updated : t)));
+        this.myTasks.update((list) => list.map((t) => (t.id === task.id ? { ...t, status: updated.status } : t)));
+        this.notifState.refresh();
       },
       error: () => {
-        task.status = newStatus;
+        task.status = newStatus === 'Completed' ? 'Pending' : 'Completed';
       },
     });
   }

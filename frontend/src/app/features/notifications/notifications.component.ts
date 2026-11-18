@@ -12,7 +12,11 @@ export type { DetailedNotification };
   selector: 'app-notifications',
   imports: [CommonModule, FormsModule, IconDirective],
   template: `
-    <div class="flex justify-end items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--text); margin: 0 0 4px 0;">Notifications Center</h2>
+        <p style="font-size: 13px; color: var(--muted); margin: 0;">Real-time overview of approvals, leave alerts, birthdays, and company updates.</p>
+      </div>
       <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
         <button class="btn btn-outline btn-sm" (click)="markAllAsRead()" style="display: flex; align-items: center; gap: 6px;">
           <span [appIcon]="'check'"></span> Mark All as Read
@@ -67,6 +71,30 @@ export type { DetailedNotification };
             (click)="activeFilter.set('policy')"
           >
             Policy &amp; Notices
+          </button>
+          <button
+            class="btn btn-sm"
+            [class.btn-primary]="activeFilter() === 'birthday'"
+            [class.btn-outline]="activeFilter() !== 'birthday'"
+            (click)="activeFilter.set('birthday')"
+          >
+            🎂 Birthdays
+          </button>
+          <button
+            class="btn btn-sm"
+            [class.btn-primary]="activeFilter() === 'document'"
+            [class.btn-outline]="activeFilter() !== 'document'"
+            (click)="activeFilter.set('document')"
+          >
+            📄 Documents
+          </button>
+          <button
+            class="btn btn-sm"
+            [class.btn-primary]="activeFilter() === 'payroll'"
+            [class.btn-outline]="activeFilter() !== 'payroll'"
+            (click)="activeFilter.set('payroll')"
+          >
+            💰 Payroll
           </button>
         </div>
 
@@ -253,7 +281,7 @@ export class NotificationsComponent implements OnInit {
   private readonly toast = inject(ToastService);
 
   protected readonly notifications = computed(() => this.notifState.notifications());
-  protected readonly activeFilter = signal<'all' | 'unread' | 'approval' | 'attendance' | 'policy'>('all');
+  protected readonly activeFilter = signal<'all' | 'unread' | 'approval' | 'attendance' | 'policy' | 'birthday' | 'document' | 'payroll'>('all');
   protected readonly searchKeyword = signal('');
 
   protected readonly unreadCount = computed(() => this.notifState.unreadCount());
@@ -273,6 +301,12 @@ export class NotificationsComponent implements OnInit {
       list = list.filter((n) => n.category === 'Attendance');
     } else if (filter === 'policy') {
       list = list.filter((n) => n.category === 'Policy');
+    } else if (filter === 'birthday') {
+      list = list.filter((n) => n.category === 'Birthday');
+    } else if (filter === 'document') {
+      list = list.filter((n) => n.category === 'Document');
+    } else if (filter === 'payroll') {
+      list = list.filter((n) => n.category === 'Payroll');
     }
 
     if (q) {

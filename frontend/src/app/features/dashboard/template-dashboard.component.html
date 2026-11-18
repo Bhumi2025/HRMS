@@ -96,9 +96,18 @@
               @for (bar of attendanceGraph(); track bar.label) {
                 <div class="bar-col">
                   <div class="bar-stack">
-                    <div class="seg seg-present" [style.height.%]="bar.present * 3" [title]="'Present: ' + bar.present"></div>
-                    <div class="seg seg-late" [style.height.%]="bar.late * 4" [title]="'Late: ' + bar.late"></div>
-                    <div class="seg seg-absent" [style.height.%]="bar.absent * 4" [title]="'Absent: ' + bar.absent"></div>
+                    @if (bar.present > 0) {
+                      <div class="seg seg-present" [style.height.%]="getBarHeight(bar.present)" [title]="'Present: ' + bar.present"></div>
+                    }
+                    @if (bar.late > 0) {
+                      <div class="seg seg-late" [style.height.%]="getBarHeight(bar.late)" [title]="'Late: ' + bar.late"></div>
+                    }
+                    @if (bar.absent > 0) {
+                      <div class="seg seg-absent" [style.height.%]="getBarHeight(bar.absent)" [title]="'Absent: ' + bar.absent"></div>
+                    }
+                    @if (bar.present === 0 && bar.late === 0 && bar.absent === 0) {
+                      <div class="seg seg-empty" style="height: 4px; background: var(--border, #e2e8f0); border-radius: 2px;" title="No attendance records"></div>
+                    }
                   </div>
                   <span class="bar-label">{{ bar.label }}</span>
                 </div>
@@ -173,13 +182,13 @@
             </div>
             <div class="tab-pills">
               <button class="tab-btn" [class.active]="activeCelebrationTab() === 'Birthday'" (click)="activeCelebrationTab.set('Birthday')">
-                🎂 Birthdays
+                🎂 Birthdays ({{ countForTab('Birthday') }})
               </button>
               <button class="tab-btn" [class.active]="activeCelebrationTab() === 'WorkAnniversary'" (click)="activeCelebrationTab.set('WorkAnniversary')">
-                🎖️ Anniversaries
+                🎖️ Anniversaries ({{ countForTab('WorkAnniversary') }})
               </button>
               <button class="tab-btn" [class.active]="activeCelebrationTab() === 'NewJoinee'" (click)="activeCelebrationTab.set('NewJoinee')">
-                👋 New Joinees
+                👋 New Joinees ({{ countForTab('NewJoinee') }})
               </button>
             </div>
           </div>
@@ -217,8 +226,14 @@
               <div class="task-list">
                 @for (task of myTasks(); track task.id) {
                   <div class="task-row" [class.completed]="task.status === 'Completed'">
-                    <input type="checkbox" [checked]="task.status === 'Completed'" (change)="toggleTask(task)" />
-                    <div class="task-body">
+                    <input
+                      type="checkbox"
+                      [checked]="task.status === 'Completed'"
+                      (click)="$event.stopPropagation()"
+                      (change)="toggleTask(task)"
+                      style="cursor: pointer;"
+                    />
+                    <div class="task-body" (click)="toggleTask(task)" style="cursor: pointer;">
                       <div class="task-title">{{ task.title }}</div>
                       <div class="task-meta">Due: {{ task.dueDate }} · <span class="priority-pill" [class]="'priority-' + task.priority.toLowerCase()">{{ task.priority }}</span></div>
                     </div>
@@ -393,54 +408,45 @@
         </div>
 
         <div class="quick-links-grid">
-          @if (perms.hasModuleAccess('Leave')) {
-            <a routerLink="/leave" class="quick-link-btn">
-              <span class="link-icon">🏖️</span>
-              <span>Apply Leave</span>
-            </a>
-          }
-          @if (perms.hasModuleAccess('Attendance')) {
-            <a routerLink="/attendance" class="quick-link-btn">
-              <span class="link-icon">⏱️</span>
-              <span>Regularization</span>
-            </a>
-          }
-          @if (perms.hasModuleAccess('Shift')) {
-            <a routerLink="/shift" class="quick-link-btn">
-              <span class="link-icon">🕒</span>
-              <span>Shift Management</span>
-            </a>
-          }
-          @if (perms.hasModuleAccess('Payslips') || perms.hasModuleAccess('Payroll')) {
-            <a routerLink="/payslips" class="quick-link-btn">
-              <span class="link-icon">💳</span>
-              <span>View Payslip</span>
-            </a>
-          }
-          @if (perms.hasModuleAccess('Settings')) {
-            <a routerLink="/settings" [queryParams]="{ tab: 'keygroup' }" class="quick-link-btn">
-              <span class="link-icon">⚙️</span>
-              <span>Key Groups</span>
-            </a>
-            <a routerLink="/settings" [queryParams]="{ tab: 'role' }" class="quick-link-btn">
-              <span class="link-icon">🔐</span>
-              <span>Roles &amp; RBAC</span>
-            </a>
-          }
-          <a routerLink="/kiosk" class="quick-link-btn">
-            <span class="link-icon">📷</span>
-            <span>Face Kiosk</span>
+          <a [routerLink]="role() === 'Employee' ? '/me/leave' : '/leave'" [queryParams]="{ action: 'apply' }" class="quick-link-btn">
+            <span class="link-icon">🏖️</span>
+            <span>Apply Leave</span>
           </a>
-          @if (perms.hasModuleAccess('Payroll')) {
-            <a routerLink="/loans" class="quick-link-btn">
-              <span class="link-icon">💰</span>
-              <span>Loans</span>
+
+          <a [routerLink]="role() === 'Employee' ? '/me/attendance' : '/approvals'" [queryParams]="role() === 'Employee' ? null : { tab: 'reg' }" class="quick-link-btn">
+            <span class="link-icon">⏱️</span>
+            <span>Regularization</span>
+          </a>
+
+          <a routerLink="/shift" class="quick-link-btn">
+            <span class="link-icon">📅</span>
+            <span>Shift Roster</span>
+          </a>
+
+          <a [routerLink]="role() === 'Employee' ? '/me/payslips' : '/payslips'" class="quick-link-btn">
+            <span class="link-icon">💳</span>
+            <span>View Payslip</span>
+          </a>
+
+          <a [routerLink]="role() === 'Employee' ? '/me/documents' : '/documents'" class="quick-link-btn">
+            <span class="link-icon">📁</span>
+            <span>Documents</span>
+          </a>
+
+          <a [routerLink]="role() === 'Employee' ? '/me/leave' : '/approvals'" class="quick-link-btn">
+            <span class="link-icon">📋</span>
+            <span>Approvals</span>
+          </a>
+
+          @if (role() !== 'Employee') {
+            <a routerLink="/onboarding" class="quick-link-btn">
+              <span class="link-icon">👤</span>
+              <span>Onboarding</span>
             </a>
-          }
-          @if (perms.hasModuleAccess('Employees')) {
-            <a routerLink="/employees" class="quick-link-btn">
-              <span class="link-icon">👥</span>
-              <span>Directory</span>
+
+            <a routerLink="/reports" class="quick-link-btn">
+              <span class="link-icon">📊</span>
+              <span>Reports</span>
             </a>
           }
         </div>

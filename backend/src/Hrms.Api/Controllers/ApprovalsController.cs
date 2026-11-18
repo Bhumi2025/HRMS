@@ -1,6 +1,7 @@
 using Hrms.Application.Abstractions.Services;
 using Hrms.Application.DTOs;
 using Hrms.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
@@ -8,6 +9,7 @@ namespace Hrms.Api.Controllers;
 
 [ApiController]
 [Route("api/approvals")]
+[Authorize]
 [Tags("Approvals")]
 public sealed class ApprovalsController : ControllerBase
 {
@@ -42,6 +44,7 @@ public sealed class ApprovalsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/approve")]
+    [Authorize(Policy = "ManagerOrAbove")]
     [ProducesResponseType(typeof(ApprovalDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApprovalDto>> Approve(
         Guid id,
@@ -50,6 +53,7 @@ public sealed class ApprovalsController : ControllerBase
         Ok(await _approvals.DecideAsync(id, true, request, ct));
 
     [HttpPost("{id:guid}/reject")]
+    [Authorize(Policy = "ManagerOrAbove")]
     [ProducesResponseType(typeof(ApprovalDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApprovalDto>> Reject(
         Guid id,
@@ -58,6 +62,7 @@ public sealed class ApprovalsController : ControllerBase
         Ok(await _approvals.DecideAsync(id, false, request, ct));
 
     [HttpPost("approve-all")]
+    [Authorize(Policy = "ManagerOrAbove")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public async Task<ActionResult> ApproveAll(CancellationToken ct)
     {

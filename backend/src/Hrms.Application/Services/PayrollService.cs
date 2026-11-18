@@ -27,7 +27,7 @@ public sealed class PayrollService : IPayrollService
         var totals = await _uow.Payslips.FirstOrDefaultAsync(
             payslips.GroupBy(_ => 1).Select(g => new
             {
-                Gross = g.Sum(p => p.BasicSalary),
+                Basic = g.Sum(p => p.BasicSalary),
                 Allowances = g.Sum(p => p.Allowances),
                 Deductions = g.Sum(p => p.Deductions),
                 Net = g.Sum(p => p.NetPay),
@@ -35,13 +35,19 @@ public sealed class PayrollService : IPayrollService
             ct);
 
         var employees = await _uow.Payslips.CountQueryAsync(payslips.Select(p => p.EmployeeId).Distinct(), ct);
+        var basic = totals?.Basic ?? 0m;
+        var allowances = totals?.Allowances ?? 0m;
+        var deductions = totals?.Deductions ?? 0m;
+        var net = totals?.Net ?? 0m;
+        var gross = basic + allowances;
 
         return new PayrollSummaryDto(
-            totals?.Gross ?? 0m,
-            totals?.Allowances ?? 0m,
-            totals?.Deductions ?? 0m,
-            totals?.Net ?? 0m,
-            employees);
+            gross,
+            allowances,
+            deductions,
+            net,
+            employees,
+            basic);
     }
 
     public async Task<IReadOnlyList<PayrollRunDto>> GetRunsAsync(CancellationToken ct = default)
@@ -132,6 +138,17 @@ public sealed class PayrollService : IPayrollService
 
         await _uow.PayrollRuns.AddAsync(run, ct);
         await _uow.Payslips.AddRangeAsync(payslips, ct);
+
+        await _uow.Notifications.AddAsync(new Notification
+        {
+            IconKey = "card",
+            Title = "Payroll Run Processed",
+            Message = $"Payroll for {new DateTime(request.Year, request.Month, 1):MMMM yyyy} was processed for {payslips.Count} employees. Total Net: ${run.TotalNet:N0}.",
+            TimeLabel = "Just now",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        }, ct);
+
         await _uow.SaveChangesAsync(ct);
 
         return ToRunDto(run);

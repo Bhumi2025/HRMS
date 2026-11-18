@@ -124,7 +124,7 @@
         >
           <span [appIcon]="'bell'"></span>
           @if (unreadCount() > 0) {
-            <span class="notif-dot"></span>
+            <span class="notif-badge">{{ unreadCount() > 9 ? '9+' : unreadCount() }}</span>
           }
         </div>
         <div
@@ -205,12 +205,13 @@
     }
   </div>
   <div style="padding: 10px 16px; text-align: center; border-top: 1px solid var(--border)">
-    <button
-      (click)="viewAllNotifications()"
-      style="font-size: 12px; font-weight: 600; color: var(--p); background: none; border: none; cursor: pointer; width: 100%; padding: 4px;"
+    <a
+      [routerLink]="role() === 'Employee' ? '/me/notifications' : '/notifications'"
+      (click)="ui.closePanel()"
+      style="font-size: 12px; font-weight: 700; color: var(--p); text-decoration: none; display: block; width: 100%; padding: 6px 0; cursor: pointer;"
     >
-      View All Notifications
-    </button>
+      View All Notifications ›
+    </a>
   </div>
 </div>
 

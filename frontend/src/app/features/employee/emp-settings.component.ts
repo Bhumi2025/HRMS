@@ -16,6 +16,11 @@ interface Preference {
   selector: 'app-emp-settings',
   imports: [CommonModule, IconDirective],
   template: `
+    <div style="margin-bottom: 24px">
+      <div class="page-title">Settings</div>
+      <div class="page-subtitle">Manage your account preferences</div>
+    </div>
+
     <div class="grid-2">
       <div class="card">
         <div class="card-header"><div class="card-title">Change Password</div></div>
