@@ -94,7 +94,6 @@ import { ToastService } from '../../core/services/toast.service';
                 <th>Tenant Code</th>
                 <th>Administrator</th>
                 <th>Database</th>
-                <th style="text-align: center;">Status</th>
                 <th style="text-align: right; min-width: 180px;">Actions</th>
               </tr>
             </thead>
@@ -131,21 +130,6 @@ import { ToastService } from '../../core/services/toast.service';
                       {{ c.databaseName || 'HRMS (Default)' }}
                     </span>
                   </td>
-                  <td style="text-align: center;">
-                    @if ((c.status || '').toLowerCase() === 'active') {
-                      <span class="status-badge status-active">
-                        <span class="dot"></span> Active
-                      </span>
-                    } @else if ((c.status || '').toLowerCase() === 'suspended') {
-                      <span class="status-badge status-suspended">
-                        <span class="dot"></span> Suspended
-                      </span>
-                    } @else {
-                      <span class="status-badge status-provisioning">
-                        <span class="dot"></span> Provisioning
-                      </span>
-                    }
-                  </td>
                   <td style="text-align: right;">
                     <div class="actions-group">
                       @if (!c.isDefault) {
@@ -175,7 +159,7 @@ import { ToastService } from '../../core/services/toast.service';
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="6" class="empty-state">
+                  <td colspan="5" class="empty-state">
                     <div class="empty-icon">🏢</div>
                     <div class="empty-title">No tenant organizations found</div>
                     <div class="empty-desc">Try clearing your search query or filter</div>
@@ -189,8 +173,8 @@ import { ToastService } from '../../core/services/toast.service';
 
       <!-- Company Details & Employees Modal (matching Image 2) -->
       @if (showDetailsModal()) {
-        <div class="modal-overlay" (click)="closeCompanyDetails()">
-          <div class="modal-card" style="max-width: 860px;" (click)="$event.stopPropagation()">
+        <div class="modal-overlay open" (click)="closeCompanyDetails()">
+          <div class="modal modal-card" style="max-width: 860px; width: 100%;" (click)="$event.stopPropagation()">
             <!-- Modal Header -->
             <div class="modal-header">
               <div style="display: flex; align-items: center; gap: 10px;">
@@ -401,8 +385,8 @@ import { ToastService } from '../../core/services/toast.service';
 
       <!-- Create Organization Modal -->
       @if (showCreateOrgModal()) {
-        <div class="modal-overlay" (click)="closeCreateOrgModal()">
-          <div class="modal-card" style="max-width: 580px;" (click)="$event.stopPropagation()">
+        <div class="modal-overlay open" (click)="closeCreateOrgModal()">
+          <div class="modal modal-card" style="max-width: 580px; width: 100%;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <div>
                 <h3 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 800;">New Organization &amp; Tenant Provisioning</h3>
@@ -930,11 +914,19 @@ import { ToastService } from '../../core/services/toast.service';
         inset: 0;
         background: rgba(15, 23, 42, 0.65);
         backdrop-filter: blur(5px);
-        z-index: 9999;
+        z-index: 99999;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 20px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+      .modal-overlay.open {
+        opacity: 1 !important;
+        pointer-events: all !important;
+        visibility: visible !important;
       }
       .modal-card {
         background: var(--surface, #ffffff);
@@ -943,6 +935,8 @@ import { ToastService } from '../../core/services/toast.service';
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         width: 100%;
         overflow: hidden;
+        opacity: 1 !important;
+        transform: scale(1) translateY(0) !important;
         animation: modalIn 0.2s ease-out;
       }
       .modal-large {

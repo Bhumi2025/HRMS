@@ -161,7 +161,6 @@ function emptyTenantForm(): CreateCompanyRequest {
               <thead>
                 <tr style="background: var(--bg); border-bottom: 1px solid var(--border);">
                   <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Company</th>
-                  <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Status</th>
                   <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Dedicated Database</th>
                   <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Administrator</th>
                   <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Invitation</th>
@@ -171,11 +170,11 @@ function emptyTenantForm(): CreateCompanyRequest {
               <tbody>
                 @if (tenantLoading()) {
                   <tr>
-                    <td colspan="6" style="text-align: center; padding: 32px; color: var(--muted);">Loading tenant companies…</td>
+                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">Loading tenant companies…</td>
                   </tr>
                 } @else if (tenantCompanies().length === 0) {
                   <tr>
-                    <td colspan="6" style="text-align: center; padding: 32px; color: var(--muted);">No companies yet. Create one to provision its dedicated database.</td>
+                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">No companies yet. Create one to provision its dedicated database.</td>
                   </tr>
                 } @else {
                   @for (c of filteredTenantCompanies(); track c.id) {
@@ -195,9 +194,6 @@ function emptyTenantForm(): CreateCompanyRequest {
                             <span class="badge badge-info">Default</span>
                           }
                         </div>
-                      </td>
-                      <td style="padding: 14px 16px;">
-                        <span class="badge" [ngClass]="statusBadge(c.status)">{{ c.status }}</span>
                       </td>
                       <td style="padding: 14px 16px; font-size: 13px; font-family: monospace; color: var(--muted);">
                         {{ c.databaseName || '—' }}
