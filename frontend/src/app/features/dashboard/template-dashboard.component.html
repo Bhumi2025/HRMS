@@ -115,7 +115,7 @@
           </div>
         </div>
 
-        <!-- 2. Attendance Overview Card (Exact Boxed Dynamic Line Chart Matching Reference) -->
+        <!-- 2. Attendance Overview Card (Clean Modern Bar Chart Matching Reference Image) -->
         <div class="dash-widget attendance-widget">
           <div class="widget-header">
             <div class="header-left">
@@ -130,7 +130,7 @@
                     title="Select Month & Year"
                   >
                     @for (m of availableMonths(); track m.key) {
-                      <option [value]="m.key">{{ m.label }}</option>
+                      <option [value]="m.key" [selected]="m.key === selectedMonthKey()">{{ m.label }}</option>
                     }
                   </select>
                   <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -140,109 +140,151 @@
               </div>
             </div>
 
-            <!-- Legend & Action (Redirects to Monthly Muster Register for Selected Month) -->
+            <!-- Legend & Action (Redirects to Monthly Muster Register) -->
             <div class="header-actions">
               <div class="graph-legend">
-                <span class="legend-item"><span class="line-badge badge-purple"></span> Present</span>
+                <span class="legend-item"><span class="legend-dot dot-before-break"></span> Before Break</span>
+                <span class="legend-item"><span class="legend-dot dot-break"></span> Break</span>
+                <span class="legend-item"><span class="legend-dot dot-after-break"></span> After Break</span>
+                <span class="legend-item"><span class="legend-dot dot-missing"></span> Missing</span>
               </div>
               <a [routerLink]="['/attendance']" [queryParams]="{ tab: 'muster', month: selectedMonthKey() }" class="view-link" title="Open Monthly Muster Register">Detailed Log ›</a>
             </div>
           </div>
 
           <div class="widget-body attendance-graph-content">
-            <!-- Framed Boxed Line Chart (Bigger & Taller Matching Reference Image) -->
-            <div class="framed-chart-wrapper">
-              <svg class="boxed-line-chart-svg" viewBox="0 0 770 215" preserveAspectRatio="none">
-                <!-- Outer Framed Rectangle with subtle purple border matching reference -->
-                <rect x="42" y="16" width="710" height="145" fill="#ffffff" stroke="#c4b5fd" stroke-width="1.2" />
-
-                <!-- Horizontal Grid Lines and Y-Axis Scale Values outside box -->
+            <!-- Modern Minimalist Horizontal Grid Bar Chart Matching Reference Image -->
+            <div class="timelog-chart-wrapper">
+              <svg class="timelog-bar-chart-svg" viewBox="0 0 760 185" preserveAspectRatio="none">
+                <!-- Subtle Horizontal Grid Lines & Y-Axis Scale Values -->
                 @for (val of chartYScaleSteps(); track val) {
                   <line
-                    x1="42"
+                    x1="36"
                     [attr.y1]="getYCoord(val)"
-                    x2="752"
+                    x2="745"
                     [attr.y2]="getYCoord(val)"
-                    stroke="#ede9fe"
-                    stroke-width="1"
+                    stroke="#f1f5f9"
+                    stroke-width="1.2"
                   />
                   <text
-                    x="36"
+                    x="28"
                     [attr.y]="getYCoord(val) + 3.5"
                     text-anchor="end"
-                    class="y-axis-step-text"
+                    class="y-axis-scale-text"
                   >
                     {{ val }}
                   </text>
                 }
 
-                <!-- Vertical Grid Lines for Each Date Column -->
-                @for (pt of attendanceChartPoints(); track pt.idx) {
-                  <line
-                    [attr.x1]="pt.x"
-                    y1="16"
-                    [attr.x2]="pt.x"
-                    y2="161"
-                    stroke="#ede9fe"
-                    stroke-width="1"
-                  />
-                }
+                <!-- Vertical Column Bars for Each Day of the Month -->
+                @for (b of timelogBars(); track b.idx) {
+                  <g class="bar-day-group" [class.is-today]="b.isToday" [class.is-hovered]="hoveredBar()?.idx === b.idx">
+                    <!-- Invisible Full-Height Hover Trigger Zone -->
+                    <rect
+                      [attr.x]="b.barX - 2"
+                      y="15"
+                      [attr.width]="b.barWidth + 4"
+                      height="145"
+                      fill="transparent"
+                      class="bar-hover-zone"
+                      (mouseenter)="onBarEnter(b)"
+                      (mouseleave)="onBarLeave()"
+                    />
 
-                <!-- Purple Trend Line Connecting All Points -->
-                <path
-                  [attr.d]="chartLinePath()"
-                  fill="none"
-                  stroke="#6d28d9"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
+                    <!-- Stacked Segments -->
+                    <!-- 1. Before Break (Bottom Segment) -->
+                    @if (b.hBefore > 0) {
+                      <rect
+                        [attr.x]="b.barX"
+                        [attr.y]="b.yBefore"
+                        [attr.width]="b.barWidth"
+                        [attr.height]="b.hBefore"
+                        rx="2"
+                        fill="#22c55e"
+                        class="bar-segment seg-before"
+                      />
+                    }
 
-                <!-- Circular Hollow Nodes & Angled Date Labels -->
-                @for (pt of attendanceChartPoints(); track pt.idx) {
-                  <!-- Invisible Hover Trigger -->
-                  <circle
-                    [attr.cx]="pt.x"
-                    [attr.cy]="pt.y"
-                    r="8"
-                    fill="transparent"
-                    class="node-hover-trigger"
-                    (mouseenter)="onPointEnter(pt)"
-                    (mouseleave)="onPointLeave()"
-                  />
+                    <!-- 2. Break -->
+                    @if (b.hBreak > 0) {
+                      <rect
+                        [attr.x]="b.barX"
+                        [attr.y]="b.yBreak"
+                        [attr.width]="b.barWidth"
+                        [attr.height]="b.hBreak"
+                        rx="2"
+                        fill="#f59e0b"
+                        class="bar-segment seg-break"
+                      />
+                    }
 
-                  <!-- Hollow Circular Node (White center, purple border) -->
-                  <circle
-                    [attr.cx]="pt.x"
-                    [attr.cy]="pt.y"
-                    r="3.5"
-                    fill="#ffffff"
-                    stroke="#6d28d9"
-                    stroke-width="2"
-                    class="node-circle"
-                    [class.node-active]="hoveredChartPoint()?.idx === pt.idx"
-                  />
+                    <!-- 3. After Break -->
+                    @if (b.hAfter > 0) {
+                      <rect
+                        [attr.x]="b.barX"
+                        [attr.y]="b.yAfter"
+                        [attr.width]="b.barWidth"
+                        [attr.height]="b.hAfter"
+                        rx="2"
+                        fill="#16a34a"
+                        class="bar-segment seg-after"
+                      />
+                    }
 
-                  <!-- Angled Date Text at -48° along bottom axis -->
-                  <text
-                    [attr.transform]="'translate(' + pt.x + ', 172) rotate(-48)'"
-                    text-anchor="end"
-                    class="x-axis-date-angled"
-                    [class.date-active]="hoveredChartPoint()?.idx === pt.idx"
-                  >
-                    {{ pt.formattedDate }}
-                  </text>
+                    <!-- 4. Missing (Solid rounded coral bar on missing/absent day) -->
+                    @if (b.hMissing > 0) {
+                      <rect
+                        [attr.x]="b.barX"
+                        [attr.y]="b.yMissing"
+                        [attr.width]="b.barWidth"
+                        [attr.height]="b.hMissing"
+                        rx="3"
+                        fill="#f87171"
+                        class="bar-segment seg-missing"
+                      />
+                    }
+
+                    <!-- X-Axis Day Number Centered Below Column -->
+                    <text
+                      [attr.x]="b.cx"
+                      y="168"
+                      text-anchor="middle"
+                      class="x-axis-day-num"
+                      [class.day-today]="b.isToday"
+                      [class.day-hovered]="hoveredBar()?.idx === b.idx"
+                    >
+                      {{ b.dayNumber }}
+                    </text>
+                  </g>
                 }
 
                 <!-- Interactive Floating Tooltip -->
-                @if (hoveredChartPoint(); as hov) {
-                  <g class="chart-tooltip-group" [attr.transform]="'translate(' + (hov.x > 640 ? hov.x - 115 : (hov.x < 110 ? hov.x + 8 : hov.x - 55)) + ', ' + (hov.y > 60 ? hov.y - 48 : hov.y + 12) + ')'">
-                    <rect width="110" height="40" rx="6" fill="#1e1b4b" opacity="0.95" />
-                    <text x="55" y="16" text-anchor="middle" fill="#ffffff" font-size="9.5" font-weight="600">
-                      {{ hov.formattedDate }} ({{ hov.dayOfWeek }})
+                @if (hoveredBar(); as hov) {
+                  <g
+                    class="bar-tooltip-group"
+                    [attr.transform]="'translate(' + (hov.cx > 630 ? hov.cx - 135 : (hov.cx < 80 ? hov.cx + 5 : hov.cx - 65)) + ', ' + (hov.topY > 65 ? hov.topY - 55 : hov.topY + 12) + ')'"
+                  >
+                    <rect width="130" height="50" rx="7" fill="#0f172a" opacity="0.95" />
+                    <text x="65" y="15" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="700">
+                      {{ hov.formattedDate }}
                     </text>
-                    <text x="55" y="30" text-anchor="middle" fill="#a7f3d0" font-size="9" font-weight="600">
-                      Present: {{ hov.present }} Staff
+                    <text x="65" y="29" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="500">
+                      @if (hov.totalHours > 0) {
+                        Total: {{ hov.totalHours }}h ({{ hov.present }} Present)
+                      } @else {
+                        No Activity Recorded
+                      }
+                    </text>
+                    <text x="65" y="43" text-anchor="middle" fill="#38bdf8" font-size="8.5" font-weight="600">
+                      @if (hov.missing > 0 && hov.beforeBreak === 0) {
+                        Status: Missing / Absent
+                      } @else if (hov.late > 0) {
+                        Status: Late Check-in
+                      } @else if (hov.present > 0) {
+                        Status: On-Time Work
+                      } @else {
+                        Status: Off / Weekend
+                      }
                     </text>
                   </g>
                 }
