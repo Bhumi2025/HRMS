@@ -118,7 +118,7 @@ import { ToastService } from '../../core/services/toast.service';
                   [class.active]="statusFilter() === 'Suspended'"
                   (click)="statusFilter.set('Suspended')"
                 >
-                  Suspended
+                  Suspended ({{ suspendedCompanies() }})
                 </button>
               </div>
 
@@ -129,10 +129,11 @@ import { ToastService } from '../../core/services/toast.service';
                   type="text"
                   class="search-input"
                   placeholder="Search tenant or code..."
-                  [(ngModel)]="searchQuery"
+                  [ngModel]="searchQuery()"
+                  (ngModelChange)="searchQuery.set($event)"
                 />
-                @if (searchQuery) {
-                  <button class="clear-search-btn" (click)="searchQuery = ''">✕</button>
+                @if (searchQuery()) {
+                  <button class="clear-search-btn" (click)="searchQuery.set('')">✕</button>
                 }
               </div>
             </div>
@@ -217,19 +218,26 @@ import { ToastService } from '../../core/services/toast.service';
                           </button>
                         }
 
-                        <button
-                          class="action-btn btn-neutral"
-                          (click)="resendInvitation(c)"
-                          data-tooltip="Resend Admin Invitation Email"
-                        >
-                          <span [appIcon]="'mail'"></span>
-                          Invite
-                        </button>
+                        @if (c.invitationStatus !== 'Accepted') {
+                          <button
+                            class="action-btn btn-neutral"
+                            (click)="resendInvitation(c)"
+                            data-tooltip="Resend Admin Invitation Email"
+                          >
+                            <span [appIcon]="'mail'"></span>
+                            Invite
+                          </button>
+                        } @else {
+                          <span class="status-badge status-active" style="padding: 4px 8px; font-size: 11px;" data-tooltip="Invitation Accepted">
+                            <span class="dot"></span> Accepted
+                          </span>
+                        }
 
                         <button
                           class="action-btn btn-manage"
-                          (click)="goToCompanies()"
-                          data-tooltip="Manage Company"
+                          (click)="manageCompany(c)"
+                          [attr.data-tooltip]="'Manage ' + c.name"
+                          title="Manage {{ c.name }}"
                         >
                           <span [appIcon]="'arrow_right'"></span>
                         </button>
@@ -1103,12 +1111,15 @@ export class SuperAdminDashboardComponent implements OnInit {
 
   protected readonly companies = signal<CompanyListItem[]>([]);
 
-  protected searchQuery = '';
+  protected readonly searchQuery = signal<string>('');
   protected readonly statusFilter = signal<'all' | 'Active' | 'Suspended'>('all');
 
   protected readonly totalCompanies = computed(() => this.companies().length);
   protected readonly activeCompanies = computed(
     () => this.companies().filter((c) => c.status === 'Active').length
+  );
+  protected readonly suspendedCompanies = computed(
+    () => this.companies().filter((c) => c.status === 'Suspended').length
   );
   protected readonly totalAdmins = computed(() => {
     const list = this.companies();
@@ -1121,14 +1132,15 @@ export class SuperAdminDashboardComponent implements OnInit {
     if (filter !== 'all') {
       list = list.filter((c) => c.status === filter);
     }
-    const q = this.searchQuery.trim().toLowerCase();
+    const q = this.searchQuery().trim().toLowerCase();
     if (!q) return list;
     return list.filter(
       (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.code.toLowerCase().includes(q) ||
-        c.adminEmail.toLowerCase().includes(q) ||
-        (c.adminFullName && c.adminFullName.toLowerCase().includes(q))
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.code && c.code.toLowerCase().includes(q)) ||
+        (c.adminEmail && c.adminEmail.toLowerCase().includes(q)) ||
+        (c.adminFullName && c.adminFullName.toLowerCase().includes(q)) ||
+        (c.databaseName && c.databaseName.toLowerCase().includes(q))
     );
   });
 
@@ -1263,6 +1275,10 @@ export class SuperAdminDashboardComponent implements OnInit {
 
   protected goToCompanies(): void {
     void this.router.navigateByUrl('/company');
+  }
+
+  protected manageCompany(company: CompanyListItem): void {
+    void this.router.navigate(['/company'], { queryParams: { id: company.id } });
   }
 
   protected goToRoles(): void {

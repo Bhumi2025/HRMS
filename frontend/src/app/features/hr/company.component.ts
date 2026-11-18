@@ -141,7 +141,7 @@ function emptyTenantForm(): CreateCompanyRequest {
             <!-- Super Admin Tenant Companies Search Header -->
             <div class="input-group" style="max-width: 280px;">
               <span class="input-icon" [appIcon]="'search'"></span>
-              <input class="form-control" type="text" placeholder="Search name, code, email..." [(ngModel)]="tenantSearch" (keyup.enter)="loadTenantCompanies()" />
+              <input class="form-control" type="text" placeholder="Search name, code, email..." [ngModel]="tenantSearch()" (ngModelChange)="tenantSearch.set($event)" />
             </div>
           } @else if (activeTab() === 'profile') {
             <!-- Bottom Save button is used -->
@@ -196,7 +196,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                     <td colspan="6" style="text-align: center; padding: 32px; color: var(--muted);">No companies yet. Create one to provision its dedicated database.</td>
                   </tr>
                 } @else {
-                  @for (c of tenantCompanies(); track c.id) {
+                  @for (c of filteredTenantCompanies(); track c.id) {
                     <tr style="border-bottom: 1px solid var(--border);">
                       <td style="padding: 14px 16px;">
                         <div style="font-weight: 700; font-size: 14px; color: var(--text);">{{ c.name }}</div>
@@ -228,12 +228,20 @@ function emptyTenantForm(): CreateCompanyRequest {
                           <button class="tbl-btn" data-tooltip="Edit Company" (click)="editTenant(c)" [disabled]="busyTenantId() === c.id">
                             <span [appIcon]="'edit'"></span>
                           </button>
-                          <button class="tbl-btn" data-tooltip="Retry Provisioning" (click)="retryTenant(c)" [disabled]="busyTenantId() === c.id">
-                            <span [appIcon]="'sync'"></span>
-                          </button>
-                          <button class="tbl-btn" data-tooltip="Resend Invitation" (click)="resendTenant(c)" [disabled]="busyTenantId() === c.id">
-                            <span [appIcon]="'mail'"></span>
-                          </button>
+                          @if (c.status === 'Failed' || c.status === 'Provisioning' || c.provisioningError) {
+                            <button class="tbl-btn" style="color: #f59e0b;" data-tooltip="Retry Provisioning" (click)="retryTenant(c)" [disabled]="busyTenantId() === c.id">
+                              <span [appIcon]="'sync'"></span>
+                            </button>
+                          }
+                          @if (c.invitationStatus === 'Accepted') {
+                            <button class="tbl-btn success" data-tooltip="Admin Invitation Accepted" disabled style="opacity: 0.6; cursor: default;">
+                              <span [appIcon]="'check'"></span>
+                            </button>
+                          } @else {
+                            <button class="tbl-btn" data-tooltip="Resend Invitation" (click)="resendTenant(c)" [disabled]="busyTenantId() === c.id">
+                              <span [appIcon]="'mail'"></span>
+                            </button>
+                          }
                           @if (!c.isDefault) {
                             <button
                               class="tbl-btn"
@@ -1218,6 +1226,7 @@ function emptyTenantForm(): CreateCompanyRequest {
       justify-content: center;
       cursor: pointer;
       transition: all .15s;
+      position: relative;
     }
     .tbl-btn:hover {
       border-color: var(--p);
@@ -1228,14 +1237,21 @@ function emptyTenantForm(): CreateCompanyRequest {
       color: var(--danger);
       background: #fef2f2;
     }
-    .tbl-btn.success:hover {
-      border-color: #10b981;
+    .tbl-btn.success {
+      border-color: rgba(16, 185, 129, 0.4);
       color: #059669;
       background: #f0fdf4;
     }
-    .action-icon-btn {
+    .tbl-btn.success:hover {
+      border-color: #10b981;
+      color: #059669;
+      background: #dcfce7;
+    }
+    .action-icon-btn,
+    .tbl-btn {
       position: relative;
     }
+    .tbl-btn[data-tooltip]::after,
     .action-icon-btn[data-tooltip]::after {
       bottom: auto !important;
       top: calc(100% + 8px) !important;
@@ -1323,7 +1339,20 @@ export class CompanyComponent implements OnInit {
   // Super Admin Tenant Database State
   protected readonly tenantCompanies = signal<CompanyListItem[]>([]);
   protected readonly tenantLoading = signal(false);
-  protected tenantSearch = '';
+  protected readonly tenantSearch = signal('');
+  protected readonly filteredTenantCompanies = computed(() => {
+    const list = this.tenantCompanies();
+    const q = this.tenantSearch().trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (c) =>
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.code && c.code.toLowerCase().includes(q)) ||
+        (c.adminEmail && c.adminEmail.toLowerCase().includes(q)) ||
+        (c.adminFullName && c.adminFullName.toLowerCase().includes(q)) ||
+        (c.databaseName && c.databaseName.toLowerCase().includes(q))
+    );
+  });
   protected readonly showCreateTenant = signal(false);
   protected readonly showEditTenant = signal(false);
   protected readonly showDeleteTenantConfirm = signal(false);
@@ -1379,6 +1408,21 @@ export class CompanyComponent implements OnInit {
       this.route.queryParams.subscribe((params) => {
         if (params['action'] === 'new' || params['create'] === 'true') {
           this.openCreateTenant();
+        }
+        if (params['id']) {
+          const targetId = params['id'];
+          this.api.tenantCompanies().subscribe({
+            next: (list) => {
+              this.tenantCompanies.set(list || []);
+              const target = list?.find((x) => x.id === targetId);
+              if (target) {
+                this.viewTenant(target);
+              }
+            },
+          });
+        }
+        if (params['search']) {
+          this.tenantSearch.set(params['search']);
         }
       });
     } else {
@@ -1542,7 +1586,7 @@ export class CompanyComponent implements OnInit {
   // --- Super Admin Tenant Companies Methods ---
   protected loadTenantCompanies(): void {
     this.tenantLoading.set(true);
-    this.api.tenantCompanies(this.tenantSearch).subscribe({
+    this.api.tenantCompanies().subscribe({
       next: (list) => {
         this.tenantCompanies.set(list || []);
         this.tenantLoading.set(false);
