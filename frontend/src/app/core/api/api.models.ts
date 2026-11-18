@@ -849,11 +849,24 @@ export interface CompanyListItem {
   invitationError?: string | null;
 }
 
+export interface CompanyEmployeeSummary {
+  id: string;
+  employeeCode: string;
+  fullName: string;
+  email: string;
+  department?: string | null;
+  designation?: string | null;
+  status: string;
+  joinedDate?: string | null;
+}
+
 export interface CompanyDetail extends CompanyListItem {
   suspendedAtUtc?: string | null;
   invitationEmail?: string | null;
   invitationAcceptedAtUtc?: string | null;
   provisioningLogs: ProvisioningLog[];
+  employeeCount?: number;
+  employees?: CompanyEmployeeSummary[];
 }
 
 export interface CreateCompanyRequest {

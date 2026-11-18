@@ -78,7 +78,20 @@ public sealed class CompanyManagementService : ICompanyManagementService
             _master.ProvisioningLogs.Query().Where(l => l.CompanyId == id).OrderBy(l => l.OccurredAtUtc),
             ct);
 
-        return ToDetail(company, invitation, logs);
+        IReadOnlyList<CompanyEmployeeSummaryDto> employees = Array.Empty<CompanyEmployeeSummaryDto>();
+        if (!string.IsNullOrWhiteSpace(company.DatabaseName))
+        {
+            try
+            {
+                employees = await _tenantDb.GetEmployeesAsync(company.DatabaseName, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load employees for tenant database {DbName}", company.DatabaseName);
+            }
+        }
+
+        return ToDetail(company, invitation, logs, employees);
     }
 
     public async Task<CompanyProvisioningResultDto> CreateAsync(CreateCompanyRequest request, CancellationToken ct = default)
@@ -481,7 +494,7 @@ public sealed class CompanyManagementService : ICompanyManagementService
         invitation?.SentAtUtc,
         invitation?.LastError);
 
-    private static CompanyDetailDto ToDetail(Company c, CompanyInvitation? invitation, IReadOnlyList<ProvisioningLog> logs) => new(
+    private static CompanyDetailDto ToDetail(Company c, CompanyInvitation? invitation, IReadOnlyList<ProvisioningLog> logs, IReadOnlyList<CompanyEmployeeSummaryDto>? employees = null) => new(
         c.Id,
         c.Name,
         c.Code,
@@ -502,5 +515,7 @@ public sealed class CompanyManagementService : ICompanyManagementService
         invitation?.SentAtUtc,
         invitation?.AcceptedAtUtc,
         invitation?.LastError,
-        logs.Select(l => new ProvisioningLogDto(l.Step, l.Succeeded, l.Message, l.OccurredAtUtc)).ToList());
+        logs.Select(l => new ProvisioningLogDto(l.Step, l.Succeeded, l.Message, l.OccurredAtUtc)).ToList(),
+        employees?.Count ?? 0,
+        employees ?? Array.Empty<CompanyEmployeeSummaryDto>());
 }

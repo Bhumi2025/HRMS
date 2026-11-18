@@ -118,26 +118,28 @@
           (click)="toggleDark()"
           [appIcon]="theme.isDark() ? 'sun' : 'moon'"
         ></div>
-        <div
-          class="header-btn"
-          data-tooltip="Notifications"
-          id="notifBtn"
-          (click)="ui.togglePanel('notif')"
-          style="position: relative"
-        >
-          <span [appIcon]="'bell'"></span>
-          @if (unreadCount() > 0) {
-            <span class="notif-badge">{{ unreadCount() > 9 ? '9+' : unreadCount() }}</span>
-          }
-        </div>
-        <div
-          class="header-btn punch-btn"
-          data-tooltip="Punch"
-          id="punchBtn"
-          (click)="ui.togglePanel('punch')"
-          style="position: relative"
-          [appIcon]="'clock'"
-        ></div>
+        @if (role() !== 'Super Admin') {
+          <div
+            class="header-btn"
+            data-tooltip="Notifications"
+            id="notifBtn"
+            (click)="ui.togglePanel('notif')"
+            style="position: relative"
+          >
+            <span [appIcon]="'bell'"></span>
+            @if (unreadCount() > 0) {
+              <span class="notif-badge">{{ unreadCount() > 9 ? '9+' : unreadCount() }}</span>
+            }
+          </div>
+          <div
+            class="header-btn punch-btn"
+            data-tooltip="Punch"
+            id="punchBtn"
+            (click)="ui.togglePanel('punch')"
+            style="position: relative"
+            [appIcon]="'clock'"
+          ></div>
+        }
         <div
           class="header-avatar"
           id="avatarBtn"

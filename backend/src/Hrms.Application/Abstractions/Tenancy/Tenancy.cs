@@ -1,3 +1,4 @@
+using Hrms.Application.DTOs;
 using Hrms.Domain.Enums;
 
 namespace Hrms.Application.Abstractions.Tenancy;
@@ -93,6 +94,8 @@ public interface ITenantDatabaseService
     Task SetUserPasswordAsync(string databaseName, string email, string passwordHash, CancellationToken ct = default);
 
     Task<int> CountUsersAsync(string databaseName, CancellationToken ct = default);
+
+    Task<IReadOnlyList<CompanyEmployeeSummaryDto>> GetEmployeesAsync(string databaseName, CancellationToken ct = default);
 
     /// <summary>Safely drops a tenant database.</summary>
     Task DropDatabaseAsync(string databaseName, CancellationToken ct = default);

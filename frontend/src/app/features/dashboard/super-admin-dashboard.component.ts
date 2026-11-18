@@ -1,262 +1,434 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { of, catchError } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
-import { CompanyListItem, CreateCompanyRequest } from '../../core/api/api.models';
+import { CompanyListItem, CompanyDetail, CreateCompanyRequest } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 
 @Component({
   selector: 'app-super-admin-dashboard',
-  imports: [CommonModule, FormsModule, IconDirective],
+  imports: [CommonModule, FormsModule, IconDirective, DatePipe],
   template: `
     <div class="super-admin-dashboard">
-      <!-- Header / Hero Banner -->
-      <div class="dash-hero-card">
-        <div class="hero-left">
-          <div class="hero-badge">
-            <span class="live-dot"></span>
-            <span>SUPER ADMIN PLATFORM CONTROL</span>
-          </div>
-          <h1 class="hero-title">Platform &amp; Multi-Tenant Dashboard</h1>
-          <p class="hero-subtitle">
-            Centralized orchestration for organizations, tenant isolation, dynamic RBAC matrices, and system security.
-          </p>
-          <div class="hero-meta">
-            <span class="meta-pill">
-              <span [appIcon]="'check'"></span> Multi-Tenant Schema: Synchronized
-            </span>
-            <span class="meta-pill">
-              <span [appIcon]="'clock'"></span> Real-time Biometric Core Active
-            </span>
-          </div>
-        </div>
-        <div class="hero-actions">
-          <button class="hero-btn btn-secondary" (click)="refreshAll()" [disabled]="isRefreshing()">
-            <span [appIcon]="'sync'" class="action-icon" [class.spin]="isRefreshing()"></span>
-            <span>{{ isRefreshing() ? 'Refreshing...' : 'Refresh Telemetry' }}</span>
-          </button>
-          <button class="hero-btn btn-primary" (click)="openCreateOrgModal()">
-            <span [appIcon]="'plus'"></span>
-            <span>New Organization</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Top KPI Metric Cards (6 metrics) -->
-      <div class="kpi-grid">
-        <!-- Card 1: Total Companies -->
-        <div class="metric-card metric-blue" (click)="goToCompanies()">
-          <div class="card-accent"></div>
-          <div class="metric-head">
-            <div>
-              <div class="metric-label">Total Tenants</div>
-              <div class="metric-value">{{ totalCompanies() }}</div>
-            </div>
-            <div class="metric-icon-wrap icon-blue">
-              <span [appIcon]="'company'"></span>
-            </div>
-          </div>
-          <div class="metric-footer">
-            <span class="status-indicator-dot online"></span>
-            <span class="footer-highlight">{{ activeCompanies() }} Active</span>
-            <span class="footer-muted">organizations online</span>
-          </div>
-        </div>
-
-        <!-- Card 2: Tenant Admins -->
-        <div class="metric-card metric-emerald">
-          <div class="card-accent"></div>
-          <div class="metric-head">
-            <div>
-              <div class="metric-label">Company Admins</div>
-              <div class="metric-value">{{ totalAdmins() }}</div>
-            </div>
-            <div class="metric-icon-wrap icon-emerald">
-              <span [appIcon]="'user'"></span>
-            </div>
-          </div>
-          <div class="metric-footer">
-            <span class="status-indicator-dot online"></span>
-            <span class="footer-highlight">{{ totalAdmins() }} Dedicated Leads</span>
-            <span class="footer-muted">across tenant databases</span>
-          </div>
-        </div>
-      </div>
-
       <!-- Main Content: Tenant Organizations Full-Width Table -->
       <div class="content-panel">
-          <div class="panel-header">
-            <div>
-              <h3 class="panel-title">Tenant Organizations</h3>
-              <p class="panel-desc">Manage tenant lifecycle, provisioning status, and administrator invitations</p>
-            </div>
-            <div class="panel-controls">
-              <!-- Filter pills -->
-              <div class="filter-pills">
-                <button
-                  type="button"
-                  class="pill-btn"
-                  [class.active]="statusFilter() === 'all'"
-                  (click)="statusFilter.set('all')"
-                >
-                  All ({{ companies().length }})
-                </button>
-                <button
-                  type="button"
-                  class="pill-btn"
-                  [class.active]="statusFilter() === 'Active'"
-                  (click)="statusFilter.set('Active')"
-                >
-                  Active ({{ activeCompanies() }})
-                </button>
-                <button
-                  type="button"
-                  class="pill-btn"
-                  [class.active]="statusFilter() === 'Suspended'"
-                  (click)="statusFilter.set('Suspended')"
-                >
-                  Suspended ({{ suspendedCompanies() }})
-                </button>
-              </div>
-
-              <!-- Search -->
-              <div class="search-wrap">
-                <span [appIcon]="'search'" class="search-icon"></span>
-                <input
-                  type="text"
-                  class="search-input"
-                  placeholder="Search tenant or code..."
-                  [ngModel]="searchQuery()"
-                  (ngModelChange)="searchQuery.set($event)"
-                />
-                @if (searchQuery()) {
-                  <button class="clear-search-btn" (click)="searchQuery.set('')">✕</button>
-                }
-              </div>
-            </div>
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">Tenant Organizations</h3>
+            <p class="panel-desc">Manage tenant lifecycle, provisioning status, and administrator invitations</p>
           </div>
+          <div class="panel-controls">
+            <!-- Filter pills -->
+            <div class="filter-pills">
+              <button
+                type="button"
+                class="pill-btn"
+                [class.active]="statusFilter() === 'all'"
+                (click)="statusFilter.set('all')"
+              >
+                All ({{ companies().length }})
+              </button>
+              <button
+                type="button"
+                class="pill-btn"
+                [class.active]="statusFilter() === 'Active'"
+                (click)="statusFilter.set('Active')"
+              >
+                Active ({{ activeCompanies() }})
+              </button>
+              <button
+                type="button"
+                class="pill-btn"
+                [class.active]="statusFilter() === 'Suspended'"
+                (click)="statusFilter.set('Suspended')"
+              >
+                Suspended ({{ suspendedCompanies() }})
+              </button>
+            </div>
 
-          <div class="table-responsive">
-            <table class="modern-table">
-              <thead>
-                <tr>
-                  <th>Organization</th>
-                  <th>Tenant Code</th>
-                  <th>Administrator</th>
-                  <th>Database</th>
-                  <th style="text-align: center;">Status</th>
-                  <th style="text-align: right; min-width: 180px;">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (c of filteredCompanies(); track c.id) {
-                  <tr class="table-row">
-                    <td>
-                      <div class="org-cell">
-                        <div class="org-avatar">
-                          {{ c.name.charAt(0) }}
-                        </div>
-                        <div class="org-info">
-                          <div class="org-name">{{ c.name }}</div>
-                          @if (c.isDefault) {
-                            <span class="badge badge-default">Primary Default</span>
-                          }
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span class="code-badge">
-                        {{ c.code }}
-                      </span>
-                    </td>
-                    <td>
-                      <div class="admin-name">{{ c.adminFullName || 'Administrator' }}</div>
-                      <div class="admin-email">{{ c.adminEmail }}</div>
-                    </td>
-                    <td>
-                      <span class="db-badge">
-                        <span [appIcon]="'grid'"></span>
-                        {{ c.databaseName || 'HRMS (Default)' }}
-                      </span>
-                    </td>
-                    <td style="text-align: center;">
-                      @if (c.status === 'Active') {
-                        <span class="status-badge status-active">
-                          <span class="dot"></span> Active
-                        </span>
-                      } @else if (c.status === 'Suspended') {
-                        <span class="status-badge status-suspended">
-                          <span class="dot"></span> Suspended
-                        </span>
-                      } @else {
-                        <span class="status-badge status-provisioning">
-                          <span class="dot"></span> Provisioning
-                        </span>
-                      }
-                    </td>
-                    <td style="text-align: right;">
-                      <div class="actions-group">
-                        @if (c.status === 'Active') {
-                          <button
-                            class="action-btn btn-danger-soft"
-                            (click)="suspendCompany(c)"
-                            [disabled]="c.isDefault"
-                            [attr.data-tooltip]="c.isDefault ? 'Primary tenant cannot be suspended' : 'Suspend Tenant'"
-                          >
-                            Suspend
-                          </button>
-                        } @else {
-                          <button
-                            class="action-btn btn-success-soft"
-                            (click)="activateCompany(c)"
-                            data-tooltip="Activate Tenant"
-                          >
-                            Activate
-                          </button>
-                        }
+            <!-- Search -->
+            <div class="search-wrap">
+              <span [appIcon]="'search'" class="search-icon"></span>
+              <input
+                type="text"
+                name="tenantFilterQuery"
+                id="tenantFilterQuery"
+                autocomplete="new-password"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                class="search-input"
+                placeholder="Search tenant or code..."
+                [value]="searchQuery()"
+                (input)="onSearchInput($event)"
+              />
+              @if (searchQuery()) {
+                <button class="clear-search-btn" (click)="clearSearch()" type="button" title="Clear search">✕</button>
+              }
+            </div>
 
-                        @if (c.invitationStatus !== 'Accepted') {
-                          <button
-                            class="action-btn btn-neutral"
-                            (click)="resendInvitation(c)"
-                            data-tooltip="Resend Admin Invitation Email"
-                          >
-                            <span [appIcon]="'mail'"></span>
-                            Invite
-                          </button>
-                        } @else {
-                          <span class="status-badge status-active" style="padding: 4px 8px; font-size: 11px;" data-tooltip="Invitation Accepted">
-                            <span class="dot"></span> Accepted
-                          </span>
-                        }
-
-                        <button
-                          class="action-btn btn-manage"
-                          (click)="manageCompany(c)"
-                          [attr.data-tooltip]="'Manage ' + c.name"
-                          title="Manage {{ c.name }}"
-                        >
-                          <span [appIcon]="'arrow_right'"></span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                } @empty {
-                  <tr>
-                    <td colspan="6" class="empty-state">
-                      <div class="empty-icon">🏢</div>
-                      <div class="empty-title">No tenant organizations found</div>
-                      <div class="empty-desc">Try clearing your search query or filter</div>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+            <!-- Top Actions -->
+            <button class="action-top-btn btn-secondary" (click)="refreshAll()" [disabled]="isRefreshing()" title="Refresh Telemetry">
+              <span [appIcon]="'sync'" class="action-icon" [class.spin]="isRefreshing()"></span>
+              <span>{{ isRefreshing() ? 'Refreshing...' : 'Refresh Telemetry' }}</span>
+            </button>
+            <button class="action-top-btn btn-primary" (click)="openCreateOrgModal()" title="New Organization">
+              <span [appIcon]="'plus'"></span>
+              <span>+ New Organization</span>
+            </button>
           </div>
         </div>
+
+        <div class="table-responsive">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>Organization</th>
+                <th>Tenant Code</th>
+                <th>Administrator</th>
+                <th>Database</th>
+                <th style="text-align: center;">Status</th>
+                <th style="text-align: right; min-width: 180px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of filteredCompanies(); track c.id) {
+                <tr class="table-row">
+                  <td>
+                    <div class="org-cell">
+                      <div class="org-avatar">
+                        {{ c.name.charAt(0) }}
+                      </div>
+                      <div class="org-info">
+                        <div class="org-name">{{ c.name }}</div>
+                        @if (c.isDefault) {
+                          <span class="badge badge-default">Primary Default</span>
+                        }
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="code-badge">
+                      {{ c.code }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="admin-name">{{ c.adminFullName || 'Administrator' }}</div>
+                    <div class="admin-email">{{ c.adminEmail }}</div>
+                  </td>
+                  <td>
+                    <span class="db-badge">
+                      <span [appIcon]="'grid'"></span>
+                      {{ c.databaseName || 'HRMS (Default)' }}
+                    </span>
+                  </td>
+                  <td style="text-align: center;">
+                    @if ((c.status || '').toLowerCase() === 'active') {
+                      <span class="status-badge status-active">
+                        <span class="dot"></span> Active
+                      </span>
+                    } @else if ((c.status || '').toLowerCase() === 'suspended') {
+                      <span class="status-badge status-suspended">
+                        <span class="dot"></span> Suspended
+                      </span>
+                    } @else {
+                      <span class="status-badge status-provisioning">
+                        <span class="dot"></span> Provisioning
+                      </span>
+                    }
+                  </td>
+                  <td style="text-align: right;">
+                    <div class="actions-group">
+                      @if ((c.status || '').toLowerCase() === 'active') {
+                        <button
+                          class="action-btn btn-danger-soft"
+                          (click)="suspendCompany(c)"
+                          [disabled]="c.isDefault"
+                          [attr.data-tooltip]="c.isDefault ? 'Primary tenant cannot be suspended' : 'Suspend Tenant'"
+                        >
+                          Suspend
+                        </button>
+                      } @else {
+                        <button
+                          class="action-btn btn-success-soft"
+                          (click)="activateCompany(c)"
+                          data-tooltip="Activate Tenant"
+                        >
+                          Activate
+                        </button>
+                      }
+
+                      @if (c.invitationStatus !== 'Accepted') {
+                        <button
+                          class="action-btn btn-neutral"
+                          (click)="resendInvitation(c)"
+                          data-tooltip="Resend Admin Invitation Email"
+                        >
+                          <span [appIcon]="'mail'"></span>
+                          Invite
+                        </button>
+                      } @else {
+                        <span class="status-badge status-active" style="padding: 4px 8px; font-size: 11px;" data-tooltip="Invitation Accepted">
+                          <span class="dot"></span> Accepted
+                        </span>
+                      }
+
+                      <button
+                        class="action-btn btn-manage"
+                        (click)="openCompanyDetails(c)"
+                        [attr.data-tooltip]="'View details & employees for ' + c.name"
+                        title="View {{ c.name }} Details & Employees"
+                      >
+                        <span [appIcon]="'arrow_right'"></span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="empty-state">
+                    <div class="empty-icon">🏢</div>
+                    <div class="empty-title">No tenant organizations found</div>
+                    <div class="empty-desc">Try clearing your search query or filter</div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Company Details & Employees Modal -->
+      @if (showDetailsModal()) {
+        <div class="modal-overlay" (click)="closeCompanyDetails()">
+          <div class="modal-card modal-large" (click)="$event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="modal-header">
+              <div class="detail-header-left">
+                <div class="detail-avatar">
+                  {{ selectedCompanyListItem()?.name?.charAt(0) || 'C' }}
+                </div>
+                <div>
+                  <div class="detail-title-row">
+                    <h3 class="detail-title">{{ selectedCompanyDetail()?.name || selectedCompanyListItem()?.name }}</h3>
+                    <span class="code-badge">{{ selectedCompanyDetail()?.code || selectedCompanyListItem()?.code }}</span>
+                    @if ((selectedCompanyDetail()?.status || selectedCompanyListItem()?.status || '').toLowerCase() === 'active') {
+                      <span class="status-badge status-active"><span class="dot"></span> Active</span>
+                    } @else {
+                      <span class="status-badge status-suspended"><span class="dot"></span> Suspended</span>
+                    }
+                    @if (selectedCompanyDetail()?.isDefault || selectedCompanyListItem()?.isDefault) {
+                      <span class="badge badge-default">Primary Default</span>
+                    }
+                  </div>
+                  <p class="modal-desc">
+                    Tenant details, dedicated database provisioning, administrator credentials, and active staff directory.
+                  </p>
+                </div>
+              </div>
+              <button class="btn-icon" (click)="closeCompanyDetails()" type="button" title="Close"><span [appIcon]="'x'"></span></button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="modal-body-scroll">
+              @if (loadingCompanyDetails()) {
+                <div class="modal-loading-state">
+                  <span [appIcon]="'sync'" class="action-icon spin" style="font-size: 28px; color: var(--p, #2563eb);"></span>
+                  <div style="font-weight: 700; margin-top: 12px;">Loading Company Details &amp; Employees...</div>
+                  <div style="font-size: 12.5px; color: var(--muted, #64748b);">Querying dedicated tenant database</div>
+                </div>
+              } @else if (selectedCompanyDetail()) {
+                @let d = selectedCompanyDetail()!;
+                
+                <!-- Quick Stats Cards Row -->
+                <div class="details-stats-grid">
+                  <div class="detail-stat-box">
+                    <div class="stat-label">Dedicated Database</div>
+                    <div class="stat-value text-blue">
+                      <span [appIcon]="'grid'"></span>
+                      {{ d.databaseName || 'HRMS (Default)' }}
+                    </div>
+                    <div class="stat-meta">Isolated SQL Database</div>
+                  </div>
+                  <div class="detail-stat-box">
+                    <div class="stat-label">Total Provisioned Staff</div>
+                    <div class="stat-value text-emerald">
+                      <span [appIcon]="'user'"></span>
+                      {{ d.employeeCount || d.employees?.length || 0 }} Employees
+                    </div>
+                    <div class="stat-meta">Live from tenant schema</div>
+                  </div>
+                  <div class="detail-stat-box">
+                    <div class="stat-label">Administrator</div>
+                    <div class="stat-value text-slate">
+                      {{ d.adminFullName }}
+                    </div>
+                    <div class="stat-meta">{{ d.adminEmail }}</div>
+                  </div>
+                  <div class="detail-stat-box">
+                    <div class="stat-label">Time Zone</div>
+                    <div class="stat-value text-slate">
+                      {{ d.timeZone || 'UTC' }}
+                    </div>
+                    <div class="stat-meta">Provisioned: {{ d.provisionedAtUtc ? (d.provisionedAtUtc | date:'shortDate') : 'Pending' }}</div>
+                  </div>
+                </div>
+
+                <!-- Section: Admin & HR Credentials -->
+                <div class="section-card">
+                  <div class="section-header">
+                    <div class="section-title">
+                      <span [appIcon]="'user'"></span>
+                      <span>Administrator &amp; HR Credentials</span>
+                    </div>
+                    <div class="section-badge">
+                      @if (d.invitationStatus === 'Accepted') {
+                        <span class="status-badge status-active"><span class="dot"></span> Invitation Accepted</span>
+                      } @else {
+                        <span class="status-badge status-provisioning"><span class="dot"></span> Invitation Sent (Pending Login)</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="credentials-grid">
+                    <div class="credential-item">
+                      <div class="cred-label">Full Name</div>
+                      <div class="cred-value">{{ d.adminFullName }}</div>
+                    </div>
+                    <div class="credential-item">
+                      <div class="cred-label">Admin Email / Username</div>
+                      <div class="cred-value email-highlight">{{ d.adminEmail }}</div>
+                    </div>
+                    <div class="credential-item">
+                      <div class="cred-label">Platform Role</div>
+                      <div class="cred-value">Company Administrator / HR Lead</div>
+                    </div>
+                    <div class="credential-item">
+                      <div class="cred-label">Invitation Status</div>
+                      <div class="cred-value">
+                        <strong>{{ d.invitationStatus || 'Pending' }}</strong>
+                        @if (d.invitationSentAtUtc) {
+                          <span class="cred-sub"> (Sent {{ d.invitationSentAtUtc | date:'short' }})</span>
+                        }
+                      </div>
+                    </div>
+                    @if (d.contactName || d.contactEmail) {
+                      <div class="credential-item">
+                        <div class="cred-label">Contact Person</div>
+                        <div class="cred-value">{{ d.contactName || '—' }} ({{ d.contactEmail || '—' }})</div>
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                <!-- Section: Provisioned Employees Directory -->
+                <div class="section-card">
+                  <div class="section-header">
+                    <div class="section-title">
+                      <span [appIcon]="'company'"></span>
+                      <span>Provisioned Employees Directory</span>
+                      <span class="count-pill">{{ d.employees?.length || 0 }} Total</span>
+                    </div>
+                    <div class="section-desc">Employees registered and active inside <strong>{{ d.databaseName }}</strong></div>
+                  </div>
+
+                  @if (d.employees && d.employees.length > 0) {
+                    <div class="table-responsive">
+                      <table class="employees-mini-table">
+                        <thead>
+                          <tr>
+                            <th>Code</th>
+                            <th>Employee Name</th>
+                            <th>Work Email</th>
+                            <th>Department</th>
+                            <th>Designation / Role</th>
+                            <th style="text-align: center;">Status</th>
+                            <th>Date of Joining</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (emp of d.employees; track emp.id) {
+                            <tr>
+                              <td>
+                                <span class="code-badge">{{ emp.employeeCode }}</span>
+                              </td>
+                              <td>
+                                <div class="emp-name-cell">
+                                  <div class="emp-avatar-sm">
+                                    {{ emp.fullName.charAt(0) }}
+                                  </div>
+                                  <span class="emp-name">{{ emp.fullName }}</span>
+                                </div>
+                              </td>
+                              <td class="emp-email">{{ emp.email }}</td>
+                              <td>
+                                @if (emp.department) {
+                                  <span class="dept-badge">{{ emp.department }}</span>
+                                } @else {
+                                  <span class="text-muted">—</span>
+                                }
+                              </td>
+                              <td>{{ emp.designation || 'Staff' }}</td>
+                              <td style="text-align: center;">
+                                @if (emp.status.toLowerCase() === 'active') {
+                                  <span class="status-badge status-active"><span class="dot"></span> Active</span>
+                                } @else if (emp.status.toLowerCase() === 'onleave') {
+                                  <span class="status-badge status-provisioning"><span class="dot"></span> On Leave</span>
+                                } @else {
+                                  <span class="status-badge status-suspended"><span class="dot"></span> {{ emp.status }}</span>
+                                }
+                              </td>
+                              <td>
+                                {{ emp.joinedDate ? (emp.joinedDate | date:'mediumDate') : '—' }}
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  } @else {
+                    <div class="empty-employees-box">
+                      <div class="empty-icon">👥</div>
+                      <div style="font-weight: 700; color: var(--text, #0f172a);">No employees created yet</div>
+                      <div style="font-size: 12.5px; color: var(--muted, #64748b); margin-top: 4px;">
+                        This tenant database currently has 0 employee records. The Company Admin can add staff via the HR Manager portal.
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+              <div class="footer-left">
+                @if (selectedCompanyDetail()) {
+                  @let d = selectedCompanyDetail()!;
+                  @if (d.invitationStatus !== 'Accepted') {
+                    <button class="action-btn btn-neutral" (click)="resendInvitationFromModal(d)" type="button">
+                      <span [appIcon]="'mail'"></span> Resend Admin Invite
+                    </button>
+                  }
+                  @if (!d.isDefault) {
+                    @if (d.status === 'Active') {
+                      <button class="action-btn btn-danger-soft" (click)="suspendCompanyFromModal(d)" type="button">
+                        Suspend Company
+                      </button>
+                    } @else {
+                      <button class="action-btn btn-success-soft" (click)="activateCompanyFromModal(d)" type="button">
+                        Activate Company
+                      </button>
+                    }
+                  }
+                }
+              </div>
+              <button class="btn-cancel" type="button" (click)="closeCompanyDetails()">Close</button>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Create Organization Modal -->
       @if (showCreateOrgModal()) {
@@ -332,245 +504,7 @@ import { ToastService } from '../../core/services/toast.service';
         padding-bottom: 40px;
         display: flex;
         flex-direction: column;
-        gap: 22px;
-      }
-
-      /* Hero Card */
-      .dash-hero-card {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #1e3a8a 100%);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 18px;
-        padding: 26px 30px;
-        color: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 24px;
-        box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.4);
-        position: relative;
-        overflow: hidden;
-      }
-      .dash-hero-card::after {
-        content: '';
-        position: absolute;
-        top: -60px;
-        right: -60px;
-        width: 240px;
-        height: 240px;
-        border-radius: 50%;
-        background: radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, transparent 70%);
-        pointer-events: none;
-      }
-      .hero-left {
-        max-width: 720px;
-        position: relative;
-        z-index: 1;
-      }
-      .hero-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(8px);
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        color: #93c5fd;
-        margin-bottom: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-      }
-      .live-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: #10b981;
-        box-shadow: 0 0 8px #10b981;
-      }
-      .hero-title {
-        font-size: 24px;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        margin: 0 0 8px 0;
-        color: #ffffff;
-      }
-      .hero-subtitle {
-        font-size: 13.5px;
-        color: #cbd5e1;
-        margin: 0 0 16px 0;
-        line-height: 1.5;
-      }
-      .hero-meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      .meta-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        font-weight: 600;
-        background: rgba(15, 23, 42, 0.6);
-        padding: 4px 10px;
-        border-radius: 6px;
-        color: #e2e8f0;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-      }
-      .meta-pill span {
-        color: #34d399;
-      }
-      .hero-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        min-width: 170px;
-        position: relative;
-        z-index: 1;
-      }
-      .hero-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 10px 18px;
-        border-radius: 10px;
-        font-size: 13px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        border: none;
-      }
-      .hero-btn.btn-primary {
-        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
-        color: #ffffff;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
-      }
-      .hero-btn.btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
-      }
-      .hero-btn.btn-secondary {
-        background: rgba(255, 255, 255, 0.08);
-        color: #f1f5f9;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-      }
-      .hero-btn.btn-secondary:hover {
-        background: rgba(255, 255, 255, 0.16);
-        transform: translateY(-2px);
-      }
-
-      /* KPI Metric Cards Grid */
-      .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
         gap: 20px;
-      }
-      @media (max-width: 640px) {
-        .kpi-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .metric-card {
-        background: var(--surface, #ffffff);
-        border: 1px solid var(--border, #e2e8f0);
-        border-radius: 14px;
-        padding: 18px 20px;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-        cursor: default;
-      }
-      .metric-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-        border-color: rgba(37, 99, 235, 0.3);
-      }
-      .card-accent {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: transparent;
-      }
-      .metric-blue .card-accent { background: linear-gradient(90deg, #2563eb, #60a5fa); }
-      .metric-emerald .card-accent { background: linear-gradient(90deg, #059669, #34d399); }
-      .metric-cyan .card-accent { background: linear-gradient(90deg, #0891b2, #38bdf8); }
-      .metric-amber .card-accent { background: linear-gradient(90deg, #d97706, #fbbf24); }
-      .metric-purple .card-accent { background: linear-gradient(90deg, #7c3aed, #c084fc); }
-      .metric-indigo .card-accent { background: linear-gradient(90deg, #4f46e5, #818cf8); }
-
-      .metric-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 12px;
-      }
-      .metric-label {
-        font-size: 11.5px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--muted, #64748b);
-      }
-      .metric-value {
-        font-size: 26px;
-        font-weight: 800;
-        color: var(--text, #0f172a);
-        margin-top: 6px;
-        line-height: 1.1;
-      }
-      .metric-icon-wrap {
-        width: 42px;
-        height: 42px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-      .icon-blue { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
-      .icon-emerald { background: rgba(16, 185, 129, 0.12); color: #059669; }
-      .icon-cyan { background: rgba(6, 182, 212, 0.12); color: #0891b2; }
-      .icon-amber { background: rgba(245, 158, 11, 0.12); color: #d97706; }
-      .icon-purple { background: rgba(147, 51, 234, 0.12); color: #9333ea; }
-      .icon-indigo { background: rgba(79, 70, 229, 0.12); color: #4f46e5; }
-
-      .metric-footer {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        margin-top: 14px;
-        font-size: 12px;
-      }
-      .status-indicator-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        display: inline-block;
-      }
-      .status-indicator-dot.online { background: #10b981; }
-      .status-indicator-dot.warm { background: #f59e0b; }
-      .footer-highlight { font-weight: 700; color: var(--text, #0f172a); }
-      .footer-muted { color: var(--muted, #64748b); }
-      .footer-link { font-weight: 700; color: var(--p, #2563eb); cursor: pointer; }
-      .text-emerald { color: #059669 !important; }
-
-      /* Main Dual-Column Grid */
-      .dash-grid-layout {
-        display: grid;
-        grid-template-columns: 1fr 360px;
-        gap: 22px;
-        align-items: start;
-      }
-      @media (max-width: 1100px) {
-        .dash-grid-layout {
-          grid-template-columns: 1fr;
-        }
       }
 
       /* Content Panels */
@@ -579,7 +513,7 @@ import { ToastService } from '../../core/services/toast.service';
         border: 1px solid var(--border, #e2e8f0);
         border-radius: 16px;
         overflow: hidden;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
       }
       .panel-header {
         padding: 20px 24px;
@@ -590,11 +524,8 @@ import { ToastService } from '../../core/services/toast.service';
         flex-wrap: wrap;
         gap: 16px;
       }
-      .panel-header.compact {
-        padding: 16px 20px;
-      }
       .panel-title {
-        font-size: 16px;
+        font-size: 17px;
         font-weight: 800;
         color: var(--text, #0f172a);
         margin: 0;
@@ -614,27 +545,32 @@ import { ToastService } from '../../core/services/toast.service';
       }
       .filter-pills {
         display: flex;
-        background: var(--bg, #f8fafc);
-        border: 1px solid var(--border, #e2e8f0);
-        padding: 3px;
-        border-radius: 8px;
-        gap: 3px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        padding: 4px;
+        border-radius: 10px;
+        gap: 4px;
       }
       .pill-btn {
         border: none;
         background: transparent;
-        font-size: 11.5px;
+        font-size: 12px;
         font-weight: 600;
-        padding: 5px 12px;
-        border-radius: 6px;
-        color: var(--muted, #64748b);
+        padding: 6px 14px;
+        border-radius: 7px;
+        color: #64748b;
         cursor: pointer;
-        transition: all 0.15s;
+        transition: all 0.15s ease-in-out;
+      }
+      .pill-btn:hover:not(.active) {
+        color: #0f172a;
+        background: rgba(255, 255, 255, 0.6);
       }
       .pill-btn.active {
-        background: var(--surface, #ffffff);
-        color: var(--p, #2563eb);
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        background: #2563eb;
+        color: #ffffff;
+        font-weight: 700;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28);
       }
 
       .search-wrap {
@@ -644,34 +580,70 @@ import { ToastService } from '../../core/services/toast.service';
       }
       .search-icon {
         position: absolute;
-        left: 10px;
+        left: 11px;
         color: var(--muted, #94a3b8);
         pointer-events: none;
+        font-size: 14px;
       }
       .search-input {
-        padding: 7px 28px 7px 32px;
+        padding: 8px 30px 8px 34px;
         border: 1px solid var(--border, #cbd5e1);
         border-radius: 8px;
         font-size: 12.5px;
         background: var(--surface, #ffffff);
         color: var(--text, #0f172a);
-        width: 190px;
+        width: 210px;
         transition: all 0.2s;
       }
       .search-input:focus {
         outline: none;
-        border-color: var(--p, #2563eb);
-        width: 230px;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        border-color: #2563eb;
+        width: 250px;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
       }
       .clear-search-btn {
         position: absolute;
-        right: 8px;
+        right: 9px;
         background: none;
         border: none;
         color: var(--muted, #94a3b8);
         cursor: pointer;
-        font-size: 11px;
+        font-size: 12px;
+        padding: 2px 4px;
+      }
+      .clear-search-btn:hover {
+        color: #0f172a;
+      }
+
+      .action-top-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 12.5px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.18s;
+        border: 1px solid transparent;
+        white-space: nowrap;
+      }
+      .action-top-btn.btn-secondary {
+        background: var(--surface, #ffffff);
+        border-color: var(--border, #cbd5e1);
+        color: var(--text, #334155);
+      }
+      .action-top-btn.btn-secondary:hover:not(:disabled) {
+        background: var(--bg, #f8fafc);
+        border-color: #94a3b8;
+      }
+      .action-top-btn.btn-primary {
+        background: #2563eb;
+        color: #ffffff;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+      }
+      .action-top-btn.btn-primary:hover {
+        background: #1d4ed8;
       }
 
       /* Modern Table */
@@ -685,9 +657,9 @@ import { ToastService } from '../../core/services/toast.service';
       }
       .modern-table th {
         background: var(--bg, #f8fafc);
-        padding: 12px 18px;
+        padding: 13px 20px;
         text-align: left;
-        font-size: 11px;
+        font-size: 11.5px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
@@ -695,7 +667,7 @@ import { ToastService } from '../../core/services/toast.service';
         border-bottom: 1px solid var(--border, #e2e8f0);
       }
       .modern-table td {
-        padding: 14px 18px;
+        padding: 15px 20px;
         border-bottom: 1px solid var(--border, #f1f5f9);
         vertical-align: middle;
       }
@@ -709,8 +681,8 @@ import { ToastService } from '../../core/services/toast.service';
         gap: 12px;
       }
       .org-avatar {
-        width: 36px;
-        height: 36px;
+        width: 38px;
+        height: 38px;
         border-radius: 10px;
         background: linear-gradient(135deg, #2563eb, #60a5fa);
         color: #ffffff;
@@ -718,7 +690,7 @@ import { ToastService } from '../../core/services/toast.service';
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 14px;
+        font-size: 14.5px;
         flex-shrink: 0;
       }
       .org-name {
@@ -732,7 +704,7 @@ import { ToastService } from '../../core/services/toast.service';
         font-weight: 700;
         background: rgba(37, 99, 235, 0.1);
         color: #2563eb;
-        padding: 1px 7px;
+        padding: 2px 7px;
         border-radius: 4px;
         margin-top: 3px;
       }
@@ -748,35 +720,39 @@ import { ToastService } from '../../core/services/toast.service';
         letter-spacing: 0.04em;
         color: var(--text, #334155);
       }
+
       .admin-name {
-        font-weight: 600;
+        font-weight: 700;
         color: var(--text, #0f172a);
+        font-size: 13px;
       }
       .admin-email {
         font-size: 11.5px;
         color: var(--muted, #64748b);
         margin-top: 1px;
       }
+
       .db-badge {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        font-family: monospace;
+        gap: 6px;
+        padding: 4px 10px;
+        background: rgba(15, 23, 42, 0.04);
+        border: 1px solid var(--border, #cbd5e1);
+        border-radius: 6px;
         font-size: 11.5px;
-        color: var(--muted, #64748b);
-        background: var(--bg, #f8fafc);
-        padding: 3px 8px;
-        border-radius: 5px;
-        border: 1px solid var(--border, #e2e8f0);
+        font-weight: 600;
+        color: var(--text, #334155);
+        font-family: monospace;
       }
 
       .status-badge {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 3px 10px;
+        gap: 5px;
+        padding: 4px 10px;
         border-radius: 20px;
-        font-size: 11px;
+        font-size: 11.5px;
         font-weight: 700;
       }
       .status-badge .dot {
@@ -808,7 +784,7 @@ import { ToastService } from '../../core/services/toast.service';
         gap: 6px;
       }
       .action-btn {
-        padding: 5px 10px;
+        padding: 5px 11px;
         border-radius: 6px;
         font-size: 11.5px;
         font-weight: 700;
@@ -817,7 +793,7 @@ import { ToastService } from '../../core/services/toast.service';
         transition: all 0.15s;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: 5px;
       }
       .btn-danger-soft {
         background: rgba(239, 68, 68, 0.1);
@@ -828,7 +804,7 @@ import { ToastService } from '../../core/services/toast.service';
         background: rgba(239, 68, 68, 0.18);
       }
       .btn-danger-soft:disabled {
-        opacity: 0.5;
+        opacity: 0.45;
         cursor: not-allowed;
       }
 
@@ -853,11 +829,12 @@ import { ToastService } from '../../core/services/toast.service';
       .btn-manage {
         background: transparent;
         color: var(--p, #2563eb);
-        border: 1px solid rgba(37, 99, 235, 0.25);
-        padding: 5px 8px;
+        border: 1px solid rgba(37, 99, 235, 0.3);
+        padding: 5px 9px;
       }
       .btn-manage:hover {
-        background: rgba(37, 99, 235, 0.1);
+        background: #2563eb;
+        color: #ffffff;
       }
 
       .empty-state {
@@ -868,130 +845,7 @@ import { ToastService } from '../../core/services/toast.service';
       .empty-title { font-weight: 700; font-size: 14px; color: var(--text, #0f172a); }
       .empty-desc { font-size: 12px; color: var(--muted, #64748b); margin-top: 3px; }
 
-      /* Side Column */
-      .side-column {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-      }
-
-      /* Shortcuts List */
-      .shortcuts-list {
-        padding: 12px 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .shortcut-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 12px;
-        border-radius: 10px;
-        border: 1px solid var(--border, #e2e8f0);
-        background: var(--bg, #f8fafc);
-        cursor: pointer;
-        transition: all 0.18s ease;
-      }
-      .shortcut-item:hover {
-        background: var(--surface, #ffffff);
-        border-color: var(--p, #2563eb);
-        transform: translateX(3px);
-        box-shadow: 0 3px 12px rgba(37, 99, 235, 0.1);
-      }
-      .sc-icon {
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-      .sc-blue { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
-      .sc-emerald { background: rgba(16, 185, 129, 0.12); color: #059669; }
-      .sc-amber { background: rgba(245, 158, 11, 0.12); color: #d97706; }
-      .sc-purple { background: rgba(147, 51, 234, 0.12); color: #9333ea; }
-      .sc-indigo { background: rgba(79, 70, 229, 0.12); color: #4f46e5; }
-      .sc-cyan { background: rgba(6, 182, 212, 0.12); color: #0891b2; }
-
-      .sc-content { flex: 1; min-width: 0; }
-      .sc-title {
-        font-size: 13px;
-        font-weight: 700;
-        color: var(--text, #0f172a);
-      }
-      .sc-sub {
-        font-size: 11.5px;
-        color: var(--muted, #64748b);
-        margin-top: 1px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .sc-arrow {
-        color: var(--muted, #94a3b8);
-        font-size: 14px;
-        font-weight: 700;
-        transition: transform 0.15s;
-      }
-      .shortcut-item:hover .sc-arrow {
-        color: var(--p, #2563eb);
-        transform: translateX(2px);
-      }
-
-      /* Activity Feed */
-      .activity-feed {
-        padding: 16px 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        max-height: 380px;
-        overflow-y: auto;
-      }
-      .activity-item {
-        display: flex;
-        gap: 12px;
-        align-items: flex-start;
-      }
-      .activity-icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-      .act-success { background: rgba(16, 185, 129, 0.15); color: #059669; }
-      .act-warning { background: rgba(245, 158, 11, 0.15); color: #d97706; }
-      .act-info { background: rgba(37, 99, 235, 0.15); color: #2563eb; }
-
-      .activity-content { flex: 1; min-width: 0; }
-      .activity-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 8px;
-      }
-      .activity-title {
-        font-weight: 700;
-        font-size: 12.5px;
-        color: var(--text, #0f172a);
-      }
-      .activity-time {
-        font-size: 11px;
-        color: var(--muted, #94a3b8);
-        white-space: nowrap;
-      }
-      .activity-desc {
-        font-size: 11.5px;
-        color: var(--muted, #64748b);
-        margin-top: 2px;
-        line-height: 1.4;
-      }
-
-      /* Refresh Spin Animation */
+      /* Spin Animation */
       .action-icon.spin {
         animation: spin 1s linear infinite;
         display: inline-block;
@@ -1005,7 +859,7 @@ import { ToastService } from '../../core/services/toast.service';
         position: fixed;
         inset: 0;
         background: rgba(15, 23, 42, 0.65);
-        backdrop-filter: blur(4px);
+        backdrop-filter: blur(5px);
         z-index: 9999;
         display: flex;
         align-items: center;
@@ -1016,21 +870,28 @@ import { ToastService } from '../../core/services/toast.service';
         background: var(--surface, #ffffff);
         border: 1px solid var(--border, #e2e8f0);
         border-radius: 16px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         width: 100%;
         overflow: hidden;
         animation: modalIn 0.2s ease-out;
       }
+      .modal-large {
+        max-width: 900px;
+        max-height: 88vh;
+        display: flex;
+        flex-direction: column;
+      }
       @keyframes modalIn {
-        from { opacity: 0; transform: scale(0.95); }
+        from { opacity: 0; transform: scale(0.96); }
         to { opacity: 1; transform: scale(1); }
       }
       .modal-header {
-        padding: 20px 24px;
+        padding: 18px 24px;
         border-bottom: 1px solid var(--border, #e2e8f0);
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: space-between;
+        background: var(--surface, #ffffff);
       }
       .btn-icon {
         background: transparent;
@@ -1044,6 +905,226 @@ import { ToastService } from '../../core/services/toast.service';
         background: var(--p-soft, #eff6ff);
         color: var(--text, #0f172a);
       }
+
+      .detail-header-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .detail-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        color: #ffffff;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      .detail-title-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .detail-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--text, #0f172a);
+      }
+
+      .modal-body-scroll {
+        padding: 20px 24px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        background: var(--bg, #f8fafc);
+      }
+
+      .modal-loading-state {
+        text-align: center;
+        padding: 60px 20px;
+      }
+
+      /* Quick Stats Grid */
+      .details-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+      }
+      .detail-stat-box {
+        background: var(--surface, #ffffff);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: 12px;
+        padding: 14px 16px;
+      }
+      .stat-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted, #64748b);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .stat-value {
+        font-size: 15px;
+        font-weight: 800;
+        margin: 4px 0 2px 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .stat-value.text-blue { color: #2563eb; }
+      .stat-value.text-emerald { color: #059669; }
+      .stat-value.text-slate { color: #1e293b; }
+      .stat-meta {
+        font-size: 11px;
+        color: var(--muted, #94a3b8);
+      }
+
+      /* Section Card */
+      .section-card {
+        background: var(--surface, #ffffff);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .section-header {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border, #e2e8f0);
+        background: #fafbfc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .section-title {
+        font-size: 13.5px;
+        font-weight: 800;
+        color: var(--text, #0f172a);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .section-desc {
+        font-size: 12px;
+        color: var(--muted, #64748b);
+      }
+      .count-pill {
+        background: rgba(37, 99, 235, 0.1);
+        color: #2563eb;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 12px;
+      }
+
+      .credentials-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        padding: 16px 18px;
+      }
+      .cred-label {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--muted, #64748b);
+      }
+      .cred-value {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text, #0f172a);
+        margin-top: 3px;
+      }
+      .cred-sub {
+        font-weight: 400;
+        font-size: 11px;
+        color: var(--muted, #64748b);
+      }
+      .email-highlight {
+        color: #2563eb;
+      }
+
+      /* Mini Table for employees */
+      .employees-mini-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12.5px;
+      }
+      .employees-mini-table th {
+        background: #fafbfc;
+        padding: 10px 14px;
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted, #64748b);
+        border-bottom: 1px solid var(--border, #e2e8f0);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .employees-mini-table td {
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border, #f1f5f9);
+        vertical-align: middle;
+      }
+      .emp-name-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .emp-avatar-sm {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #e0e7ff;
+        color: #3730a3;
+        font-weight: 700;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .emp-name {
+        font-weight: 700;
+        color: var(--text, #0f172a);
+      }
+      .emp-email {
+        color: var(--muted, #64748b);
+        font-size: 12px;
+      }
+      .dept-badge {
+        display: inline-block;
+        padding: 2px 7px;
+        background: #f1f5f9;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #334155;
+      }
+
+      .empty-employees-box {
+        text-align: center;
+        padding: 36px 16px;
+      }
+
+      .modal-footer {
+        padding: 14px 24px;
+        border-top: 1px solid var(--border, #e2e8f0);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--surface, #ffffff);
+      }
+      .footer-left {
+        display: flex;
+        gap: 10px;
+      }
+
       .form-input {
         width: 100%;
         padding: 10px 14px;
@@ -1060,7 +1141,7 @@ import { ToastService } from '../../core/services/toast.service';
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
       }
       .btn-cancel {
-        padding: 9px 18px;
+        padding: 8px 18px;
         border-radius: 8px;
         border: 1px solid var(--border, #cbd5e1);
         background: transparent;
@@ -1068,6 +1149,9 @@ import { ToastService } from '../../core/services/toast.service';
         font-weight: 600;
         font-size: 13px;
         cursor: pointer;
+      }
+      .btn-cancel:hover {
+        background: var(--bg, #f1f5f9);
       }
       .btn-submit {
         padding: 9px 20px;
@@ -1110,16 +1194,21 @@ export class SuperAdminDashboardComponent implements OnInit {
   };
 
   protected readonly companies = signal<CompanyListItem[]>([]);
-
   protected readonly searchQuery = signal<string>('');
   protected readonly statusFilter = signal<'all' | 'Active' | 'Suspended'>('all');
 
+  // Company Details Modal
+  protected readonly showDetailsModal = signal<boolean>(false);
+  protected readonly loadingCompanyDetails = signal<boolean>(false);
+  protected readonly selectedCompanyListItem = signal<CompanyListItem | null>(null);
+  protected readonly selectedCompanyDetail = signal<CompanyDetail | null>(null);
+
   protected readonly totalCompanies = computed(() => this.companies().length);
   protected readonly activeCompanies = computed(
-    () => this.companies().filter((c) => c.status === 'Active').length
+    () => this.companies().filter((c) => (c.status || '').toLowerCase() === 'active').length
   );
   protected readonly suspendedCompanies = computed(
-    () => this.companies().filter((c) => c.status === 'Suspended').length
+    () => this.companies().filter((c) => (c.status || '').toLowerCase() === 'suspended').length
   );
   protected readonly totalAdmins = computed(() => {
     const list = this.companies();
@@ -1129,8 +1218,10 @@ export class SuperAdminDashboardComponent implements OnInit {
   protected readonly filteredCompanies = computed(() => {
     let list = this.companies();
     const filter = this.statusFilter();
-    if (filter !== 'all') {
-      list = list.filter((c) => c.status === filter);
+    if (filter === 'Active') {
+      list = list.filter((c) => (c.status || '').toLowerCase() === 'active');
+    } else if (filter === 'Suspended') {
+      list = list.filter((c) => (c.status || '').toLowerCase() === 'suspended');
     }
     const q = this.searchQuery().trim().toLowerCase();
     if (!q) return list;
@@ -1164,6 +1255,84 @@ export class SuperAdminDashboardComponent implements OnInit {
           this.toast.show('Failed to refresh telemetry.', 'danger');
         },
       });
+  }
+
+  protected onSearchInput(event: Event): void {
+    const val = (event.target as HTMLInputElement).value || '';
+    this.searchQuery.set(val);
+  }
+
+  protected clearSearch(): void {
+    this.searchQuery.set('');
+  }
+
+  protected openCompanyDetails(company: CompanyListItem): void {
+    this.selectedCompanyListItem.set(company);
+    this.selectedCompanyDetail.set(null);
+    this.showDetailsModal.set(true);
+    this.loadingCompanyDetails.set(true);
+
+    this.api.tenantCompany(company.id).subscribe({
+      next: (detail) => {
+        this.selectedCompanyDetail.set(detail);
+        this.loadingCompanyDetails.set(false);
+      },
+      error: (err) => {
+        this.loadingCompanyDetails.set(false);
+        this.toast.show(err?.error?.message || 'Failed to load company details and employees.', 'danger');
+      },
+    });
+  }
+
+  protected closeCompanyDetails(): void {
+    this.showDetailsModal.set(false);
+    this.selectedCompanyDetail.set(null);
+    this.selectedCompanyListItem.set(null);
+  }
+
+  protected resendInvitationFromModal(detail: CompanyDetail): void {
+    this.api.resendInvitation(detail.id).subscribe({
+      next: () => {
+        this.toast.show(`Invitation resent to ${detail.adminEmail}`, 'success');
+        this.openCompanyDetails({ ...detail });
+      },
+      error: (err) => {
+        this.toast.show(err?.error?.message || 'Failed to resend invitation', 'danger');
+      },
+    });
+  }
+
+  protected suspendCompanyFromModal(detail: CompanyDetail): void {
+    if (detail.isDefault) {
+      this.toast.show('The primary default company cannot be suspended', 'danger');
+      return;
+    }
+    if (!confirm(`Are you sure you want to suspend company '${detail.name}'?`)) {
+      return;
+    }
+    this.api.suspendTenantCompany(detail.id).subscribe({
+      next: () => {
+        this.toast.show(`Company '${detail.name}' has been suspended`, 'warning');
+        this.refreshAll();
+        this.openCompanyDetails({ ...detail, status: 'Suspended' });
+      },
+      error: (err) => {
+        this.toast.show(err?.error?.message || 'Failed to suspend company', 'danger');
+      },
+    });
+  }
+
+  protected activateCompanyFromModal(detail: CompanyDetail): void {
+    this.api.activateTenantCompany(detail.id).subscribe({
+      next: () => {
+        this.toast.show(`Company '${detail.name}' activated successfully`, 'success');
+        this.refreshAll();
+        this.openCompanyDetails({ ...detail, status: 'Active' });
+      },
+      error: (err) => {
+        this.toast.show(err?.error?.message || 'Failed to activate company', 'danger');
+      },
+    });
   }
 
   protected openCreateOrgModal(): void {
@@ -1228,7 +1397,6 @@ export class SuperAdminDashboardComponent implements OnInit {
     });
   }
 
-
   protected suspendCompany(company: CompanyListItem): void {
     if (company.isDefault) {
       this.toast.show('The primary default company cannot be suspended', 'danger');
@@ -1271,33 +1439,5 @@ export class SuperAdminDashboardComponent implements OnInit {
         this.toast.show(err?.error?.message || 'Failed to resend invitation', 'danger');
       },
     });
-  }
-
-  protected goToCompanies(): void {
-    void this.router.navigateByUrl('/company');
-  }
-
-  protected manageCompany(company: CompanyListItem): void {
-    void this.router.navigate(['/company'], { queryParams: { id: company.id } });
-  }
-
-  protected goToRoles(): void {
-    void this.router.navigate(['/settings'], { queryParams: { tab: 'role' } });
-  }
-
-  protected goToPermissions(): void {
-    void this.router.navigate(['/settings'], { queryParams: { tab: 'permission' } });
-  }
-
-  protected goToNavigation(): void {
-    void this.router.navigate(['/settings'], { queryParams: { tab: 'navigation' } });
-  }
-
-  protected goToKeyGroup(): void {
-    void this.router.navigate(['/settings'], { queryParams: { tab: 'keygroup' } });
-  }
-
-  protected goToKiosk(): void {
-    void this.router.navigateByUrl('/kiosk');
   }
 }

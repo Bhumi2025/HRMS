@@ -22,7 +22,17 @@ public sealed record CompanyListItemDto(
     DateTime? InvitationSentAtUtc,
     string? InvitationError);
 
-/// <summary>Company detail including provisioning logs and invitation metadata.</summary>
+public sealed record CompanyEmployeeSummaryDto(
+    Guid Id,
+    string EmployeeCode,
+    string FullName,
+    string Email,
+    string? Department,
+    string? Designation,
+    string Status,
+    DateTime? JoinedDate);
+
+/// <summary>Company detail including provisioning logs, invitation metadata and provisioned employees.</summary>
 public sealed record CompanyDetailDto(
     Guid Id,
     string Name,
@@ -44,7 +54,9 @@ public sealed record CompanyDetailDto(
     DateTime? InvitationSentAtUtc,
     DateTime? InvitationAcceptedAtUtc,
     string? InvitationError,
-    IReadOnlyList<ProvisioningLogDto> ProvisioningLogs);
+    IReadOnlyList<ProvisioningLogDto> ProvisioningLogs,
+    int EmployeeCount = 0,
+    IReadOnlyList<CompanyEmployeeSummaryDto>? Employees = null);
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false)]
 public sealed class OptionalEmailAddressAttribute : ValidationAttribute

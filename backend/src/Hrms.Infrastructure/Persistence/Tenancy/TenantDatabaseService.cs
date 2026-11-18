@@ -1,5 +1,6 @@
 using Hrms.Application.Abstractions.Tenancy;
 using Hrms.Application.Common;
+using Hrms.Application.DTOs;
 using Hrms.Domain.Entities;
 using Hrms.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -293,6 +294,51 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Leav
     {
         await using var db = Create(databaseName);
         return await db.Users.CountAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<CompanyEmployeeSummaryDto>> GetEmployeesAsync(string databaseName, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+        {
+            return Array.Empty<CompanyEmployeeSummaryDto>();
+        }
+
+        try
+        {
+            await using var db = Create(databaseName);
+            var items = await db.Employees
+                .AsNoTracking()
+                .Include(e => e.Department)
+                .Include(e => e.Designation)
+                .OrderBy(e => e.EmployeeCode)
+                .Select(e => new
+                {
+                    e.Id,
+                    e.EmployeeCode,
+                    FullName = (e.FirstName + " " + e.LastName).Trim(),
+                    e.Email,
+                    Department = e.Department != null ? e.Department.Name : null,
+                    Designation = e.Designation != null ? e.Designation.Name : (!string.IsNullOrEmpty(e.JobTitle) ? e.JobTitle : null),
+                    Status = e.Status.ToString(),
+                    e.JoinDate
+                })
+                .ToListAsync(ct);
+
+            return items.Select(e => new CompanyEmployeeSummaryDto(
+                e.Id,
+                e.EmployeeCode,
+                e.FullName,
+                e.Email,
+                e.Department,
+                e.Designation,
+                e.Status,
+                new DateTime(e.JoinDate.Year, e.JoinDate.Month, e.JoinDate.Day, 0, 0, 0, DateTimeKind.Utc)
+            )).ToList();
+        }
+        catch
+        {
+            return Array.Empty<CompanyEmployeeSummaryDto>();
+        }
     }
 
     public async Task DropDatabaseAsync(string databaseName, CancellationToken ct = default)
