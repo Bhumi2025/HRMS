@@ -41,6 +41,29 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly currentNoticeIndex = signal(0);
   protected readonly currentTime = signal(new Date());
 
+  // Dynamic Selected Month for Attendance Chart (e.g. '2026-11')
+  protected readonly selectedMonthKey = signal<string>(
+    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  );
+
+  // Available months: past 6 months to next 12 months (e.g., Nov 2026, Dec 2026, Jan 2027...)
+  protected readonly availableMonths = computed(() => {
+    const now = this.currentTime();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const list: { key: string; label: string; year: number; month: number }[] = [];
+
+    for (let i = -6; i <= 12; i++) {
+      const d = new Date(currentYear, currentMonth + i, 1);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const key = `${y}-${String(m).padStart(2, '0')}`;
+      const label = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(d);
+      list.push({ key, label, year: y, month: m });
+    }
+    return list;
+  });
+
   // Reference Line Chart State & Tooltip
   protected readonly hoveredChartPoint = signal<{
     idx: number;
@@ -115,9 +138,9 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     const totalDays = list.length;
     const maxVal = this.chartMaxScale() || 1;
     const boxLeft = 42;
-    const boxWidth = 700;
-    const boxTop = 14;
-    const boxHeight = 108;
+    const boxWidth = 710;
+    const boxTop = 16;
+    const boxHeight = 145;
     const stepX = boxWidth / totalDays;
 
     return list.map((p, idx) => {
@@ -133,7 +156,8 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
         }
       }
       if (!formattedDate) {
-        formattedDate = `11/${idx + 1}/2026`;
+        const [yStr, mStr] = this.selectedMonthKey().split('-');
+        formattedDate = `${parseInt(mStr, 10)}/${idx + 1}/${yStr}`;
       }
 
       return {
@@ -158,8 +182,8 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
 
   protected getYCoord(val: number): number {
     const maxVal = this.chartMaxScale() || 1;
-    const boxTop = 14;
-    const boxHeight = 108;
+    const boxTop = 16;
+    const boxHeight = 145;
     return Math.round(((boxTop + boxHeight) - (val / maxVal) * boxHeight) * 10) / 10;
   }
 
@@ -327,6 +351,28 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
 
   onPointLeave(): void {
     this.hoveredChartPoint.set(null);
+  }
+
+  onMonthChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    if (!target) return;
+    const key = target.value;
+    this.selectedMonthKey.set(key);
+    const [yStr, mStr] = key.split('-');
+    const year = parseInt(yStr, 10);
+    const month = parseInt(mStr, 10);
+    this.loadAttendanceTrendForMonth(year, month);
+  }
+
+  loadAttendanceTrendForMonth(year: number, month: number): void {
+    this.api.attendanceTrend(year, month).subscribe({
+      next: (points) => {
+        if (points && points.length > 0) {
+          this.attendanceGraph.set(points);
+        }
+      },
+      error: () => {},
+    });
   }
 
   toggleTask(task: TaskItem): void {
