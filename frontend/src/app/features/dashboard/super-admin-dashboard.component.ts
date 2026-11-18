@@ -1,11 +1,11 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, OnInit, AfterViewInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { of, catchError } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { SessionService } from '../../core/services/session.service';
-import { CompanyListItem, CompanyDetail, CreateCompanyRequest } from '../../core/api/api.models';
+import { CompanyListItem, CompanyDetail, CreateCompanyRequest, STANDARD_TIMEZONES } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 
@@ -103,11 +103,13 @@ import { ToastService } from '../../core/services/toast.service';
                 <tr class="table-row">
                   <td>
                     <div class="org-cell">
-                      <div class="org-avatar">
+                      <div class="org-avatar" (click)="openCompanyDetails(c)" role="button" title="View {{ c.name }} details & employees" style="cursor: pointer;">
                         {{ c.name.charAt(0) }}
                       </div>
                       <div class="org-info">
-                        <div class="org-name">{{ c.name }}</div>
+                        <button type="button" class="org-name-btn" (click)="openCompanyDetails(c)" title="View {{ c.name }} details & employees">
+                          {{ c.name }}
+                        </button>
                         @if (c.isDefault) {
                           <span class="badge badge-default">Primary Default</span>
                         }
@@ -146,22 +148,19 @@ import { ToastService } from '../../core/services/toast.service';
                   </td>
                   <td style="text-align: right;">
                     <div class="actions-group">
-                      @if ((c.status || '').toLowerCase() === 'active') {
+                      @if (!c.isDefault) {
                         <button
-                          class="action-btn btn-danger-soft"
-                          (click)="suspendCompany(c)"
-                          [disabled]="c.isDefault"
-                          [attr.data-tooltip]="c.isDefault ? 'Primary tenant cannot be suspended' : 'Suspend Tenant'"
+                          type="button"
+                          class="status-toggle-switch"
+                          [class.active]="(c.status || '').toLowerCase() === 'active'"
+                          [class.suspended]="(c.status || '').toLowerCase() === 'suspended'"
+                          (click)="toggleCompanyStatus(c)"
+                          [attr.data-tooltip]="(c.status || '').toLowerCase() === 'suspended' ? 'Click to Activate tenant' : 'Click to Suspend tenant'"
                         >
-                          Suspend
-                        </button>
-                      } @else {
-                        <button
-                          class="action-btn btn-success-soft"
-                          (click)="activateCompany(c)"
-                          data-tooltip="Activate Tenant"
-                        >
-                          Activate
+                          <span class="switch-track">
+                            <span class="switch-thumb"></span>
+                          </span>
+                          <span class="switch-label">{{ (c.status || '').toLowerCase() === 'suspended' ? 'Suspended' : 'Active' }}</span>
                         </button>
                       }
 
@@ -174,19 +173,16 @@ import { ToastService } from '../../core/services/toast.service';
                           <span [appIcon]="'mail'"></span>
                           Invite
                         </button>
-                      } @else {
-                        <span class="status-badge status-active" style="padding: 4px 8px; font-size: 11px;" data-tooltip="Invitation Accepted">
-                          <span class="dot"></span> Accepted
-                        </span>
                       }
 
                       <button
-                        class="action-btn btn-manage"
+                        class="action-btn btn-neutral"
                         (click)="openCompanyDetails(c)"
-                        [attr.data-tooltip]="'View details & employees for ' + c.name"
+                        data-tooltip="View Details & Employees"
                         title="View {{ c.name }} Details & Employees"
                       >
-                        <span [appIcon]="'arrow_right'"></span>
+                        <span [appIcon]="'eye'"></span>
+                        Details
                       </button>
                     </div>
                   </td>
@@ -329,69 +325,116 @@ import { ToastService } from '../../core/services/toast.service';
 
                 <!-- Section: Provisioned Employees Directory -->
                 <div class="section-card">
-                  <div class="section-header">
-                    <div class="section-title">
-                      <span [appIcon]="'company'"></span>
-                      <span>Provisioned Employees Directory</span>
-                      <span class="count-pill">{{ d.employees?.length || 0 }} Total</span>
+                  <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                      <div class="section-title">
+                        <span [appIcon]="'company'"></span>
+                        <span>Provisioned Employees Directory</span>
+                        <span class="count-pill">{{ d.employees?.length || 0 }} Total</span>
+                      </div>
+                      <div class="section-desc">Employees registered and active inside <strong>{{ d.databaseName }}</strong></div>
                     </div>
-                    <div class="section-desc">Employees registered and active inside <strong>{{ d.databaseName }}</strong></div>
+                    @if (d.employees && d.employees.length > 5) {
+                      <div style="max-width: 220px;">
+                        <input
+                          type="text"
+                          class="search-input-sm"
+                          placeholder="Search employees..."
+                          [ngModel]="empModalSearch()"
+                          (ngModelChange)="onEmpModalSearchChange($event)"
+                        />
+                      </div>
+                    }
                   </div>
 
                   @if (d.employees && d.employees.length > 0) {
-                    <div class="table-responsive">
-                      <table class="employees-mini-table">
-                        <thead>
-                          <tr>
-                            <th>Code</th>
-                            <th>Employee Name</th>
-                            <th>Work Email</th>
-                            <th>Department</th>
-                            <th>Designation / Role</th>
-                            <th style="text-align: center;">Status</th>
-                            <th>Date of Joining</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (emp of d.employees; track emp.id) {
+                    @if (pagedModalEmployees().length > 0) {
+                      <div class="table-responsive">
+                        <table class="employees-mini-table">
+                          <thead>
                             <tr>
-                              <td>
-                                <span class="code-badge">{{ emp.employeeCode }}</span>
-                              </td>
-                              <td>
-                                <div class="emp-name-cell">
-                                  <div class="emp-avatar-sm">
-                                    {{ emp.fullName.charAt(0) }}
-                                  </div>
-                                  <span class="emp-name">{{ emp.fullName }}</span>
-                                </div>
-                              </td>
-                              <td class="emp-email">{{ emp.email }}</td>
-                              <td>
-                                @if (emp.department) {
-                                  <span class="dept-badge">{{ emp.department }}</span>
-                                } @else {
-                                  <span class="text-muted">—</span>
-                                }
-                              </td>
-                              <td>{{ emp.designation || 'Staff' }}</td>
-                              <td style="text-align: center;">
-                                @if (emp.status.toLowerCase() === 'active') {
-                                  <span class="status-badge status-active"><span class="dot"></span> Active</span>
-                                } @else if (emp.status.toLowerCase() === 'onleave') {
-                                  <span class="status-badge status-provisioning"><span class="dot"></span> On Leave</span>
-                                } @else {
-                                  <span class="status-badge status-suspended"><span class="dot"></span> {{ emp.status }}</span>
-                                }
-                              </td>
-                              <td>
-                                {{ emp.joinedDate ? (emp.joinedDate | date:'mediumDate') : '—' }}
-                              </td>
+                              <th>Code</th>
+                              <th>Employee Name</th>
+                              <th>Work Email</th>
+                              <th>Department</th>
+                              <th>Designation / Role</th>
+                              <th style="text-align: center;">Status</th>
+                              <th>Date of Joining</th>
                             </tr>
-                          }
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            @for (emp of pagedModalEmployees(); track emp.id) {
+                              <tr>
+                                <td>
+                                  <span class="code-badge">{{ emp.employeeCode }}</span>
+                                </td>
+                                <td>
+                                  <div class="emp-name-cell">
+                                    <div class="emp-avatar-sm">
+                                      {{ emp.fullName.charAt(0) }}
+                                    </div>
+                                    <span class="emp-name">{{ emp.fullName }}</span>
+                                  </div>
+                                </td>
+                                <td class="emp-email">{{ emp.email }}</td>
+                                <td>
+                                  @if (emp.department) {
+                                    <span class="dept-badge">{{ emp.department }}</span>
+                                  } @else {
+                                    <span class="text-muted">—</span>
+                                  }
+                                </td>
+                                <td>{{ emp.designation || 'Staff' }}</td>
+                                <td style="text-align: center;">
+                                  @if (emp.status.toLowerCase() === 'active') {
+                                    <span class="status-badge status-active"><span class="dot"></span> Active</span>
+                                  } @else if (emp.status.toLowerCase() === 'onleave') {
+                                    <span class="status-badge status-provisioning"><span class="dot"></span> On Leave</span>
+                                  } @else {
+                                    <span class="status-badge status-suspended"><span class="dot"></span> {{ emp.status }}</span>
+                                  }
+                                </td>
+                                <td>
+                                  {{ emp.joinedDate ? (emp.joinedDate | date:'mediumDate') : '—' }}
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <!-- Pagination Controls -->
+                      <div class="modal-pagination-bar">
+                        <div class="pagination-info">
+                          Showing {{ empModalStartIndex() }} to {{ empModalEndIndex() }} of {{ filteredModalEmployees().length }} employees
+                        </div>
+                        <div class="pagination-buttons">
+                          <button
+                            type="button"
+                            class="page-nav-btn"
+                            [disabled]="empModalPage() <= 1"
+                            (click)="changeEmpModalPage(empModalPage() - 1)"
+                          >
+                            ‹ Previous
+                          </button>
+                          <span class="page-indicator">
+                            Page {{ empModalPage() }} of {{ empModalTotalPages() }}
+                          </span>
+                          <button
+                            type="button"
+                            class="page-nav-btn"
+                            [disabled]="empModalPage() >= empModalTotalPages()"
+                            (click)="changeEmpModalPage(empModalPage() + 1)"
+                          >
+                            Next ›
+                          </button>
+                        </div>
+                      </div>
+                    } @else {
+                      <div class="empty-employees-box">
+                        <div style="font-weight: 600; color: var(--muted, #64748b);">No employees match "{{ empModalSearch() }}"</div>
+                      </div>
+                    }
                   } @else {
                     <div class="empty-employees-box">
                       <div class="empty-icon">👥</div>
@@ -458,7 +501,11 @@ import { ToastService } from '../../core/services/toast.service';
                 </div>
                 <div class="form-group">
                   <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px;">Time Zone</label>
-                  <input class="form-input" type="text" [(ngModel)]="createOrgForm.timeZone" placeholder="e.g. Asia/Dubai" />
+                  <select class="form-input" [(ngModel)]="createOrgForm.timeZone" style="width: 100%; height: 38px;">
+                    @for (tz of standardTimezones; track tz.value) {
+                      <option [value]="tz.value">{{ tz.label }}</option>
+                    }
+                  </select>
                 </div>
               </div>
 
@@ -699,6 +746,22 @@ import { ToastService } from '../../core/services/toast.service';
         color: var(--text, #0f172a);
         font-size: 13.5px;
       }
+      .org-name-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        font-weight: 700;
+        color: var(--text, #0f172a);
+        font-size: 13.5px;
+        cursor: pointer;
+        text-align: left;
+        transition: color 0.15s;
+        display: block;
+      }
+      .org-name-btn:hover {
+        color: #2563eb;
+        text-decoration: underline;
+      }
       .badge-default {
         display: inline-block;
         font-size: 10px;
@@ -825,6 +888,115 @@ import { ToastService } from '../../core/services/toast.service';
       }
       .btn-neutral:hover {
         background: var(--border, #e2e8f0);
+      }
+
+      .status-toggle-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px 3px 4px;
+        border-radius: 20px;
+        border: 1px solid var(--border, #cbd5e1);
+        background: var(--surface, #ffffff);
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+      }
+      .status-toggle-switch:hover {
+        border-color: #2563eb;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      }
+      .status-toggle-switch .switch-track {
+        width: 26px;
+        height: 15px;
+        background: #cbd5e1;
+        border-radius: 10px;
+        position: relative;
+        transition: background 0.2s ease;
+        display: inline-block;
+      }
+      .status-toggle-switch .switch-thumb {
+        width: 11px;
+        height: 11px;
+        background: #ffffff;
+        border-radius: 50%;
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        transition: transform 0.2s ease;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+      }
+      .status-toggle-switch.active .switch-track {
+        background: #10b981;
+      }
+      .status-toggle-switch.active .switch-thumb {
+        transform: translateX(11px);
+      }
+      .status-toggle-switch.active .switch-label {
+        color: #059669;
+      }
+      .status-toggle-switch.suspended .switch-track {
+        background: #f59e0b;
+      }
+      .status-toggle-switch.suspended .switch-thumb {
+        transform: translateX(0);
+      }
+      .status-toggle-switch.suspended .switch-label {
+        color: #d97706;
+      }
+
+      .modal-pagination-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 18px;
+        border-top: 1px solid var(--border, #e2e8f0);
+        background: var(--bg, #f8fafc);
+        font-size: 12px;
+        color: var(--muted, #64748b);
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .pagination-buttons {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .page-nav-btn {
+        padding: 4px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border, #cbd5e1);
+        background: var(--surface, #ffffff);
+        color: var(--text, #1e293b);
+        font-size: 11.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .page-nav-btn:hover:not(:disabled) {
+        border-color: #2563eb;
+        color: #2563eb;
+      }
+      .page-nav-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .page-indicator {
+        font-weight: 700;
+        color: var(--text, #0f172a);
+        font-size: 12px;
+      }
+      .search-input-sm {
+        padding: 5px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border, #cbd5e1);
+        font-size: 12px;
+        outline: none;
+        width: 180px;
+      }
+      .search-input-sm:focus {
+        border-color: #2563eb;
       }
 
       .btn-manage {
@@ -1176,11 +1348,14 @@ import { ToastService } from '../../core/services/toast.service';
     `,
   ],
 })
-export class SuperAdminDashboardComponent implements OnInit, AfterViewInit {
+export class SuperAdminDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly session = inject(SessionService);
+
+  protected readonly standardTimezones = STANDARD_TIMEZONES;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   protected readonly isRefreshing = signal<boolean>(false);
   protected readonly showCreateOrgModal = signal<boolean>(false);
@@ -1204,6 +1379,74 @@ export class SuperAdminDashboardComponent implements OnInit, AfterViewInit {
   protected readonly loadingCompanyDetails = signal<boolean>(false);
   protected readonly selectedCompanyListItem = signal<CompanyListItem | null>(null);
   protected readonly selectedCompanyDetail = signal<CompanyDetail | null>(null);
+
+  // Modal Employee Pagination
+  protected readonly empModalPage = signal<number>(1);
+  protected readonly empModalPageSize = signal<number>(5);
+  protected readonly empModalSearch = signal<string>('');
+
+  protected readonly filteredModalEmployees = computed(() => {
+    const list = this.selectedCompanyDetail()?.employees || [];
+    const q = this.empModalSearch().toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(
+      (e) =>
+        e.fullName?.toLowerCase().includes(q) ||
+        e.employeeCode?.toLowerCase().includes(q) ||
+        e.email?.toLowerCase().includes(q) ||
+        (e.department && e.department.toLowerCase().includes(q)) ||
+        (e.designation && e.designation.toLowerCase().includes(q))
+    );
+  });
+
+  protected readonly empModalTotalPages = computed(() => {
+    const count = this.filteredModalEmployees().length;
+    const size = this.empModalPageSize();
+    return Math.max(1, Math.ceil(count / size));
+  });
+
+  protected readonly pagedModalEmployees = computed(() => {
+    const list = this.filteredModalEmployees();
+    const page = this.empModalPage();
+    const size = this.empModalPageSize();
+    const start = (page - 1) * size;
+    return list.slice(start, start + size);
+  });
+
+  protected readonly empModalStartIndex = computed(() => {
+    const total = this.filteredModalEmployees().length;
+    if (total === 0) return 0;
+    return (this.empModalPage() - 1) * this.empModalPageSize() + 1;
+  });
+
+  protected readonly empModalEndIndex = computed(() => {
+    const total = this.filteredModalEmployees().length;
+    return Math.min(this.empModalPage() * this.empModalPageSize(), total);
+  });
+
+  protected changeEmpModalPage(page: number): void {
+    if (page >= 1 && page <= this.empModalTotalPages()) {
+      this.empModalPage.set(page);
+    }
+  }
+
+  protected onEmpModalSearchChange(val: string): void {
+    this.empModalSearch.set(val);
+    this.empModalPage.set(1);
+  }
+
+  protected toggleCompanyStatus(company: CompanyListItem): void {
+    if (company.isDefault) {
+      this.toast.show('The primary default company cannot be suspended', 'warning');
+      return;
+    }
+    const isSuspended = (company.status || '').toLowerCase() === 'suspended';
+    if (isSuspended) {
+      this.activateCompany(company);
+    } else {
+      this.suspendCompany(company);
+    }
+  }
 
   protected readonly selectedTenantCode = computed(() => {
     const code = this.session.user()?.companyCode;
@@ -1265,6 +1508,28 @@ export class SuperAdminDashboardComponent implements OnInit, AfterViewInit {
   ngOnInit(): void {
     this.searchQuery.set('');
     this.refreshAll();
+
+    // Dynamically update tenant organizations
+    this.pollTimer = setInterval(() => {
+      if (!this.showDetailsModal() && !this.showCreateOrgModal()) {
+        this.api
+          .tenantCompanies()
+          .pipe(catchError(() => of([] as CompanyListItem[])))
+          .subscribe({
+            next: (list) => {
+              this.companies.set(list || []);
+            },
+            error: () => {},
+          });
+      }
+    }, 15000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 
   ngAfterViewInit(): void {
@@ -1326,6 +1591,8 @@ export class SuperAdminDashboardComponent implements OnInit, AfterViewInit {
   protected openCompanyDetails(company: CompanyListItem): void {
     this.selectedCompanyListItem.set(company);
     this.selectedCompanyDetail.set(null);
+    this.empModalPage.set(1);
+    this.empModalSearch.set('');
     this.showDetailsModal.set(true);
     this.loadingCompanyDetails.set(true);
 
