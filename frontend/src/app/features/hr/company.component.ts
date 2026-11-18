@@ -1264,9 +1264,6 @@ export class CompanyComponent implements OnInit {
     if (this.isSuperAdmin()) {
       return [
         { id: 'directory' as CompanyTab, label: 'Companies' },
-        { id: 'departments' as CompanyTab, label: 'Departments' },
-        { id: 'designations' as CompanyTab, label: 'Designations' },
-        { id: 'holiday' as CompanyTab, label: 'Holiday' },
       ];
     }
     return [

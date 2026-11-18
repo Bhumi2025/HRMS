@@ -104,14 +104,14 @@ export class ShellComponent implements OnInit, OnDestroy {
     const isEmp = this.role() === 'Employee';
     const count = this.pendingApprovalsCount();
 
-    // 1. In Super Admin: strictly Dashboard and Company Onboarding (Settings removed for Super Admin)
+    // 1. In Super Admin: strictly Dashboard and Company (Settings removed for Super Admin)
     if (isSuper) {
       return [
         {
           section: 'Platform',
           items: [
             { icon: 'dashboard' as IconName, label: 'Dashboard', path: '/dashboard' },
-            { icon: 'company' as IconName, label: 'Company Onboarding', path: '/companies' },
+            { icon: 'company' as IconName, label: 'Company', path: '/companies' },
           ],
         },
       ];

@@ -2,22 +2,11 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, of, catchError } from 'rxjs';
+import { of, catchError } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
-import { CompanyListItem, CreateCompanyRequest, RoleItem } from '../../core/api/api.models';
+import { CompanyListItem, CreateCompanyRequest } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
-
-interface ActivityItem {
-  id: string;
-  type: 'tenant' | 'user' | 'security' | 'schema';
-  title: string;
-  description: string;
-  timeAgo: string;
-  icon: string;
-  severity: 'info' | 'success' | 'warning';
-  isLiveDbEvent: boolean;
-}
 
 @Component({
   selector: 'app-super-admin-dashboard',
@@ -91,90 +80,14 @@ interface ActivityItem {
           </div>
           <div class="metric-footer">
             <span class="status-indicator-dot online"></span>
-            <span class="footer-highlight">Dedicated Leads</span>
+            <span class="footer-highlight">{{ totalAdmins() }} Dedicated Leads</span>
             <span class="footer-muted">across tenant databases</span>
-          </div>
-        </div>
-
-        <!-- Card 3: Total Active Users -->
-        <div class="metric-card metric-cyan">
-          <div class="card-accent"></div>
-          <div class="metric-head">
-            <div>
-              <div class="metric-label">Total Active Users</div>
-              <div class="metric-value">{{ totalActiveUsers() }}</div>
-            </div>
-            <div class="metric-icon-wrap icon-cyan">
-              <span [appIcon]="'employees'"></span>
-            </div>
-          </div>
-          <div class="metric-footer">
-            <span class="status-indicator-dot online"></span>
-            <span class="footer-highlight">Employees &amp; Staff</span>
-            <span class="footer-muted">provisioned</span>
-          </div>
-        </div>
-
-        <!-- Card 4: Today's Check-ins -->
-        <div class="metric-card metric-amber">
-          <div class="card-accent"></div>
-          <div class="metric-head">
-            <div>
-              <div class="metric-label">Today's Check-ins</div>
-              <div class="metric-value">{{ todayLogins() }}</div>
-            </div>
-            <div class="metric-icon-wrap icon-amber">
-              <span [appIcon]="'clock'"></span>
-            </div>
-          </div>
-          <div class="metric-footer">
-            <span class="status-indicator-dot warm"></span>
-            <span class="footer-highlight">Biometric Punches</span>
-            <span class="footer-muted">logged today</span>
-          </div>
-        </div>
-
-        <!-- Card 5: Dynamic Roles -->
-        <div class="metric-card metric-purple" (click)="goToRoles()">
-          <div class="card-accent"></div>
-          <div class="metric-head">
-            <div>
-              <div class="metric-label">Configured Roles</div>
-              <div class="metric-value">{{ totalRoles() }}</div>
-            </div>
-            <div class="metric-icon-wrap icon-purple">
-              <span [appIcon]="'lock'"></span>
-            </div>
-          </div>
-          <div class="metric-footer">
-            <span class="footer-link">Manage RBAC Matrix →</span>
-          </div>
-        </div>
-
-        <!-- Card 6: Platform Status & Database -->
-        <div class="metric-card metric-indigo">
-          <div class="card-accent"></div>
-          <div class="metric-head">
-            <div>
-              <div class="metric-label">System Health</div>
-              <div class="metric-value text-emerald">99.98%</div>
-            </div>
-            <div class="metric-icon-wrap icon-indigo">
-              <span [appIcon]="'shield'"></span>
-            </div>
-          </div>
-          <div class="metric-footer">
-            <span class="status-indicator-dot online"></span>
-            <span class="footer-highlight">Healthy</span>
-            <span class="footer-muted">All services operational</span>
           </div>
         </div>
       </div>
 
-      <!-- Main Layout: 2 Columns (Tenant Overview Grid + Activity Log & Quick Shortcuts) -->
-      <div class="dash-grid-layout">
-        <!-- Left: Tenant Overview Grid -->
-        <div class="content-panel">
+      <!-- Main Content: Tenant Organizations Full-Width Table -->
+      <div class="content-panel">
           <div class="panel-header">
             <div>
               <h3 class="panel-title">Tenant Organizations</h3>
@@ -336,42 +249,6 @@ interface ActivityItem {
             </table>
           </div>
         </div>
-
-        <!-- Right: Recent Activity Log -->
-        <div class="side-column">
-          <!-- Activity Feed -->
-          <div class="content-panel">
-            <div class="panel-header compact">
-              <div>
-                <h4 class="panel-title">Recent Tenant Activity</h4>
-                <p class="panel-desc">Provisioning logs and live security audits</p>
-              </div>
-            </div>
-
-            <div class="activity-feed">
-              @for (act of activities(); track act.id) {
-                <div class="activity-item">
-                  <div
-                    class="activity-icon"
-                    [class.act-success]="act.severity === 'success'"
-                    [class.act-warning]="act.severity === 'warning'"
-                    [class.act-info]="act.severity === 'info'"
-                  >
-                    <span [appIcon]="act.icon"></span>
-                  </div>
-                  <div class="activity-content">
-                    <div class="activity-header">
-                      <span class="activity-title">{{ act.title }}</span>
-                      <span class="activity-time">{{ act.timeAgo }}</span>
-                    </div>
-                    <div class="activity-desc">{{ act.description }}</div>
-                  </div>
-                </div>
-              }
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- Create Organization Modal -->
       @if (showCreateOrgModal()) {
@@ -579,20 +456,10 @@ interface ActivityItem {
       /* KPI Metric Cards Grid */
       .kpi-grid {
         display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        gap: 16px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
       }
-      @media (max-width: 1400px) {
-        .kpi-grid {
-          grid-template-columns: repeat(3, 1fr);
-        }
-      }
-      @media (max-width: 768px) {
-        .kpi-grid {
-          grid-template-columns: repeat(2, 1fr);
-        }
-      }
-      @media (max-width: 480px) {
+      @media (max-width: 640px) {
         .kpi-grid {
           grid-template-columns: 1fr;
         }
@@ -1235,20 +1102,18 @@ export class SuperAdminDashboardComponent implements OnInit {
   };
 
   protected readonly companies = signal<CompanyListItem[]>([]);
-  protected readonly roles = signal<RoleItem[]>([]);
-  protected readonly activities = signal<ActivityItem[]>([]);
-  protected readonly totalActiveUsers = signal<number>(8);
-  protected readonly todayLogins = signal<number>(5);
 
   protected searchQuery = '';
   protected readonly statusFilter = signal<'all' | 'Active' | 'Suspended'>('all');
 
-  protected readonly totalCompanies = computed(() => this.companies().length || 1);
+  protected readonly totalCompanies = computed(() => this.companies().length);
   protected readonly activeCompanies = computed(
-    () => this.companies().filter((c) => c.status === 'Active').length || 1
+    () => this.companies().filter((c) => c.status === 'Active').length
   );
-  protected readonly totalAdmins = computed(() => this.companies().length || 1);
-  protected readonly totalRoles = computed(() => this.roles().length || 5);
+  protected readonly totalAdmins = computed(() => {
+    const list = this.companies();
+    return list.filter((c) => !!c.adminEmail || !!c.adminFullName).length;
+  });
 
   protected readonly filteredCompanies = computed(() => {
     let list = this.companies();
@@ -1273,34 +1138,20 @@ export class SuperAdminDashboardComponent implements OnInit {
 
   protected refreshAll(): void {
     this.isRefreshing.set(true);
-    forkJoin({
-      companies: this.api.tenantCompanies().pipe(catchError(() => of([] as CompanyListItem[]))),
-      roles: this.api.roles().pipe(catchError(() => of([] as RoleItem[]))),
-      attendance: this.api.attendanceToday().pipe(catchError(() => of([] as any[]))),
-    }).subscribe({
-      next: (res) => {
-        if (res.companies && res.companies.length > 0) {
-          this.companies.set(res.companies);
-          this.generateRealActivities(res.companies);
-        }
-        if (res.roles && res.roles.length > 0) {
-          this.roles.set(res.roles);
-          const userSum = res.roles.reduce((sum, r) => sum + (r.userCount || 0), 0);
-          if (userSum > 0) {
-            this.totalActiveUsers.set(userSum);
-          }
-        }
-        if (res.attendance) {
-          this.todayLogins.set(res.attendance.length);
-        }
-        this.isRefreshing.set(false);
-        this.toast.show('Telemetry synchronized with database.', 'success');
-      },
-      error: () => {
-        this.isRefreshing.set(false);
-        this.toast.show('Failed to refresh telemetry.', 'danger');
-      },
-    });
+    this.api
+      .tenantCompanies()
+      .pipe(catchError(() => of([] as CompanyListItem[])))
+      .subscribe({
+        next: (list) => {
+          this.companies.set(list || []);
+          this.isRefreshing.set(false);
+          this.toast.show('Telemetry synchronized with database.', 'success');
+        },
+        error: () => {
+          this.isRefreshing.set(false);
+          this.toast.show('Failed to refresh telemetry.', 'danger');
+        },
+      });
   }
 
   protected openCreateOrgModal(): void {
@@ -1346,50 +1197,6 @@ export class SuperAdminDashboardComponent implements OnInit {
     });
   }
 
-  /** Generates activity items directly from database company provisioning logs and timestamps */
-  private generateRealActivities(companies: CompanyListItem[]): void {
-    const items: ActivityItem[] = [
-      {
-        id: 'evt-0',
-        type: 'schema',
-        title: 'Multi-Tenant Schema Synchronized',
-        description: 'Roles, NavigationItems and Permissions verified across tenant databases',
-        timeAgo: 'Live System',
-        icon: 'check',
-        severity: 'success',
-        isLiveDbEvent: true,
-      },
-    ];
-
-    for (const c of companies) {
-      if (c.createdAtUtc) {
-        items.push({
-          id: `comp-${c.id}`,
-          type: 'tenant',
-          title: `Tenant: ${c.name} (${c.code})`,
-          description: `Database '${c.databaseName || 'HRMS'}' provisioned with admin ${c.adminEmail}`,
-          timeAgo: new Date(c.createdAtUtc).toLocaleDateString(),
-          icon: 'company',
-          severity: c.status === 'Active' ? 'success' : 'warning',
-          isLiveDbEvent: true,
-        });
-      }
-      if (c.invitationSentAtUtc) {
-        items.push({
-          id: `inv-${c.id}`,
-          type: 'security',
-          title: `Admin Invitation (${c.code})`,
-          description: `Invitation sent to ${c.adminEmail} with status: ${c.invitationStatus}`,
-          timeAgo: new Date(c.invitationSentAtUtc).toLocaleDateString(),
-          icon: 'mail',
-          severity: 'info',
-          isLiveDbEvent: true,
-        });
-      }
-    }
-
-    this.activities.set(items);
-  }
 
   protected suspendCompany(company: CompanyListItem): void {
     if (company.isDefault) {

@@ -41,7 +41,7 @@ export const NAV_CONFIG: Record<Role, NavSection[]> = {
       section: 'Platform',
       items: [
         { icon: 'dashboard', label: 'Dashboard', path: '/dashboard' },
-        { icon: 'company', label: 'Company Onboarding', path: '/companies' },
+        { icon: 'company', label: 'Company', path: '/companies' },
       ],
     },
   ],
