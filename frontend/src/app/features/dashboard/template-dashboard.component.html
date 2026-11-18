@@ -115,227 +115,124 @@
           </div>
         </div>
 
-        <!-- 2. Attendance Overview Card (Week-Wise Line Graph - Simple & Clean) -->
+        <!-- 2. Attendance Overview Card (Exact Boxed Dynamic Line Chart Matching Reference) -->
         <div class="dash-widget attendance-widget">
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator"></span>
               <div class="header-title-box">
                 <h3 class="widget-title-nowrap">Attendance Overview</h3>
-                <span class="month-pill">{{ currentMonthName() }} · Week {{ selectedWeek() }}</span>
+                <span class="month-pill">{{ currentMonthName() }}</span>
               </div>
             </div>
 
-            <!-- Week Switcher Tabs (Week 1 to Week 4) -->
-            <div class="week-pills-bar">
-              @for (w of weekDateRanges(); track w.week) {
-              <button
-                type="button"
-                class="week-pill-btn"
-                [class.active]="selectedWeek() === w.week"
-                [class.current]="currentCalendarWeek() === w.week"
-                (click)="selectWeek(w.week)"
-                [title]="w.label + ' (' + w.range + ')'"
-              >
-                <span class="pill-w">Week {{ w.week }}</span>
-                @if (currentCalendarWeek() === w.week) {
-                <span class="live-dot" title="Current Active Week"></span>
-                }
-              </button>
-              }
-            </div>
-
-            <!-- Simple Clean Legend -->
+            <!-- Legend & Action -->
             <div class="header-actions">
               <div class="graph-legend">
-                <span class="legend-item"><span class="line-badge badge-cur"></span> This Week</span>
-                <span class="legend-item"><span class="line-badge badge-prev"></span> Last Week</span>
+                <span class="legend-item"><span class="line-badge badge-purple"></span> Present</span>
               </div>
               <a routerLink="/attendance" class="view-link">Detailed Log ›</a>
             </div>
           </div>
 
           <div class="widget-body attendance-graph-content">
-            <!-- Simple 7-Day Week Line Chart -->
-            <div class="week-line-chart-container">
-              <svg class="week-line-chart-svg" viewBox="0 0 650 118" preserveAspectRatio="none">
-                <defs>
-                  <!-- Smooth Area Gradient for This Week -->
-                  <linearGradient id="weekAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#2563eb" stop-opacity="0.20" />
-                    <stop offset="80%" stop-color="#2563eb" stop-opacity="0.03" />
-                    <stop offset="100%" stop-color="#2563eb" stop-opacity="0.0" />
-                  </linearGradient>
-                </defs>
+            <!-- Framed Boxed Line Chart Matching Reference Image -->
+            <div class="framed-chart-wrapper">
+              <svg class="boxed-line-chart-svg" viewBox="0 0 760 170" preserveAspectRatio="none">
+                <!-- Outer Framed Rectangle with subtle purple border matching reference -->
+                <rect x="42" y="14" width="700" height="108" fill="#ffffff" stroke="#c4b5fd" stroke-width="1.2" />
 
-                <!-- Subtle Horizontal Guide Lines -->
-                <line x1="40" y1="20" x2="610" y2="20" class="guide-grid-line" stroke="#f1f5f9" stroke-dasharray="3 3" />
-                <text x="625" y="23" class="scale-label">8</text>
+                <!-- Horizontal Grid Lines and Y-Axis Scale Values outside box -->
+                @for (val of chartYScaleSteps(); track val) {
+                  <line
+                    x1="42"
+                    [attr.y1]="getYCoord(val)"
+                    x2="742"
+                    [attr.y2]="getYCoord(val)"
+                    stroke="#ede9fe"
+                    stroke-width="1"
+                  />
+                  <text
+                    x="36"
+                    [attr.y]="getYCoord(val) + 3.5"
+                    text-anchor="end"
+                    class="y-axis-step-text"
+                  >
+                    {{ val }}
+                  </text>
+                }
 
-                <line x1="40" y1="56" x2="610" y2="56" class="guide-grid-line" stroke="#f1f5f9" stroke-dasharray="3 3" />
-                <text x="625" y="59" class="scale-label">4</text>
-
-                <line x1="40" y1="92" x2="610" y2="92" class="guide-baseline" stroke="#e2e8f0" stroke-width="1" />
-                <text x="625" y="95" class="scale-label">0</text>
-
-                <!-- 1. LAST WEEK LINE (Soft Thinner Dashed Reference) -->
-                <path
-                  [attr.d]="prevWeekLinePath()"
-                  class="line-last-week"
-                  fill="none"
-                />
-
-                @for (pt of weekPoints(); track 'prev-' + pt.idx) {
-                  <circle
-                    [attr.cx]="pt.x"
-                    [attr.cy]="pt.yPrev"
-                    r="2.5"
-                    class="dot-last-week"
+                <!-- Vertical Grid Lines for Each Date Column -->
+                @for (pt of attendanceChartPoints(); track pt.idx) {
+                  <line
+                    [attr.x1]="pt.x"
+                    y1="14"
+                    [attr.x2]="pt.x"
+                    y2="122"
+                    stroke="#ede9fe"
+                    stroke-width="1"
                   />
                 }
 
-                <!-- 2. THIS WEEK AREA & CLEAN VIBRANT LINE -->
+                <!-- Purple Trend Line Connecting All Points -->
                 <path
-                  [attr.d]="weekAreaPath()"
-                  fill="url(#weekAreaGradient)"
-                  class="area-this-week"
-                />
-
-                <path
-                  [attr.d]="weekLinePath()"
-                  class="line-this-week"
+                  [attr.d]="chartLinePath()"
                   fill="none"
+                  stroke="#6d28d9"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                 />
 
-                <!-- Data Nodes, Count Badges & Day Labels for all 7 Days -->
-                @for (pt of weekPoints(); track 'cur-' + pt.idx) {
-                  @if (pt.isToday) {
-                    <line
-                      [attr.x1]="pt.x"
-                      y1="18"
-                      [attr.x2]="pt.x"
-                      y2="92"
-                      class="today-col-line"
-                      stroke="#2563eb"
-                      stroke-dasharray="2 2"
-                      stroke-width="1.2"
-                      opacity="0.4"
-                    />
-                  }
-
-                  <!-- Number Count Badge directly above node -->
-                  <text
-                    [attr.x]="pt.x"
-                    [attr.y]="pt.yCurrent - 7"
-                    text-anchor="middle"
-                    class="node-count-badge"
-                    [class.count-today]="pt.isToday"
-                  >
-                    {{ pt.present }}
-                  </text>
-
-                  <!-- Node Circle -->
+                <!-- Circular Hollow Nodes & Angled Date Labels -->
+                @for (pt of attendanceChartPoints(); track pt.idx) {
+                  <!-- Invisible Hover Trigger -->
                   <circle
                     [attr.cx]="pt.x"
-                    [attr.cy]="pt.yCurrent"
-                    [attr.r]="pt.isToday ? 5 : 3.5"
-                    class="dot-this-week"
-                    [class.dot-today]="pt.isToday"
+                    [attr.cy]="pt.y"
+                    r="8"
+                    fill="transparent"
+                    class="node-hover-trigger"
+                    (mouseenter)="onPointEnter(pt)"
+                    (mouseleave)="onPointLeave()"
                   />
 
-                  @if (pt.isToday) {
-                    <circle
-                      [attr.cx]="pt.x"
-                      [attr.cy]="pt.yCurrent"
-                      r="9"
-                      class="today-halo"
-                    />
-                  }
+                  <!-- Hollow Circular Node (White center, purple border) -->
+                  <circle
+                    [attr.cx]="pt.x"
+                    [attr.cy]="pt.y"
+                    r="3.5"
+                    fill="#ffffff"
+                    stroke="#6d28d9"
+                    stroke-width="2"
+                    class="node-circle"
+                    [class.node-active]="hoveredChartPoint()?.idx === pt.idx"
+                  />
 
-                  <!-- X-Axis Labels: Day Name and Date Number -->
+                  <!-- Angled Date Text at -50° along bottom axis -->
                   <text
-                    [attr.x]="pt.x"
-                    y="104"
-                    text-anchor="middle"
-                    class="x-axis-day"
-                    [class.text-today]="pt.isToday"
+                    [attr.transform]="'translate(' + pt.x + ', 130) rotate(-50)'"
+                    text-anchor="end"
+                    class="x-axis-date-angled"
+                    [class.date-active]="hoveredChartPoint()?.idx === pt.idx"
                   >
-                    {{ pt.dayOfWeek }}
+                    {{ pt.formattedDate }}
                   </text>
-                  <text
-                    [attr.x]="pt.x"
-                    y="114"
-                    text-anchor="middle"
-                    class="x-axis-date"
-                    [class.text-today]="pt.isToday"
-                  >
-                    Nov {{ pt.dayNumber }}
-                  </text>
+                }
+
+                <!-- Interactive Floating Tooltip -->
+                @if (hoveredChartPoint(); as hov) {
+                  <g class="chart-tooltip-group" [attr.transform]="'translate(' + (hov.x > 640 ? hov.x - 115 : (hov.x < 110 ? hov.x + 8 : hov.x - 55)) + ', ' + (hov.y > 55 ? hov.y - 48 : hov.y + 12) + ')'">
+                    <rect width="110" height="40" rx="6" fill="#1e1b4b" opacity="0.95" />
+                    <text x="55" y="16" text-anchor="middle" fill="#ffffff" font-size="9.5" font-weight="600">
+                      {{ hov.formattedDate }} ({{ hov.dayOfWeek }})
+                    </text>
+                    <text x="55" y="30" text-anchor="middle" fill="#a7f3d0" font-size="9" font-weight="600">
+                      Present: {{ hov.present }} Staff
+                    </text>
+                  </g>
                 }
               </svg>
-            </div>
-
-            <!-- Weekly Attendance Insights Strip -->
-            <div class="attendance-insights-strip">
-              <div class="insight-pill pill-present">
-                <span class="pill-badge">Week {{ weekInsights().selectedWeek }} Present</span>
-                <span class="pill-count">{{ weekInsights().totalPresent }} Staff</span>
-              </div>
-              <div class="insight-pill pill-ontime">
-                <span class="pill-badge">On-Time</span>
-                <span class="pill-count">{{ weekInsights().totalOnTime }}</span>
-              </div>
-              <div class="insight-pill pill-late">
-                <span class="pill-badge">Late</span>
-                <span class="pill-count">{{ weekInsights().totalLate }}</span>
-              </div>
-              <div class="insight-pill pill-comparison">
-                <span class="pill-badge">vs Last Week</span>
-                @if (weekInsights().hasPrevData) {
-                  <span class="pill-count" [class.comp-up]="weekInsights().diff >= 0" [class.comp-down]="weekInsights().diff < 0">
-                    {{ weekInsights().diff >= 0 ? '↑ +' : '↓ ' }}{{ weekInsights().diff }} ({{ weekInsights().diffPct >= 0 ? '+' : '' }}{{ weekInsights().diffPct }}%)
-                  </span>
-                } @else {
-                  <span class="pill-count comp-baseline">Baseline</span>
-                }
-              </div>
-            </div>
-
-            <!-- Month Progression Rail (Bottom Heartbeat Indicator with Activated Button) -->
-            <div class="month-progression-rail">
-              <div class="rail-left">
-                <span class="rail-title">{{ currentMonthName() }} Flow:</span>
-                <div class="rail-steps">
-                  @for (w of [1, 2, 3, 4]; track w) {
-                  <button type="button" class="rail-step-btn" [class.step-active]="selectedWeek() === w"
-                    [class.step-current]="currentCalendarWeek() === w" [class.step-past]="w < currentCalendarWeek()"
-                    (click)="selectWeek(w)" [title]="'View Week ' + w + (w === currentCalendarWeek() ? ' (Current Active Week)' : '')">
-                    <span class="step-dot"></span>
-                    <span class="step-label">Week {{ w }}</span>
-                  </button>
-                  @if (w < 4) {
-                  <div class="step-line" [class.line-filled]="w < selectedWeek()"></div>
-                  }
-                  }
-                </div>
-              </div>
-
-              <!-- Activated Fresh Month Pulse Button -->
-              <button
-                type="button"
-                class="fresh-start-btn"
-                [class.active-cycling]="isAutoCycling()"
-                (click)="toggleAutoCycle()"
-                [title]="isAutoCycling() ? 'Click to pause automatic week cycle' : 'Click to cycle through Weeks 1 to 4'"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" [class.spin-svg]="isAutoCycling()">
-                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-                </svg>
-                <span>{{ isAutoCycling() ? 'Pause Cycle' : 'Fresh Month Pulse' }}</span>
-                @if (isAutoCycling()) {
-                <span class="pulse-live-pip"></span>
-                }
-              </button>
             </div>
           </div>
         </div>

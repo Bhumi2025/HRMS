@@ -41,10 +41,18 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly currentNoticeIndex = signal(0);
   protected readonly currentTime = signal(new Date());
 
-  // Attendance Graph Week-Wise Signals
-  protected readonly selectedWeek = signal<number>(this.getCalendarWeek(new Date()));
-  protected readonly isAutoCycling = signal<boolean>(false);
-  private cycleTimer: ReturnType<typeof setInterval> | null = null;
+  // Reference Line Chart State & Tooltip
+  protected readonly hoveredChartPoint = signal<{
+    idx: number;
+    date: string;
+    formattedDate: string;
+    dayOfWeek: string;
+    present: number;
+    late: number;
+    absent: number;
+    x: number;
+    y: number;
+  } | null>(null);
 
   // Data signals
   protected readonly notices = signal<NoticeBoardItem[]>([]);
@@ -73,118 +81,87 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     return hr < 12 ? 'Good Morning' : hr < 17 ? 'Good Afternoon' : 'Good Evening';
   });
 
-  protected getCalendarWeek(d: Date): number {
-    const day = d.getDate();
-    return Math.min(4, Math.floor((day - 1) / 7) + 1);
-  }
-
-  protected readonly currentCalendarWeek = computed(() => {
-    return this.getCalendarWeek(this.currentTime());
-  });
-
   protected readonly currentMonthName = computed(() => {
     return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(this.currentTime());
   });
 
-  protected readonly previousWeekNumber = computed(() => {
-    const w = this.selectedWeek();
-    return w > 1 ? w - 1 : 1;
-  });
-
-  protected readonly weekDateRanges = computed(() => {
-    const now = this.currentTime();
-    const y = now.getFullYear();
-    const m = now.getMonth();
-    const lastDay = new Date(y, m + 1, 0).getDate();
-    return [
-      { week: 1, label: 'Week 1', range: '1–7' },
-      { week: 2, label: 'Week 2', range: '8–14' },
-      { week: 3, label: 'Week 3', range: '15–21' },
-      { week: 4, label: 'Week 4', range: `22–${lastDay}` },
-    ];
-  });
-
-  protected readonly weekPoints = computed(() => {
-    const all = this.attendanceGraph();
-    const w = this.selectedWeek();
-    const now = this.currentTime();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    const weekList = all.filter((p) => p.weekNumber === w);
-    const source = weekList.length === 7 ? weekList : all.slice((w - 1) * 7, w * 7);
-    const finalSource = source.length > 0 ? source : all.slice(0, 7);
-
-    let maxVal = 8;
-    for (const p of finalSource) {
-      maxVal = Math.max(maxVal, p.present || 0, p.prevPresent || 0);
+  protected readonly chartMaxScale = computed(() => {
+    const list = this.attendanceGraph();
+    let max = 0;
+    for (const p of list) {
+      max = Math.max(max, p.present || 0);
     }
+    const total = this.totalHeadcount();
+    const peak = Math.max(max, total, 4);
+    return peak <= 4 ? 4 : (peak <= 8 ? 8 : (peak <= 12 ? 12 : Math.ceil(peak / 5) * 5));
+  });
 
-    return finalSource.map((p, idx) => {
-      const dayNum = p.date ? parseInt(p.date.split('-')[2], 10) : (w - 1) * 7 + idx + 1;
-      const x = 50 + idx * 92;
-      const yCurrent = Math.round(90 - ((p.present || 0) / maxVal) * 70);
-      const yPrev = Math.round(90 - ((p.prevPresent || 0) / maxVal) * 70);
-      const isToday = p.date ? p.date === todayStr : false;
+  protected readonly chartYScaleSteps = computed(() => {
+    const max = this.chartMaxScale();
+    const step = max <= 8 ? 1 : (max <= 16 ? 2 : Math.ceil(max / 8));
+    const steps: number[] = [];
+    for (let v = 0; v <= max; v += step) {
+      steps.push(v);
+    }
+    if (steps[steps.length - 1] < max) {
+      steps.push(max);
+    }
+    return steps.reverse();
+  });
+
+  protected readonly attendanceChartPoints = computed(() => {
+    const list = this.attendanceGraph();
+    if (!list || list.length === 0) return [];
+    const totalDays = list.length;
+    const maxVal = this.chartMaxScale() || 1;
+    const boxLeft = 42;
+    const boxWidth = 700;
+    const boxTop = 14;
+    const boxHeight = 108;
+    const stepX = boxWidth / totalDays;
+
+    return list.map((p, idx) => {
+      const x = boxLeft + (idx + 0.5) * stepX;
+      const present = p.present || 0;
+      const y = (boxTop + boxHeight) - (present / maxVal) * boxHeight;
+
+      let formattedDate = '';
+      if (p.date) {
+        const parts = p.date.split('-');
+        if (parts.length === 3) {
+          formattedDate = `${parseInt(parts[1], 10)}/${parseInt(parts[2], 10)}/${parts[0]}`;
+        }
+      }
+      if (!formattedDate) {
+        formattedDate = `11/${idx + 1}/2026`;
+      }
 
       return {
         idx,
-        dayOfWeek: (p.label || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][idx]).toUpperCase(),
-        dayNumber: dayNum,
-        date: p.date,
-        present: p.present || 0,
+        date: p.date || '',
+        formattedDate,
+        dayOfWeek: p.label || '',
+        present,
         late: p.late || 0,
         absent: p.absent || 0,
-        prevPresent: p.prevPresent || 0,
-        isToday,
-        x,
-        yCurrent,
-        yPrev,
+        x: Math.round(x * 10) / 10,
+        y: Math.round(y * 10) / 10,
       };
     });
   });
 
-  protected readonly weekLinePath = computed(() => {
-    const pts = this.weekPoints();
+  protected readonly chartLinePath = computed(() => {
+    const pts = this.attendanceChartPoints();
     if (pts.length === 0) return '';
-    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yCurrent}`).join(' ');
+    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
   });
 
-  protected readonly weekAreaPath = computed(() => {
-    const pts = this.weekPoints();
-    if (pts.length === 0) return '';
-    const first = pts[0];
-    const last = pts[pts.length - 1];
-    const lineSegments = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yCurrent}`).join(' ');
-    return `${lineSegments} L ${last.x} 92 L ${first.x} 92 Z`;
-  });
-
-  protected readonly prevWeekLinePath = computed(() => {
-    const pts = this.weekPoints();
-    if (pts.length === 0) return '';
-    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yPrev}`).join(' ');
-  });
-
-  protected readonly weekInsights = computed(() => {
-    const pts = this.weekPoints();
-    const totalPresent = pts.reduce((s: number, b: any) => s + (b.present || 0), 0);
-    const totalLate = pts.reduce((s: number, b: any) => s + (b.late || 0), 0);
-    const totalAbsent = pts.reduce((s: number, b: any) => s + (b.absent || 0), 0);
-    const totalPrevPresent = pts.reduce((s: number, b: any) => s + (b.prevPresent || 0), 0);
-
-    const diff = totalPresent - totalPrevPresent;
-    const diffPct = totalPrevPresent > 0 ? Math.round((diff / totalPrevPresent) * 100) : 0;
-
-    return {
-      totalPresent,
-      totalOnTime: Math.max(0, totalPresent - totalLate),
-      totalLate,
-      totalAbsent,
-      diff,
-      diffPct,
-      hasPrevData: totalPrevPresent > 0,
-      selectedWeek: this.selectedWeek(),
-    };
-  });
+  protected getYCoord(val: number): number {
+    const maxVal = this.chartMaxScale() || 1;
+    const boxTop = 14;
+    const boxHeight = 108;
+    return Math.round(((boxTop + boxHeight) - (val / maxVal) * boxHeight) * 10) / 10;
+  }
 
   protected readonly currentNotice = computed(() => {
     const list = this.notices();
@@ -236,7 +213,6 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
     }
-    this.stopAutoCycle();
   }
 
   loadData(): void {
@@ -335,45 +311,22 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     return this.celebrations().filter((c) => c.type === tab).length;
   }
 
-  selectWeek(week: number): void {
-    if (this.isAutoCycling()) {
-      this.stopAutoCycle();
-    }
-    this.selectedWeek.set(week);
+  onPointEnter(pt: {
+    idx: number;
+    date: string;
+    formattedDate: string;
+    dayOfWeek: string;
+    present: number;
+    late: number;
+    absent: number;
+    x: number;
+    y: number;
+  }): void {
+    this.hoveredChartPoint.set(pt);
   }
 
-  toggleAutoCycle(): void {
-    if (this.isAutoCycling()) {
-      this.stopAutoCycle();
-    } else {
-      this.startAutoCycle();
-    }
-  }
-
-  private startAutoCycle(): void {
-    this.isAutoCycling.set(true);
-    if (this.cycleTimer) clearInterval(this.cycleTimer);
-    this.cycleTimer = setInterval(() => {
-      this.zone.run(() => {
-        // Cycle: 1 -> 2 -> 3 -> 4 -> 1
-        this.selectedWeek.update((w) => (w % 4) + 1);
-      });
-    }, 2800);
-  }
-
-  private stopAutoCycle(): void {
-    this.isAutoCycling.set(false);
-    if (this.cycleTimer) {
-      clearInterval(this.cycleTimer);
-      this.cycleTimer = null;
-    }
-  }
-
-  getBarHeight(count: number, isPrev = false): number {
-    if (!count || count <= 0) return 0;
-    const max = Math.max(this.totalHeadcount(), 6);
-    const height = Math.min(100, Math.max(16, Math.round((count / max) * 100)));
-    return isPrev ? Math.round(height * 0.85) : height;
+  onPointLeave(): void {
+    this.hoveredChartPoint.set(null);
   }
 
   toggleTask(task: TaskItem): void {
