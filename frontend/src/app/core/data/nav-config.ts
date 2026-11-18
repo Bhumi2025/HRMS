@@ -42,7 +42,6 @@ export const NAV_CONFIG: Record<Role, NavSection[]> = {
       items: [
         { icon: 'dashboard', label: 'Dashboard', path: '/dashboard' },
         { icon: 'company', label: 'Company Onboarding', path: '/companies' },
-        { icon: 'settings', label: 'Settings', path: '/settings' },
       ],
     },
   ],

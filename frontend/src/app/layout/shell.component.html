@@ -57,11 +57,11 @@
           <button
             class="tenant-btn"
             type="button"
-            (click)="role() === 'Super Admin' ? tenantOpen.update(v => !v) : null; $event.stopPropagation()"
+            (click)="toggleTenantMenu($event)"
             [style.cursor]="role() === 'Super Admin' ? 'pointer' : 'default'"
             style="display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; color: var(--text); font-weight: 700; font-size: 13px;"
           >
-            <img [src]="companyLogo() || selectedTenant().logo || 'assets/images/shape-logo.png'" alt="Logo" style="width: 20px; height: 20px; object-fit: contain; border-radius: 4px;" />
+            <img [src]="companyLogo() || selectedTenant()?.logo || 'assets/images/shape-logo.png'" alt="Logo" style="width: 20px; height: 20px; object-fit: contain; border-radius: 4px;" />
             <span>{{ currentCompanyName() }}</span>
             @if (role() === 'Super Admin') {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" [style.transform]="tenantOpen() ? 'rotate(180deg)' : ''" style="transition: transform .2s">
@@ -73,7 +73,7 @@
           @if (tenantOpen() && role() === 'Super Admin') {
             <div
               class="tenant-menu"
-              style="position: absolute; top: calc(100% + 6px); left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.15); min-width: 230px; padding: 6px; z-index: 1000;"
+              style="position: absolute; top: calc(100% + 6px); left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.15); min-width: 240px; padding: 6px; z-index: 1000;"
               (click)="$event.stopPropagation()"
             >
               <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); padding: 6px 10px;">Select Company / Tenant</div>
@@ -81,8 +81,8 @@
                 <div
                   (click)="selectTenant(t)"
                   style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background .15s;"
-                  [style.background]="t.id === selectedTenant().id ? 'var(--p-soft)' : 'transparent'"
-                  [style.color]="t.id === selectedTenant().id ? 'var(--p)' : 'var(--text)'"
+                  [style.background]="t.id === selectedTenant()?.id ? 'var(--p-soft)' : 'transparent'"
+                  [style.color]="t.id === selectedTenant()?.id ? 'var(--p)' : 'var(--text)'"
                 >
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <img [src]="t.logo" alt="" style="width: 18px; height: 18px; object-fit: contain;" />
@@ -91,10 +91,13 @@
                       <div style="font-size: 11px; color: var(--muted);">{{ t.location }}</div>
                     </div>
                   </div>
-                  @if (t.id === selectedTenant().id) {
+                  @if (t.id === selectedTenant()?.id) {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--p)" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                   }
                 </div>
+              }
+              @if (tenants().length === 0) {
+                <div style="padding: 10px; font-size: 12px; color: var(--muted); text-align: center;">No organizations found</div>
               }
             </div>
           }

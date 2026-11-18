@@ -77,19 +77,23 @@ export class ShellComponent implements OnInit, OnDestroy {
   protected readonly sidebarOpen = signal(false);
   protected readonly pendingApprovalsCount = signal<number>(0);
 
-  protected readonly tenants = signal([
-    { id: '1', name: 'Firebird', location: 'Dubai HQ', logo: 'assets/images/shape-logo.png' },
-    { id: '2', name: 'HRNexus Global', location: 'Abu Dhabi', logo: 'assets/images/shape-logo.png' },
-    { id: '3', name: 'Nexus Tech', location: 'Riyadh', logo: 'assets/images/shape-logo.png' },
-    { id: '4', name: 'Acme Solutions', location: 'London', logo: 'assets/images/shape-logo.png' },
+  protected readonly tenants = signal<{ id: string; name: string; location: string; logo: string }[]>([
+    { id: 'default', name: 'HR Nexus Corporation', location: 'HRNEXUS', logo: 'assets/images/shape-logo.png' },
   ]);
-  protected readonly selectedTenant = signal(this.readStoredTenant() || this.tenants()[0]);
+  protected readonly selectedTenant = signal<{ id: string; name: string; location: string; logo: string }>(
+    this.readStoredTenant() || { id: 'default', name: 'HR Nexus Corporation', location: 'HRNEXUS', logo: 'assets/images/shape-logo.png' }
+  );
   protected readonly tenantOpen = signal(false);
 
   protected readonly user = computed(() => this.session.user());
   protected readonly role = computed(() => this.session.activeRole());
   protected readonly companyLogo = computed(() => this.session.companyLogo() || null);
-  protected readonly currentCompanyName = computed(() => this.user()?.companyName || this.selectedTenant().name);
+  protected readonly currentCompanyName = computed(() => {
+    if (this.role() === 'Super Admin') {
+      return this.selectedTenant()?.name || this.user()?.companyName || 'HR Nexus Corporation';
+    }
+    return this.user()?.companyName || this.selectedTenant()?.name || 'HR Nexus Corporation';
+  });
 
   protected readonly backendNavItems = signal<any[]>([]);
 
@@ -100,7 +104,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     const isEmp = this.role() === 'Employee';
     const count = this.pendingApprovalsCount();
 
-    // 1. In Super Admin: strictly Dashboard, Company Onboarding, and Settings page
+    // 1. In Super Admin: strictly Dashboard and Company Onboarding (Settings removed for Super Admin)
     if (isSuper) {
       return [
         {
@@ -108,7 +112,6 @@ export class ShellComponent implements OnInit, OnDestroy {
           items: [
             { icon: 'dashboard' as IconName, label: 'Dashboard', path: '/dashboard' },
             { icon: 'company' as IconName, label: 'Company Onboarding', path: '/companies' },
-            { icon: 'settings' as IconName, label: 'Settings', path: '/settings' },
           ],
         },
       ];
@@ -324,14 +327,20 @@ export class ShellComponent implements OnInit, OnDestroy {
       this.api.tenantCompanies().subscribe({
         next: (items) => {
           if (items && items.length > 0) {
-            this.tenants.set(
-              items.map((c) => ({
-                id: c.id,
-                name: c.name,
-                location: c.code,
-                logo: 'assets/images/shape-logo.png',
-              }))
-            );
+            const mapped = items.map((c) => ({
+              id: c.id,
+              name: c.name,
+              location: c.code,
+              logo: c.logoUrl || 'assets/images/shape-logo.png',
+            }));
+            this.tenants.set(mapped);
+            const stored = this.readStoredTenant();
+            const matched = stored ? mapped.find((m) => m.id === stored.id) : null;
+            if (matched) {
+              this.selectedTenant.set(matched);
+            } else if (mapped.length > 0) {
+              this.selectedTenant.set(mapped[0]);
+            }
           }
         },
         error: () => {},
@@ -442,11 +451,18 @@ export class ShellComponent implements OnInit, OnDestroy {
     this.theme.toggle();
   }
 
+  protected toggleTenantMenu(event: MouseEvent): void {
+    if (this.role() !== 'Super Admin') return;
+    event.stopPropagation();
+    this.tenantOpen.update((v) => !v);
+  }
+
   protected selectTenant(tenant: { id: string; name: string; location: string; logo: string }): void {
     this.selectedTenant.set(tenant);
     sessionStorage.setItem('current_tenant', JSON.stringify(tenant));
+    this.session.updateUser({ companyName: tenant.name, companyCode: tenant.location });
     this.tenantOpen.set(false);
-    this.toast.show(`Switched to tenant: ${tenant.name} (${tenant.location})`);
+    this.toast.show(`Switched to tenant: ${tenant.name} (${tenant.location})`, 'success');
   }
 
   private readStoredTenant(): { id: string; name: string; location: string; logo: string } | null {
@@ -489,9 +505,13 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   @HostListener('document:click', ['$event'])
   protected onDocumentClick(event: MouseEvent): void {
-    this.tenantOpen.set(false);
     const target = event.target as HTMLElement | null;
     if (!target) return;
+
+    const switcher = document.querySelector('.tenant-switcher-wrap');
+    if (switcher && !switcher.contains(target)) {
+      this.tenantOpen.set(false);
+    }
     const panels: { key: 'notif' | 'punch' | 'avatar'; panel: string; button: string }[] = [
       { key: 'notif', panel: 'notifPanel', button: 'notifBtn' },
       { key: 'punch', panel: 'punchPanel', button: 'punchBtn' },

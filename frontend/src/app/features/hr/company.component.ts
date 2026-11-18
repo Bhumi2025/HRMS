@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
 import {
   CompanyDetail,
@@ -1254,6 +1255,7 @@ export class CompanyComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
   private readonly session = inject(SessionService);
+  private readonly route = inject(ActivatedRoute);
   protected readonly perms = inject(PermissionService);
 
   protected readonly isSuperAdmin = computed(() => this.session.activeRole() === 'Super Admin');
@@ -1377,6 +1379,11 @@ export class CompanyComponent implements OnInit {
     if (this.isSuperAdmin()) {
       this.activeTab.set('directory');
       this.loadTenantCompanies();
+      this.route.queryParams.subscribe((params) => {
+        if (params['action'] === 'new' || params['create'] === 'true') {
+          this.openCreateTenant();
+        }
+      });
     } else {
       this.activeTab.set('profile');
       this.loadCompanyProfile();

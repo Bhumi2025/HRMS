@@ -2,8 +2,9 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, of, catchError } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
-import { CompanyListItem, RoleItem } from '../../core/api/api.models';
+import { CompanyListItem, CreateCompanyRequest, RoleItem } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 
@@ -44,11 +45,11 @@ interface ActivityItem {
           </div>
         </div>
         <div class="hero-actions">
-          <button class="hero-btn btn-secondary" (click)="refreshAll()">
-            <span [appIcon]="'sync'" class="action-icon"></span>
-            <span>Refresh Telemetry</span>
+          <button class="hero-btn btn-secondary" (click)="refreshAll()" [disabled]="isRefreshing()">
+            <span [appIcon]="'sync'" class="action-icon" [class.spin]="isRefreshing()"></span>
+            <span>{{ isRefreshing() ? 'Refreshing...' : 'Refresh Telemetry' }}</span>
           </button>
-          <button class="hero-btn btn-primary" (click)="goToCompanies()">
+          <button class="hero-btn btn-primary" (click)="openCreateOrgModal()">
             <span [appIcon]="'plus'"></span>
             <span>New Organization</span>
           </button>
@@ -336,92 +337,8 @@ interface ActivityItem {
           </div>
         </div>
 
-        <!-- Right: Recent Activity Log & Quick Navigation Shortcuts -->
+        <!-- Right: Recent Activity Log -->
         <div class="side-column">
-          <!-- Administration Shortcuts (Quick Settings in Dashboard) -->
-          <div class="content-panel">
-            <div class="panel-header compact">
-              <div>
-                <h4 class="panel-title">Quick Settings &amp; Modules</h4>
-                <p class="panel-desc">Direct shortcuts to system masters and configuration</p>
-              </div>
-            </div>
-
-            <div class="shortcuts-list">
-              <!-- Shortcut 1: Companies -->
-              <div class="shortcut-item" (click)="goToCompanies()">
-                <div class="sc-icon sc-blue">
-                  <span [appIcon]="'company'"></span>
-                </div>
-                <div class="sc-content">
-                  <div class="sc-title">Companies &amp; Tenants</div>
-                  <div class="sc-sub">Manage multi-tenant orgs &amp; databases</div>
-                </div>
-                <div class="sc-arrow">→</div>
-              </div>
-
-              <!-- Shortcut 2: Key Group -->
-              <div class="shortcut-item" (click)="goToKeyGroup()">
-                <div class="sc-icon sc-emerald">
-                  <span [appIcon]="'grid'"></span>
-                </div>
-                <div class="sc-content">
-                  <div class="sc-title">Key Group &amp; Constants</div>
-                  <div class="sc-sub">Enums, lookups &amp; Key Store dictionary</div>
-                </div>
-                <div class="sc-arrow">→</div>
-              </div>
-
-              <!-- Shortcut 3: Navigation Manager -->
-              <div class="shortcut-item" (click)="goToNavigation()">
-                <div class="sc-icon sc-amber">
-                  <span [appIcon]="'list'"></span>
-                </div>
-                <div class="sc-content">
-                  <div class="sc-title">Navigation Hierarchy</div>
-                  <div class="sc-sub">Configure route structure &amp; ordering</div>
-                </div>
-                <div class="sc-arrow">→</div>
-              </div>
-
-              <!-- Shortcut 4: Roles -->
-              <div class="shortcut-item" (click)="goToRoles()">
-                <div class="sc-icon sc-purple">
-                  <span [appIcon]="'lock'"></span>
-                </div>
-                <div class="sc-content">
-                  <div class="sc-title">User Roles &amp; Access</div>
-                  <div class="sc-sub">Manage system &amp; custom roles</div>
-                </div>
-                <div class="sc-arrow">→</div>
-              </div>
-
-              <!-- Shortcut 5: Permissions -->
-              <div class="shortcut-item" (click)="goToPermissions()">
-                <div class="sc-icon sc-indigo">
-                  <span [appIcon]="'shield'"></span>
-                </div>
-                <div class="sc-content">
-                  <div class="sc-title">Security Permissions</div>
-                  <div class="sc-sub">Fine-grained CRUD access matrix</div>
-                </div>
-                <div class="sc-arrow">→</div>
-              </div>
-
-              <!-- Shortcut 6: Face Kiosk -->
-              <div class="shortcut-item" (click)="goToKiosk()">
-                <div class="sc-icon sc-cyan">
-                  <span [appIcon]="'camera'"></span>
-                </div>
-                <div class="sc-content">
-                  <div class="sc-title">Face Attendance Kiosk</div>
-                  <div class="sc-sub">Mounted biometric terminal view</div>
-                </div>
-                <div class="sc-arrow">→</div>
-              </div>
-            </div>
-          </div>
-
           <!-- Activity Feed -->
           <div class="content-panel">
             <div class="panel-header compact">
@@ -455,6 +372,73 @@ interface ActivityItem {
           </div>
         </div>
       </div>
+
+      <!-- Create Organization Modal -->
+      @if (showCreateOrgModal()) {
+        <div class="modal-overlay" (click)="closeCreateOrgModal()">
+          <div class="modal-card" style="max-width: 580px;" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div>
+                <h3 class="modal-title" style="margin: 0; font-size: 18px; font-weight: 800;">New Organization &amp; Tenant Provisioning</h3>
+                <p class="modal-desc" style="margin: 4px 0 0 0; font-size: 13px; color: var(--muted);">Provision a dedicated organization tenant with isolated database schema</p>
+              </div>
+              <button class="btn-icon" (click)="closeCreateOrgModal()" type="button"><span [appIcon]="'x'"></span></button>
+            </div>
+            <div class="modal-body" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px;">
+              <div class="form-group">
+                <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px;">Organization Name <span style="color: #ef4444;">*</span></label>
+                <input class="form-input" type="text" [(ngModel)]="createOrgForm.name" placeholder="e.g. Acme Global Industries" />
+              </div>
+
+              <div class="form-row-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="form-group">
+                  <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px;">Tenant Code (Auto if blank)</label>
+                  <input class="form-input" type="text" [(ngModel)]="createOrgForm.code" placeholder="e.g. ACME" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px;">Time Zone</label>
+                  <input class="form-input" type="text" [(ngModel)]="createOrgForm.timeZone" placeholder="e.g. Asia/Dubai" />
+                </div>
+              </div>
+
+              <div class="form-row-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="form-group">
+                  <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px;">Admin Full Name <span style="color: #ef4444;">*</span></label>
+                  <input class="form-input" type="text" [(ngModel)]="createOrgForm.adminFullName" placeholder="e.g. Alex Johnson" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px;">Admin Email <span style="color: #ef4444;">*</span></label>
+                  <input class="form-input" type="email" [(ngModel)]="createOrgForm.adminEmail" placeholder="admin@acme.com" />
+                </div>
+              </div>
+
+              <div class="form-row-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="form-group">
+                  <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px;">Contact Person</label>
+                  <input class="form-input" type="text" [(ngModel)]="createOrgForm.contactName" placeholder="Optional" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px;">Contact Email</label>
+                  <input class="form-input" type="email" [(ngModel)]="createOrgForm.contactEmail" placeholder="Optional" />
+                </div>
+              </div>
+
+              <div style="background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 8px; padding: 12px 14px; font-size: 12.5px; color: #1e40af; display: flex; align-items: center; gap: 10px;">
+                <span [appIcon]="'info'" style="font-size: 18px; flex-shrink: 0;"></span>
+                <div>
+                  <strong>Database Provisioning:</strong> A dedicated, isolated tenant database and initial admin user will automatically be created and registered in <code>HRMS_Dummy_Master</code>.
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px;">
+              <button class="btn-cancel" type="button" (click)="closeCreateOrgModal()" [disabled]="creatingOrg()">Cancel</button>
+              <button class="btn-submit" type="button" (click)="submitCreateOrg()" [disabled]="creatingOrg()">
+                {{ creatingOrg() ? 'Provisioning Database...' : 'Create & Provision Organization' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [
@@ -1131,6 +1115,104 @@ interface ActivityItem {
         margin-top: 2px;
         line-height: 1.4;
       }
+
+      /* Refresh Spin Animation */
+      .action-icon.spin {
+        animation: spin 1s linear infinite;
+        display: inline-block;
+      }
+      @keyframes spin {
+        100% { transform: rotate(360deg); }
+      }
+
+      /* Modal Dialog Styles */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .modal-card {
+        background: var(--surface, #ffffff);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: 16px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+        width: 100%;
+        overflow: hidden;
+        animation: modalIn 0.2s ease-out;
+      }
+      @keyframes modalIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border, #e2e8f0);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+      .btn-icon {
+        background: transparent;
+        border: none;
+        color: var(--muted, #64748b);
+        cursor: pointer;
+        padding: 6px;
+        border-radius: 6px;
+      }
+      .btn-icon:hover {
+        background: var(--p-soft, #eff6ff);
+        color: var(--text, #0f172a);
+      }
+      .form-input {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border, #cbd5e1);
+        background: var(--surface, #ffffff);
+        color: var(--text, #0f172a);
+        font-size: 13.5px;
+        box-sizing: border-box;
+      }
+      .form-input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      }
+      .btn-cancel {
+        padding: 9px 18px;
+        border-radius: 8px;
+        border: 1px solid var(--border, #cbd5e1);
+        background: transparent;
+        color: var(--text, #334155);
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .btn-submit {
+        padding: 9px 20px;
+        border-radius: 8px;
+        border: none;
+        background: #2563eb;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+      }
+      .btn-submit:hover:not(:disabled) {
+        background: #1d4ed8;
+      }
+      .btn-submit:disabled,
+      .btn-cancel:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
     `,
   ],
 })
@@ -1138,6 +1220,19 @@ export class SuperAdminDashboardComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+
+  protected readonly isRefreshing = signal<boolean>(false);
+  protected readonly showCreateOrgModal = signal<boolean>(false);
+  protected readonly creatingOrg = signal<boolean>(false);
+  protected createOrgForm: CreateCompanyRequest = {
+    name: '',
+    code: '',
+    adminFullName: '',
+    adminEmail: '',
+    contactName: '',
+    contactEmail: '',
+    timeZone: 'Asia/Dubai',
+  };
 
   protected readonly companies = signal<CompanyListItem[]>([]);
   protected readonly roles = signal<RoleItem[]>([]);
@@ -1177,32 +1272,77 @@ export class SuperAdminDashboardComponent implements OnInit {
   }
 
   protected refreshAll(): void {
-    this.api.tenantCompanies().subscribe({
-      next: (list) => {
-        this.companies.set(list);
-        this.generateRealActivities(list);
-      },
-      error: () => {},
-    });
-
-    this.api.roles().subscribe({
-      next: (roleList) => {
-        this.roles.set(roleList);
-        const userSum = roleList.reduce((sum, r) => sum + (r.userCount || 0), 0);
-        if (userSum > 0) {
-          this.totalActiveUsers.set(userSum);
+    this.isRefreshing.set(true);
+    forkJoin({
+      companies: this.api.tenantCompanies().pipe(catchError(() => of([] as CompanyListItem[]))),
+      roles: this.api.roles().pipe(catchError(() => of([] as RoleItem[]))),
+      attendance: this.api.attendanceToday().pipe(catchError(() => of([] as any[]))),
+    }).subscribe({
+      next: (res) => {
+        if (res.companies && res.companies.length > 0) {
+          this.companies.set(res.companies);
+          this.generateRealActivities(res.companies);
         }
-      },
-      error: () => {},
-    });
-
-    this.api.attendanceToday().subscribe({
-      next: (records) => {
-        if (records && records.length > 0) {
-          this.todayLogins.set(records.length);
+        if (res.roles && res.roles.length > 0) {
+          this.roles.set(res.roles);
+          const userSum = res.roles.reduce((sum, r) => sum + (r.userCount || 0), 0);
+          if (userSum > 0) {
+            this.totalActiveUsers.set(userSum);
+          }
         }
+        if (res.attendance) {
+          this.todayLogins.set(res.attendance.length);
+        }
+        this.isRefreshing.set(false);
+        this.toast.show('Telemetry synchronized with database.', 'success');
       },
-      error: () => {},
+      error: () => {
+        this.isRefreshing.set(false);
+        this.toast.show('Failed to refresh telemetry.', 'danger');
+      },
+    });
+  }
+
+  protected openCreateOrgModal(): void {
+    this.createOrgForm = {
+      name: '',
+      code: '',
+      adminFullName: '',
+      adminEmail: '',
+      contactName: '',
+      contactEmail: '',
+      timeZone: 'Asia/Dubai',
+    };
+    this.showCreateOrgModal.set(true);
+  }
+
+  protected closeCreateOrgModal(): void {
+    this.showCreateOrgModal.set(false);
+  }
+
+  protected submitCreateOrg(): void {
+    if (
+      !this.createOrgForm.name?.trim() ||
+      !this.createOrgForm.adminFullName?.trim() ||
+      !this.createOrgForm.adminEmail?.trim()
+    ) {
+      this.toast.show('Organization name, admin name, and admin email are required.', 'warning');
+      return;
+    }
+
+    this.creatingOrg.set(true);
+    this.api.createTenantCompany(this.createOrgForm).subscribe({
+      next: () => {
+        this.creatingOrg.set(false);
+        this.showCreateOrgModal.set(false);
+        this.toast.show(`Organization '${this.createOrgForm.name}' provisioned successfully!`, 'success');
+        this.refreshAll();
+      },
+      error: (err) => {
+        this.creatingOrg.set(false);
+        const msg = err?.error?.title || err?.error?.message || 'Failed to create organization.';
+        this.toast.show(msg, 'danger');
+      },
     });
   }
 

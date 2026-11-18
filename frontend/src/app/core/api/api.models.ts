@@ -840,6 +840,7 @@ export interface CompanyListItem {
   contactName?: string | null;
   contactEmail?: string | null;
   timeZone?: string | null;
+  logoUrl?: string | null;
   createdAtUtc: string;
   provisionedAtUtc?: string | null;
   provisioningError?: string | null;
