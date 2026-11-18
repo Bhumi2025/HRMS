@@ -19,11 +19,9 @@ import {
   LeaveBalance,
 } from '../../core/api/api.models';
 
-import { EmployeePunchWidgetComponent } from '../../shared/employee-punch-widget.component';
-
 @Component({
   selector: 'app-template-dashboard',
-  imports: [CommonModule, RouterLink, EmployeePunchWidgetComponent],
+  imports: [CommonModule, RouterLink],
   templateUrl: './template-dashboard.component.html',
   styleUrls: ['./template-dashboard.component.scss'],
 })

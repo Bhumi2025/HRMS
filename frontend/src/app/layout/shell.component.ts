@@ -118,6 +118,26 @@ export class ShellComponent implements OnInit, OnDestroy {
     return this.user()?.companyName || this.selectedTenant()?.name || 'HR Nexus Corporation';
   });
 
+  protected readonly greeting = computed(() => {
+    const hr = new Date().getHours();
+    return hr < 12 ? 'Good Morning' : hr < 17 ? 'Good Afternoon' : 'Good Evening';
+  });
+
+  protected readonly userDisplayName = computed(() => {
+    const role = this.role();
+    if (role === 'HR Manager' || role === 'Company Admin') return 'HR Manager';
+    return this.user()?.name || role || 'User';
+  });
+
+  protected readonly todayFormatted = computed(() => {
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date());
+  });
+
   protected readonly backendNavItems = signal<any[]>([]);
 
   /** Sidebar sections dynamically generated per role */
