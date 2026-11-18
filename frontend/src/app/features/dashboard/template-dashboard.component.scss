@@ -1,140 +1,200 @@
-.dash-container {
-  padding: 4px 0 24px;
-}
-
-// ── Top Header Banner ──
-.dash-header-banner {
-  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #3b82f6 100%);
-  border-radius: 16px;
-  padding: 22px 28px;
-  margin-bottom: 22px;
+:host {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  color: #fff;
-  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.25);
-  position: relative;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    right: -40px;
-    top: -40px;
-    width: 200px;
-    height: 200px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-  }
+  box-sizing: border-box;
 }
 
-.banner-welcome {
-  position: relative;
-  z-index: 1;
-
-  .banner-tag {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    background: rgba(255, 255, 255, 0.2);
-    padding: 3px 8px;
-    border-radius: 20px;
-    margin-bottom: 8px;
-  }
-
-  .banner-title {
-    font-size: 1.45rem;
-    font-weight: 800;
-    margin: 0 0 6px;
-  }
-
-  .banner-subtitle {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.8);
-    margin: 0;
-  }
-}
-
-.banner-kpis {
+.dash-container {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  gap: 18px;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(8px);
-  padding: 12px 20px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  position: relative;
-  z-index: 1;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 10px;
+  box-sizing: border-box;
+}
 
-  .kpi-item {
-    text-align: center;
-    min-width: 75px;
+// ── 4 Modern Metric KPI Cards (Ref: Modern Dashboard Image Pattern) ──
+.kpi-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.kpi-card {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .kpi-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
 
     .kpi-label {
       font-size: 11px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.75);
+      color: var(--muted, #64748b);
       text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+  }
 
-    .kpi-val {
-      font-size: 1.45rem;
-      font-weight: 800;
-      line-height: 1.2;
+  .kpi-icon-wrap {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    &.icon-purple {
+      background: #f3e8ff;
+      color: #9333ea;
     }
+    &.icon-green {
+      background: #dcfce7;
+      color: #16a34a;
+    }
+    &.icon-coral {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+    &.icon-amber {
+      background: #fef3c7;
+      color: #d97706;
+    }
+  }
 
-    .kpi-sub {
-      font-size: 11px;
+  .kpi-card-val {
+    font-size: 1.45rem;
+    font-weight: 800;
+    line-height: 1.15;
+    color: var(--text, #111827);
+    margin-bottom: 3px;
+    letter-spacing: -0.02em;
+  }
+
+  .kpi-card-meta {
+    display: flex;
+    align-items: center;
+
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
       font-weight: 600;
-      &.positive { color: #86efac; }
+      padding: 1px 7px;
+      border-radius: 12px;
+
+      &.positive {
+        background: #ecfdf5;
+        color: #059669;
+      }
+      &.neutral {
+        background: #f1f5f9;
+        color: #475569;
+      }
+      &.alert {
+        background: #fffbeb;
+        color: #d97706;
+      }
     }
   }
-
-  .kpi-divider {
-    width: 1px;
-    height: 36px;
-    background: rgba(255, 255, 255, 0.2);
-  }
 }
 
-// ── Main Dual Column Grid ──
-.dash-grid {
+// ── Main Dashboard Layout (Full Viewport Height) ──
+.dash-main-area {
+  flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 20px;
-  align-items: start;
+  grid-template-columns: 1fr 310px;
+  gap: 10px;
+  overflow: hidden;
 
-  @media (max-width: 1280px) {
-    grid-template-columns: 1fr 300px;
-  }
-
-  @media (max-width: 1024px) {
-    grid-template-columns: 1fr;
+  @media (max-width: 1200px) {
+    grid-template-columns: 1fr 280px;
   }
 }
 
-.dash-left-col,
-.dash-right-col {
+// ── Left/Center Column ──
+.dash-center-col {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
-// ── Widget Base Card ──
+// ── Row 1: Notice Board & Attendance (Side by Side) ──
+.top-widgets-row {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 10px;
+  overflow: hidden;
+}
+
+// ── Row 2: Bottom 3-Column Widgets Row ──
+.bottom-widgets-row {
+  flex: 1.12;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  overflow: hidden;
+}
+
+// ── Right Column (Punch + Holiday Calendar) ──
+.dash-right-col {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+// ── Base Widget Card ──
 .dash-widget {
   background: var(--surface, #ffffff);
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 14px;
-  padding: 18px 20px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.2s ease;
+  padding: 10px 14px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease;
 
   &:hover {
-    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 3px 10px -2px rgba(0, 0, 0, 0.05);
   }
 }
 
@@ -142,15 +202,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
 
   .header-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 
     h3 {
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 700;
       color: var(--text, #111827);
       margin: 0;
@@ -158,10 +219,10 @@
   }
 
   .widget-indicator {
-    width: 4px;
-    height: 16px;
+    width: 3.5px;
+    height: 13px;
     background: var(--p, #2563eb);
-    border-radius: 4px;
+    border-radius: 3px;
 
     &.red { background: #ef4444; }
     &.amber { background: #f59e0b; }
@@ -169,42 +230,56 @@
     &.blue { background: #3b82f6; }
     &.teal { background: #14b8a6; }
     &.orange { background: #f97316; }
-    &.green { background: #10b981; }
-    &.cyan { background: #06b6d4; }
   }
 
   .count-pill {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    padding: 1px 7px;
-    border-radius: 12px;
-    background: #e5e7eb;
-    color: #374151;
+    padding: 1px 6px;
+    border-radius: 10px;
 
     &.red { background: #fee2e2; color: #dc2626; }
-    &.amber { background: #fef3c7; color: #d97706; }
-    &.blue { background: #dbeafe; color: #1d4ed8; }
     &.teal { background: #ccfbf1; color: #0f766e; }
+  }
+
+  .badge-info {
+    font-size: 10px;
+    font-weight: 600;
+    background: #eff6ff;
+    color: #2563eb;
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+
+  .badge-warning {
+    font-size: 10px;
+    font-weight: 600;
+    background: #fff7ed;
+    color: #ea580c;
+    padding: 1px 6px;
+    border-radius: 10px;
   }
 
   .header-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
   }
 
   .nav-btn {
-    width: 26px;
-    height: 26px;
-    border-radius: 6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
     border: 1px solid var(--border, #e5e7eb);
     background: var(--bg, #f9fafb);
     cursor: pointer;
     font-weight: 700;
+    font-size: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--text, #374151);
+    line-height: 1;
 
     &:hover {
       background: var(--surface, #ffffff);
@@ -214,11 +289,11 @@
   }
 
   .view-link {
-    font-size: 12px;
+    font-size: 10.5px;
     font-weight: 600;
     color: var(--p, #2563eb);
     text-decoration: none;
-    margin-left: 6px;
+    margin-left: 3px;
 
     &:hover {
       text-decoration: underline;
@@ -226,78 +301,125 @@
   }
 }
 
-// ── Notice Board ──
-.notice-card {
-  border-radius: 10px;
-  padding: 14px 16px;
-  border-left: 4px solid var(--p, #2563eb);
-  background: #f8fafc;
+.widget-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 
-  &.severity-success {
-    border-left-color: #10b981;
-    background: #f0fdf4;
-  }
-  &.severity-warning {
-    border-left-color: #f59e0b;
-    background: #fffbeb;
-  }
-  &.severity-danger {
-    border-left-color: #ef4444;
-    background: #fef2f2;
-  }
+// ── Widget Internal Scrollbars (Subtle & Non-Intrusive) ──
+.widget-scroll-list {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 
-  .notice-meta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
 
-    .tag-pill {
-      font-size: 11px;
-      font-weight: 700;
-      background: rgba(0, 0, 0, 0.05);
-      padding: 2px 8px;
-      border-radius: 4px;
+    &:hover {
+      background: rgba(0, 0, 0, 0.25);
     }
-
-    .date-label {
-      font-size: 11px;
-      color: var(--muted, #6b7280);
-    }
-  }
-
-  .notice-title {
-    font-size: 15px;
-    font-weight: 700;
-    margin: 0 0 4px;
-    color: var(--text, #111827);
-  }
-
-  .notice-msg {
-    font-size: 13px;
-    color: var(--muted, #4b5563);
-    margin: 0;
-    line-height: 1.45;
   }
 }
 
-// ── Attendance Graph ──
-.attendance-graph-content {
+// ── 1. Notice Board Card (Scrollable List) ──
+.notice-widget {
+  .notices-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .notice-card {
+    border-radius: 8px;
+    padding: 7px 10px;
+    border-left: 3.5px solid var(--p, #2563eb);
+    background: var(--bg, #f8fafc);
+    flex-shrink: 0;
+
+    &.severity-success {
+      border-left-color: #10b981;
+      background: #f0fdf4;
+    }
+    &.severity-warning {
+      border-left-color: #f59e0b;
+      background: #fffbeb;
+    }
+    &.severity-danger {
+      border-left-color: #ef4444;
+      background: #fef2f2;
+    }
+
+    .notice-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2px;
+
+      .tag-pill {
+        font-size: 9px;
+        font-weight: 700;
+        background: rgba(0, 0, 0, 0.05);
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: var(--text, #374151);
+      }
+
+      .date-label {
+        font-size: 9.5px;
+        color: var(--muted, #6b7280);
+      }
+    }
+
+    .notice-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      margin: 0 0 2px;
+      color: var(--text, #111827);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .notice-msg {
+      font-size: 10.5px;
+      color: var(--muted, #4b5563);
+      margin: 0;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+}
+
+// ── 2. Attendance Overview Card ──
+.attendance-widget {
   .graph-legend {
     display: flex;
-    gap: 16px;
-    font-size: 12px;
+    gap: 10px;
+    font-size: 10.5px;
     color: var(--muted, #6b7280);
-    margin-bottom: 14px;
+    margin-right: 6px;
 
     .legend-item {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
     }
     .dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       &.dot-present { background: #2563eb; }
       &.dot-late { background: #f59e0b; }
@@ -305,12 +427,17 @@
     }
   }
 
+  .attendance-graph-content {
+    justify-content: flex-end;
+  }
+
   .graph-bars {
     display: flex;
-    justify-content: space-between;
-    height: 130px;
+    justify-content: space-around;
     align-items: flex-end;
-    padding-top: 10px;
+    height: 100%;
+    min-height: 80px;
+    padding-top: 2px;
     border-bottom: 1px solid var(--border, #e5e7eb);
 
     .bar-col {
@@ -323,11 +450,11 @@
     }
 
     .bar-stack {
-      width: 22px;
+      width: 18px;
       display: flex;
       flex-direction: column-reverse;
       gap: 2px;
-      height: 90px;
+      height: 72%;
       justify-content: flex-start;
     }
 
@@ -338,303 +465,275 @@
       &.seg-present { background: #2563eb; }
       &.seg-late { background: #f59e0b; }
       &.seg-absent { background: #ef4444; }
+      &.seg-empty {
+        height: 3px;
+        background: var(--border, #e2e8f0);
+        border-radius: 2px;
+      }
     }
 
     .bar-label {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       color: var(--muted, #6b7280);
-      margin-top: 6px;
+      margin-top: 3px;
     }
   }
 }
 
-// ── Dual Sub-Row ──
-.widget-dual-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
+// ── 3. Absent Today Card ──
+.absent-widget {
+  .widget-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
   }
-}
 
-// ── Person Rows (Absent / On Leave) ──
-.widget-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.person-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--bg, #f9fafb);
-  border: 1px solid var(--border, #f3f4f6);
-
-  .person-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    font-size: 11px;
-    font-weight: 700;
+  .person-row {
     display: flex;
     align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 7px;
+    background: var(--bg, #f9fafb);
+    border: 1px solid var(--border, #f3f4f6);
 
-    &.red { background: #fee2e2; color: #dc2626; }
-    &.amber { background: #fef3c7; color: #d97706; }
-  }
-
-  .person-info {
-    flex: 1;
-    min-width: 0;
-
-    .person-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text, #111827);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .person-sub {
-      font-size: 11px;
-      color: var(--muted, #6b7280);
-    }
-  }
-
-  .status-pill {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 7px;
-    border-radius: 12px;
-
-    &.status-absent { background: #fee2e2; color: #dc2626; }
-    &.status-leave { background: #fef3c7; color: #d97706; }
-  }
-}
-
-// ── Celebrations & Highlights ──
-.tab-pills {
-  display: flex;
-  gap: 4px;
-  background: var(--bg, #f3f4f6);
-  padding: 3px;
-  border-radius: 8px;
-
-  .tab-btn {
-    border: none;
-    background: transparent;
-    padding: 4px 10px;
-    font-size: 11px;
-    font-weight: 600;
-    border-radius: 6px;
-    cursor: pointer;
-    color: var(--muted, #4b5563);
-    transition: all 0.15s ease;
-
-    &.active {
-      background: var(--surface, #ffffff);
-      color: var(--text, #111827);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-  }
-}
-
-.celebration-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-}
-
-.celebration-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: var(--bg, #f9fafb);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 10px;
-
-  .celeb-avatar {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    background: #ede9fe;
-    color: #7c3aed;
-    font-size: 12px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .celeb-details {
-    flex: 1;
-    min-width: 0;
-
-    .celeb-name {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text, #111827);
-    }
-    .celeb-dept {
-      font-size: 11px;
-      color: var(--muted, #6b7280);
-    }
-    .celeb-badge {
-      font-size: 11px;
-      font-weight: 600;
-      color: #7c3aed;
-      margin-top: 2px;
-    }
-  }
-}
-
-// ── Tasks ──
-.task-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.task-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 10px;
-  background: var(--bg, #f9fafb);
-  border-radius: 8px;
-
-  &.completed {
-    opacity: 0.6;
-    .task-title { text-decoration: line-through; }
-  }
-
-  input[type='checkbox'] {
-    margin-top: 3px;
-    cursor: pointer;
-  }
-
-  .task-body {
-    flex: 1;
-
-    .task-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text, #111827);
-    }
-
-    .task-meta {
-      font-size: 11px;
-      color: var(--muted, #6b7280);
-      margin-top: 2px;
-    }
-  }
-
-  .priority-pill {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 4px;
-    &.priority-high { background: #fee2e2; color: #dc2626; }
-    &.priority-medium { background: #fef3c7; color: #d97706; }
-    &.priority-low { background: #f3f4f6; color: #4b5563; }
-  }
-}
-
-// ── Approvals List ──
-.approvals-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.approval-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
-  background: var(--bg, #f9fafb);
-  border-radius: 8px;
-
-  .approval-main {
-    flex: 1;
-    min-width: 0;
-
-    .req-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text, #111827);
-    }
-    .req-details {
-      font-size: 11px;
-      color: var(--muted, #6b7280);
-    }
-  }
-
-  .approval-actions {
-    display: flex;
-    gap: 4px;
-
-    .btn-action {
+    .person-avatar {
       width: 26px;
       height: 26px;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      font-size: 11px;
+      border-radius: 50%;
+      font-size: 10px;
       font-weight: 700;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
 
-      &.btn-approve {
-        background: #dcfce7;
-        color: #16a34a;
-        &:hover { background: #16a34a; color: #fff; }
+      &.red { background: #fee2e2; color: #dc2626; }
+    }
+
+    .person-info {
+      flex: 1;
+      min-width: 0;
+
+      .person-name {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--text, #111827);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
-      &.btn-reject {
-        background: #fee2e2;
-        color: #dc2626;
-        &:hover { background: #dc2626; color: #fff; }
+
+      .person-sub {
+        font-size: 10px;
+        color: var(--muted, #6b7280);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    .status-pill {
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 8px;
+      &.status-absent { background: #fee2e2; color: #dc2626; }
+    }
+  }
+}
+
+// ── 4. Workforce Highlights Card ──
+.highlights-widget {
+  .tab-pills {
+    display: flex;
+    gap: 2px;
+    background: var(--bg, #f3f4f6);
+    padding: 2px;
+    border-radius: 6px;
+
+    .tab-btn {
+      border: none;
+      background: transparent;
+      padding: 2px 6px;
+      font-size: 9.5px;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--muted, #4b5563);
+      transition: all 0.15s ease;
+
+      &.active {
+        background: var(--surface, #ffffff);
+        color: var(--text, #111827);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      }
+    }
+  }
+
+  .celebration-cards-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .celebration-card {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 8px;
+    background: var(--bg, #f9fafb);
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 7px;
+
+    .celeb-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #ede9fe;
+      color: #7c3aed;
+      font-size: 9.5px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .celeb-details {
+      flex: 1;
+      min-width: 0;
+
+      .celeb-name {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--text, #111827);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .celeb-dept {
+        font-size: 10px;
+        color: var(--muted, #6b7280);
+      }
+      .celeb-badge {
+        font-size: 9.5px;
+        font-weight: 600;
+        color: #7c3aed;
       }
     }
   }
 }
 
-// ── Punch Tracker Card (Right Col) ──
+// ── 5. Pending Approvals Card ──
+.approvals-widget {
+  .approvals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .approval-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 7px;
+    padding: 5px 8px;
+    background: var(--bg, #f9fafb);
+    border-radius: 7px;
+    border: 1px solid var(--border, #f3f4f6);
+
+    .approval-main {
+      flex: 1;
+      min-width: 0;
+
+      .req-title {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--text, #111827);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .req-details {
+        font-size: 10px;
+        color: var(--muted, #6b7280);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    .approval-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+
+      .btn-action {
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        font-size: 10px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        transition: transform 0.1s ease;
+
+        &:active {
+          transform: scale(0.95);
+        }
+
+        &.btn-approve {
+          background: #dcfce7;
+          color: #16a34a;
+          &:hover { background: #16a34a; color: #fff; }
+        }
+        &.btn-reject {
+          background: #fee2e2;
+          color: #dc2626;
+          &:hover { background: #dc2626; color: #fff; }
+        }
+      }
+    }
+  }
+}
+
+// ── Right Column: 1. Time Tracker & Attendance Activity ──
 .punch-widget {
+  flex: 1.15;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 10px 12px;
   background: linear-gradient(180deg, var(--surface, #ffffff) 0%, #f8fafc 100%);
   border: 1px solid var(--border, #e5e7eb);
 }
 
 .punch-header {
   text-align: center;
-  margin-bottom: 12px;
+  margin-bottom: 5px;
+  flex-shrink: 0;
 
   .punch-date {
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 600;
     color: var(--muted, #6b7280);
   }
 
   .punch-live-clock {
-    font-size: 1.6rem;
+    font-size: 1.35rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     color: var(--text, #111827);
-    margin-top: 2px;
+    margin-top: 1px;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -642,18 +741,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 14px;
+  font-size: 10px;
   font-weight: 700;
   background: #f3f4f6;
   color: #6b7280;
-  margin-bottom: 14px;
+  margin-bottom: 7px;
+  flex-shrink: 0;
 
   .status-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: #9ca3af;
   }
@@ -663,7 +763,7 @@
     color: #059669;
     .status-dot {
       background: #10b981;
-      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
     }
   }
 
@@ -672,7 +772,7 @@
     color: #d97706;
     .status-dot {
       background: #f59e0b;
-      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
     }
   }
 }
@@ -680,29 +780,31 @@
 .punch-timers {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 7px;
+  flex-shrink: 0;
 
   .timer-box {
     text-align: center;
     background: var(--surface, #ffffff);
     border: 1px solid var(--border, #e5e7eb);
-    padding: 8px 6px;
-    border-radius: 8px;
+    padding: 4px 3px;
+    border-radius: 6px;
 
     .timer-label {
-      font-size: 10px;
+      font-size: 8.5px;
       font-weight: 600;
       color: var(--muted, #6b7280);
       text-transform: uppercase;
+      letter-spacing: 0.02em;
     }
 
     .timer-value {
-      font-size: 1.1rem;
+      font-size: 0.92rem;
       font-weight: 800;
       font-variant-numeric: tabular-nums;
       color: var(--p, #2563eb);
-      margin-top: 2px;
+      margin-top: 1px;
 
       &.break { color: #f59e0b; }
     }
@@ -710,24 +812,22 @@
 }
 
 .punch-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 7px;
+  flex-shrink: 0;
 
   .btn-punch {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 5px;
     width: 100%;
-    padding: 10px 16px;
-    border-radius: 10px;
-    font-size: 14px;
+    padding: 6px 10px;
+    border-radius: 7px;
+    font-size: 11.5px;
     font-weight: 700;
     cursor: pointer;
     border: none;
-    transition: all 0.18s ease;
+    transition: all 0.15s ease;
 
     &.btn-clockin {
       background: #10b981;
@@ -745,9 +845,6 @@
       background: #f3f4f6;
       color: #374151;
       border: 1px solid #d1d5db;
-      font-size: 13px;
-      padding: 8px 12px;
-
       &:hover { background: #e5e7eb; }
       &.active {
         background: #fef3c7;
@@ -756,40 +853,81 @@
       }
     }
   }
+
+  .punch-active-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .punch-readonly-note {
+    background: var(--bg, #f9fafb);
+    border: 1px dashed var(--border, #e5e7eb);
+    border-radius: 6px;
+    padding: 5px;
+    font-size: 10px;
+    color: var(--muted, #6b7280);
+    text-align: center;
+  }
 }
 
-// ── Punch History Timeline ──
+// ── Today's Attendance Activity Timeline ──
 .punch-history {
   border-top: 1px dashed var(--border, #e5e7eb);
-  padding-top: 12px;
+  padding-top: 5px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
   .history-title {
-    font-size: 11px;
+    font-size: 9.5px;
     font-weight: 700;
     color: var(--muted, #6b7280);
     text-transform: uppercase;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
   }
 
   .history-timeline {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    max-height: 120px;
-    overflow-y: auto;
+    gap: 3px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 4px;
+    }
   }
 
   .timeline-entry {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 11px;
+    gap: 6px;
+    font-size: 10px;
+    padding: 2px 0;
 
     .timeline-dot {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
       background: #9ca3af;
+      flex-shrink: 0;
       &.type-clockin { background: #10b981; }
       &.type-clockout { background: #ef4444; }
       &.type-breakin, &.type-breakout { background: #f59e0b; }
@@ -806,128 +944,102 @@
   }
 
   .timeline-empty {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--muted, #9ca3af);
     font-style: italic;
+    padding: 2px 0;
   }
 }
 
-// ── Holidays List ──
-.holiday-list {
+// ── Right Column: 2. Holiday Calendar Card (Restored) ──
+.holiday-widget {
+  flex: 0.85;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
+  padding: 10px 12px;
 
-.holiday-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 10px;
-  background: var(--bg, #f9fafb);
-  border-radius: 8px;
-
-  .holiday-date-badge {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    background: #ffedd5;
-    color: #c2410c;
+  .holiday-list {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-
-    .month { font-size: 9px; font-weight: 800; text-transform: uppercase; }
-    .day { font-size: 14px; font-weight: 800; line-height: 1; }
+    gap: 6px;
   }
 
-  .holiday-details {
-    .holiday-name {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text, #111827);
+  .holiday-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    background: var(--bg, #f9fafb);
+    border: 1px solid var(--border, #f3f4f6);
+    border-radius: 8px;
+
+    .holiday-date-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 7px;
+      background: #ffedd5;
+      color: #ea580c;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+
+      .month {
+        font-size: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        line-height: 1;
+      }
+      .day {
+        font-size: 12.5px;
+        font-weight: 800;
+        line-height: 1;
+      }
     }
-    .holiday-sub {
-      font-size: 11px;
-      color: var(--muted, #6b7280);
+
+    .holiday-details {
+      flex: 1;
+      min-width: 0;
+
+      .holiday-name {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--text, #111827);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .holiday-sub {
+        font-size: 9.5px;
+        color: var(--muted, #6b7280);
+        margin-top: 1px;
+      }
+
+      .holiday-pill {
+        font-weight: 600;
+        color: #ea580c;
+      }
     }
   }
 }
 
-// ── Leave Balances ──
-.leave-quota-list {
+// ── Generic Empty State ──
+.empty-state {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.quota-item {
-  .quota-header {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    margin-bottom: 4px;
-
-    .quota-name { font-weight: 600; color: var(--text, #111827); }
-    .quota-count { font-size: 11px; color: var(--muted, #6b7280); }
-  }
-
-  .quota-bar-track {
-    width: 100%;
-    height: 6px;
-    background: #e5e7eb;
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .quota-bar-fill {
-    height: 100%;
-    border-radius: 3px;
-    transition: width 0.3s ease;
-  }
-}
-
-// ── Quick Links ──
-.quick-links-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.quick-link-btn {
-  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px;
-  background: var(--bg, #f9fafb);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text, #374151);
-  text-decoration: none;
-  transition: all 0.15s ease;
-
-  .link-icon { font-size: 15px; }
-
-  &:hover {
-    background: var(--surface, #ffffff);
-    border-color: var(--p, #2563eb);
-    color: var(--p, #2563eb);
-    transform: translateY(-1px);
-  }
-}
-
-.empty-state {
-  font-size: 12px;
+  justify-content: center;
+  gap: 4px;
   color: var(--muted, #9ca3af);
+  font-size: 10px;
   text-align: center;
-  padding: 16px 0;
-  font-style: italic;
+  padding: 6px;
 
-  &.full-width {
-    grid-column: 1 / -1;
+  .empty-icon {
+    font-size: 14px;
   }
 }
