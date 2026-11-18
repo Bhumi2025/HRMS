@@ -1,10 +1,9 @@
 import { NavSection, Role } from '../models';
 
-const overview = (analyticsPath: string): NavSection => ({
+const overview = (): NavSection => ({
   section: 'Overview',
   items: [
     { icon: 'dashboard', label: 'Dashboard', path: '/dashboard' },
-    { icon: 'reports', label: 'Analytics', path: analyticsPath },
   ],
 });
 
@@ -38,10 +37,10 @@ export const NAV_CONFIG: Record<Role, NavSection[]> = {
       ],
     },
   ],
-  'Company Admin': [overview('/dashboard'), hrModules()],
-  'HR Manager': [overview('/dashboard'), hrModules()],
+  'Company Admin': [overview(), hrModules()],
+  'HR Manager': [overview(), hrModules()],
   Manager: [
-    overview('/dashboard'),
+    overview(),
     {
       section: 'Management',
       items: [

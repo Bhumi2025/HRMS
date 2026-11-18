@@ -65,8 +65,8 @@ export const routes: Routes = [
       },
       {
         path: 'analytics',
-        data: { title: 'Analytics' },
-        loadComponent: () => import('./features/dashboard/analytics.component').then((m) => m.AnalyticsComponent),
+        redirectTo: 'dashboard',
+        pathMatch: 'full',
       },
 
       // HR modules
