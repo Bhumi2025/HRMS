@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
 import { AttendanceRecord, EmployeeListItem, MonthlyMusterDay, TodayAttendanceOverview } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
@@ -584,6 +584,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly perms = inject(PermissionService);
   private readonly session = inject(SessionService);
   private readonly api = inject(ApiService);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly tab = signal<'daily' | 'muster' | 'reg'>('daily');
   protected readonly canReg = signal(this.session.activeRole() !== 'Employee');
@@ -651,6 +652,22 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    this.route.queryParams.subscribe((params) => {
+      if (params['tab'] === 'muster') {
+        this.tab.set('muster');
+        if (params['month']) {
+          this.selectedMusterMonth = params['month'];
+        }
+        if (this.selectedMusterEmpId) {
+          this.generateMuster();
+        }
+      } else if (params['tab'] === 'reg') {
+        this.tab.set('reg');
+      } else if (params['tab'] === 'daily') {
+        this.tab.set('daily');
+      }
+    });
+
     this.loadEmployees();
     this.loadDailyAttendance();
     this.loadRegularizations();

@@ -122,32 +122,46 @@
               <span class="widget-indicator"></span>
               <div class="header-title-box">
                 <h3 class="widget-title-nowrap">Attendance Overview</h3>
-                <span class="month-pill">{{ currentMonthName() }}</span>
+                <div class="month-selector-badge">
+                  <select
+                    class="month-dropdown"
+                    [value]="selectedMonthKey()"
+                    (change)="onMonthChange($event)"
+                    title="Select Month & Year"
+                  >
+                    @for (m of availableMonths(); track m.key) {
+                      <option [value]="m.key">{{ m.label }}</option>
+                    }
+                  </select>
+                  <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M6 9l6 6 6-6"/>
+                  </svg>
+                </div>
               </div>
             </div>
 
-            <!-- Legend & Action -->
+            <!-- Legend & Action (Redirects to Monthly Muster Register for Selected Month) -->
             <div class="header-actions">
               <div class="graph-legend">
                 <span class="legend-item"><span class="line-badge badge-purple"></span> Present</span>
               </div>
-              <a routerLink="/attendance" class="view-link">Detailed Log ›</a>
+              <a [routerLink]="['/attendance']" [queryParams]="{ tab: 'muster', month: selectedMonthKey() }" class="view-link" title="Open Monthly Muster Register">Detailed Log ›</a>
             </div>
           </div>
 
           <div class="widget-body attendance-graph-content">
-            <!-- Framed Boxed Line Chart Matching Reference Image -->
+            <!-- Framed Boxed Line Chart (Bigger & Taller Matching Reference Image) -->
             <div class="framed-chart-wrapper">
-              <svg class="boxed-line-chart-svg" viewBox="0 0 760 170" preserveAspectRatio="none">
+              <svg class="boxed-line-chart-svg" viewBox="0 0 770 215" preserveAspectRatio="none">
                 <!-- Outer Framed Rectangle with subtle purple border matching reference -->
-                <rect x="42" y="14" width="700" height="108" fill="#ffffff" stroke="#c4b5fd" stroke-width="1.2" />
+                <rect x="42" y="16" width="710" height="145" fill="#ffffff" stroke="#c4b5fd" stroke-width="1.2" />
 
                 <!-- Horizontal Grid Lines and Y-Axis Scale Values outside box -->
                 @for (val of chartYScaleSteps(); track val) {
                   <line
                     x1="42"
                     [attr.y1]="getYCoord(val)"
-                    x2="742"
+                    x2="752"
                     [attr.y2]="getYCoord(val)"
                     stroke="#ede9fe"
                     stroke-width="1"
@@ -166,9 +180,9 @@
                 @for (pt of attendanceChartPoints(); track pt.idx) {
                   <line
                     [attr.x1]="pt.x"
-                    y1="14"
+                    y1="16"
                     [attr.x2]="pt.x"
-                    y2="122"
+                    y2="161"
                     stroke="#ede9fe"
                     stroke-width="1"
                   />
@@ -209,9 +223,9 @@
                     [class.node-active]="hoveredChartPoint()?.idx === pt.idx"
                   />
 
-                  <!-- Angled Date Text at -50° along bottom axis -->
+                  <!-- Angled Date Text at -48° along bottom axis -->
                   <text
-                    [attr.transform]="'translate(' + pt.x + ', 130) rotate(-50)'"
+                    [attr.transform]="'translate(' + pt.x + ', 172) rotate(-48)'"
                     text-anchor="end"
                     class="x-axis-date-angled"
                     [class.date-active]="hoveredChartPoint()?.idx === pt.idx"
@@ -222,7 +236,7 @@
 
                 <!-- Interactive Floating Tooltip -->
                 @if (hoveredChartPoint(); as hov) {
-                  <g class="chart-tooltip-group" [attr.transform]="'translate(' + (hov.x > 640 ? hov.x - 115 : (hov.x < 110 ? hov.x + 8 : hov.x - 55)) + ', ' + (hov.y > 55 ? hov.y - 48 : hov.y + 12) + ')'">
+                  <g class="chart-tooltip-group" [attr.transform]="'translate(' + (hov.x > 640 ? hov.x - 115 : (hov.x < 110 ? hov.x + 8 : hov.x - 55)) + ', ' + (hov.y > 60 ? hov.y - 48 : hov.y + 12) + ')'">
                     <rect width="110" height="40" rx="6" fill="#1e1b4b" opacity="0.95" />
                     <text x="55" y="16" text-anchor="middle" fill="#ffffff" font-size="9.5" font-weight="600">
                       {{ hov.formattedDate }} ({{ hov.dayOfWeek }})

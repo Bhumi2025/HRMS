@@ -209,11 +209,17 @@ public sealed class DashboardService : IDashboardService
             ct);
     }
 
-    public async Task<IReadOnlyList<AttendanceTrendPointDto>> GetAttendanceTrendAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<AttendanceTrendPointDto>> GetAttendanceTrendAsync(CancellationToken ct = default) =>
+        GetAttendanceTrendAsync(null, null, ct);
+
+    public async Task<IReadOnlyList<AttendanceTrendPointDto>> GetAttendanceTrendAsync(int? year, int? month, CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var monthStart = new DateOnly(today.Year, today.Month, 1);
-        var monthEnd = new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+        var targetYear = year.HasValue && year.Value >= 2020 && year.Value <= 2035 ? year.Value : today.Year;
+        var targetMonth = month.HasValue && month.Value >= 1 && month.Value <= 12 ? month.Value : today.Month;
+
+        var monthStart = new DateOnly(targetYear, targetMonth, 1);
+        var monthEnd = new DateOnly(targetYear, targetMonth, DateTime.DaysInMonth(targetYear, targetMonth));
         var prevMonthStart = monthStart.AddMonths(-1);
         var prevMonthDays = DateTime.DaysInMonth(prevMonthStart.Year, prevMonthStart.Month);
 
@@ -236,11 +242,11 @@ public sealed class DashboardService : IDashboardService
 
         var byDate = daily.ToDictionary(d => d.Date);
         var result = new List<AttendanceTrendPointDto>();
-        var totalDays = DateTime.DaysInMonth(today.Year, today.Month);
+        var totalDays = DateTime.DaysInMonth(targetYear, targetMonth);
 
         for (var day = 1; day <= totalDays; day++)
         {
-            var date = new DateOnly(today.Year, today.Month, day);
+            var date = new DateOnly(targetYear, targetMonth, day);
             var prevDate = new DateOnly(prevMonthStart.Year, prevMonthStart.Month, Math.Min(day, prevMonthDays));
 
             byDate.TryGetValue(date, out var dayStat);

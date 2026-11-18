@@ -557,8 +557,10 @@ export class ApiService {
     return this.http.get<DepartmentHeadcount[]>(this.url('/dashboard/department-headcount'));
   }
 
-  attendanceTrend(): Observable<AttendanceTrendPoint[]> {
-    return this.http.get<AttendanceTrendPoint[]>(this.url('/dashboard/attendance-trend'));
+  attendanceTrend(year?: number, month?: number): Observable<AttendanceTrendPoint[]> {
+    return this.http.get<AttendanceTrendPoint[]>(this.url('/dashboard/attendance-trend'), {
+      params: toParams({ year, month }),
+    });
   }
 
   recentActivity(take = 6): Observable<Activity[]> {
