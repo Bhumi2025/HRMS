@@ -16,10 +16,10 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   if (token) {
     setHeaders['Authorization'] = `Bearer ${token}`;
   }
-  if (companyCode && !request.headers.has('X-Company-Code')) {
+  if (companyCode && companyCode !== 'ALL' && !request.headers.has('X-Company-Code')) {
     setHeaders['X-Company-Code'] = companyCode;
   }
-  if (companyId && !request.headers.has('X-Company-Id')) {
+  if (companyId && companyId !== 'all' && !request.headers.has('X-Company-Id')) {
     setHeaders['X-Company-Id'] = companyId;
   }
 

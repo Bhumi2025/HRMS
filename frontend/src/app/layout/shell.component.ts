@@ -73,12 +73,39 @@ export class ShellComponent implements OnInit, OnDestroy {
   protected readonly sidebarOpen = signal(false);
   protected readonly pendingApprovalsCount = signal<number>(0);
 
+  private readonly allOrganizationsTenant = {
+    id: 'all',
+    name: 'All Organizations',
+    location: 'ALL',
+    logo: 'assets/images/shape-logo.png',
+  };
+
   protected readonly tenants = signal<{ id: string; name: string; location: string; logo: string }[]>([
+    { id: 'all', name: 'All Organizations', location: 'ALL', logo: 'assets/images/shape-logo.png' },
     { id: 'default', name: 'HR Nexus Corporation', location: 'HRNEXUS', logo: 'assets/images/shape-logo.png' },
   ]);
-  protected readonly selectedTenant = signal<{ id: string; name: string; location: string; logo: string }>(
-    this.readStoredTenant() || { id: 'default', name: 'HR Nexus Corporation', location: 'HRNEXUS', logo: 'assets/images/shape-logo.png' }
-  );
+  protected readonly selectedTenant = computed(() => {
+    const list = this.tenants();
+    const allOption = list.find((t) => t.id === 'all') || this.allOrganizationsTenant;
+    if (this.role() !== 'Super Admin') {
+      const u = this.user();
+      if (!u) return allOption;
+      return list.find((t) => (u.companyId && t.id === u.companyId) || (u.companyCode && t.location === u.companyCode)) || {
+        id: u.companyId || 'current',
+        name: u.companyName || 'HR Nexus Corporation',
+        location: u.companyCode || 'HRNEXUS',
+        logo: 'assets/images/shape-logo.png',
+      };
+    }
+
+    const code = this.user()?.companyCode;
+    const cid = this.user()?.companyId;
+    if (!code || code === 'ALL' || cid === 'all') {
+      return allOption;
+    }
+    const match = list.find((t) => (cid && t.id === cid) || (code && t.location.toUpperCase() === code.toUpperCase()));
+    return match || allOption;
+  });
   protected readonly tenantOpen = signal(false);
 
   protected readonly user = computed(() => this.session.user());
@@ -86,7 +113,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   protected readonly companyLogo = computed(() => this.session.companyLogo() || null);
   protected readonly currentCompanyName = computed(() => {
     if (this.role() === 'Super Admin') {
-      return this.selectedTenant()?.name || this.user()?.companyName || 'HR Nexus Corporation';
+      return this.selectedTenant()?.name || 'All Organizations';
     }
     return this.user()?.companyName || this.selectedTenant()?.name || 'HR Nexus Corporation';
   });
@@ -321,20 +348,26 @@ export class ShellComponent implements OnInit, OnDestroy {
     if (this.role() === 'Super Admin') {
       this.api.tenantCompanies().subscribe({
         next: (items) => {
-          if (items && items.length > 0) {
-            const mapped = items.map((c) => ({
+          const allOption = this.allOrganizationsTenant;
+          const mapped = [
+            allOption,
+            ...(items || []).map((c) => ({
               id: c.id,
               name: c.name,
               location: c.code,
               logo: c.logoUrl || 'assets/images/shape-logo.png',
-            }));
-            this.tenants.set(mapped);
-            const stored = this.readStoredTenant();
-            const matched = stored ? mapped.find((m) => m.id === stored.id) : null;
+            })),
+          ];
+          this.tenants.set(mapped);
+          const stored = this.readStoredTenant();
+          if (stored && stored.id !== 'all') {
+            const matched = mapped.find((m) => m.id === stored.id || (stored.location && m.location === stored.location));
             if (matched) {
-              this.selectedTenant.set(matched);
-            } else if (mapped.length > 0) {
-              this.selectedTenant.set(mapped[0]);
+              this.session.updateUser({
+                companyId: matched.id && matched.id !== 'default' ? matched.id : undefined,
+                companyName: matched.name,
+                companyCode: matched.location,
+              });
             }
           }
         },
@@ -453,15 +486,23 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   protected selectTenant(tenant: { id: string; name: string; location: string; logo: string }): void {
-    this.selectedTenant.set(tenant);
     sessionStorage.setItem('current_tenant', JSON.stringify(tenant));
-    this.session.updateUser({
-      companyId: tenant.id && tenant.id !== 'default' ? tenant.id : undefined,
-      companyName: tenant.name,
-      companyCode: tenant.location,
-    });
+    if (tenant.id === 'all') {
+      this.session.updateUser({
+        companyId: undefined,
+        companyName: 'All Organizations',
+        companyCode: undefined,
+      });
+      this.toast.show('Switched to Platform View: All Organizations', 'success');
+    } else {
+      this.session.updateUser({
+        companyId: tenant.id && tenant.id !== 'default' ? tenant.id : undefined,
+        companyName: tenant.name,
+        companyCode: tenant.location,
+      });
+      this.toast.show(`Switched to tenant: ${tenant.name} (${tenant.location})`, 'success');
+    }
     this.tenantOpen.set(false);
-    this.toast.show(`Switched to tenant: ${tenant.name} (${tenant.location})`, 'success');
   }
 
   private readStoredTenant(): { id: string; name: string; location: string; logo: string } | null {

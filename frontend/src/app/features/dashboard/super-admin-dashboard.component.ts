@@ -1,9 +1,10 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, AfterViewInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { of, catchError } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
+import { SessionService } from '../../core/services/session.service';
 import { CompanyListItem, CompanyDetail, CreateCompanyRequest } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
@@ -21,13 +22,21 @@ import { ToastService } from '../../core/services/toast.service';
             <p class="panel-desc">Manage tenant lifecycle, provisioning status, and administrator invitations</p>
           </div>
           <div class="panel-controls">
+            <!-- Header Tenant Switcher Filter Indicator -->
+            @if (selectedTenantCode()) {
+              <div class="active-tenant-chip">
+                <span>Tenant: <strong>{{ selectedTenantName() }}</strong></span>
+                <button type="button" class="chip-clear-btn" (click)="clearTenantFilter()" title="Show All Organizations">✕ Show All</button>
+              </div>
+            }
+
             <!-- Filter pills -->
             <div class="filter-pills">
               <button
                 type="button"
                 class="pill-btn"
                 [class.active]="statusFilter() === 'all'"
-                (click)="statusFilter.set('all')"
+                (click)="setStatusFilter('all')"
               >
                 All ({{ companies().length }})
               </button>
@@ -35,7 +44,7 @@ import { ToastService } from '../../core/services/toast.service';
                 type="button"
                 class="pill-btn"
                 [class.active]="statusFilter() === 'Active'"
-                (click)="statusFilter.set('Active')"
+                (click)="setStatusFilter('Active')"
               >
                 Active ({{ activeCompanies() }})
               </button>
@@ -43,20 +52,25 @@ import { ToastService } from '../../core/services/toast.service';
                 type="button"
                 class="pill-btn"
                 [class.active]="statusFilter() === 'Suspended'"
-                (click)="statusFilter.set('Suspended')"
+                (click)="setStatusFilter('Suspended')"
               >
                 Suspended ({{ suspendedCompanies() }})
               </button>
             </div>
 
-            <!-- Search -->
+            <!-- Search (Chrome autofill protected) -->
             <div class="search-wrap">
+              <!-- Off-screen Chrome Autofill Sink -->
+              <div style="position: absolute; width: 0; height: 0; overflow: hidden; opacity: 0; pointer-events: none;" aria-hidden="true">
+                <input type="text" name="chrome_sink_username" tabindex="-1" autocomplete="username" />
+                <input type="password" name="chrome_sink_password" tabindex="-1" autocomplete="current-password" />
+              </div>
               <span [appIcon]="'search'" class="search-icon"></span>
               <input
-                type="text"
-                name="tenantFilterQuery"
-                id="tenantFilterQuery"
-                autocomplete="new-password"
+                type="search"
+                name="search_tenant_no_autofill"
+                id="tenantFilterSearchBox"
+                autocomplete="off"
                 autocorrect="off"
                 autocapitalize="off"
                 spellcheck="false"
@@ -69,16 +83,6 @@ import { ToastService } from '../../core/services/toast.service';
                 <button class="clear-search-btn" (click)="clearSearch()" type="button" title="Clear search">✕</button>
               }
             </div>
-
-            <!-- Top Actions -->
-            <button class="action-top-btn btn-secondary" (click)="refreshAll()" [disabled]="isRefreshing()" title="Refresh Telemetry">
-              <span [appIcon]="'sync'" class="action-icon" [class.spin]="isRefreshing()"></span>
-              <span>{{ isRefreshing() ? 'Refreshing...' : 'Refresh Telemetry' }}</span>
-            </button>
-            <button class="action-top-btn btn-primary" (click)="openCreateOrgModal()" title="New Organization">
-              <span [appIcon]="'plus'"></span>
-              <span>+ New Organization</span>
-            </button>
           </div>
         </div>
 
@@ -615,34 +619,31 @@ import { ToastService } from '../../core/services/toast.service';
         color: #0f172a;
       }
 
-      .action-top-btn {
+      .active-tenant-chip {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 16px;
+        background: rgba(37, 99, 235, 0.08);
+        border: 1px solid rgba(37, 99, 235, 0.25);
+        color: #1d4ed8;
+        padding: 5px 12px;
         border-radius: 8px;
-        font-size: 12.5px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: all 0.18s;
-        border: 1px solid transparent;
+        font-size: 12px;
+        font-weight: 600;
         white-space: nowrap;
       }
-      .action-top-btn.btn-secondary {
-        background: var(--surface, #ffffff);
-        border-color: var(--border, #cbd5e1);
-        color: var(--text, #334155);
-      }
-      .action-top-btn.btn-secondary:hover:not(:disabled) {
-        background: var(--bg, #f8fafc);
-        border-color: #94a3b8;
-      }
-      .action-top-btn.btn-primary {
+      .chip-clear-btn {
         background: #2563eb;
         color: #ffffff;
-        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+        border: none;
+        border-radius: 4px;
+        padding: 2px 7px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s;
       }
-      .action-top-btn.btn-primary:hover {
+      .chip-clear-btn:hover {
         background: #1d4ed8;
       }
 
@@ -1175,10 +1176,11 @@ import { ToastService } from '../../core/services/toast.service';
     `,
   ],
 })
-export class SuperAdminDashboardComponent implements OnInit {
+export class SuperAdminDashboardComponent implements OnInit, AfterViewInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly session = inject(SessionService);
 
   protected readonly isRefreshing = signal<boolean>(false);
   protected readonly showCreateOrgModal = signal<boolean>(false);
@@ -1203,6 +1205,18 @@ export class SuperAdminDashboardComponent implements OnInit {
   protected readonly selectedCompanyListItem = signal<CompanyListItem | null>(null);
   protected readonly selectedCompanyDetail = signal<CompanyDetail | null>(null);
 
+  protected readonly selectedTenantCode = computed(() => {
+    const code = this.session.user()?.companyCode;
+    return code && code !== 'ALL' ? code.toUpperCase() : null;
+  });
+
+  protected readonly selectedTenantName = computed(() => {
+    const code = this.selectedTenantCode();
+    if (!code) return null;
+    const match = this.companies().find((c) => (c.code || '').toUpperCase() === code);
+    return match ? match.name : this.session.user()?.companyName || code;
+  });
+
   protected readonly totalCompanies = computed(() => this.companies().length);
   protected readonly activeCompanies = computed(
     () => this.companies().filter((c) => (c.status || '').toLowerCase() === 'active').length
@@ -1217,12 +1231,25 @@ export class SuperAdminDashboardComponent implements OnInit {
 
   protected readonly filteredCompanies = computed(() => {
     let list = this.companies();
+
+    // 1. Filter by header tenant switcher if a specific tenant is active
+    const tCode = this.selectedTenantCode();
+    if (tCode) {
+      const match = list.filter((c) => (c.code || '').toUpperCase() === tCode);
+      if (match.length > 0) {
+        list = match;
+      }
+    }
+
+    // 2. Filter by status pill
     const filter = this.statusFilter();
     if (filter === 'Active') {
       list = list.filter((c) => (c.status || '').toLowerCase() === 'active');
     } else if (filter === 'Suspended') {
       list = list.filter((c) => (c.status || '').toLowerCase() === 'suspended');
     }
+
+    // 3. Filter by search input
     const q = this.searchQuery().trim().toLowerCase();
     if (!q) return list;
     return list.filter(
@@ -1236,7 +1263,33 @@ export class SuperAdminDashboardComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.searchQuery.set('');
     this.refreshAll();
+  }
+
+  ngAfterViewInit(): void {
+    // Clear any unwanted browser autofill from search field
+    setTimeout(() => {
+      const el = document.getElementById('tenantFilterSearchBox') as HTMLInputElement | null;
+      if (el && !this.searchQuery()) {
+        el.value = '';
+      }
+    }, 150);
+  }
+
+  protected setStatusFilter(filter: 'all' | 'Active' | 'Suspended'): void {
+    this.statusFilter.set(filter);
+  }
+
+  protected clearTenantFilter(): void {
+    const allOption = { id: 'all', name: 'All Organizations', location: 'ALL', logo: 'assets/images/shape-logo.png' };
+    sessionStorage.setItem('current_tenant', JSON.stringify(allOption));
+    this.session.updateUser({
+      companyId: undefined,
+      companyCode: undefined,
+      companyName: 'All Organizations',
+    });
+    this.toast.show('Switched to Platform View: All Organizations', 'success');
   }
 
   protected refreshAll(): void {
@@ -1264,6 +1317,10 @@ export class SuperAdminDashboardComponent implements OnInit {
 
   protected clearSearch(): void {
     this.searchQuery.set('');
+    const el = document.getElementById('tenantFilterSearchBox') as HTMLInputElement | null;
+    if (el) {
+      el.value = '';
+    }
   }
 
   protected openCompanyDetails(company: CompanyListItem): void {
