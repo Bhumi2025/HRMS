@@ -212,12 +212,15 @@ public sealed class DashboardService : IDashboardService
     public async Task<IReadOnlyList<AttendanceTrendPointDto>> GetAttendanceTrendAsync(CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var from = today.AddDays(-6);
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        var monthEnd = new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+        // Query from 7 days before month start so Week 1 has previous week comparison
+        var queryFrom = monthStart.AddDays(-7);
 
-        // Aggregate per day in SQL — previously every attendance row for the week was loaded.
+        // Aggregate per day in SQL
         var daily = await _uow.Attendance.ToListAsync(
             _uow.Attendance.Query()
-                .Where(r => r.Date >= from && r.Date <= today)
+                .Where(r => r.Date >= queryFrom && r.Date <= monthEnd)
                 .GroupBy(r => r.Date)
                 .Select(g => new
                 {
@@ -231,16 +234,28 @@ public sealed class DashboardService : IDashboardService
 
         var byDate = daily.ToDictionary(d => d.Date);
         var result = new List<AttendanceTrendPointDto>();
+        var totalDays = DateTime.DaysInMonth(today.Year, today.Month);
 
-        for (var i = 6; i >= 0; i--)
+        for (var day = 1; day <= totalDays; day++)
         {
-            var date = today.AddDays(-i);
-            byDate.TryGetValue(date, out var day);
+            var date = new DateOnly(today.Year, today.Month, day);
+            var prevDate = date.AddDays(-7);
+
+            byDate.TryGetValue(date, out var dayStat);
+            byDate.TryGetValue(prevDate, out var prevStat);
+
+            int weekNumber = Math.Min(4, ((day - 1) / 7) + 1);
+
             result.Add(new AttendanceTrendPointDto(
                 date.DayOfWeek.ToString()[..3],
-                day?.Present ?? 0,
-                day?.Absent ?? 0,
-                day?.Late ?? 0));
+                dayStat?.Present ?? 0,
+                dayStat?.Absent ?? 0,
+                dayStat?.Late ?? 0,
+                date.ToString("yyyy-MM-dd"),
+                weekNumber,
+                prevStat?.Present ?? 0,
+                prevStat?.Absent ?? 0,
+                prevStat?.Late ?? 0));
         }
 
         return result;

@@ -12,7 +12,16 @@ public sealed record DashboardStatsDto(
 
 public sealed record DepartmentHeadcountDto(string Department, int Count);
 
-public sealed record AttendanceTrendPointDto(string Label, int Present, int Absent, int Late);
+public sealed record AttendanceTrendPointDto(
+    string Label,
+    int Present,
+    int Absent,
+    int Late,
+    string? Date = null,
+    int WeekNumber = 1,
+    int PrevPresent = 0,
+    int PrevAbsent = 0,
+    int PrevLate = 0);
 
 public sealed record ActivityDto(
     Guid EmployeeId,

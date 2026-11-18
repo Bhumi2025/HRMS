@@ -98,44 +98,154 @@
           </div>
         </div>
 
-        <!-- 2. Attendance Overview Card -->
+        <!-- 2. Attendance Overview Card (Multi-Week Heartbeat Flow) -->
         <div class="dash-widget attendance-widget">
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator"></span>
-              <h3>Attendance Overview</h3>
+              <div class="header-title-box">
+                <h3>Attendance Overview</h3>
+                <span class="month-pill">{{ currentMonthName() }} · Week {{ selectedWeek() }}</span>
+              </div>
             </div>
+
+            <!-- Week Switcher Pills & Heartbeat Pulse Button -->
+            <div class="week-pills-bar">
+              @for (w of [1, 2, 3, 4]; track w) {
+                <button
+                  type="button"
+                  class="week-pill-btn"
+                  [class.active]="selectedWeek() === w"
+                  [class.current]="currentCalendarWeek() === w"
+                  (click)="selectWeek(w)"
+                  [title]="'View Week ' + w + (currentCalendarWeek() === w ? ' (Current Active Week)' : '')"
+                >
+                  <span class="pill-w">W{{ w }}</span>
+                  @if (currentCalendarWeek() === w) {
+                    <span class="live-dot" title="Current Active Week"></span>
+                  }
+                </button>
+              }
+              <button
+                type="button"
+                class="cycle-btn"
+                [class.cycling]="isAutoCycling()"
+                (click)="toggleAutoCycle()"
+                title="Heartbeat cycle: Sweeps week-by-week and resets for the month"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                <span>{{ isAutoCycling() ? 'Looping' : 'Pulse' }}</span>
+              </button>
+            </div>
+
             <div class="header-actions">
               <div class="graph-legend">
                 <span class="legend-item"><span class="dot dot-present"></span> Present</span>
                 <span class="legend-item"><span class="dot dot-late"></span> Late</span>
                 <span class="legend-item"><span class="dot dot-absent"></span> Absent</span>
+                <span class="legend-item"><span class="dot dot-prev-ghost"></span> Prev W{{ previousWeekNumber() }}</span>
               </div>
               <a routerLink="/attendance" class="view-link">Detailed Log ›</a>
             </div>
           </div>
 
           <div class="widget-body attendance-graph-content">
+            <!-- Heartbeat ECG line overlay across the top -->
+            <div class="heartbeat-line-track">
+              <svg class="ecg-wave-svg" viewBox="0 0 500 24" preserveAspectRatio="none">
+                <path class="ecg-wave-path" d="M0,12 L100,12 L115,2 L125,22 L135,12 L240,12 L255,4 L265,20 L275,12 L380,12 L395,1 L405,23 L415,12 L500,12" />
+              </svg>
+            </div>
+
+            <!-- Graph Bars Area -->
             <div class="graph-bars">
-              @for (bar of attendanceGraph(); track bar.label) {
-                <div class="bar-col">
-                  <div class="bar-stack">
-                    @if (bar.present > 0) {
-                      <div class="seg seg-present" [style.height.%]="getBarHeight(bar.present)" [title]="'Present: ' + bar.present"></div>
-                    }
-                    @if (bar.late > 0) {
-                      <div class="seg seg-late" [style.height.%]="getBarHeight(bar.late)" [title]="'Late: ' + bar.late"></div>
-                    }
-                    @if (bar.absent > 0) {
-                      <div class="seg seg-absent" [style.height.%]="getBarHeight(bar.absent)" [title]="'Absent: ' + bar.absent"></div>
-                    }
-                    @if (bar.present === 0 && bar.late === 0 && bar.absent === 0) {
-                      <div class="seg seg-empty" title="No attendance records"></div>
+              @for (bar of activeWeekBars(); track bar.label + (bar.date || '')) {
+                <div class="bar-col" [class.is-today]="bar.isToday">
+                  @if (bar.isToday) {
+                    <div class="today-pulse-indicator" title="Today's Live Beat">
+                      <span class="pulse-beacon"></span>
+                    </div>
+                  }
+
+                  <!-- Side-by-side / Layered: Ghost Previous Week (Small) + Active Week (Highlighted) -->
+                  <div class="bar-pair-container">
+                    <!-- 1. PREVIOUS WEEK GHOST BAR ("slightly show back in small") -->
+                    <div
+                      class="bar-stack ghost-prev-stack"
+                      [title]="'Previous Week (W' + previousWeekNumber() + ') - Present: ' + (bar.prevPresent || 0) + ', Late: ' + (bar.prevLate || 0) + ', Absent: ' + (bar.prevAbsent || 0)"
+                    >
+                      @if (bar.prevPresent > 0) {
+                        <div class="seg seg-prev-present" [style.height.%]="getBarHeight(bar.prevPresent, true)"></div>
+                      }
+                      @if (bar.prevLate > 0) {
+                        <div class="seg seg-prev-late" [style.height.%]="getBarHeight(bar.prevLate, true)"></div>
+                      }
+                      @if (bar.prevAbsent > 0) {
+                        <div class="seg seg-prev-absent" [style.height.%]="getBarHeight(bar.prevAbsent, true)"></div>
+                      }
+                      @if (!bar.prevPresent && !bar.prevLate && !bar.prevAbsent) {
+                        <div class="seg seg-ghost-empty"></div>
+                      }
+                    </div>
+
+                    <!-- 2. ACTIVE WEEK HIGHLIGHTED BAR (Solid Full Size) -->
+                    <div
+                      class="bar-stack active-week-stack"
+                      [class.today-bar]="bar.isToday"
+                      title="Week {{ selectedWeek() }} ({{ bar.label }}): {{ bar.present }} Present, {{ bar.late }} Late, {{ bar.absent }} Absent"
+                    >
+                      @if (bar.present > 0) {
+                        <div class="seg seg-present" [style.height.%]="getBarHeight(bar.present)" [title]="'Present: ' + bar.present"></div>
+                      }
+                      @if (bar.late > 0) {
+                        <div class="seg seg-late" [style.height.%]="getBarHeight(bar.late)" [title]="'Late: ' + bar.late"></div>
+                      }
+                      @if (bar.absent > 0) {
+                        <div class="seg seg-absent" [style.height.%]="getBarHeight(bar.absent)" [title]="'Absent: ' + bar.absent"></div>
+                      }
+                      @if (bar.present === 0 && bar.late === 0 && bar.absent === 0) {
+                        <div class="seg seg-empty" title="No attendance records"></div>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Date & Day Label -->
+                  <div class="bar-label-wrap">
+                    <span class="bar-label" [class.label-today]="bar.isToday">{{ bar.label }}</span>
+                    @if (bar.dayNumber) {
+                      <span class="bar-day-num" [class.num-today]="bar.isToday">{{ bar.dayNumber }}</span>
                     }
                   </div>
-                  <span class="bar-label">{{ bar.label }}</span>
                 </div>
               }
+            </div>
+
+            <!-- Month Progression Rail (Bottom Heartbeat Indicator) -->
+            <div class="month-progression-rail">
+              <span class="rail-title">{{ currentMonthName() }} Flow:</span>
+              <div class="rail-steps">
+                @for (w of [1, 2, 3, 4]; track w) {
+                  <div
+                    class="rail-step"
+                    [class.step-active]="selectedWeek() === w"
+                    [class.step-current]="currentCalendarWeek() === w"
+                    [class.step-past]="w < currentCalendarWeek()"
+                    (click)="selectWeek(w)"
+                  >
+                    <span class="step-dot"></span>
+                    <span class="step-label">Week {{ w }}</span>
+                  </div>
+                  @if (w < 4) {
+                    <div class="step-line" [class.line-filled]="w < selectedWeek()"></div>
+                  }
+                }
+              </div>
+              <span class="fresh-start-tag" title="After Month completion, restarts freshly like a heartbeat pulse">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Fresh Month Pulse
+              </span>
             </div>
           </div>
         </div>

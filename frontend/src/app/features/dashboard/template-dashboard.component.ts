@@ -41,6 +41,11 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly currentNoticeIndex = signal(0);
   protected readonly currentTime = signal(new Date());
 
+  // Attendance Graph Multi-Week & Heartbeat Signals
+  protected readonly selectedWeek = signal<number>(this.getCalendarWeek(new Date()));
+  protected readonly isAutoCycling = signal<boolean>(false);
+  private cycleTimer: ReturnType<typeof setInterval> | null = null;
+
   // Data signals
   protected readonly notices = signal<NoticeBoardItem[]>([]);
   protected readonly presentToday = signal<AttendancePerson[]>([]);
@@ -66,6 +71,48 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly greeting = computed(() => {
     const hr = this.currentTime().getHours();
     return hr < 12 ? 'Good Morning' : hr < 17 ? 'Good Afternoon' : 'Good Evening';
+  });
+
+  protected getCalendarWeek(d: Date): number {
+    const day = d.getDate();
+    return Math.min(4, Math.floor((day - 1) / 7) + 1);
+  }
+
+  protected readonly currentCalendarWeek = computed(() => {
+    return this.getCalendarWeek(this.currentTime());
+  });
+
+  protected readonly currentMonthName = computed(() => {
+    return new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(this.currentTime());
+  });
+
+  protected readonly previousWeekNumber = computed(() => {
+    const w = this.selectedWeek();
+    return w > 1 ? w - 1 : 4;
+  });
+
+  protected readonly activeWeekBars = computed(() => {
+    const all = this.attendanceGraph();
+    const w = this.selectedWeek();
+    const now = this.currentTime();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // Filter points for the selected week
+    const weekPoints = all.filter((p) => p.weekNumber === w);
+    const source = weekPoints.length > 0 ? weekPoints : all.slice(0, 7);
+
+    return source.map((p) => {
+      const isToday = p.date ? p.date === todayStr : false;
+      const dayNum = p.date ? parseInt(p.date.split('-')[2], 10) : undefined;
+      return {
+        ...p,
+        isToday,
+        dayNumber: dayNum,
+        prevPresent: p.prevPresent ?? 0,
+        prevLate: p.prevLate ?? 0,
+        prevAbsent: p.prevAbsent ?? 0,
+      };
+    });
   });
 
   protected readonly currentNotice = computed(() => {
@@ -118,6 +165,7 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
     }
+    this.stopAutoCycle();
   }
 
   loadData(): void {
@@ -216,10 +264,44 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     return this.celebrations().filter((c) => c.type === tab).length;
   }
 
-  getBarHeight(count: number): number {
+  selectWeek(week: number): void {
+    if (this.isAutoCycling()) {
+      this.stopAutoCycle();
+    }
+    this.selectedWeek.set(week);
+  }
+
+  toggleAutoCycle(): void {
+    if (this.isAutoCycling()) {
+      this.stopAutoCycle();
+    } else {
+      this.startAutoCycle();
+    }
+  }
+
+  private startAutoCycle(): void {
+    this.isAutoCycling.set(true);
+    if (this.cycleTimer) clearInterval(this.cycleTimer);
+    this.cycleTimer = setInterval(() => {
+      this.zone.run(() => {
+        this.selectedWeek.update((w) => (w % 4) + 1);
+      });
+    }, 3200);
+  }
+
+  private stopAutoCycle(): void {
+    this.isAutoCycling.set(false);
+    if (this.cycleTimer) {
+      clearInterval(this.cycleTimer);
+      this.cycleTimer = null;
+    }
+  }
+
+  getBarHeight(count: number, isPrev = false): number {
     if (!count || count <= 0) return 0;
     const max = Math.max(this.totalHeadcount(), 6);
-    return Math.min(100, Math.max(16, Math.round((count / max) * 100)));
+    const height = Math.min(100, Math.max(16, Math.round((count / max) * 100)));
+    return isPrev ? Math.round(height * 0.85) : height;
   }
 
   toggleTask(task: TaskItem): void {

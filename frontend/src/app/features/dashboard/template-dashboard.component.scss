@@ -403,19 +403,128 @@
   }
 }
 
-// ── 2. Attendance Overview Card ──
+// ── 2. Attendance Overview Card (Multi-Week Heartbeat Flow) ──
 .attendance-widget {
+  .widget-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-title-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    h3 {
+      margin: 0;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text, #1f2937);
+    }
+
+    .month-pill {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: var(--bg, #f1f5f9);
+      color: var(--muted, #64748b);
+      border: 1px solid var(--border, #e2e8f0);
+      white-space: nowrap;
+    }
+  }
+
+  .week-pills-bar {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg, #f1f5f9);
+    border: 1px solid var(--border, #e2e8f0);
+    padding: 2px;
+    border-radius: 8px;
+    gap: 3px;
+
+    .week-pill-btn {
+      position: relative;
+      border: none;
+      background: transparent;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted, #6b7280);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.18s ease;
+
+      &:hover:not(.active) {
+        background: rgba(255, 255, 255, 0.7);
+        color: var(--text, #111827);
+      }
+
+      &.active {
+        background: #2563eb;
+        color: #ffffff;
+        box-shadow: 0 1px 4px rgba(37, 99, 235, 0.3);
+      }
+
+      .live-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #10b981;
+        box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+      }
+    }
+
+    .cycle-btn {
+      border: none;
+      background: transparent;
+      padding: 3px 7px;
+      border-radius: 6px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #2563eb;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.18s ease;
+
+      &:hover {
+        background: rgba(37, 99, 235, 0.1);
+      }
+
+      &.cycling {
+        background: #10b981;
+        color: #ffffff;
+        animation: pulse 1.5s infinite;
+      }
+    }
+  }
+
   .graph-legend {
     display: flex;
-    gap: 10px;
+    align-items: center;
+    gap: 8px;
     font-size: 10.5px;
     color: var(--muted, #6b7280);
-    margin-right: 6px;
 
     .legend-item {
       display: flex;
       align-items: center;
       gap: 4px;
+      white-space: nowrap;
     }
     .dot {
       width: 7px;
@@ -424,21 +533,49 @@
       &.dot-present { background: #2563eb; }
       &.dot-late { background: #f59e0b; }
       &.dot-absent { background: #ef4444; }
+      &.dot-prev-ghost {
+        background: rgba(148, 163, 184, 0.45);
+        border: 1px dashed #64748b;
+      }
     }
   }
 
   .attendance-graph-content {
-    justify-content: flex-end;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    padding-top: 4px;
+    min-height: 155px;
+  }
+
+  .heartbeat-line-track {
+    width: 100%;
+    height: 12px;
+    overflow: hidden;
+    margin-bottom: 2px;
+    opacity: 0.35;
+    pointer-events: none;
+
+    .ecg-wave-svg {
+      width: 100%;
+      height: 100%;
+    }
+    .ecg-wave-path {
+      fill: none;
+      stroke: #2563eb;
+      stroke-width: 1.5;
+      stroke-dasharray: 6 3;
+    }
   }
 
   .graph-bars {
     display: flex;
     justify-content: space-around;
     align-items: flex-end;
-    height: 100%;
-    min-height: 80px;
-    padding-top: 2px;
+    height: 98px;
     border-bottom: 1px solid var(--border, #e5e7eb);
+    padding-bottom: 4px;
 
     .bar-col {
       display: flex;
@@ -447,38 +584,243 @@
       flex: 1;
       height: 100%;
       justify-content: flex-end;
+      position: relative;
+
+      &.is-today {
+        .active-week-stack {
+          filter: drop-shadow(0 2px 5px rgba(37, 99, 235, 0.35));
+        }
+      }
     }
 
-    .bar-stack {
+    .today-pulse-indicator {
+      position: absolute;
+      top: -8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      .pulse-beacon {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.35);
+        animation: heartbeatPulse 1.4s infinite ease-in-out;
+      }
+    }
+
+    .bar-pair-container {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 3px;
+      height: 80%;
+      width: 100%;
+    }
+
+    // Ghost Previous Week ("the previous week portion will slightly show back in small")
+    .ghost-prev-stack {
+      width: 10px;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 1.5px;
+      height: 100%;
+      justify-content: flex-start;
+      opacity: 0.42;
+      border-radius: 3px;
+      transition: all 0.25s ease;
+
+      &:hover {
+        opacity: 0.75;
+      }
+
+      .seg {
+        border-radius: 2px;
+        min-height: 3px;
+        &.seg-prev-present {
+          background: #93c5fd;
+          border: 1px dashed #3b82f6;
+        }
+        &.seg-prev-late {
+          background: #fde68a;
+          border: 1px dashed #d97706;
+        }
+        &.seg-prev-absent {
+          background: #fca5a5;
+          border: 1px dashed #dc2626;
+        }
+        &.seg-ghost-empty {
+          height: 2px;
+          background: #e2e8f0;
+        }
+      }
+    }
+
+    // Active Highlighted Week
+    .active-week-stack {
       width: 18px;
       display: flex;
       flex-direction: column-reverse;
       gap: 2px;
-      height: 72%;
+      height: 100%;
       justify-content: flex-start;
-    }
+      border-radius: 4px;
+      transition: all 0.25s ease;
 
-    .seg {
-      border-radius: 3px;
-      min-height: 4px;
-      transition: height 0.3s ease;
-      &.seg-present { background: #2563eb; }
-      &.seg-late { background: #f59e0b; }
-      &.seg-absent { background: #ef4444; }
-      &.seg-empty {
-        height: 3px;
-        background: var(--border, #e2e8f0);
-        border-radius: 2px;
+      &.today-bar {
+        transform: scale(1.04);
+      }
+
+      .seg {
+        border-radius: 3px;
+        min-height: 4px;
+        transition: height 0.3s ease;
+        &.seg-present {
+          background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+        }
+        &.seg-late {
+          background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+        }
+        &.seg-absent {
+          background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+        }
+        &.seg-empty {
+          height: 3px;
+          background: var(--border, #e2e8f0);
+          border-radius: 2px;
+        }
       }
     }
 
-    .bar-label {
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--muted, #6b7280);
+    .bar-label-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       margin-top: 3px;
+      gap: 1px;
+
+      .bar-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--muted, #6b7280);
+        text-transform: uppercase;
+
+        &.label-today {
+          color: #2563eb;
+          font-weight: 800;
+        }
+      }
+
+      .bar-day-num {
+        font-size: 9.5px;
+        color: var(--muted, #9ca3af);
+        font-weight: 500;
+
+        &.num-today {
+          color: #2563eb;
+          font-weight: 700;
+        }
+      }
     }
   }
+
+  // Month Progression Rail
+  .month-progression-rail {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 4px 0 4px;
+    font-size: 10px;
+    color: var(--muted, #64748b);
+
+    .rail-title {
+      font-weight: 600;
+      font-size: 10px;
+    }
+
+    .rail-steps {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .rail-step {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 2px 5px;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+
+      .step-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #cbd5e1;
+        transition: all 0.15s ease;
+      }
+
+      .step-label {
+        font-size: 9.5px;
+        font-weight: 600;
+      }
+
+      &.step-active {
+        background: rgba(37, 99, 235, 0.08);
+        color: #2563eb;
+        .step-dot {
+          background: #2563eb;
+          box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+        }
+      }
+
+      &.step-current:not(.step-active) {
+        color: #10b981;
+        .step-dot {
+          background: #10b981;
+        }
+      }
+
+      &.step-past:not(.step-active) {
+        color: #64748b;
+        .step-dot {
+          background: #94a3b8;
+        }
+      }
+    }
+
+    .step-line {
+      width: 14px;
+      height: 2px;
+      background: #e2e8f0;
+      border-radius: 1px;
+
+      &.line-filled {
+        background: #93c5fd;
+      }
+    }
+
+    .fresh-start-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9.5px;
+      font-weight: 600;
+      color: #64748b;
+      background: var(--bg, #f8fafc);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border, #e2e8f0);
+    }
+  }
+}
+
+@keyframes heartbeatPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 // ── 3. Absent Today Card ──

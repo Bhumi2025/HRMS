@@ -333,6 +333,11 @@ export interface AttendanceTrendPoint {
   present: number;
   absent: number;
   late: number;
+  date?: string;
+  weekNumber?: number;
+  prevPresent?: number;
+  prevAbsent?: number;
+  prevLate?: number;
 }
 
 export interface Activity {
