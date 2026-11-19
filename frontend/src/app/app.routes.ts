@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, landingRedirectGuard, superAdminGuard } from './core/guards';
+import { authGuard, landingRedirectGuard, nonEmployeeGuard, superAdminGuard } from './core/guards';
 import { ShellComponent } from './layout/shell.component';
 
 /**
@@ -61,6 +61,7 @@ export const routes: Routes = [
       {
         path: 'dashboard',
         data: { title: 'HRMS Home' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
@@ -73,37 +74,44 @@ export const routes: Routes = [
       {
         path: 'company',
         data: { title: 'Company' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/company.component').then((m) => m.CompanyComponent),
       },
       {
         path: 'employees',
         data: { title: 'Employees' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/employees.component').then((m) => m.EmployeesComponent),
       },
       {
         path: 'employee-profile',
         data: { title: 'Profile' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () =>
           import('./features/hr/employee-profile.component').then((m) => m.EmployeeProfileComponent),
       },
       {
         path: 'onboarding',
         data: { title: 'Onboarding' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/onboarding.component').then((m) => m.OnboardingComponent),
       },
       {
         path: 'leave',
         data: { title: 'Leave Management' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/leave.component').then((m) => m.LeaveComponent),
       },
       {
         path: 'attendance',
         data: { title: 'Attendance' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/attendance.component').then((m) => m.AttendanceComponent),
       },
       {
         path: 'shift',
         data: { title: 'Shift Management' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/shift.component').then((m) => m.ShiftComponent),
       },
       {
@@ -114,21 +122,25 @@ export const routes: Routes = [
       {
         path: 'payroll',
         data: { title: 'Payroll Processing' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/payroll.component').then((m) => m.PayrollComponent),
       },
       {
         path: 'payslips',
         data: { title: 'Payslip' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/payslip.component').then((m) => m.PayslipComponent),
       },
       {
         path: 'documents',
         data: { title: 'Documents' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/documents.component').then((m) => m.DocumentsComponent),
       },
       {
         path: 'approvals',
         data: { title: 'Approvals' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/approvals.component').then((m) => m.ApprovalsComponent),
       },
       {
@@ -139,6 +151,7 @@ export const routes: Routes = [
       {
         path: 'reports',
         data: { title: 'Reports' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/reports.component').then((m) => m.ReportsComponent),
       },
       {
@@ -158,11 +171,13 @@ export const routes: Routes = [
       {
         path: 'settings',
         data: { title: 'Company Settings' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/settings.component').then((m) => m.SettingsComponent),
       },
       {
         path: 'erp',
         data: { title: 'ERP Integration' },
+        canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/erp.component').then((m) => m.ErpComponent),
       },
 

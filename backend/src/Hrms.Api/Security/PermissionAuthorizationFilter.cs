@@ -97,15 +97,34 @@ public sealed class PermissionAuthorizationFilter : IAsyncActionFilter
         bool isCompanyAdmin = roleName.Equals("Company Admin", StringComparison.OrdinalIgnoreCase) ||
                               roleName.Equals("CompanyAdmin", StringComparison.OrdinalIgnoreCase);
 
-        // 4. Employee self-service opt-outs (personal data operations)
+        // 4. Employee self-service opt-outs (personal data operations and read-only lookups)
+        var empClaim = user.FindFirstValue("employeeId");
+        bool isOwnEmployeePath = !string.IsNullOrWhiteSpace(empClaim) &&
+            path.StartsWith($"/api/employees/{empClaim}", StringComparison.OrdinalIgnoreCase);
+
         if (path.StartsWith("/api/employees/me", StringComparison.OrdinalIgnoreCase) ||
+            isOwnEmployeePath ||
             path.StartsWith("/api/attendance/today", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/attendance/punch", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/attendance/punches/today", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/attendance/enrolled-faces", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/attendance/clock-in", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/attendance/clock-out", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/dashboard/me", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/payslips/my", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/payroll/me/payslips", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/notifications", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/profile", StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWith("/api/face-recognition", StringComparison.OrdinalIgnoreCase))
+            path.StartsWith("/api/face-recognition", StringComparison.OrdinalIgnoreCase) ||
+            (context.HttpContext.Request.Method == "GET" && (
+                path.StartsWith("/api/organization/company", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("/api/organization/departments", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("/api/organization/designations", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("/api/organization/branches", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("/api/options/group", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("/api/options/groups", StringComparison.OrdinalIgnoreCase)
+            )) ||
+            (context.HttpContext.Request.Method == "POST" && path.StartsWith("/api/options/multiple", StringComparison.OrdinalIgnoreCase)))
         {
             await next();
             return;
