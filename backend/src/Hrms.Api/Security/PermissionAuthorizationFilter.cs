@@ -99,11 +99,26 @@ public sealed class PermissionAuthorizationFilter : IAsyncActionFilter
 
         // 4. Employee self-service opt-outs (personal data operations and read-only lookups)
         var empClaim = user.FindFirstValue("employeeId");
-        bool isOwnEmployeePath = !string.IsNullOrWhiteSpace(empClaim) &&
-            path.StartsWith($"/api/employees/{empClaim}", StringComparison.OrdinalIgnoreCase);
+        bool isOwnEmployeePath = false;
+        if (!string.IsNullOrWhiteSpace(empClaim))
+        {
+            if (path.StartsWith($"/api/employees/{empClaim}", StringComparison.OrdinalIgnoreCase))
+            {
+                isOwnEmployeePath = true;
+            }
+            else if (path.StartsWith("/api/employees/", StringComparison.OrdinalIgnoreCase))
+            {
+                var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (segments.Length >= 3 && Guid.TryParse(segments[2], out var targetId) && Guid.TryParse(empClaim, out var userEmpId) && targetId == userEmpId)
+                {
+                    isOwnEmployeePath = true;
+                }
+            }
+        }
 
         if (path.StartsWith("/api/employees/me", StringComparison.OrdinalIgnoreCase) ||
             isOwnEmployeePath ||
+            path.StartsWith("/api/documents", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/attendance/today", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/attendance/punch", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/attendance/punches/today", StringComparison.OrdinalIgnoreCase) ||

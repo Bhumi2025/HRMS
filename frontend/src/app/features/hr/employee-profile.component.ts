@@ -1144,6 +1144,9 @@ export class EmployeeProfileComponent implements OnInit {
         this.employeeOptions.set(opts);
         this.reportingOptions = [
           { v: '', l: 'None (Direct Report to Management)' },
+          { v: 'HR Manager', l: 'HR Manager' },
+          { v: 'Manager', l: 'Manager' },
+          { v: 'Company Admin', l: 'Company Admin' },
           ...res.items.map((e) => ({
             v: e.fullName,
             l: `${e.fullName} (${e.employeeCode})`,
@@ -1726,7 +1729,12 @@ export class EmployeeProfileComponent implements OnInit {
   ];
   protected readonly bloodOptions: SelectOption[] = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((b) => ({ v: b, l: b }));
   protected deptOptions: SelectOption[] = [];
-  protected reportingOptions: SelectOption[] = [];
+  protected reportingOptions: SelectOption[] = [
+    { v: '', l: 'None (Direct Report to Management)' },
+    { v: 'HR Manager', l: 'HR Manager' },
+    { v: 'Manager', l: 'Manager' },
+    { v: 'Company Admin', l: 'Company Admin' },
+  ];
   protected readonly countryOptions: SelectOption[] = [
     { v: 'UAE', l: 'UAE' },
     { v: 'Saudi Arabia', l: 'Saudi Arabia' },
