@@ -50,6 +50,8 @@ __screenshots__/
 
 # ── Runtime Uploads & Tenant Media ──
 # Exclude uploaded tenant logos and documents, keep directories intact
+backend/src/Hrms.Api/uploads/*
+!backend/src/Hrms.Api/uploads/.gitkeep
 backend/src/Hrms.Api/wwwroot/uploads/*
 !backend/src/Hrms.Api/wwwroot/uploads/.gitkeep
 backend/src/Hrms.Api/wwwroot/uploads/tenants/*
