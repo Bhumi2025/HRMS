@@ -938,6 +938,15 @@ interface DocRow {
         bottom: 0;
         z-index: 10;
       }
+      .grid-2:has(.csel-open),
+      .grid-2:has(.csel-host-open),
+      .grid-2.has-open-dropdown,
+      .card:has(.csel-open),
+      .card:has(.csel-host-open),
+      .card.has-open-dropdown {
+        position: relative !important;
+        z-index: 50 !important;
+      }
       .tab-action-group {
         display: flex;
         align-items: center;
