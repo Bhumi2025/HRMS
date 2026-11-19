@@ -106,7 +106,8 @@ public sealed class EmployeeService : IEmployeeService
             BankName = string.IsNullOrWhiteSpace(request.BankName) ? null : request.BankName.Trim(),
             AccountName = string.IsNullOrWhiteSpace(request.AccountName) ? null : request.AccountName.Trim(),
             AccountNumber = string.IsNullOrWhiteSpace(request.AccountNumber) ? null : request.AccountNumber.Trim(),
-            Iban = string.IsNullOrWhiteSpace(request.Iban) ? null : request.Iban.Trim(),
+            Iban = string.IsNullOrWhiteSpace(request.Iban) ? request.IfscCode?.Trim() : request.Iban.Trim(),
+            IfscCode = string.IsNullOrWhiteSpace(request.IfscCode) ? request.Iban?.Trim() : request.IfscCode.Trim(),
             PaymentMode = request.PaymentMode ?? PaymentMode.BankTransfer,
         };
 

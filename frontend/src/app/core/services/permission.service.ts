@@ -156,7 +156,7 @@ export class PermissionService {
 
   hasModuleAccess(moduleName: string): boolean {
     const role = this.session.activeRole();
-    if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
     const key = this.normKey(moduleName);
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canView : false;
@@ -164,7 +164,7 @@ export class PermissionService {
 
   canCreate(moduleName: string): boolean {
     const role = this.session.activeRole();
-    if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
     const key = this.normKey(moduleName);
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canCreate : false;
@@ -172,7 +172,7 @@ export class PermissionService {
 
   canEdit(moduleName: string): boolean {
     const role = this.session.activeRole();
-    if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
     const key = this.normKey(moduleName);
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canEdit : false;
@@ -181,6 +181,7 @@ export class PermissionService {
   canDelete(moduleName: string): boolean {
     const role = this.session.activeRole();
     if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (role === 'HR Manager' && moduleName !== 'Company') return true;
     const key = this.normKey(moduleName);
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canDelete : false;

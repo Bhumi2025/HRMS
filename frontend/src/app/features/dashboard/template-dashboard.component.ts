@@ -172,7 +172,30 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     const list = this.attendanceGraph();
     if (!list || list.length === 0) return [];
 
-    const totalDays = list.length;
+    const todayDate = this.currentTime();
+    const todayY = todayDate.getFullYear();
+    const todayM = todayDate.getMonth() + 1;
+    const todayD = todayDate.getDate();
+    const todayZero = new Date(todayY, todayM - 1, todayD).getTime();
+
+    // Requirement: Show only past dates and today (present date) along with its specific graph
+    const filteredList = list.filter((p, idx) => {
+      let pDate: Date | null = null;
+      if (p.date) {
+        const parts = p.date.split('-');
+        if (parts.length === 3) {
+          pDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        }
+      } else {
+        const [yStr, mStr] = this.selectedMonthKey().split('-');
+        pDate = new Date(parseInt(yStr, 10), parseInt(mStr, 10) - 1, idx + 1);
+      }
+      return pDate ? pDate.getTime() <= todayZero : true;
+    });
+
+    if (filteredList.length === 0) return [];
+
+    const totalDays = filteredList.length;
     const maxVal = this.chartMaxScale() || 1.5;
     const plotLeft = 40;
     const plotRight = 745;
@@ -182,14 +205,12 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     const plotHeight = baselineY - topY;
     const scale = plotHeight / maxVal;
     const stepX = plotWidth / totalDays;
-    const barWidth = Math.min(18, Math.max(9, Math.round(stepX * 0.55 * 10) / 10));
+    const barWidth = Math.min(22, Math.max(12, Math.round(stepX * 0.52 * 10) / 10));
 
-    const todayDate = this.currentTime();
-    const todayY = todayDate.getFullYear();
-    const todayM = todayDate.getMonth() + 1;
-    const todayD = todayDate.getDate();
+    // Dynamic punch breakdown for present day
+    const livePunch = this.punchService.todayPunchBreakdown();
 
-    return list.map((p, idx) => {
+    return filteredList.map((p, idx) => {
       const cx = Math.round((plotLeft + (idx + 0.5) * stepX) * 10) / 10;
       const barX = Math.round((cx - barWidth / 2) * 10) / 10;
 
@@ -216,10 +237,33 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
         formattedDate = `${mStr}/${dayNumber}/${yStr}`;
       }
 
-      const beforeBreak = p.beforeBreakHours || 0;
-      const breakHrs = p.breakHours || 0;
-      const afterBreak = p.afterBreakHours || 0;
-      const missing = p.missingHours || 0;
+      let beforeBreak = p.beforeBreakHours || 0;
+      let breakHrs = p.breakHours || 0;
+      let afterBreak = p.afterBreakHours || 0;
+      let missing = p.missingHours || 0;
+
+      // When today, dynamically update based on punches and live elapsed time
+      if (isToday) {
+        if (livePunch.hasPunched) {
+          beforeBreak = livePunch.beforeBreakHours;
+          breakHrs = livePunch.breakHours;
+          afterBreak = livePunch.afterBreakHours;
+          missing = livePunch.missingHours;
+        } else if ((p.beforeBreakHours ?? 0) > 0 || (p.breakHours ?? 0) > 0 || (p.afterBreakHours ?? 0) > 0) {
+          // Keep backend values if present
+          beforeBreak = p.beforeBreakHours ?? 0;
+          breakHrs = p.breakHours ?? 0;
+          afterBreak = p.afterBreakHours ?? 0;
+          missing = p.missingHours ?? 0;
+        } else {
+          // No punches recorded yet today
+          beforeBreak = 0;
+          breakHrs = 0;
+          afterBreak = 0;
+          missing = 0;
+        }
+      }
+
       const totalHours = Math.round((beforeBreak + breakHrs + afterBreak + missing) * 10) / 10;
 
       const hBefore = Math.round(beforeBreak * scale * 10) / 10;

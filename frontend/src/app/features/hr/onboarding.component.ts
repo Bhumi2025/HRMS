@@ -40,13 +40,8 @@ interface AccountItem {
       }
     </div>
 
-    <!-- Progress -->
-    <div class="progress" style="margin-bottom: 24px; height: 4px">
-      <div class="progress-bar" [style.width.%]="progress()"></div>
-    </div>
-
     <!-- Card -->
-    <div class="ob-card">
+    <div class="ob-card" style="margin-top: 16px;">
       <div class="ob-card-header">
         <div class="ob-card-icon"><span [appIcon]="steps[step()].icon"></span></div>
         <div>
@@ -161,12 +156,12 @@ interface AccountItem {
               <input class="form-control" placeholder="Software Engineer" [value]="job().jobTitle" (input)="patchJ('jobTitle', $any($event.target).value)" />
             </div>
             <div class="form-group">
-              <label class="form-label">Designation</label>
-              <app-select [options]="designationOptions()" [value]="job().designationId" (valueChange)="patchJ('designationId', $event)" width="100%" />
-            </div>
-            <div class="form-group">
               <label class="form-label">Department<span class="req">*</span></label>
               <app-select [options]="deptOptions()" [value]="job().department" (valueChange)="patchJ('department', $event)" width="100%" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Designation</label>
+              <app-select [options]="designationOptions()" [value]="job().designationId" (valueChange)="patchJ('designationId', $event)" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">Grade</label>
@@ -207,22 +202,6 @@ interface AccountItem {
               <input class="form-control" placeholder="$0.00" [value]="salary().basicSalary" (input)="patchS('basicSalary', $any($event.target).value)" />
             </div>
             <div class="form-group">
-              <label class="form-label">Housing Allowance</label>
-              <input class="form-control" placeholder="$0.00" [value]="salary().housingAllowance" (input)="patchS('housingAllowance', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Transport Allowance</label>
-              <input class="form-control" placeholder="$0.00" [value]="salary().transportAllowance" (input)="patchS('transportAllowance', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Mobile Allowance</label>
-              <input class="form-control" placeholder="$0.00" [value]="salary().mobileAllowance" (input)="patchS('mobileAllowance', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Other Allowances</label>
-              <input class="form-control" placeholder="$0.00" [value]="salary().otherAllowances" (input)="patchS('otherAllowances', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
               <label class="form-label">Payment Mode</label>
               <app-key-select groupCode="PAYMENT_MODE" [value]="salary().paymentMode" (valueChange)="patchS('paymentMode', $event)" width="100%" />
             </div>
@@ -235,8 +214,8 @@ interface AccountItem {
               <input class="form-control" placeholder="1234567890" [value]="salary().accountNumber" (input)="patchS('accountNumber', $any($event.target).value)" />
             </div>
             <div class="form-group">
-              <label class="form-label">IBAN</label>
-              <input class="form-control" placeholder="AE07 0331 2345 6789 0123 456" [value]="salary().iban" (input)="patchS('iban', $any($event.target).value)" />
+              <label class="form-label">IFSC Code</label>
+              <input class="form-control" placeholder="e.g. HDFC0001234" [value]="salary().ifscCode" (input)="patchS('ifscCode', $any($event.target).value)" />
             </div>
           </div>
         }
@@ -1036,8 +1015,27 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   protected readonly faceModalMsg = signal('Align face within the frame and click Capture Face');
 
   private departmentIds = new Map<string, string>();
+  private managerMap = new Map<string, string>();
+  protected readonly allDesignations = signal<any[]>([]);
   protected readonly deptOptions = signal<SelectOption[]>([]);
-  protected readonly designationOptions = signal<SelectOption[]>([]);
+  protected readonly designationOptions = computed<SelectOption[]>(() => {
+    const list = this.allDesignations();
+    const currentDeptName = this.job().department;
+    const currentDeptId = this.departmentIds.get(currentDeptName);
+
+    const filtered = list.filter((d: any) => {
+      if (currentDeptId && d.departmentId) {
+        return d.departmentId.toLowerCase() === currentDeptId.toLowerCase();
+      }
+      if (currentDeptName && d.department) {
+        return d.department.toLowerCase() === currentDeptName.toLowerCase();
+      }
+      return false;
+    });
+
+    const toUse = filtered.length > 0 ? filtered : list;
+    return toUse.map((d: any) => ({ v: d.id, l: d.name }));
+  });
 
   ngOnInit(): void {
     this.api.departments().subscribe({
@@ -1059,24 +1057,31 @@ export class OnboardingComponent implements OnInit, OnDestroy {
 
     this.api.designations().subscribe({
       next: (list) => {
-        const opts = (list || []).map((d) => ({ v: d.id, l: d.name }));
-        this.designationOptions.set(opts);
+        this.allDesignations.set(list || []);
+        const opts = this.designationOptions();
         if (opts.length > 0 && !this.job().designationId) {
           this.job.update((j) => ({ ...j, designationId: opts[0].v }));
         }
       },
-      error: () => this.designationOptions.set([]),
+      error: () => this.allDesignations.set([]),
     });
 
     this.api.employees({ pageSize: 100 }).subscribe({
       next: (res) => {
-        const emps = (res.items || []).map((e) => ({
+        const items = res.items || [];
+        this.managerMap = new Map(items.map((e) => [e.fullName, e.id]));
+        const emps = items.map((e) => ({
           v: e.fullName,
           l: e.fullName,
         }));
-        this.managerOptions.set(emps);
+        this.managerOptions.set([
+          { v: 'Company Admin', l: 'Company Admin' },
+          ...emps,
+        ]);
       },
-      error: () => {},
+      error: () => {
+        this.managerOptions.set([{ v: 'Company Admin', l: 'Company Admin' }]);
+      },
     });
   }
 
@@ -1137,14 +1142,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
 
   protected readonly salary = signal({
     basicSalary: '',
-    housingAllowance: '',
-    transportAllowance: '',
-    mobileAllowance: '',
-    otherAllowances: '',
     paymentMode: 'Bank Transfer',
     bankName: '',
     accountNumber: '',
-    iban: '',
+    ifscCode: '',
   });
 
   protected readonly accountForm = signal({
@@ -1156,7 +1157,6 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   protected readonly roleOptions: SelectOption[] = [
     { v: 'Employee', l: 'Employee (Self-Service Portal)' },
     { v: 'HrManager', l: 'HR Manager' },
-    { v: 'CompanyAdmin', l: 'Company Admin' },
   ];
 
   protected readonly systemAccessDone = computed(() => this.accountForm().password.trim().length >= 6);
@@ -1201,14 +1201,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
 
   protected readonly salaryReview: [string, keyof ReturnType<typeof this.salary>][] = [
     ['Basic Salary', 'basicSalary'],
-    ['Housing Allowance', 'housingAllowance'],
-    ['Transport Allowance', 'transportAllowance'],
-    ['Mobile Allowance', 'mobileAllowance'],
-    ['Other Allowances', 'otherAllowances'],
     ['Payment Mode', 'paymentMode'],
     ['Bank Name', 'bankName'],
     ['Account Number', 'accountNumber'],
-    ['IBAN', 'iban'],
+    ['IFSC Code', 'ifscCode'],
   ];
 
   protected readonly genderOptions: SelectOption[] = [
@@ -1230,7 +1226,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     { v: 'Part-time', l: 'Part-time' },
     { v: 'Contract', l: 'Contract' },
   ];
-  protected readonly managerOptions = signal<SelectOption[]>([]);
+  protected readonly managerOptions = signal<SelectOption[]>([{ v: 'Company Admin', l: 'Company Admin' }]);
   protected readonly shiftOptions: SelectOption[] = [
     { v: 'Morning (9AM - 6PM)', l: 'Morning (9AM - 6PM)' },
     { v: 'Evening', l: 'Evening' },
@@ -1258,7 +1254,22 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   }
 
   protected patchJ(key: keyof ReturnType<typeof this.job>, value: string): void {
-    this.job.update((j) => ({ ...j, [key]: value }));
+    this.job.update((j) => {
+      const next = { ...j, [key]: value };
+      if (key === 'department') {
+        const deptId = this.departmentIds.get(value);
+        const matching = this.allDesignations().filter((d: any) =>
+          (deptId && d.departmentId?.toLowerCase() === deptId.toLowerCase()) ||
+          (d.department && d.department.toLowerCase() === value.toLowerCase())
+        );
+        if (matching.length > 0) {
+          next.designationId = matching[0].id;
+        } else {
+          next.designationId = '';
+        }
+      }
+      return next;
+    });
     if ((key === 'department' || key === 'jobTitle') && /\bhr\b|human resources/i.test(value)) {
       if (this.accountForm().role === 'Employee') {
         this.accountForm.update((a) => ({ ...a, role: 'HrManager' }));
@@ -1279,6 +1290,22 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) return;
     const file = input.files[0];
+
+    const maxSizeBytes = 10 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      this.toast.show('Document file size exceeds the 10MB limit.', 'danger');
+      input.value = '';
+      return;
+    }
+
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'];
+    if (!allowed.includes(ext)) {
+      this.toast.show(`File format '${ext}' is not supported. Please upload PDF, JPG, PNG or DOC.`, 'danger');
+      input.value = '';
+      return;
+    }
+
     this.uploaded.update((set) => new Set(set).add(name));
     this.toast.show(`${name} (${file.name}) uploaded!`, 'success');
     input.value = '';
@@ -1374,16 +1401,16 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       designationId: job.designationId || null,
       branchId: null,
       shiftId: null,
-      reportingManagerId: null,
+      reportingManagerId: this.managerMap.get(job.reportingManager) || null,
       jobTitle: job.jobTitle.trim() || 'Employee',
       grade: job.grade || 'L3',
       employmentType: this.employmentType(job.employmentType),
       joinDate: this.toIso(job.joinDate) ?? new Date().toISOString().slice(0, 10),
       basicSalary: this.numeric(salary.basicSalary),
-      housingAllowance: this.numeric(salary.housingAllowance),
-      transportAllowance: this.numeric(salary.transportAllowance),
-      mobileAllowance: this.numeric(salary.mobileAllowance),
-      otherAllowances: this.numeric(salary.otherAllowances),
+      housingAllowance: 0,
+      transportAllowance: 0,
+      mobileAllowance: 0,
+      otherAllowances: 0,
       currency: 'USD',
       dateOfBirth: this.toIso(personal.dob),
       gender: this.mapGender(personal.gender),
@@ -1396,7 +1423,8 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       bankName: salary.bankName.trim() || null,
       accountName: `${personal.firstName} ${personal.lastName}`.trim() || null,
       accountNumber: salary.accountNumber.trim() || null,
-      iban: salary.iban.trim() || null,
+      iban: salary.ifscCode.trim() || null,
+      ifscCode: salary.ifscCode.trim() || null,
       paymentMode: this.paymentMode(salary.paymentMode),
       password: account.password.trim() || 'Emp@12345',
       roleCode: account.role || 'Employee',
