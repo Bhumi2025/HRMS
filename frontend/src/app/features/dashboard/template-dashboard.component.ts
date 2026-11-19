@@ -415,6 +415,7 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     setTimeout(() => {
       this.loadData();
       this.notifState.refresh();
+      this.punchService.loadTodayPunches();
     }, 1200);
   }
 
@@ -423,6 +424,7 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     setTimeout(() => {
       this.loadData();
       this.notifState.refresh();
+      this.punchService.loadTodayPunches();
     }, 1200);
   }
 
@@ -431,6 +433,7 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     setTimeout(() => {
       this.loadData();
       this.notifState.refresh();
+      this.punchService.loadTodayPunches();
     }, 1200);
   }
 
