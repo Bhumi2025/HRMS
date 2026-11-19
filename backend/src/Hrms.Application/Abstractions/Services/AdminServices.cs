@@ -68,13 +68,27 @@ public interface IOrganizationService
 
     Task DeleteBranchAsync(Guid id, CancellationToken ct = default);
 
-    Task<IReadOnlyList<HolidayDto>> GetHolidaysAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<HolidayDto>> GetHolidaysAsync(Guid? templateId = null, CancellationToken ct = default);
 
     Task<HolidayDto> CreateHolidayAsync(SaveHolidayRequest request, CancellationToken ct = default);
 
     Task<HolidayDto> UpdateHolidayAsync(Guid id, SaveHolidayRequest request, CancellationToken ct = default);
 
     Task DeleteHolidayAsync(Guid id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<HolidayTemplateDto>> GetHolidayTemplatesAsync(CancellationToken ct = default);
+
+    Task<HolidayTemplateDto> CreateHolidayTemplateAsync(SaveHolidayTemplateRequest request, CancellationToken ct = default);
+
+    Task<HolidayTemplateDto> UpdateHolidayTemplateAsync(Guid id, SaveHolidayTemplateRequest request, CancellationToken ct = default);
+
+    Task DeleteHolidayTemplateAsync(Guid id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<HolidayTemplateAssignmentDto>> GetHolidayTemplateAssignmentsAsync(CancellationToken ct = default);
+
+    Task<HolidayTemplateAssignmentDto> CreateHolidayTemplateAssignmentAsync(SaveHolidayTemplateAssignmentRequest request, CancellationToken ct = default);
+
+    Task DeleteHolidayTemplateAssignmentAsync(Guid id, CancellationToken ct = default);
 
     Task<IReadOnlyList<ShiftDto>> GetShiftsAsync(CancellationToken ct = default);
 

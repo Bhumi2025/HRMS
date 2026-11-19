@@ -596,6 +596,32 @@ export interface HolidayDto {
   date: string;
   dayLabel: string;
   type: string;
+  holidayTemplateId?: string | null;
+  templateName?: string | null;
+  description?: string | null;
+  icon?: string | null;
+}
+
+export interface HolidayTemplateDto {
+  id: string;
+  name: string;
+  description?: string | null;
+  isDefault: boolean;
+  holidayCount: number;
+  assignmentCount: number;
+  holidays?: HolidayDto[] | null;
+}
+
+export interface HolidayTemplateAssignmentDto {
+  id: string;
+  holidayTemplateId: string;
+  templateName: string;
+  departmentId?: string | null;
+  departmentName?: string | null;
+  branchId?: string | null;
+  branchName?: string | null;
+  employeeId?: string | null;
+  employeeName?: string | null;
 }
 
 export interface ShiftDto {

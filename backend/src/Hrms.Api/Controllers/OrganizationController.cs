@@ -160,8 +160,8 @@ public sealed class OrganizationController : ControllerBase
     // ── Holidays ──
     [HttpGet("holidays")]
     [ProducesResponseType(typeof(IReadOnlyList<HolidayDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<HolidayDto>>> Holidays(CancellationToken ct) =>
-        Ok(await _organization.GetHolidaysAsync(ct));
+    public async Task<ActionResult<IReadOnlyList<HolidayDto>>> Holidays([FromQuery] Guid? templateId, CancellationToken ct) =>
+        Ok(await _organization.GetHolidaysAsync(templateId, ct));
 
     [HttpPost("holidays")]
     [Authorize(Policy = "HrAdmin")]
@@ -189,6 +189,67 @@ public sealed class OrganizationController : ControllerBase
     public async Task<IActionResult> DeleteHoliday(Guid id, CancellationToken ct)
     {
         await _organization.DeleteHolidayAsync(id, ct);
+        return NoContent();
+    }
+
+    // ── Holiday Templates ──
+    [HttpGet("holiday-templates")]
+    [ProducesResponseType(typeof(IReadOnlyList<HolidayTemplateDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<HolidayTemplateDto>>> HolidayTemplates(CancellationToken ct) =>
+        Ok(await _organization.GetHolidayTemplatesAsync(ct));
+
+    [HttpPost("holiday-templates")]
+    [Authorize(Policy = "HrAdmin")]
+    [ProducesResponseType(typeof(HolidayTemplateDto), StatusCodes.Status201Created)]
+    public async Task<ActionResult<HolidayTemplateDto>> CreateHolidayTemplate(
+        [FromBody] SaveHolidayTemplateRequest request,
+        CancellationToken ct)
+    {
+        var created = await _organization.CreateHolidayTemplateAsync(request, ct);
+        return CreatedAtAction(nameof(HolidayTemplates), created);
+    }
+
+    [HttpPut("holiday-templates/{id:guid}")]
+    [Authorize(Policy = "HrAdmin")]
+    [ProducesResponseType(typeof(HolidayTemplateDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<HolidayTemplateDto>> UpdateHolidayTemplate(
+        Guid id,
+        [FromBody] SaveHolidayTemplateRequest request,
+        CancellationToken ct) =>
+        Ok(await _organization.UpdateHolidayTemplateAsync(id, request, ct));
+
+    [HttpDelete("holiday-templates/{id:guid}")]
+    [Authorize(Policy = "HrAdmin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteHolidayTemplate(Guid id, CancellationToken ct)
+    {
+        await _organization.DeleteHolidayTemplateAsync(id, ct);
+        return NoContent();
+    }
+
+    // ── Holiday Template Assignments ──
+    [HttpGet("holiday-template-assignments")]
+    [ProducesResponseType(typeof(IReadOnlyList<HolidayTemplateAssignmentDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<HolidayTemplateAssignmentDto>>> HolidayTemplateAssignments(CancellationToken ct) =>
+        Ok(await _organization.GetHolidayTemplateAssignmentsAsync(ct));
+
+    [HttpPost("holiday-template-assignments")]
+    [Authorize(Policy = "HrAdmin")]
+    [ProducesResponseType(typeof(HolidayTemplateAssignmentDto), StatusCodes.Status201Created)]
+    public async Task<ActionResult<HolidayTemplateAssignmentDto>> CreateHolidayTemplateAssignment(
+        [FromBody] SaveHolidayTemplateAssignmentRequest request,
+        CancellationToken ct)
+    {
+        var created = await _organization.CreateHolidayTemplateAssignmentAsync(request, ct);
+        return CreatedAtAction(nameof(HolidayTemplateAssignments), created);
+    }
+
+    [HttpDelete("holiday-template-assignments/{id:guid}")]
+    [Authorize(Policy = "HrAdmin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteHolidayTemplateAssignment(Guid id, CancellationToken ct)
+    {
+        await _organization.DeleteHolidayTemplateAssignmentAsync(id, ct);
         return NoContent();
     }
 

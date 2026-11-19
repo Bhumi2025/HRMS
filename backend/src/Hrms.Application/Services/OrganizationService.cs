@@ -206,12 +206,26 @@ public sealed class OrganizationService : IOrganizationService
     }
 
     // ── Holidays ──
-    public async Task<IReadOnlyList<HolidayDto>> GetHolidaysAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<HolidayDto>> GetHolidaysAsync(Guid? templateId = null, CancellationToken ct = default)
     {
+        var q = _uow.Holidays.Query();
+        if (templateId.HasValue)
+        {
+            q = q.Where(h => h.HolidayTemplateId == templateId.Value);
+        }
+
         return await _uow.Holidays.ToListAsync(
-            _uow.Holidays.Query()
-                .OrderBy(h => h.Date)
-                .Select(h => new HolidayDto(h.Id, h.Name, h.Date, h.Date.DayOfWeek.ToString(), h.Type.ToString())),
+            q.OrderBy(h => h.Date)
+             .Select(h => new HolidayDto(
+                 h.Id,
+                 h.Name,
+                 h.Date,
+                 h.Date.DayOfWeek.ToString(),
+                 h.Type.ToString(),
+                 h.HolidayTemplateId,
+                 h.HolidayTemplate != null ? h.HolidayTemplate.Name : null,
+                 h.Description,
+                 h.Icon)),
             ct);
     }
 
@@ -222,11 +236,31 @@ public sealed class OrganizationService : IOrganizationService
             Name = request.Name.Trim(),
             Date = request.Date,
             Type = request.Type,
+            HolidayTemplateId = request.HolidayTemplateId,
+            Description = request.Description?.Trim(),
+            Icon = request.Icon ?? "calendar",
         };
 
         await _uow.Holidays.AddAsync(holiday, ct);
         await _uow.SaveChangesAsync(ct);
-        return new HolidayDto(holiday.Id, holiday.Name, holiday.Date, holiday.Date.DayOfWeek.ToString(), holiday.Type.ToString());
+
+        string? tmplName = null;
+        if (holiday.HolidayTemplateId.HasValue)
+        {
+            var tmpl = await _uow.HolidayTemplates.GetByIdAsync(holiday.HolidayTemplateId.Value, ct);
+            tmplName = tmpl?.Name;
+        }
+
+        return new HolidayDto(
+            holiday.Id,
+            holiday.Name,
+            holiday.Date,
+            holiday.Date.DayOfWeek.ToString(),
+            holiday.Type.ToString(),
+            holiday.HolidayTemplateId,
+            tmplName,
+            holiday.Description,
+            holiday.Icon);
     }
 
     public async Task<HolidayDto> UpdateHolidayAsync(Guid id, SaveHolidayRequest request, CancellationToken ct = default)
@@ -237,10 +271,30 @@ public sealed class OrganizationService : IOrganizationService
         holiday.Name = request.Name.Trim();
         holiday.Date = request.Date;
         holiday.Type = request.Type;
+        holiday.HolidayTemplateId = request.HolidayTemplateId;
+        holiday.Description = request.Description?.Trim();
+        if (!string.IsNullOrWhiteSpace(request.Icon)) holiday.Icon = request.Icon;
 
         _uow.Holidays.Update(holiday);
         await _uow.SaveChangesAsync(ct);
-        return new HolidayDto(holiday.Id, holiday.Name, holiday.Date, holiday.Date.DayOfWeek.ToString(), holiday.Type.ToString());
+
+        string? tmplName = null;
+        if (holiday.HolidayTemplateId.HasValue)
+        {
+            var tmpl = await _uow.HolidayTemplates.GetByIdAsync(holiday.HolidayTemplateId.Value, ct);
+            tmplName = tmpl?.Name;
+        }
+
+        return new HolidayDto(
+            holiday.Id,
+            holiday.Name,
+            holiday.Date,
+            holiday.Date.DayOfWeek.ToString(),
+            holiday.Type.ToString(),
+            holiday.HolidayTemplateId,
+            tmplName,
+            holiday.Description,
+            holiday.Icon);
     }
 
     public async Task DeleteHolidayAsync(Guid id, CancellationToken ct = default)
@@ -249,6 +303,166 @@ public sealed class OrganizationService : IOrganizationService
                       ?? throw NotFoundException.For("Holiday", id);
 
         _uow.Holidays.Remove(holiday);
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    // ── Holiday Templates ──
+    public async Task<IReadOnlyList<HolidayTemplateDto>> GetHolidayTemplatesAsync(CancellationToken ct = default)
+    {
+        return await _uow.HolidayTemplates.ToListAsync(
+            _uow.HolidayTemplates.Query()
+                .OrderByDescending(t => t.IsDefault)
+                .ThenBy(t => t.Name)
+                .Select(t => new HolidayTemplateDto(
+                    t.Id,
+                    t.Name,
+                    t.Description,
+                    t.IsDefault,
+                    t.Holidays.Count,
+                    t.Assignments.Count,
+                    null)),
+            ct);
+    }
+
+    public async Task<HolidayTemplateDto> CreateHolidayTemplateAsync(SaveHolidayTemplateRequest request, CancellationToken ct = default)
+    {
+        var template = new HolidayTemplate
+        {
+            Name = request.Name.Trim(),
+            Description = request.Description?.Trim(),
+            IsDefault = request.IsDefault,
+        };
+
+        if (request.IsDefault)
+        {
+            var existingDefaults = await _uow.HolidayTemplates.ToListAsync(
+                _uow.HolidayTemplates.Query().Where(t => t.IsDefault),
+                ct);
+            foreach (var d in existingDefaults)
+            {
+                d.IsDefault = false;
+                _uow.HolidayTemplates.Update(d);
+            }
+        }
+
+        await _uow.HolidayTemplates.AddAsync(template, ct);
+        await _uow.SaveChangesAsync(ct);
+        return new HolidayTemplateDto(template.Id, template.Name, template.Description, template.IsDefault, 0, 0, null);
+    }
+
+    public async Task<HolidayTemplateDto> UpdateHolidayTemplateAsync(Guid id, SaveHolidayTemplateRequest request, CancellationToken ct = default)
+    {
+        var template = await _uow.HolidayTemplates.GetByIdAsync(id, ct)
+                       ?? throw NotFoundException.For("HolidayTemplate", id);
+
+        template.Name = request.Name.Trim();
+        template.Description = request.Description?.Trim();
+
+        if (request.IsDefault && !template.IsDefault)
+        {
+            var existingDefaults = await _uow.HolidayTemplates.ToListAsync(
+                _uow.HolidayTemplates.Query().Where(t => t.IsDefault && t.Id != id),
+                ct);
+            foreach (var d in existingDefaults)
+            {
+                d.IsDefault = false;
+                _uow.HolidayTemplates.Update(d);
+            }
+        }
+        template.IsDefault = request.IsDefault;
+
+        _uow.HolidayTemplates.Update(template);
+        await _uow.SaveChangesAsync(ct);
+
+        var holidayCount = await _uow.Holidays.CountQueryAsync(_uow.Holidays.Query().Where(h => h.HolidayTemplateId == id), ct);
+        var assignmentCount = await _uow.HolidayTemplateAssignments.CountQueryAsync(_uow.HolidayTemplateAssignments.Query().Where(a => a.HolidayTemplateId == id), ct);
+
+        return new HolidayTemplateDto(template.Id, template.Name, template.Description, template.IsDefault, holidayCount, assignmentCount, null);
+    }
+
+    public async Task DeleteHolidayTemplateAsync(Guid id, CancellationToken ct = default)
+    {
+        var template = await _uow.HolidayTemplates.GetByIdAsync(id, ct)
+                       ?? throw NotFoundException.For("HolidayTemplate", id);
+
+        _uow.HolidayTemplates.Remove(template);
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    // ── Holiday Template Assignments ──
+    public async Task<IReadOnlyList<HolidayTemplateAssignmentDto>> GetHolidayTemplateAssignmentsAsync(CancellationToken ct = default)
+    {
+        return await _uow.HolidayTemplateAssignments.ToListAsync(
+            _uow.HolidayTemplateAssignments.Query()
+                .OrderBy(a => a.HolidayTemplate != null ? a.HolidayTemplate.Name : "")
+                .Select(a => new HolidayTemplateAssignmentDto(
+                    a.Id,
+                    a.HolidayTemplateId,
+                    a.HolidayTemplate != null ? a.HolidayTemplate.Name : string.Empty,
+                    a.DepartmentId,
+                    a.Department != null ? a.Department.Name : null,
+                    a.BranchId,
+                    a.Branch != null ? a.Branch.Name : null,
+                    a.EmployeeId,
+                    a.Employee != null ? (a.Employee.FirstName + " " + a.Employee.LastName) : null)),
+            ct);
+    }
+
+    public async Task<HolidayTemplateAssignmentDto> CreateHolidayTemplateAssignmentAsync(SaveHolidayTemplateAssignmentRequest request, CancellationToken ct = default)
+    {
+        var template = await _uow.HolidayTemplates.GetByIdAsync(request.HolidayTemplateId, ct)
+                       ?? throw NotFoundException.For("HolidayTemplate", request.HolidayTemplateId);
+
+        var assignment = new HolidayTemplateAssignment
+        {
+            HolidayTemplateId = request.HolidayTemplateId,
+            DepartmentId = request.DepartmentId,
+            BranchId = request.BranchId,
+            EmployeeId = request.EmployeeId,
+        };
+
+        await _uow.HolidayTemplateAssignments.AddAsync(assignment, ct);
+        await _uow.SaveChangesAsync(ct);
+
+        string? deptName = null;
+        if (request.DepartmentId.HasValue)
+        {
+            var dept = await _uow.Departments.GetByIdAsync(request.DepartmentId.Value, ct);
+            deptName = dept?.Name;
+        }
+
+        string? branchName = null;
+        if (request.BranchId.HasValue)
+        {
+            var branch = await _uow.Branches.GetByIdAsync(request.BranchId.Value, ct);
+            branchName = branch?.Name;
+        }
+
+        string? empName = null;
+        if (request.EmployeeId.HasValue)
+        {
+            var emp = await _uow.Employees.GetByIdAsync(request.EmployeeId.Value, ct);
+            if (emp != null) empName = $"{emp.FirstName} {emp.LastName}";
+        }
+
+        return new HolidayTemplateAssignmentDto(
+            assignment.Id,
+            template.Id,
+            template.Name,
+            assignment.DepartmentId,
+            deptName,
+            assignment.BranchId,
+            branchName,
+            assignment.EmployeeId,
+            empName);
+    }
+
+    public async Task DeleteHolidayTemplateAssignmentAsync(Guid id, CancellationToken ct = default)
+    {
+        var assignment = await _uow.HolidayTemplateAssignments.GetByIdAsync(id, ct)
+                         ?? throw NotFoundException.For("HolidayTemplateAssignment", id);
+
+        _uow.HolidayTemplateAssignments.Remove(assignment);
         await _uow.SaveChangesAsync(ct);
     }
 
