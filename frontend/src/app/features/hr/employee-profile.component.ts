@@ -332,13 +332,15 @@ interface DocRow {
       </div>
 
       <div class="tab-action-bar">
-        <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
-          <span [appIcon]="'arrow-left'"></span> Back
+        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
+          <span [appIcon]="'arrow_left'"></span> Back
         </button>
         <div class="tab-action-group">
-          <button class="btn btn-outline btn-sm" type="button" (click)="cancelEdit()">Discard</button>
-          <button class="btn btn-primary btn-sm" type="button" (click)="save('Personal & Job details saved!')">
+          <button class="btn btn-outline btn-sm" type="button" (click)="save('Personal & Job details saved!')">
             <span [appIcon]="'check'"></span> Save Changes
+          </button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="saveAndNext('Personal & Job details saved!')">
+            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
           </button>
         </div>
       </div>
@@ -405,13 +407,15 @@ interface DocRow {
       </div>
 
       <div class="tab-action-bar">
-        <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
-          <span [appIcon]="'arrow-left'"></span> Back
+        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
+          <span [appIcon]="'arrow_left'"></span> Back
         </button>
         <div class="tab-action-group">
-          <button class="btn btn-outline btn-sm" type="button" (click)="cancelEdit()">Discard</button>
-          <button class="btn btn-primary btn-sm" type="button" (click)="save('Contact & Identity details saved!')">
+          <button class="btn btn-outline btn-sm" type="button" (click)="save('Contact & Identity details saved!')">
             <span [appIcon]="'check'"></span> Save Changes
+          </button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="saveAndNext('Contact & Identity details saved!')">
+            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
           </button>
         </div>
       </div>
@@ -480,13 +484,15 @@ interface DocRow {
       </div>
 
       <div class="tab-action-bar">
-        <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
-          <span [appIcon]="'arrow-left'"></span> Back
+        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
+          <span [appIcon]="'arrow_left'"></span> Back
         </button>
         <div class="tab-action-group">
-          <button class="btn btn-outline btn-sm" type="button" (click)="cancelEdit()">Discard</button>
-          <button class="btn btn-primary btn-sm" type="button" (click)="save('Bank details saved!')">
+          <button class="btn btn-outline btn-sm" type="button" (click)="save('Bank details saved!')">
             <span [appIcon]="'check'"></span> Save Changes
+          </button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="saveAndNext('Bank details saved!')">
+            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
           </button>
         </div>
       </div>
@@ -534,12 +540,17 @@ interface DocRow {
       </div>
 
       <div class="tab-action-bar">
-        <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
-          <span [appIcon]="'arrow-left'"></span> Back
+        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
+          <span [appIcon]="'arrow_left'"></span> Back
         </button>
-        <button class="btn btn-primary btn-sm" (click)="ui.open('uploadDocModal')">
-          <span [appIcon]="'upload2'"></span> Upload Document
-        </button>
+        <div class="tab-action-group">
+          <button class="btn btn-outline btn-sm" type="button" (click)="save('Document records saved!')">
+            <span [appIcon]="'check'"></span> Save Changes
+          </button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="nextTab()">
+            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
+          </button>
+        </div>
       </div>
     }
 
@@ -570,8 +581,19 @@ interface DocRow {
               </div>
             </div>
 
-            <div style="font-size: 13px; color: var(--muted); line-height: 1.5;">
+            <div style="font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 16px;">
               Enrolling employee Face ID enables hands-free punch in/out on the Office Kiosk and self-service selfie attendance on their mobile or web portal.
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-outline btn-sm" type="button" (click)="openFaceEnrollModal()">
+                📷 {{ isFaceEnrolled() ? 'Re-enroll Face ID' : 'Enroll Face ID' }}
+              </button>
+              @if (isFaceEnrolled()) {
+                <button class="btn btn-outline btn-sm" type="button" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" (click)="removeFaceId()">
+                  Remove Face ID
+                </button>
+              }
             </div>
           </div>
         </div>
@@ -593,17 +615,12 @@ interface DocRow {
       </div>
 
       <div class="tab-action-bar">
-        <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
-          <span [appIcon]="'arrow-left'"></span> Back
+        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
+          <span [appIcon]="'arrow_left'"></span> Back
         </button>
         <div class="tab-action-group">
-          @if (isFaceEnrolled()) {
-            <button class="btn btn-outline btn-sm" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" (click)="removeFaceId()">
-              Remove Face ID
-            </button>
-          }
-          <button class="btn btn-primary btn-sm" (click)="openFaceEnrollModal()">
-            📷 {{ isFaceEnrolled() ? 'Re-enroll Face ID' : 'Enroll Face ID' }}
+          <button class="btn btn-primary btn-sm" type="button" (click)="save('Biometric & Profile details saved!')">
+            <span [appIcon]="'check'"></span> Save Changes
           </button>
         </div>
       </div>
@@ -1141,6 +1158,38 @@ export class EmployeeProfileComponent implements OnInit {
     this.router.navigate(['/employees']);
   }
 
+  protected readonly tabOrder: Array<'personal' | 'contact' | 'bank' | 'docs' | 'biometric'> = [
+    'personal',
+    'contact',
+    'bank',
+    'docs',
+    'biometric',
+  ];
+
+  protected previousTab(): void {
+    const current = this.tab();
+    const idx = this.tabOrder.indexOf(current as any);
+    if (idx > 0) {
+      this.tab.set(this.tabOrder[idx - 1]);
+    } else {
+      this.goBack();
+    }
+  }
+
+  protected nextTab(): void {
+    const current = this.tab();
+    const idx = this.tabOrder.indexOf(current as any);
+    if (idx >= 0 && idx < this.tabOrder.length - 1) {
+      this.tab.set(this.tabOrder[idx + 1]);
+    }
+  }
+
+  protected saveAndNext(message?: string): void {
+    this.save(message || 'Details saved successfully!', () => {
+      this.nextTab();
+    });
+  }
+
   protected saveAdminProfile(): void {
     const name = this.adminFullName().trim();
     if (!name) {
@@ -1375,7 +1424,7 @@ export class EmployeeProfileComponent implements OnInit {
     });
   }
 
-  protected save(message: string): void {
+  protected save(message: string, onSuccess?: () => void): void {
     const id = this.apiId();
     const detail = this.detail();
     if (!id || !detail) {
@@ -1444,6 +1493,7 @@ export class EmployeeProfileComponent implements OnInit {
         this.populateEmployee(updated);
         this.loadEmployeeOptions();
         this.toast.show(message, 'success');
+        onSuccess?.();
       },
       error: (error) => this.toast.show(error?.error?.title ?? error?.error?.message ?? 'Could not save the profile.', 'danger'),
     });
