@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
 import { AttendanceRecord, EmployeeListItem, MonthlyMusterDay, TodayAttendanceOverview } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
@@ -405,11 +405,11 @@ interface MusterDay {
             @for (emp of filteredSidebarEmployees(); track emp.id) {
               <div 
                 class="roster-item-card" 
-                [class.active]="emp.id === selectedMusterEmpId"
+                [class.active]="emp.id === selectedMusterEmpId()"
                 (click)="selectEmployeeFromSidebar(emp.id)"
               >
                 <div class="roster-user-left">
-                  <div class="roster-avatar-circle" [style.background]="emp.id === selectedMusterEmpId ? 'var(--p)' : 'var(--p-soft)'" [style.color]="emp.id === selectedMusterEmpId ? '#fff' : 'var(--p)'">
+                  <div class="roster-avatar-circle" [style.background]="emp.id === selectedMusterEmpId() ? 'var(--p)' : 'var(--p-soft)'" [style.color]="emp.id === selectedMusterEmpId() ? '#fff' : 'var(--p)'">
                     {{ emp.fullName.charAt(0) }}
                   </div>
                   <div class="roster-names">
@@ -437,12 +437,12 @@ interface MusterDay {
           <!-- Top Navigation Header -->
           <div class="detail-top-nav">
             <div class="emp-pager">
-              <button class="pager-btn" (click)="prevEmployee()" title="Previous employee">‹</button>
-              <button class="pager-btn" (click)="nextEmployee()" title="Next employee">›</button>
+              <button type="button" class="pager-btn" (click)="prevEmployee()" title="Previous employee">‹</button>
+              <button type="button" class="pager-btn" (click)="nextEmployee()" title="Next employee">›</button>
               <span class="pager-info">{{ currentEmployeeIndex() + 1 }} out of {{ employees().length }}</span>
             </div>
 
-            <button class="detail-close-btn" (click)="tab.set('daily')" title="Close and return to Daily Punch Log">✕</button>
+            <button type="button" class="detail-close-btn" (click)="tab.set('daily')" title="Close and return to Daily Punch Log">✕</button>
           </div>
 
           <!-- Employee Profile Banner -->
@@ -469,11 +469,17 @@ interface MusterDay {
             </div>
 
             <div class="profile-actions">
-              <a class="btn btn-outline btn-sm" [routerLink]="'/employees'" style="display: inline-flex; align-items: center; gap: 5px;">
+              <button 
+                type="button"
+                class="btn btn-outline btn-sm" 
+                (click)="viewEmployeeProfile()" 
+                style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;"
+                title="View full profile for {{ selectedEmployee()?.fullName }}"
+              >
                 View Details
-              </a>
+              </button>
               @if (perms.canCreate('Attendance')) {
-                <button class="btn btn-primary btn-sm" (click)="openQuickPunchModal()" style="display: inline-flex; align-items: center; gap: 6px;">
+                <button type="button" class="btn btn-primary btn-sm" (click)="openQuickPunchModal()" style="display: inline-flex; align-items: center; gap: 6px;">
                   + Add Attendance
                 </button>
               }
@@ -1885,6 +1891,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly session = inject(SessionService);
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   protected readonly tab = signal<'daily' | 'muster' | 'reg'>('daily');
   protected readonly canReg = signal(this.session.activeRole() !== 'Employee');
@@ -1895,8 +1902,8 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected filterDate = new Date().toISOString().slice(0, 10);
 
   // Time Management split-view & muster signals
-  protected selectedMusterEmpId = '';
-  protected selectedMusterMonth = new Date().toISOString().slice(0, 7);
+  protected readonly selectedMusterEmpId = signal<string>('');
+  protected readonly selectedMusterMonth = signal<string>(new Date().toISOString().slice(0, 7));
   protected musterViewMode = signal<'timeline' | 'table'>('timeline');
   protected sidebarSearch = signal('');
   protected timelineSearch = signal('');
@@ -1940,16 +1947,25 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Selected Employee object computed
   protected readonly selectedEmployee = computed(() => {
-    const id = this.selectedMusterEmpId;
+    const id = this.selectedMusterEmpId();
     return this.employees().find((e) => e.id === id) || this.employees()[0] || null;
   });
 
   protected readonly currentEmployeeIndex = computed(() => {
     const empList = this.employees();
-    const id = this.selectedMusterEmpId;
+    const id = this.selectedMusterEmpId();
     const idx = empList.findIndex((e) => e.id === id);
     return idx >= 0 ? idx : 0;
   });
+
+  protected viewEmployeeProfile(): void {
+    const emp = this.selectedEmployee();
+    if (emp?.id) {
+      this.router.navigate(['/employee-profile'], { queryParams: { id: emp.id } });
+    } else {
+      this.router.navigate(['/employee-profile']);
+    }
+  }
 
   // Filtered sidebar roster items
   protected readonly filteredSidebarEmployees = computed(() => {
@@ -1989,7 +2005,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   });
 
   protected readonly selectedMonthFormatted = computed(() => {
-    const parts = this.selectedMusterMonth.split('-');
+    const parts = this.selectedMusterMonth().split('-');
     const y = parseInt(parts[0], 10) || new Date().getFullYear();
     const m = parseInt(parts[1], 10) || new Date().getMonth() + 1;
     const d = new Date(y, m - 1, 1);
@@ -2080,12 +2096,12 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       if (params['tab'] === 'muster') {
         this.tab.set('muster');
         if (params['month']) {
-          this.selectedMusterMonth = params['month'];
+          this.selectedMusterMonth.set(params['month']);
         }
         if (params['employeeId']) {
-          this.selectedMusterEmpId = params['employeeId'];
+          this.selectedMusterEmpId.set(params['employeeId']);
         }
-        if (this.selectedMusterEmpId) {
+        if (this.selectedMusterEmpId()) {
           this.generateMuster();
         }
       } else if (params['tab'] === 'reg') {
@@ -2166,8 +2182,8 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     this.api.employees({ page: 1, pageSize: 100 }).subscribe({
       next: (res) => {
         this.employees.set(res.items);
-        if (res.items.length > 0 && !this.selectedMusterEmpId) {
-          this.selectedMusterEmpId = res.items[0].id;
+        if (res.items.length > 0 && !this.selectedMusterEmpId()) {
+          this.selectedMusterEmpId.set(res.items[0].id);
           this.newReg.employeeId = res.items[0].id;
           this.newReg.employeeName = res.items[0].fullName;
           this.punchForm.employeeId = res.items[0].id;
@@ -2271,13 +2287,13 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected viewEmployeeMuster(employeeId: string): void {
-    this.selectedMusterEmpId = employeeId;
+    this.selectedMusterEmpId.set(employeeId);
     this.tab.set('muster');
     this.generateMuster();
   }
 
   protected selectEmployeeFromSidebar(id: string): void {
-    this.selectedMusterEmpId = id;
+    this.selectedMusterEmpId.set(id);
     const emp = this.selectedEmployee();
     if (emp) {
       this.newReg.employeeId = emp.id;
@@ -2318,16 +2334,16 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected prevMonth(): void {
-    const [y, m] = this.selectedMusterMonth.split('-').map(Number);
+    const [y, m] = this.selectedMusterMonth().split('-').map(Number);
     const d = new Date(y, m - 2, 1);
-    this.selectedMusterMonth = d.toISOString().slice(0, 7);
+    this.selectedMusterMonth.set(d.toISOString().slice(0, 7));
     this.generateMuster();
   }
 
   protected nextMonth(): void {
-    const [y, m] = this.selectedMusterMonth.split('-').map(Number);
+    const [y, m] = this.selectedMusterMonth().split('-').map(Number);
     const d = new Date(y, m, 1);
-    this.selectedMusterMonth = d.toISOString().slice(0, 7);
+    this.selectedMusterMonth.set(d.toISOString().slice(0, 7));
     this.generateMuster();
   }
 
@@ -2376,15 +2392,16 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected generateMuster(): void {
-    if (!this.selectedMusterEmpId) return;
+    const empId = this.selectedMusterEmpId();
+    if (!empId) return;
 
-    const parts = this.selectedMusterMonth.split('-');
+    const parts = this.selectedMusterMonth().split('-');
     const year = parseInt(parts[0], 10) || new Date().getFullYear();
     const month = parseInt(parts[1], 10) || new Date().getMonth() + 1;
     const emp = this.selectedEmployee();
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    this.api.muster(this.selectedMusterEmpId, year, month).subscribe({
+    this.api.muster(empId, year, month).subscribe({
       next: (data: MonthlyMusterDay[]) => {
         const mapped: MusterDay[] = (data || []).map((d) => {
           const dateObj = new Date(d.date + 'T00:00:00');
@@ -2789,7 +2806,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected openRegularizeForDay(day: MusterDay): void {
     const emp = this.selectedEmployee();
-    this.newReg.employeeId = emp?.id || this.selectedMusterEmpId;
+    this.newReg.employeeId = emp?.id || this.selectedMusterEmpId();
     this.newReg.employeeName = emp?.fullName || '';
     this.newReg.date = day.dateStr;
     this.newReg.inTime = day.inTimeRaw || '09:30';
@@ -2805,7 +2822,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected openQuickPunchModal(): void {
     if (this.employees().length > 0 && !this.punchForm.employeeId) {
-      this.punchForm.employeeId = this.selectedMusterEmpId || this.employees()[0].id;
+      this.punchForm.employeeId = this.selectedMusterEmpId() || this.employees()[0].id;
     }
     this.showPunchModal.set(true);
   }
@@ -2899,7 +2916,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Muster_${emp?.employeeCode || 'EMP'}_${this.selectedMusterMonth}.csv`;
+      a.download = `Muster_${emp?.employeeCode || 'EMP'}_${this.selectedMusterMonth()}.csv`;
       a.click();
       URL.revokeObjectURL(url);
       this.toast.show(`Monthly muster for ${emp?.fullName || 'employee'} exported to CSV`);
@@ -2930,7 +2947,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected openRegModal(): void {
     if (this.employees().length > 0 && !this.newReg.employeeId) {
-      this.newReg.employeeId = this.selectedMusterEmpId || this.employees()[0].id;
+      this.newReg.employeeId = this.selectedMusterEmpId() || this.employees()[0].id;
       this.newReg.employeeName = this.selectedEmployee()?.fullName || this.employees()[0].fullName;
     }
     this.showRegModal.set(true);
