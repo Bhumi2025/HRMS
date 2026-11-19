@@ -52,28 +52,16 @@ interface DocRow {
             </span>
           </div>
           <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px">
-            {{ currentAdminEmail() }} &bull; {{ currentCompanyName() }} ({{ currentCompanyCode() }})
+            {{ currentAdminEmail() }}@if (currentRole() !== 'Super Admin') { &bull; {{ currentCompanyName() }} ({{ currentCompanyCode() }}) }
           </div>
           <div style="display: flex; gap: 6px; flex-wrap: wrap">
             <span class="profile-badge active">Active Administrator</span>
-            <span class="profile-badge"><span [appIcon]="'company'"></span> {{ currentCompanyName() }}</span>
+            @if (currentRole() !== 'Super Admin') {
+              <span class="profile-badge"><span [appIcon]="'company'"></span> {{ currentCompanyName() }}</span>
+            }
             <span class="profile-badge"><span [appIcon]="'lock'"></span> System Authenticated</span>
           </div>
         </div>
-
-        @if (employeeOptions().length > 0) {
-          <div class="profile-switcher-card">
-            <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px">
-              Inspect Employee Profile
-            </div>
-            <app-select
-              [options]="employeeOptions()"
-              [value]="selectedEmployeeId()"
-              (valueChange)="onEmployeeSelect($event)"
-              width="280px"
-            />
-          </div>
-        }
       </div>
 
       <div class="ptabs">
@@ -86,8 +74,8 @@ interface DocRow {
 
       <!-- ADMIN TAB: ACCOUNT -->
       @if (adminTab() === 'account') {
-        <div class="grid-2">
-          <div class="card" style="overflow: visible">
+        <div style="width: 100%">
+          <div class="card" style="width: 100%; overflow: visible">
             <div class="card-header"><div class="card-title">Administrator Account Information</div></div>
             <div class="card-body" style="overflow: visible">
               <div class="form-group">
@@ -120,64 +108,21 @@ interface DocRow {
                   style="background: var(--bg); color: var(--muted); cursor: not-allowed"
                 />
               </div>
-              <div class="form-group">
-                <label class="form-label">Company &amp; Tenant Workspace</label>
-                <input
-                  class="form-control"
-                  [value]="currentCompanyName() + ' (' + currentCompanyCode() + ')'"
-                  readonly
-                  style="background: var(--bg); color: var(--muted); cursor: not-allowed"
-                />
-              </div>
+              @if (currentRole() !== 'Super Admin') {
+                <div class="form-group">
+                  <label class="form-label">Company &amp; Tenant Workspace</label>
+                  <input
+                    class="form-control"
+                    [value]="currentCompanyName() + ' (' + currentCompanyCode() + ')'"
+                    readonly
+                    style="background: var(--bg); color: var(--muted); cursor: not-allowed"
+                  />
+                </div>
+              }
               <div class="form-footer">
                 <button class="btn btn-primary btn-sm" [disabled]="savingAdminProfile()" (click)="saveAdminProfile()">
                   <span [appIcon]="'check'"></span> Save Administrator Profile
                 </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header"><div class="card-title">Tenant &amp; Infrastructure Overview</div></div>
-            <div class="card-body">
-              <div style="display: flex; flex-direction: column; gap: 12px">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border)">
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Organization Workspace</div>
-                    <div style="font-size: 11px; color: var(--muted)">Tenant Code: {{ currentCompanyCode() }}</div>
-                  </div>
-                  <span class="badge badge-info">{{ currentCompanyName() }}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border)">
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Database Isolation</div>
-                    <div style="font-size: 11px; color: var(--muted)">Dedicated schema &amp; tenant DB</div>
-                  </div>
-                  <span class="badge badge-success">Active &bull; Isolated</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border)">
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Face ID &amp; Biometric Sync</div>
-                    <div style="font-size: 11px; color: var(--muted)">Office kiosk &amp; mobile attendance</div>
-                  </div>
-                  <span class="badge badge-success">Online</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border)">
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Performance Caching</div>
-                    <div style="font-size: 11px; color: var(--muted)">IMemoryCache + SplitQuery Engine</div>
-                  </div>
-                  <span class="badge badge-info">Optimized</span>
-                </div>
-              </div>
-
-              <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; gap: 8px">
-                <a class="btn btn-outline btn-sm" [routerLink]="['/employees']" style="text-decoration: none">
-                  <span [appIcon]="'employees'"></span> Manage Employees
-                </a>
-                <a class="btn btn-outline btn-sm" [routerLink]="['/company']" style="text-decoration: none">
-                  <span [appIcon]="'company'"></span> Company Settings
-                </a>
               </div>
             </div>
           </div>
@@ -186,8 +131,8 @@ interface DocRow {
 
       <!-- ADMIN TAB: SECURITY -->
       @if (adminTab() === 'security') {
-        <div class="grid-2">
-          <div class="card">
+        <div style="width: 100%">
+          <div class="card" style="width: 100%">
             <div class="card-header"><div class="card-title">Change Password</div></div>
             <div class="card-body">
               <div class="form-group">
@@ -209,6 +154,21 @@ interface DocRow {
                   (input)="newPwd.set($any($event.target).value)"
                   placeholder="At least 8 characters"
                 />
+                <!-- Inline Mini Spotify Volume Bar -->
+                @if (newPwd().length > 0) {
+                  <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                    <div style="flex: 1; height: 5px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
+                      <div
+                        [style.width.%]="passwordStrength().score"
+                        [style.background]="passwordStrength().color"
+                        style="height: 100%; border-radius: 999px; transition: width 0.3s ease, background-color 0.3s ease;"
+                      ></div>
+                    </div>
+                    <span [style.color]="passwordStrength().color" style="font-size: 11px; font-weight: 700; min-width: 60px; text-align: right;">
+                      {{ passwordStrength().label }}
+                    </span>
+                  </div>
+                }
               </div>
               <div class="form-group">
                 <label class="form-label">Confirm New Password</label>
@@ -226,108 +186,6 @@ interface DocRow {
                 </button>
               </div>
             </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header"><div class="card-title">Security &amp; Session Status</div></div>
-            <div class="card-body">
-              <div style="display: flex; flex-direction: column; gap: 14px">
-                <div style="display: flex; gap: 12px; align-items: flex-start">
-                  <div style="width: 38px; height: 38px; border-radius: 8px; background: var(--p-soft); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--p)">
-                    <span [appIcon]="'lock'"></span>
-                  </div>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Token-Based JWT Authentication</div>
-                    <div style="font-size: 12px; color: var(--muted); margin-top: 2px">
-                      Your session is secured using HMAC-SHA256 signed tokens with role-based policies.
-                    </div>
-                  </div>
-                </div>
-
-                <div style="display: flex; gap: 12px; align-items: flex-start">
-                  <div style="width: 38px; height: 38px; border-radius: 8px; background: var(--success-soft); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--success)">
-                    <span [appIcon]="'shield'"></span>
-                  </div>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Policy Level: {{ currentRole() }}</div>
-                    <div style="font-size: 12px; color: var(--muted); margin-top: 2px">
-                      Authorized for tenant administration, payroll runs, and biometric synchronization.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      }
-
-      <!-- ADMIN TAB: PRIVILEGES -->
-      @if (adminTab() === 'privileges') {
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px">
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">🏢</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Multi-Tenant Workspace</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              Company configuration, branches, departments, designations, and tenant database isolation.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">👥</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Employee Directory</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              Add, update, deactivate employees, manage salaries, reporting structures, and access roles.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">⏱️</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Attendance &amp; Biometrics</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              Manage Face ID biometric enrollment, office entrance kiosk, daily muster, and regularization.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">💰</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Payroll &amp; Compensation</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              Execute monthly payroll calculations, manage allowances/deductions, view &amp; print payslips.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">📑</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Leave &amp; Shift Management</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              Configure leave types, approve employee requests, manage shift working hours.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">🛡️</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Security &amp; Governance</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              User password resets, role-based authorization policies, session audit &amp; security tokens.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
           </div>
         </div>
       }
@@ -993,12 +851,69 @@ export class EmployeeProfileComponent implements OnInit {
 
   // Profile View Mode: admin vs employee
   protected readonly viewMode = signal<'admin' | 'employee'>('admin');
-  protected readonly adminTab = signal<'account' | 'security' | 'privileges'>('account');
+  protected readonly adminTab = signal<'account' | 'security'>('account');
   protected readonly adminTabs = [
     { id: 'account', label: 'Admin Account', icon: 'user' },
     { id: 'security', label: 'Security & Password', icon: 'lock' },
-    { id: 'privileges', label: 'System Privileges', icon: 'shield' },
   ] as const;
+
+  // Password strength computation for Spotify Volume Slider UI
+  protected readonly passwordStrength = computed(() => {
+    const pwd = this.newPwd() || '';
+    if (!pwd) {
+      return {
+        score: 0,
+        label: 'No Password',
+        color: '#94a3b8',
+        hasMinLength: false,
+        hasMixedCase: false,
+        hasNumber: false,
+        hasSymbol: false,
+      };
+    }
+
+    const hasMinLength = pwd.length >= 8;
+    const hasMixedCase = /[a-z]/.test(pwd) && /[A-Z]/.test(pwd);
+    const hasNumber = /\d/.test(pwd);
+    const hasSymbol = /[^A-Za-z0-9]/.test(pwd);
+
+    let score = 0;
+    if (pwd.length > 0) score += 10;
+    if (hasMinLength) score += 25;
+    if (pwd.length >= 12) score += 15;
+    if (hasMixedCase) score += 20;
+    if (hasNumber) score += 15;
+    if (hasSymbol) score += 15;
+
+    score = Math.min(100, score);
+
+    let label = 'Very Weak';
+    let color = '#ef4444'; // Red
+
+    if (score >= 80) {
+      label = 'Strong';
+      color = '#1db954'; // Spotify Green
+    } else if (score >= 60) {
+      label = 'Good';
+      color = '#22c55e'; // Green
+    } else if (score >= 40) {
+      label = 'Fair';
+      color = '#f59e0b'; // Amber
+    } else if (score >= 20) {
+      label = 'Weak';
+      color = '#f97316'; // Orange
+    }
+
+    return {
+      score,
+      label,
+      color,
+      hasMinLength,
+      hasMixedCase,
+      hasNumber,
+      hasSymbol,
+    };
+  });
 
   protected readonly employeeOptions = signal<SelectOption[]>([]);
   protected readonly selectedEmployeeId = signal<string>('__admin__');
@@ -1099,7 +1014,8 @@ export class EmployeeProfileComponent implements OnInit {
       },
       error: (err) => {
         this.savingAdminProfile.set(false);
-        this.toast.show(err?.error?.message || 'Could not update administrator profile.', 'danger');
+        const msg = err?.error?.detail || err?.error?.title || err?.error?.message || 'Could not update administrator profile.';
+        this.toast.show(msg, 'danger');
       },
     });
   }
@@ -1132,7 +1048,8 @@ export class EmployeeProfileComponent implements OnInit {
       },
       error: (err) => {
         this.changingPwd.set(false);
-        this.toast.show(err?.error?.message || 'Could not change password.', 'danger');
+        const msg = err?.error?.detail || err?.error?.title || err?.error?.message || 'Could not change password.';
+        this.toast.show(msg, 'danger');
       },
     });
   }

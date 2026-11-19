@@ -1012,11 +1012,13 @@ function emptyTenantForm(): CreateCompanyRequest {
                         <button
                           type="button"
                           class="btn btn-outline btn-sm"
-                          style="padding: 4px 12px; font-size: 12px;"
+                          style="padding: 4px 8px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; min-width: 32px;"
                           [disabled]="tenantEmpPage() <= 1"
                           (click)="changeTenantEmpPage(tenantEmpPage() - 1)"
+                          title="Previous Page"
+                          aria-label="Previous Page"
                         >
-                          ‹ Previous
+                          <span [appIcon]="'chevron_left'"></span>
                         </button>
                         <span style="font-weight: 600; color: var(--text); padding: 0 4px;">
                           Page {{ tenantEmpPage() }} of {{ tenantEmpTotalPages() }}
@@ -1024,11 +1026,13 @@ function emptyTenantForm(): CreateCompanyRequest {
                         <button
                           type="button"
                           class="btn btn-outline btn-sm"
-                          style="padding: 4px 12px; font-size: 12px;"
+                          style="padding: 4px 8px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; min-width: 32px;"
                           [disabled]="tenantEmpPage() >= tenantEmpTotalPages()"
                           (click)="changeTenantEmpPage(tenantEmpPage() + 1)"
+                          title="Next Page"
+                          aria-label="Next Page"
                         >
-                          Next ›
+                          <span [appIcon]="'chevron_right'"></span>
                         </button>
                       </div>
                     </div>

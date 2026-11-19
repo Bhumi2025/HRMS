@@ -25,13 +25,28 @@ public sealed class FilesController : ControllerBase
             return BadRequest(new { message = "No file was uploaded." });
         }
 
+        const long maxSizeBytes = 10 * 1024 * 1024; // 10MB
+        if (file.Length > maxSizeBytes)
+        {
+            return BadRequest(new { message = "File size exceeds the 10MB limit." });
+        }
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var allowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"
+        };
+        if (string.IsNullOrWhiteSpace(ext) || !allowedExtensions.Contains(ext))
+        {
+            return BadRequest(new { message = $"File format '{ext}' is not supported. Allowed formats: PDF, JPG, PNG, WEBP, DOC, DOCX." });
+        }
+
         var uploadsFolder = Path.Combine(_env.ContentRootPath, "uploads");
         if (!Directory.Exists(uploadsFolder))
         {
             Directory.CreateDirectory(uploadsFolder);
         }
 
-        var ext = Path.GetExtension(file.FileName);
         var uniqueFileName = $"{Guid.NewGuid():N}{ext}";
         var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
