@@ -42,15 +42,20 @@ export class SessionService {
   /** Stores the JWT + profile returned by `POST /api/auth/login`. */
   setSession(accessToken: string, apiUser: ApiUser): string {
     const role = apiUser.role as Role;
+    const isSuperAdmin = role === 'Super Admin';
+    if (isSuperAdmin && typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('current_tenant');
+    }
+
     const user: SessionUser = {
       role,
       name: apiUser.fullName,
       email: apiUser.email,
       initials: apiUser.initials,
       employeeId: apiUser.employeeId ?? undefined,
-      companyId: apiUser.companyId ?? undefined,
-      companyName: apiUser.companyName ?? undefined,
-      companyCode: apiUser.companyCode ?? undefined,
+      companyId: isSuperAdmin ? undefined : (apiUser.companyId ?? undefined),
+      companyName: isSuperAdmin ? 'All Organizations' : (apiUser.companyName ?? undefined),
+      companyCode: isSuperAdmin ? undefined : (apiUser.companyCode ?? undefined),
       companyLogoUrl: apiUser.companyLogoUrl ?? undefined,
     };
 
@@ -130,7 +135,16 @@ export class SessionService {
     if (!stored) return null;
 
     try {
-      return JSON.parse(stored) as SessionUser;
+      const u = JSON.parse(stored) as SessionUser;
+      if (u && u.role === 'Super Admin') {
+        const ct = sessionStorage.getItem('current_tenant');
+        if (!ct || ct.includes('"id":"all"')) {
+          u.companyCode = undefined;
+          u.companyId = undefined;
+          u.companyName = 'All Organizations';
+        }
+      }
+      return u;
     } catch {
       return null;
     }

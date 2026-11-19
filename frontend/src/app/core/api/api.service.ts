@@ -305,6 +305,24 @@ export class ApiService {
     return this.http.post<PayrollRun>(this.url('/payroll/run'), body);
   }
 
+  deletePayrollRun(runId: string): Observable<void> {
+    return this.http.delete<void>(this.url(`/payroll/runs/${runId}`));
+  }
+
+  payrollPreflightCheck(month: number, year: number): Observable<{ canRun: boolean; pendingLeavesCount: number; message: string; pendingEmployeeNames: string[] }> {
+    return this.http.get<{ canRun: boolean; pendingLeavesCount: number; message: string; pendingEmployeeNames: string[] }>(
+      this.url('/payroll/preflight-check'),
+      { params: toParams({ month, year }) }
+    );
+  }
+
+  sendPayslips(body: { employeeIds: string[]; month: number; year: number; customMessage?: string }): Observable<{ totalRequested: number; successfullySent: number; message: string }> {
+    return this.http.post<{ totalRequested: number; successfullySent: number; message: string }>(
+      this.url('/payroll/send-payslips'),
+      body
+    );
+  }
+
   // ── Loans ──
   loans(status?: string): Observable<Loan[]> {
     return this.http.get<Loan[]>(this.url('/loans'), { params: toParams({ status }) });
@@ -343,12 +361,16 @@ export class ApiService {
     return this.http.post<DocumentDto>(this.url('/documents'), body);
   }
 
-  uploadFile(file: File): Observable<{ fileName: string; storedName: string; url: string; size: string }> {
+  uploadFile(file: File, companyCode?: string, userId?: string): Observable<{ fileName: string; storedName: string; url: string; cloudinaryUrl?: string; localPath?: string; size: string }> {
     const formData = new FormData();
     formData.append('file', file, file.name);
-    return this.http.post<{ fileName: string; storedName: string; url: string; size: string }>(
+    const params: Record<string, string> = {};
+    if (companyCode) params['companyCode'] = companyCode;
+    if (userId) params['userId'] = userId;
+    return this.http.post<{ fileName: string; storedName: string; url: string; cloudinaryUrl?: string; localPath?: string; size: string }>(
       this.url('/files/upload'),
-      formData
+      formData,
+      { params }
     );
   }
 

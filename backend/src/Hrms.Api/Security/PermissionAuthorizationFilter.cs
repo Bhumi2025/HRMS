@@ -18,6 +18,7 @@ public sealed class PermissionAuthorizationFilter : IAsyncActionFilter
     private static readonly HashSet<string> OptOutPaths = new(StringComparer.OrdinalIgnoreCase)
     {
         "/api/navigation/user",
+        "/api/files",
         "/health",
         "/swagger",
         "/"
@@ -25,6 +26,7 @@ public sealed class PermissionAuthorizationFilter : IAsyncActionFilter
 
     private static readonly Dictionary<string, string> PathToModuleCode = new(StringComparer.OrdinalIgnoreCase)
     {
+        { "/api/files", "DOCS" },
         { "/api/employees", "EMPL" },
         { "/api/shift", "SHIF" },
         { "/api/roster", "SHIF" },

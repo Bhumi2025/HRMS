@@ -154,7 +154,7 @@ export class ShellComponent implements OnInit, OnDestroy {
           section: 'Platform',
           items: [
             { icon: 'dashboard' as IconName, label: 'Dashboard', path: '/dashboard' },
-            { icon: 'company' as IconName, label: 'Company', path: '/companies' },
+            { icon: 'company' as IconName, label: 'Company', path: '/company' },
           ],
         },
       ];

@@ -196,6 +196,7 @@ export interface PayrollRun {
   totalAllowances: number;
   totalDeductions: number;
   totalNet: number;
+  reductionPercent?: number;
 }
 
 export interface Payslip {
@@ -204,6 +205,7 @@ export interface Payslip {
   employeeCode?: string;
   employeeName: string;
   department: string;
+  designation?: string;
   month: number;
   year: number;
   basicSalary: number;
@@ -213,6 +215,14 @@ export interface Payslip {
   workingDays: number;
   status: string;
   payDate: string;
+  workedDays?: number;
+  paidLeaveDays?: number;
+  unpaidDays?: number;
+  weeklyOffDays?: number;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  reductionPercent?: number;
 }
 
 export interface PayrollSummary {
@@ -395,6 +405,7 @@ export interface CompanySettings {
   timeZone?: string | null;
   taxNumberLabel?: string | null;
   registrationNumberLabel?: string | null;
+  workingDaysPerWeek?: number | null;
 }
 
 export interface SaveCompanySettingsRequest {
@@ -414,6 +425,7 @@ export interface SaveCompanySettingsRequest {
   logoUrl?: string | null;
   taxNumberLabel?: string | null;
   registrationNumberLabel?: string | null;
+  workingDaysPerWeek?: number | null;
 }
 
 export interface TaskItem {

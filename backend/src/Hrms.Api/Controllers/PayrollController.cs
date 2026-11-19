@@ -49,6 +49,23 @@ public sealed class PayrollController : ControllerBase
         return Ok(await _payroll.GetPayslipsForEmployeeAsync(id, ct));
     }
 
+    /// <summary>Checks for any unresolved pending leaves before running payroll.</summary>
+    [HttpGet("preflight-check")]
+    [ProducesResponseType(typeof(PayrollPreflightCheckDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PayrollPreflightCheckDto>> PreflightCheck(
+        [FromQuery] int month,
+        [FromQuery] int year,
+        CancellationToken ct) =>
+        Ok(await _payroll.PreflightCheckAsync(month, year, ct));
+
+    /// <summary>Sends payslips to selected employees via registered email.</summary>
+    [HttpPost("send-payslips")]
+    [ProducesResponseType(typeof(SendPayslipsResultDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<SendPayslipsResultDto>> SendPayslips(
+        [FromBody] SendPayslipsRequest request,
+        CancellationToken ct) =>
+        Ok(await _payroll.SendPayslipsAsync(request, ct));
+
     /// <summary>Processes payroll for a month. Fails with 409 if that period already exists.</summary>
     [HttpPost("run")]
     [ProducesResponseType(typeof(PayrollRunDto), StatusCodes.Status201Created)]
@@ -59,5 +76,14 @@ public sealed class PayrollController : ControllerBase
     {
         var run = await _payroll.RunPayrollAsync(request, ct);
         return CreatedAtAction(nameof(Runs), run);
+    }
+
+    [HttpDelete("runs/{runId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteRun(Guid runId, CancellationToken ct)
+    {
+        var deleted = await _payroll.DeletePayrollRunAsync(runId, ct);
+        return deleted ? NoContent() : NotFound();
     }
 }

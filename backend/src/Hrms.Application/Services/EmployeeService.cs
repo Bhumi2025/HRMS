@@ -50,6 +50,20 @@ public sealed class EmployeeService : IEmployeeService
     public async Task<EmployeeDetailDto> CreateAsync(CreateEmployeeRequest request, CancellationToken ct = default)
     {
         var email = request.Email.Trim().ToLowerInvariant();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+        {
+            throw new ValidationException("Please provide a valid email address.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Phone))
+        {
+            var cleanPhone = System.Text.RegularExpressions.Regex.Replace(request.Phone.Trim(), @"[\s\-]", "");
+            if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(?:\+91|91|0)?[6-9]\d{9}$"))
+            {
+                throw new ValidationException("Phone number must be a valid 10-digit Indian mobile number (e.g. +91 98765 43210 or 9876543210).");
+            }
+        }
+
         if (await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.Email == email), ct))
         {
             throw new ConflictException($"An employee with email '{email}' already exists.");
@@ -167,6 +181,20 @@ public sealed class EmployeeService : IEmployeeService
                        ?? throw NotFoundException.For("Employee", id);
 
         var email = request.Email.Trim().ToLowerInvariant();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+        {
+            throw new ValidationException("Please provide a valid email address.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Phone))
+        {
+            var cleanPhone = System.Text.RegularExpressions.Regex.Replace(request.Phone.Trim(), @"[\s\-]", "");
+            if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(?:\+91|91|0)?[6-9]\d{9}$"))
+            {
+                throw new ValidationException("Phone number must be a valid 10-digit Indian mobile number (e.g. +91 98765 43210 or 9876543210).");
+            }
+        }
+
         if (await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.Email == email && e.Id != id), ct))
         {
             throw new ConflictException($"An employee with email '{email}' already exists.");

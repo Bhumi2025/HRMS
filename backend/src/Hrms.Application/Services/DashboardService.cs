@@ -49,7 +49,8 @@ public sealed class DashboardService : IDashboardService
             : Math.Round((decimal)present / attendance.Count * 100, 1);
 
         var pendingApprovals =
-            await _uow.Approvals.CountQueryAsync(_uow.Approvals.Query().Where(a => a.Status == ApprovalStatus.Pending), ct) +
+            await _uow.Approvals.CountQueryAsync(_uow.Approvals.Query().Where(a => a.Status == ApprovalStatus.Pending && a.Type != ApprovalType.Leave), ct) +
+            await _uow.LeaveRequests.CountQueryAsync(_uow.LeaveRequests.Query().Where(l => l.Status == LeaveStatus.Pending), ct) +
             await _uow.Regularizations.CountQueryAsync(_uow.Regularizations.Query().Where(r => r.Status == ApprovalStatus.Pending), ct);
 
         var monthlyPayroll = await _uow.PayrollRuns.FirstOrDefaultAsync(
@@ -330,10 +331,10 @@ public sealed class DashboardService : IDashboardService
     {
         var count = Math.Clamp(take, 1, 50);
 
-        // Filter and page in SQL instead of materialising every pending approval.
-        var pending = await _uow.Approvals.ToListAsync(
+        // Fetch non-leave pending approvals
+        var pendingApprovals = await _uow.Approvals.ToListAsync(
             _uow.Approvals.Query()
-                .Where(a => a.Status == ApprovalStatus.Pending)
+                .Where(a => a.Status == ApprovalStatus.Pending && a.Type != ApprovalType.Leave)
                 .OrderByDescending(a => a.SubmittedAtUtc)
                 .Take(count)
                 .Select(a => new
@@ -341,19 +342,31 @@ public sealed class DashboardService : IDashboardService
                     a.Id,
                     a.Title,
                     a.Details,
-                    a.Priority,
+                    Priority = a.Priority.ToString(),
                     EmployeeName = a.Employee != null ? a.Employee.FirstName + " " + a.Employee.LastName : null,
+                    a.SubmittedAtUtc,
                 }),
             ct);
 
-        return pending
-            .Select(a => new PendingApprovalDto(
-                a.Id,
-                a.EmployeeName is null ? "—" : a.EmployeeName.Trim(),
-                a.Title,
-                a.Details,
-                a.Priority.ToString()))
-            .ToList();
+        // Fetch real pending leave requests
+        var (pendingLeaves, _) = await _uow.LeaveRequests.SearchAsync(null, LeaveStatus.Pending, 1, count, ct);
+
+        var list = new List<PendingApprovalDto>();
+        list.AddRange(pendingApprovals.Select(a => new PendingApprovalDto(
+            a.Id,
+            a.EmployeeName is null ? "—" : a.EmployeeName.Trim(),
+            a.Title,
+            a.Details,
+            a.Priority)));
+
+        list.AddRange(pendingLeaves.Select(l => new PendingApprovalDto(
+            l.Id,
+            l.Employee != null ? $"{l.Employee.FirstName} {l.Employee.LastName}".Trim() : "—",
+            l.LeaveType?.Name ?? "Leave Request",
+            $"{l.Days} day(s) · {l.FromDate:dd/MM} - {l.ToDate:dd/MM}",
+            "Medium")));
+
+        return list.Take(count).ToList();
     }
 
     public async Task<IReadOnlyList<RecentLeaveDto>> GetRecentLeavesAsync(int take, CancellationToken ct = default)

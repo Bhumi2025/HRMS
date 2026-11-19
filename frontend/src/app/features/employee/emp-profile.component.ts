@@ -841,7 +841,7 @@ export class EmpProfileComponent implements OnInit {
     iban: '',
     ifsc: '',
     swift: '',
-    currency: 'AED',
+    currency: 'INR',
     paymentMode: 'Bank Transfer',
     wpsId: '',
   });
@@ -917,7 +917,7 @@ export class EmpProfileComponent implements OnInit {
     { v: 'HSBC', l: 'HSBC' },
     { v: 'Other', l: 'Other' },
   ];
-  protected readonly currencyOptions: SelectOption[] = ['AED', 'USD', 'SAR', 'GBP'].map((c) => ({ v: c, l: c }));
+  protected readonly currencyOptions: SelectOption[] = ['INR', 'USD', 'AED', 'SAR', 'EUR', 'GBP'].map((c) => ({ v: c, l: c }));
   protected readonly paymentOptions: SelectOption[] = [
     { v: 'Bank Transfer', l: 'Bank Transfer' },
     { v: 'WPS', l: 'WPS' },

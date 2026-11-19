@@ -859,6 +859,8 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
 
   private currencySymbol(code: string): string {
     switch (code) {
+      case 'INR':
+        return '₹';
       case 'AED':
         return 'AED ';
       case 'GBP':
@@ -867,8 +869,10 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
         return '€';
       case 'SAR':
         return 'SAR ';
-      default:
+      case 'USD':
         return '$';
+      default:
+        return '₹';
     }
   }
 
@@ -1158,7 +1162,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
       transportAllowance: 0,
       mobileAllowance: 0,
       otherAllowances: 0,
-      currency: 'USD',
+      currency: 'INR',
     };
 
     this.api.createEmployee(body).subscribe({

@@ -110,7 +110,7 @@ function emptyTenantForm(): CreateCompanyRequest {
             {{ currentHeaderTitle() }}
           </h4>
 
-          @if (isSuperAdmin() && activeTab() === 'directory') {
+          @if (isSuperAdmin()) {
             <!-- Super Admin Tenant Companies Search Header + New Company Button -->
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
               <div class="input-group" style="max-width: 280px;">
@@ -150,8 +150,8 @@ function emptyTenantForm(): CreateCompanyRequest {
           }
         </div>
 
-        <!-- TAB 1: SUPER ADMIN TENANT COMPANIES TABLE -->
-        @if (activeTab() === 'directory' && isSuperAdmin()) {
+        <!-- SUPER ADMIN TENANT COMPANIES TABLE -->
+        @if (isSuperAdmin()) {
           <div class="table-wrap" style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse;">
               <thead>
@@ -166,11 +166,16 @@ function emptyTenantForm(): CreateCompanyRequest {
               <tbody>
                 @if (tenantLoading()) {
                   <tr>
-                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">Loading tenant companies…</td>
+                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">
+                      <div class="spinner-sm" style="width: 24px; height: 24px; margin: 0 auto 8px auto; border: 2px solid var(--border); border-top-color: var(--p); border-radius: 50%; animation: spin .8s linear infinite;"></div>
+                      <div>Loading tenant companies…</div>
+                    </td>
                   </tr>
-                } @else if (tenantCompanies().length === 0) {
+                } @else if (filteredTenantCompanies().length === 0) {
                   <tr>
-                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">No companies yet. Create one to provision its dedicated database.</td>
+                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">
+                      {{ tenantSearch() ? 'No companies match your search filter.' : 'No companies yet. Create one to provision its dedicated database.' }}
+                    </td>
                   </tr>
                 } @else {
                   @for (c of filteredTenantCompanies(); track c.id) {
@@ -245,10 +250,9 @@ function emptyTenantForm(): CreateCompanyRequest {
               </tbody>
             </table>
           </div>
-        }
-
-        <!-- TAB 1: COMPANY PROFILE (Non-SuperAdmin) -->
-        @if (activeTab() === 'profile') {
+        } @else {
+          <!-- TAB 1: COMPANY PROFILE (Non-SuperAdmin) -->
+          @if (activeTab() === 'profile') {
           <div style="padding: 24px;">
             @if (loadingProfile()) {
               <div style="text-align: center; padding: 48px; color: var(--muted);">
@@ -324,6 +328,20 @@ function emptyTenantForm(): CreateCompanyRequest {
                     <input class="form-control" type="email" [(ngModel)]="profileForm.hrEmail" name="hrEmail" required [disabled]="!canEditCompany()" placeholder="hr@acme.com" />
                   </div>
                   <div style="flex: 1; min-width: 220px;">
+                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Payroll Currency <span class="text-danger">*</span></label>
+                    <select class="form-control" [(ngModel)]="profileForm.payrollCurrency" name="payrollCurrency" required [disabled]="!canEditCompany()">
+                      <option value="INR">INR (₹) — Indian Rupee (Default)</option>
+                      <option value="USD">USD ($) — US Dollar</option>
+                      <option value="AED">AED (AED) — UAE Dirham</option>
+                      <option value="EUR">EUR (€) — Euro</option>
+                      <option value="GBP">GBP (£) — British Pound</option>
+                      <option value="SAR">SAR (SAR) — Saudi Riyal</option>
+                      <option value="CAD">CAD (C$) — Canadian Dollar</option>
+                      <option value="AUD">AUD (A$) — Australian Dollar</option>
+                      <option value="SGD">SGD (S$) — Singapore Dollar</option>
+                    </select>
+                  </div>
+                  <div style="flex: 1; min-width: 220px;">
                     <label class="form-label" style="font-weight: 600; font-size: 13px;">Time Zone <span class="text-danger">*</span></label>
                     <select class="form-control" [(ngModel)]="profileForm.timeZone" name="timeZone" required [disabled]="!canEditCompany()">
                       <option value="Asia/Dubai">Asia/Dubai (GST +04:00)</option>
@@ -333,6 +351,15 @@ function emptyTenantForm(): CreateCompanyRequest {
                       <option value="Europe/London">Europe/London (GMT/BST)</option>
                       <option value="America/New_York">America/New_York (EST/EDT)</option>
                       <option value="Asia/Singapore">Asia/Singapore (SGT +08:00)</option>
+                    </select>
+                  </div>
+                  <div style="flex: 1; min-width: 260px;">
+                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Company Working Days / Week <span class="text-danger">*</span></label>
+                    <select class="form-control" [(ngModel)]="profileForm.workingDaysPerWeek" name="workingDaysPerWeek" required [disabled]="!canEditCompany()">
+                      <option [ngValue]="5">5 Days</option>
+                      <option [ngValue]="5.5">5.5 Days</option>
+                      <option [ngValue]="6">6 Days</option>
+                      <option [ngValue]="7">7 Days</option>
                     </select>
                   </div>
                 </div>
@@ -375,10 +402,6 @@ function emptyTenantForm(): CreateCompanyRequest {
                   <div style="flex: 1; min-width: 180px;">
                     <label class="form-label" style="font-weight: 600; font-size: 13px;">Industry</label>
                     <input class="form-control" type="text" [(ngModel)]="profileForm.industry" name="industry" [disabled]="!canEditCompany()" placeholder="e.g. Information Technology" />
-                  </div>
-                  <div style="flex: 1; min-width: 140px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Payroll Currency</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.payrollCurrency" name="payrollCurrency" [disabled]="!canEditCompany()" placeholder="AED" />
                   </div>
                 </div>
                 <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
@@ -758,6 +781,7 @@ function emptyTenantForm(): CreateCompanyRequest {
               </button>
             </div>
           </div>
+        }
         }
       </div>
     </div>
@@ -1406,7 +1430,19 @@ export class CompanyComponent implements OnInit, OnDestroy {
   protected readonly standardTimezones = STANDARD_TIMEZONES;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  protected readonly isSuperAdmin = computed(() => this.session.activeRole() === 'Super Admin');
+  protected readonly isSuperAdmin = computed(() => {
+    const role = (this.session.activeRole() || this.session.role()) as string | null;
+    if (role === 'Super Admin' || role === 'SuperAdmin') return true;
+    if (typeof sessionStorage !== 'undefined') {
+      const hrRole = sessionStorage.getItem('hrRole');
+      if (hrRole === 'Super Admin' || hrRole === 'SuperAdmin') return true;
+      try {
+        const u = JSON.parse(sessionStorage.getItem('hrms.user') || '{}');
+        if (u.role === 'Super Admin' || u.role === 'SuperAdmin') return true;
+      } catch { }
+    }
+    return false;
+  });
 
   protected readonly displayTabs = computed(() => {
     if (this.isSuperAdmin()) {
@@ -1445,10 +1481,11 @@ export class CompanyComponent implements OnInit, OnDestroy {
     city: '',
     country: '',
     phone: '',
-    payrollCurrency: 'AED',
+    payrollCurrency: 'INR',
     logoUrl: null,
     taxNumberLabel: 'Tax Number (TRN/VAT)',
     registrationNumberLabel: 'Trade License / CIN',
+    workingDaysPerWeek: 5.0,
   };
 
   // Pagination state (for non-SuperAdmin directory & tabs 2, 3, 4)
@@ -1632,8 +1669,8 @@ export class CompanyComponent implements OnInit, OnDestroy {
     } else {
       this.activeTab.set('profile');
       this.loadCompanyProfile();
+      this.loadBackendData();
     }
-    this.loadBackendData();
   }
 
   ngOnDestroy(): void {
@@ -1655,8 +1692,9 @@ export class CompanyComponent implements OnInit, OnDestroy {
   }
 
   protected currentHeaderTitle(): string {
+    if (this.isSuperAdmin()) return 'Companies';
     switch (this.activeTab()) {
-      case 'directory': return 'Company Onboarding';
+      case 'directory': return 'Companies';
       case 'profile': return 'Company Profile & Branding';
       case 'departments': return 'Departments';
       case 'designations': return 'Designations';
@@ -1695,10 +1733,11 @@ export class CompanyComponent implements OnInit, OnDestroy {
             city: data.city || '',
             country: data.country || '',
             phone: data.phone || '',
-            payrollCurrency: data.payrollCurrency || 'AED',
+            payrollCurrency: data.payrollCurrency || 'INR',
             logoUrl: data.logoUrl || null,
             taxNumberLabel: data.taxNumberLabel || 'Tax Number (TRN/VAT)',
             registrationNumberLabel: data.registrationNumberLabel || 'Trade License / CIN',
+            workingDaysPerWeek: data.workingDaysPerWeek ?? 5.0,
           };
           if (data.logoUrl) {
             this.session.updateCompanyLogo(data.logoUrl);

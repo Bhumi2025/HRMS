@@ -73,6 +73,7 @@ export const routes: Routes = [
       {
         path: 'company',
         data: { title: 'Company' },
+        runGuardsAndResolvers: 'always',
         loadComponent: () => import('./features/hr/company.component').then((m) => m.CompanyComponent),
       },
       {

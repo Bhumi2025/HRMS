@@ -107,11 +107,36 @@ interface AccountItem {
             </div>
             <div class="form-group">
               <label class="form-label">Email Address<span class="req">*</span></label>
-              <input class="form-control" type="email" placeholder="alex.morgan@company.com" [value]="personal().email" (input)="patchP('email', $any($event.target).value)" />
+              <input
+                class="form-control"
+                [class.is-invalid]="emailTouched() && !isEmailValid()"
+                type="email"
+                placeholder="alex.morgan@company.com"
+                [value]="personal().email"
+                (input)="patchP('email', $any($event.target).value)"
+                (blur)="emailTouched.set(true)"
+              />
+              @if (emailTouched() && !isEmailValid()) {
+                <div style="font-size: 11px; color: #ef4444; margin-top: 4px; font-weight: 500">
+                  Please enter a valid email address (e.g. name@company.com)
+                </div>
+              }
             </div>
             <div class="form-group">
               <label class="form-label">Phone Number<span class="req">*</span></label>
-              <input class="form-control" placeholder="+1 (555) 123-4567" [value]="personal().phone" (input)="patchP('phone', $any($event.target).value)" />
+              <input
+                class="form-control"
+                [class.is-invalid]="phoneTouched() && !isPhoneValid()"
+                placeholder="+91 98765 43210"
+                [value]="personal().phone"
+                (input)="patchP('phone', $any($event.target).value)"
+                (blur)="phoneTouched.set(true)"
+              />
+              @if (phoneTouched() && !isPhoneValid()) {
+                <div style="font-size: 11px; color: #ef4444; margin-top: 4px; font-weight: 500">
+                  Please enter a valid 10-digit Indian phone number (e.g. +91 98765 43210)
+                </div>
+              }
             </div>
             <div class="form-group">
               <label class="form-label">Date of Birth</label>
@@ -231,13 +256,13 @@ interface AccountItem {
                   </div>
                   <div style="min-width: 0">
                     <div class="doc-label" style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ d }}</div>
-                    <div class="doc-label" style="color: var(--muted); white-space: nowrap">PDF, JPG up to 10MB</div>
+                    <div class="doc-label" style="color: var(--muted); white-space: nowrap">PDF, JPG, PNG up to 3MB</div>
                   </div>
                 </div>
                 <input
                   #docFileInput
                   type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  accept=".pdf,.jpg,.jpeg"
                   style="display: none"
                   (change)="onDocFileSelected(d, $event)"
                 />
@@ -295,6 +320,21 @@ interface AccountItem {
                       <span [appIcon]="showPassword() ? 'eye' : 'lock'"></span>
                     </button>
                   </div>
+                  <!-- Inline Spotify Volume Password Strength Bar -->
+                  @if (accountForm().password.length > 0) {
+                    <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                      <div style="flex: 1; height: 5px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
+                        <div
+                          [style.width.%]="passwordStrength().score"
+                          [style.background]="passwordStrength().color"
+                          style="height: 100%; border-radius: 999px; transition: width 0.3s ease, background-color 0.3s ease;"
+                        ></div>
+                      </div>
+                      <span [style.color]="passwordStrength().color" style="font-size: 11px; font-weight: 700; min-width: 60px; text-align: right;">
+                        {{ passwordStrength().label }}
+                      </span>
+                    </div>
+                  }
                   <div style="font-size: 11px; color: var(--muted); margin-top: 4px">Employee will use this password to sign in</div>
                 </div>
 
@@ -1066,21 +1106,24 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       error: () => this.allDesignations.set([]),
     });
 
-    this.api.employees({ pageSize: 100 }).subscribe({
+    this.api.employees({ pageSize: 200 }).subscribe({
       next: (res) => {
         const items = res.items || [];
         this.managerMap = new Map(items.map((e) => [e.fullName, e.id]));
-        const emps = items.map((e) => ({
-          v: e.fullName,
-          l: e.fullName,
-        }));
-        this.managerOptions.set([
-          { v: 'Company Admin', l: 'Company Admin' },
-          ...emps,
-        ]);
+        const emps = items.map((e) => {
+          const designation = (e as any).designation || e.jobTitle || 'Employee';
+          return {
+            v: e.fullName,
+            l: `${e.fullName} - ${designation}`,
+          };
+        });
+        this.managerOptions.set(emps.length > 0 ? emps : [{ v: '', l: 'No Managers Available' }]);
+        if (emps.length > 0 && !this.job().reportingManager) {
+          this.job.update((j) => ({ ...j, reportingManager: emps[0].v }));
+        }
       },
       error: () => {
-        this.managerOptions.set([{ v: 'Company Admin', l: 'Company Admin' }]);
+        this.managerOptions.set([]);
       },
     });
   }
@@ -1219,14 +1262,75 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     { v: 'Divorced', l: 'Divorced' },
     { v: 'Widowed', l: 'Widowed' },
   ];
-  protected readonly bloodOptions: SelectOption[] = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((b) => ({ v: b, l: b }));
+  protected readonly emailTouched = signal(false);
+  protected readonly phoneTouched = signal(false);
+  protected readonly isEmailValid = computed(() => {
+    const email = this.personal().email.trim();
+    return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+  });
+  protected readonly isPhoneValid = computed(() => {
+    const phone = this.personal().phone.trim().replace(/[\s\-]/g, '');
+    return phone.length === 0 || /^(?:\+91|91|0)?[6-9]\d{9}$/.test(phone);
+  });
+
+  // Password strength computation for Spotify Volume Slider UI
+  protected readonly passwordStrength = computed(() => {
+    const pwd = this.accountForm().password || '';
+    if (!pwd) {
+      return {
+        score: 0,
+        label: 'No Password',
+        color: '#94a3b8',
+      };
+    }
+
+    const hasMinLength = pwd.length >= 8;
+    const hasMixedCase = /[a-z]/.test(pwd) && /[A-Z]/.test(pwd);
+    const hasNumber = /\d/.test(pwd);
+    const hasSymbol = /[^A-Za-z0-9]/.test(pwd);
+
+    let score = 0;
+    if (pwd.length > 0) score += 10;
+    if (hasMinLength) score += 25;
+    if (pwd.length >= 12) score += 15;
+    if (hasMixedCase) score += 20;
+    if (hasNumber) score += 15;
+    if (hasSymbol) score += 15;
+
+    score = Math.min(100, score);
+
+    let label = 'Very Weak';
+    let color = '#ef4444'; // Red
+
+    if (score >= 80) {
+      label = 'Strong';
+      color = '#1db954'; // Spotify Green
+    } else if (score >= 60) {
+      label = 'Good';
+      color = '#22c55e'; // Green
+    } else if (score >= 40) {
+      label = 'Fair';
+      color = '#f59e0b'; // Amber
+    } else if (score >= 20) {
+      label = 'Weak';
+      color = '#f97316'; // Orange
+    }
+
+    return {
+      score,
+      label,
+      color,
+    };
+  });
+
+  private readonly uploadedDocs = new Map<string, string>();
   protected readonly gradeOptions: SelectOption[] = ['L3', 'L4', 'L5'].map((g) => ({ v: g, l: g }));
   protected readonly employmentOptions: SelectOption[] = [
     { v: 'Full-time', l: 'Full-time' },
     { v: 'Part-time', l: 'Part-time' },
     { v: 'Contract', l: 'Contract' },
   ];
-  protected readonly managerOptions = signal<SelectOption[]>([{ v: 'Company Admin', l: 'Company Admin' }]);
+  protected readonly managerOptions = signal<SelectOption[]>([]);
   protected readonly shiftOptions: SelectOption[] = [
     { v: 'Morning (9AM - 6PM)', l: 'Morning (9AM - 6PM)' },
     { v: 'Evening', l: 'Evening' },
@@ -1291,31 +1395,54 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     if (!input.files || input.files.length === 0) return;
     const file = input.files[0];
 
-    const maxSizeBytes = 10 * 1024 * 1024;
+    // Max 3MB limit
+    const maxSizeBytes = 3 * 1024 * 1024;
     if (file.size > maxSizeBytes) {
-      this.toast.show('Document file size exceeds the 10MB limit.', 'danger');
+      this.toast.show('Document file size exceeds the 3MB limit.', 'danger');
       input.value = '';
       return;
     }
 
+    // PDF, JPG, PNG, WEBP allowed (up to 3MB)
     const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
-    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'];
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
     if (!allowed.includes(ext)) {
-      this.toast.show(`File format '${ext}' is not supported. Please upload PDF, JPG, PNG or DOC.`, 'danger');
+      this.toast.show(`File format '${ext}' is not supported. Please upload PDF, JPG, or PNG (up to 3MB).`, 'danger');
       input.value = '';
       return;
     }
 
-    this.uploaded.update((set) => new Set(set).add(name));
-    this.toast.show(`${name} (${file.name}) uploaded!`, 'success');
+    this.api.uploadFile(file).subscribe({
+      next: (res) => {
+        const stored = res.cloudinaryUrl || res.url || res.storedName || res.fileName;
+        this.uploadedDocs.set(name, stored);
+        this.uploaded.update((set) => new Set(set).add(name));
+        this.toast.show(`${name} (${file.name}) uploaded!`, 'success');
+      },
+      error: (err) => {
+        const msg = err?.error?.message || `Failed to upload ${name}`;
+        this.toast.show(msg, 'danger');
+      },
+    });
     input.value = '';
   }
 
   protected next(): void {
     if (this.step() === 0) {
+      this.emailTouched.set(true);
+      this.phoneTouched.set(true);
       const p = this.personal();
       if (!p.firstName.trim() || !p.lastName.trim() || !p.email.trim()) {
         this.toast.show('First name, last name and email are required.', 'danger');
+        return;
+      }
+      if (!this.isEmailValid()) {
+        this.toast.show('Please enter a valid email address (e.g. name@company.com).', 'danger');
+        return;
+      }
+      const phoneClean = p.phone.trim().replace(/[\s\-]/g, '');
+      if (phoneClean && !/^(?:\+91|91|0)?[6-9]\d{9}$/.test(phoneClean)) {
+        this.toast.show('Please enter a valid 10-digit Indian mobile number (e.g. +91 98765 43210 or 9876543210).', 'danger');
         return;
       }
     }
@@ -1411,7 +1538,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       transportAllowance: 0,
       mobileAllowance: 0,
       otherAllowances: 0,
-      currency: 'USD',
+      currency: 'INR',
       dateOfBirth: this.toIso(personal.dob),
       gender: this.mapGender(personal.gender),
       maritalStatus: personal.maritalStatus,
@@ -1462,6 +1589,20 @@ export class OnboardingComponent implements OnInit, OnDestroy {
           }).subscribe({ next: () => {}, error: () => {} });
         }
 
+        // Persist uploaded document records in database
+        if (created?.id && this.uploadedDocs.size > 0) {
+          for (const [docName, storedFileName] of this.uploadedDocs.entries()) {
+            this.api.createDocument({
+              employeeId: created.id,
+              name: docName,
+              type: this.mapDocType(docName),
+              fileUrl: storedFileName,
+              fileSize: '3 MB',
+              isCompanyDocument: false,
+            }).subscribe({ next: () => {}, error: () => {} });
+          }
+        }
+
         this.submitted.set(true);
         this.toast.show('Employee onboarded with biometric Face ID!', 'success');
       },
@@ -1472,6 +1613,15 @@ export class OnboardingComponent implements OnInit, OnDestroy {
         this.toast.show(msg, 'danger');
       },
     });
+  }
+
+  private mapDocType(docName: string): string {
+    const n = (docName || '').toLowerCase();
+    if (n.includes('passport') || n.includes('id')) return 'Identity';
+    if (n.includes('visa') || n.includes('permit')) return 'Legal';
+    if (n.includes('medical') || n.includes('insurance')) return 'Benefits';
+    if (n.includes('certificate') || n.includes('contract')) return 'Employment';
+    return 'Other';
   }
 
   private mapGender(value: string): string {

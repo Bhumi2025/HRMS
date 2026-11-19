@@ -20,6 +20,7 @@ public sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Comp
         builder.Property(c => c.Phone).HasMaxLength(40);
         builder.Property(c => c.HrEmail).HasMaxLength(160);
         builder.Property(c => c.PayrollCurrency).HasMaxLength(3);
+        builder.Property(c => c.WorkingDaysPerWeek).HasPrecision(3, 1).HasDefaultValue(5.0m);
     }
 }
 

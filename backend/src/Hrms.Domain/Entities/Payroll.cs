@@ -26,6 +26,8 @@ public class PayrollRun : BaseEntity
 
     public decimal TotalNet { get; set; }
 
+    public decimal ReductionPercent { get; set; }
+
     public DateTime? ProcessedAtUtc { get; set; }
 
     public ICollection<Payslip> Payslips { get; set; } = new List<Payslip>();
@@ -53,6 +55,8 @@ public class Payslip : BaseEntity
     public decimal Deductions { get; set; }
 
     public decimal NetPay { get; set; }
+
+    public decimal ReductionPercent { get; set; }
 
     public int WorkingDays { get; set; }
 

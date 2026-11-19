@@ -224,6 +224,10 @@ public sealed class CompanyService : ICompanyService
         settings.TaxNumberLabel = string.IsNullOrWhiteSpace(request.TaxNumberLabel) ? "TRN / Tax Number" : request.TaxNumberLabel.Trim();
         settings.RegistrationNumberLabel = string.IsNullOrWhiteSpace(request.RegistrationNumberLabel) ? "Trade License / Reg No" : request.RegistrationNumberLabel.Trim();
         settings.LogoUrl = string.IsNullOrWhiteSpace(request.LogoUrl) ? null : request.LogoUrl.Trim();
+        if (request.WorkingDaysPerWeek.HasValue && request.WorkingDaysPerWeek.Value >= 1.0m && request.WorkingDaysPerWeek.Value <= 7.0m)
+        {
+            settings.WorkingDaysPerWeek = request.WorkingDaysPerWeek.Value;
+        }
     }
 
     private static CompanySettingsDto ToDto(CompanySettings s) => new(
@@ -242,7 +246,8 @@ public sealed class CompanyService : ICompanyService
         s.LogoUrl,
         s.TimeZone,
         s.TaxNumberLabel,
-        s.RegistrationNumberLabel);
+        s.RegistrationNumberLabel,
+        s.WorkingDaysPerWeek);
 }
 
 public sealed class TaskService : ITaskService

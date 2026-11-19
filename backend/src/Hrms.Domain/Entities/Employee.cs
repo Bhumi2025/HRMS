@@ -80,7 +80,7 @@ public class Employee : BaseEntity
 
     public decimal OtherAllowances { get; set; }
 
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = "INR";
 
     // ── Bank ──
     public string? BankName { get; set; }

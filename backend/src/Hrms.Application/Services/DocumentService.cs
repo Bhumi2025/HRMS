@@ -77,7 +77,7 @@ public sealed class DocumentService : IDocumentService
             IssueDate = request.IssueDate,
             ExpiryDate = request.ExpiryDate,
             Notes = request.Notes,
-            FileUrl = request.FileUrl,
+            FileUrl = !string.IsNullOrWhiteSpace(request.FileUrl) ? request.FileUrl.Trim() : null,
             FileSize = request.FileSize,
             IsCompanyDocument = request.IsCompanyDocument,
             Status = ResolveStatus(request.ExpiryDate),
@@ -153,6 +153,12 @@ public sealed class DocumentService : IDocumentService
             ? expiry.DayNumber - DateOnly.FromDateTime(DateTime.UtcNow).DayNumber
             : (int?)null;
 
+        var fileUrl = d.FileUrl;
+        if (!string.IsNullOrWhiteSpace(fileUrl) && !fileUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) && !fileUrl.StartsWith("/"))
+        {
+            fileUrl = $"/api/files/download/{fileUrl}";
+        }
+
         return new DocumentDto(
             d.Id,
             d.EmployeeId == Guid.Empty ? null : d.EmployeeId,
@@ -167,7 +173,7 @@ public sealed class DocumentService : IDocumentService
             status.ToString(),
             d.Notes,
             d.FileSize,
-            d.FileUrl,
+            fileUrl,
             d.IsCompanyDocument);
     }
 }

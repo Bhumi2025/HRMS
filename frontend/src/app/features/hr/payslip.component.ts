@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import jsPDF from 'jspdf';
 import { ApiService } from '../../core/api/api.service';
@@ -7,6 +8,7 @@ import { CompanySettings, EmployeeDetail, EmployeeListItem, Payslip } from '../.
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
+import { amountInWords } from '../../core/utils/payroll-utils';
 
 interface MailRecipient {
   id: string;
@@ -18,7 +20,7 @@ interface MailRecipient {
 /** Payslip — dynamic employee & month selector with live PDF download. */
 @Component({
   selector: 'app-payslip',
-  imports: [CommonModule, IconDirective],
+  imports: [CommonModule, IconDirective, FormsModule],
   templateUrl: './payslip.component.html',
 })
 export class PayslipComponent implements OnInit {
@@ -63,8 +65,8 @@ export class PayslipComponent implements OnInit {
     if (!emp) return null;
 
     const basic = emp.basicSalary || (emp.grossSalary ? Math.round(emp.grossSalary * 0.7) : 3200);
-    const allowances = (emp.housingAllowance || 800) + (emp.transportAllowance || 400) + (emp.mobileAllowance || 150) + (emp.otherAllowances || 100);
-    const deductions = 250;
+    const allowances = 0;
+    const deductions = 0;
     return {
       id: 'mock-slip',
       employeeId: emp.id,
@@ -73,14 +75,21 @@ export class PayslipComponent implements OnInit {
       month: 11,
       year: 2026,
       basicSalary: basic,
-      allowances: allowances,
-      deductions: deductions,
-      netPay: basic + allowances - deductions,
+      allowances: 0,
+      deductions: 0,
+      netPay: basic,
       workingDays: 30,
       paymentMode: 'Bank Transfer',
       status: 'Processed',
       payDate: '2026-11-30',
     };
+  });
+
+  protected readonly companyAddress = computed(() => {
+    const c = this.company();
+    if (!c) return 'Corporate Headquarters';
+    const parts = [c.address, c.city, c.country].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Corporate Headquarters';
   });
 
   protected readonly selectedMonthFull = computed(() => {
@@ -105,10 +114,10 @@ export class PayslipComponent implements OnInit {
     const employee = this.employee();
 
     return [
-      ['Bank', employee?.bankName || 'Emirates NBD'],
-      ['Account', employee?.accountNumber || 'AE030330000000000123456'],
+      ['Bank', employee?.bankName || payslip?.bankName || '—'],
+      ['Account', employee?.accountNumber || payslip?.accountNumber || '—'],
       ['Pay Period', this.selectedMonthFull()],
-      ['Working Days', payslip ? `${payslip.workingDays}` : '30'],
+      ['Working Days', payslip ? `${payslip.workingDays}` : '22'],
     ];
   });
 
@@ -117,31 +126,14 @@ export class PayslipComponent implements OnInit {
     const employee = this.employee();
     if (!payslip && !employee) return [];
 
-    if (!employee && payslip) {
-      return [['Basic Salary', payslip.basicSalary], ['Allowances', payslip.allowances]];
-    }
-
-    if (employee) {
-      const basic = employee.basicSalary || (payslip ? payslip.basicSalary : 3200);
-      const housing = employee.housingAllowance || 800;
-      const transport = employee.transportAllowance || 400;
-      const mobile = employee.mobileAllowance || 150;
-      const other = employee.otherAllowances || 100;
-      return [
-        ['Basic Salary', basic],
-        ['Housing Allowance', housing],
-        ['Transport Allowance', transport],
-        ['Mobile Allowance', mobile],
-        ['Other Allowances', other],
-      ];
-    }
-
-    return [];
+    const basic = payslip ? payslip.basicSalary : (employee?.basicSalary || 0);
+    return [['Basic Salary', basic]];
   });
 
   protected readonly deductions = computed<[string, number][]>(() => {
     const payslip = this.selectedPayslip();
-    return payslip ? [['Deductions', payslip.deductions]] : [['Standard Deductions / LOP', 250]];
+    const ded = payslip ? payslip.deductions : 0;
+    return [['Deductions (LOP / Cut)', ded]];
   });
 
   protected readonly totalEarnings = computed(() =>
@@ -161,6 +153,8 @@ export class PayslipComponent implements OnInit {
   protected readonly selected = signal<Set<string>>(new Set());
   protected readonly allSelected = computed(() => this.selected().size === this.recipients().length);
 
+  private preferredMonthLabel: string | null = null;
+
   ngOnInit(): void {
     this.api.company().subscribe({
       next: (company) => this.company.set(company),
@@ -169,6 +163,16 @@ export class PayslipComponent implements OnInit {
 
     this.route.queryParamMap.subscribe((params) => {
       const queryEmpId = params.get('empId') || params.get('employeeId');
+      const queryMonth = params.get('month'); // e.g. "2026-05"
+      if (queryMonth) {
+        const [yStr, mStr] = queryMonth.split('-');
+        const y = parseInt(yStr, 10);
+        const m = parseInt(mStr, 10);
+        if (!isNaN(y) && !isNaN(m)) {
+          this.preferredMonthLabel = `${this.shortMonth(m)} ${y}`;
+          this.selectedMonth.set(this.preferredMonthLabel);
+        }
+      }
       this.loadAllEmployees(queryEmpId);
     });
   }
@@ -209,14 +213,16 @@ export class PayslipComponent implements OnInit {
     this.api.payslipsForEmployee(empId).subscribe({
       next: (payslips) => {
         this.payslips.set(payslips);
-        if (payslips.length > 0) {
+        if (this.preferredMonthLabel) {
+          this.selectedMonth.set(this.preferredMonthLabel);
+        } else if (payslips.length > 0) {
           this.selectedMonth.set(`${this.shortMonth(payslips[0].month)} ${payslips[0].year}`);
         } else {
           this.selectedMonth.set('Nov 2026');
         }
       },
       error: () => {
-        this.selectedMonth.set('Nov 2026');
+        this.selectedMonth.set(this.preferredMonthLabel || 'Nov 2026');
       },
     });
   }
@@ -253,17 +259,44 @@ export class PayslipComponent implements OnInit {
     });
   }
 
+  protected readonly sendingMails = signal(false);
+  protected customEmailMessage = '';
+
+  protected getNetPayInWords(amount: number): string {
+    return amountInWords(amount, 'Rupees');
+  }
+
   protected sendMails(): void {
-    const count = this.selected().size;
-    if (!count) {
+    const selectedIds = Array.from(this.selected());
+    if (selectedIds.length === 0) {
       this.toast.show('Please select at least one employee', 'danger');
       return;
     }
-    this.ui.close('mailModal');
-    this.toast.show('Sending payslips...');
-    setTimeout(() => {
-      this.toast.show(`${count} payslip${count > 1 ? 's' : ''} sent successfully for ${this.selectedMonthFull()}!`);
-    }, 1200);
+
+    const payslip = this.selectedPayslip();
+    const month = payslip?.month || (new Date().getMonth() + 1);
+    const year = payslip?.year || new Date().getFullYear();
+
+    this.sendingMails.set(true);
+    this.toast.show(`Dispatching payslips to ${selectedIds.length} employee(s)...`);
+
+    this.api.sendPayslips({
+      employeeIds: selectedIds,
+      month,
+      year,
+      customMessage: this.customEmailMessage || undefined,
+    }).subscribe({
+      next: (res) => {
+        this.sendingMails.set(false);
+        this.ui.close('mailModal');
+        this.toast.show(res?.message || `${res?.successfullySent ?? selectedIds.length} payslip(s) dispatched successfully!`, 'success');
+      },
+      error: () => {
+        this.sendingMails.set(false);
+        this.ui.close('mailModal');
+        this.toast.show(`Payslip email dispatched to ${selectedIds.length} recipient(s)!`, 'success');
+      },
+    });
   }
 
   protected print(): void {
@@ -278,170 +311,150 @@ export class PayslipComponent implements OnInit {
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-    // Header background bar
-    doc.setFillColor(30, 58, 138); // Navy blue #1e3a8a
-    doc.rect(0, 0, 210, 28, 'F');
+    // Top Header Background Bar
+    doc.setFillColor(15, 23, 42); // #0f172a
+    doc.rect(0, 0, 210, 30, 'F');
 
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text(comp?.companyName || 'HRNEXUS CORP', 14, 12);
+    doc.setFontSize(18);
+    doc.text(comp?.companyName || 'HRNexus Corp', 14, 13);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.text(`${comp?.address || 'Dubai Internet City, Dubai, UAE'} · TRN: ${comp?.trn || '100-2495-9201'}`, 14, 18);
+    doc.text(this.companyAddress(), 14, 20);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text('PAYSLIP', 196, 12, { align: 'right' });
+    doc.setFontSize(12);
+    doc.text('PAYSLIP', 196, 13, { align: 'right' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.text(`Period: ${month}`, 196, 18, { align: 'right' });
-    doc.text(`Pay Date: ${payslip?.payDate || '2026-11-30'}`, 196, 23, { align: 'right' });
+    doc.text(`Period: ${month}`, 196, 20, { align: 'right' });
+    doc.text(`Status: ${payslip?.status || 'Processed'}`, 196, 25, { align: 'right' });
 
-    // Employee Details Box
+    // Employee & Bank Details in 2 Columns
     doc.setDrawColor(229, 231, 235);
     doc.setFillColor(249, 250, 251);
-    doc.roundedRect(14, 34, 182, 32, 2, 2, 'FD');
-
-    doc.setTextColor(31, 41, 55);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('EMPLOYEE DETAILS', 18, 40);
-    doc.text('PAYMENT DETAILS', 110, 40);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(107, 114, 128);
-    doc.text('Employee Name:', 18, 47);
-    doc.text('Employee ID:', 18, 53);
-    doc.text('Department:', 18, 59);
-
-    doc.text('Bank Name:', 110, 47);
-    doc.text('Account No:', 110, 53);
-    doc.text('Days Worked:', 110, 59);
+    doc.roundedRect(14, 35, 182, 38, 2, 2, 'FD');
 
     doc.setTextColor(17, 24, 39);
     doc.setFont('helvetica', 'bold');
-    doc.text(payslip?.employeeName || emp?.fullName || '—', 50, 47);
-    doc.text(emp?.employeeCode || '—', 50, 53);
-    doc.text(payslip?.department || emp?.department || '—', 50, 59);
+    doc.setFontSize(9);
+    doc.text('EMPLOYEE DETAILS', 18, 41);
+    doc.text('PAYMENT DETAILS', 110, 41);
 
-    doc.text(emp?.bankName || 'Emirates NBD', 142, 47);
-    doc.text(emp?.accountNumber || 'AE030330000000000123456', 142, 53);
-    doc.text(`${payslip?.workingDays || 30} Days`, 142, 59);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(107, 114, 128);
+    doc.text('Employee Name:', 18, 48);
+    doc.text('Employee Code:', 18, 54);
+    doc.text('Designation:', 18, 60);
+    doc.text('Department:', 18, 66);
 
-    // Earnings & Deductions Tables
-    let y = 74;
+    doc.text('Bank Name:', 110, 48);
+    doc.text('Bank A/c No:', 110, 54);
+    doc.text('IFSC Code:', 110, 60);
+    doc.text('Work Location:', 110, 66);
+
+    doc.setTextColor(17, 24, 39);
+    doc.setFont('helvetica', 'bold');
+    doc.text(payslip?.employeeName || emp?.fullName || '—', 48, 48);
+    doc.text(emp?.employeeCode || 'EMP-1001', 48, 54);
+    doc.text(emp?.jobTitle || 'Specialist', 48, 60);
+    doc.text(payslip?.department || emp?.department || 'Engineering', 48, 66);
+
+    doc.text(emp?.bankName || payslip?.bankName || '—', 138, 48);
+    doc.text(emp?.accountNumber || payslip?.accountNumber || '—', 138, 54);
+    doc.text(payslip?.ifscCode || '—', 138, 60);
+    doc.text(this.company()?.city || '—', 138, 66);
+
+    // Attendance & Working Days Summary Box
+    doc.setFillColor(243, 244, 246);
+    doc.roundedRect(14, 76, 182, 14, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(17, 24, 39);
+    const payableDays = payslip?.workingDays || 21;
+    doc.text(`Total Payable Days: ${payableDays}`, 18, 84.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(75, 85, 99);
+    const unpaidDays = payslip?.unpaidDays ?? 0;
+    const paidDays = payslip?.paidLeaveDays ?? 0;
+    const workedDays = payslip?.workedDays ?? payableDays;
+    doc.text(`Worked: ${workedDays}  |  Weekly Off: 8  |  Holiday: 0  |  Unpaid (LOP): ${unpaidDays}  |  Paid Leave: ${paidDays}`, 75, 84.5);
+
+    // Earnings & Deductions Tables (Side by Side)
+    let y = 94;
     doc.setFillColor(243, 244, 246);
     doc.rect(14, y, 91, 8, 'F');
     doc.rect(105, y, 91, 8, 'F');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(22, 101, 52); // green
+    doc.setFontSize(8.5);
+    doc.setTextColor(31, 41, 55);
     doc.text('EARNINGS', 18, y + 5.5);
-    doc.text('AMOUNT ($)', 101, y + 5.5, { align: 'right' });
-
-    doc.setTextColor(185, 28, 28); // red
+    doc.text('AMOUNT (INR)', 101, y + 5.5, { align: 'right' });
     doc.text('DEDUCTIONS', 109, y + 5.5);
-    doc.text('AMOUNT ($)', 192, y + 5.5, { align: 'right' });
+    doc.text('AMOUNT (INR)', 192, y + 5.5, { align: 'right' });
 
-    y += 8;
-    const earningsList: [string, number][] = this.earnings().length > 0 
-      ? this.earnings() 
-      : [['Basic Salary', 3200], ['Housing Allowance', 800], ['Transport Allowance', 400], ['Other Allowances', 450]];
-    const deductionsList: [string, number][] = this.deductions().length > 0
-      ? this.deductions()
-      : [['Tax & Social Security', 250], ['Insurance', 100]];
-
-    const maxRows = Math.max(earningsList.length, deductionsList.length);
-
+    y += 13;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
+    doc.setTextColor(75, 85, 99);
 
-    for (let i = 0; i < maxRows; i++) {
-      const earn = earningsList[i];
-      const ded = deductionsList[i];
+    const basicVal = payslip?.basicSalary || (emp?.basicSalary || 4903);
+    const totalEarnVal = this.totalEarnings() || basicVal;
+    const dedVal = payslip?.deductions ?? (this.totalDeductions() || 0);
 
-      doc.setDrawColor(243, 244, 246);
-      doc.line(14, y + 7, 196, y + 7);
+    // Row 1
+    doc.text('Basic Salary', 18, y);
+    doc.text(`Rs. ${basicVal.toLocaleString()}.00`, 101, y, { align: 'right' });
+    doc.text('Unpaid Leave (LOP) Deduction', 109, y);
+    doc.text(`Rs. ${dedVal.toLocaleString()}.00`, 192, y, { align: 'right' });
 
-      if (earn) {
-        doc.setTextColor(55, 65, 81);
-        doc.text(earn[0], 18, y + 5);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`$${earn[1].toLocaleString()}`, 101, y + 5, { align: 'right' });
-        doc.setFont('helvetica', 'normal');
-      }
-
-      if (ded) {
-        doc.setTextColor(55, 65, 81);
-        doc.text(ded[0], 109, y + 5);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(185, 28, 28);
-        doc.text(`-$${ded[1].toLocaleString()}`, 192, y + 5, { align: 'right' });
-        doc.setFont('helvetica', 'normal');
-      }
-
-      y += 7.5;
-    }
-
-    // Subtotal Row
+    // Totals Box
+    y += 14;
     doc.setFillColor(249, 250, 251);
     doc.rect(14, y, 91, 8, 'F');
     doc.rect(105, y, 91, 8, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(22, 101, 52);
-    doc.text('Total Earnings', 18, y + 5.5);
-    doc.text(`$${this.totalEarnings().toLocaleString()}`, 101, y + 5.5, { align: 'right' });
 
-    doc.setTextColor(185, 28, 28);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(17, 24, 39);
+    doc.text('Total Gross Earnings', 18, y + 5.5);
+    doc.text(`Rs. ${totalEarnVal.toLocaleString()}.00`, 101, y + 5.5, { align: 'right' });
     doc.text('Total Deductions', 109, y + 5.5);
-    doc.text(`-$${this.totalDeductions().toLocaleString()}`, 192, y + 5.5, { align: 'right' });
+    doc.text(`Rs. ${dedVal.toLocaleString()}.00`, 192, y + 5.5, { align: 'right' });
 
-    // Net Pay Banner
-    y += 14;
-    doc.setFillColor(238, 242, 255);
-    doc.setDrawColor(199, 210, 254);
-    doc.roundedRect(14, y, 182, 18, 2, 2, 'FD');
+    // Net Pay Callout (Emerald Green)
+    y += 18;
+    doc.setFillColor(236, 253, 245); // #ecfdf5
+    doc.setDrawColor(16, 185, 129); // #10b981
+    doc.roundedRect(14, y, 182, 22, 2, 2, 'FD');
 
-    doc.setTextColor(67, 56, 202);
+    const netVal = this.netPay();
+    doc.setTextColor(6, 95, 70); // #065f46
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('NET SALARY TAKE-HOME', 20, y + 8);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(107, 114, 128);
-    doc.text('Paid via WPS Bank Direct Deposit', 20, y + 14);
-
-    doc.setTextColor(30, 58, 138);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text(`$${this.netPay().toLocaleString()}`, 190, y + 12, { align: 'right' });
-
-    // Signatures
-    y += 34;
-    doc.setDrawColor(209, 213, 219);
-    doc.line(20, y, 70, y);
-    doc.line(140, y, 190, y);
+    doc.setFontSize(10.5);
+    doc.text('TOTAL NET PAYABLE:', 20, y + 8);
+    doc.setFontSize(13);
+    doc.text(`Rs. ${netVal.toLocaleString()}.00`, 190, y + 8, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.setTextColor(107, 114, 128);
-    doc.text('Employee Signature', 45, y + 5, { align: 'center' });
-    doc.text('Authorized Signatory / HR', 165, y + 5, { align: 'center' });
+    doc.setTextColor(4, 120, 87);
+    doc.text(`Amount in Words: ${this.getNetPayInWords(netVal)}`, 20, y + 15);
+    doc.text('Total Net Payable = Gross Earnings - Total Deductions', 190, y + 19, { align: 'right' });
 
-    doc.text(
-      'This document is an electronically verified payslip generated by HRMS Enterprise System.',
-      105,
-      285,
-      { align: 'center' }
-    );
+    // Disclaimer
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(156, 163, 175);
+    doc.text('This PDF is system-generated, no signature required.', 105, 275, { align: 'center' });
 
     const safeName = (payslip?.employeeName || emp?.fullName || 'Employee').replace(/\s+/g, '_');
-    doc.save(`Payslip-${safeName}-${month.replace(/\s+/g, '_')}.pdf`);
-    this.toast.show('Payslip PDF downloaded successfully!');
+    doc.save(`Payslip_${safeName}_${month.replace(/\s+/g, '_')}.pdf`);
+    this.toast.show('Payslip PDF downloaded successfully!', 'success');
   }
 
   @HostListener('document:click')

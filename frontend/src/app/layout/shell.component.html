@@ -122,13 +122,13 @@
           (click)="toggleFullscreen()"
           [appIcon]="'expand'"
         ></div>
-        <div
+        <!-- <div
           class="header-btn"
           [attr.data-tooltip]="theme.isDark() ? 'Light Mode' : 'Dark Mode'"
           style="cursor: pointer"
           (click)="toggleDark()"
           [appIcon]="theme.isDark() ? 'sun' : 'moon'"
-        ></div>
+        ></div> -->
         @if (role() !== 'Super Admin') {
           <div
             class="header-btn"

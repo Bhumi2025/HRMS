@@ -272,21 +272,27 @@ public static class DbSeeder
 
         // ── Payroll run + payslips (previous month) ──
         var period = today.AddMonths(-1);
+        var daysInPeriod = DateTime.DaysInMonth(period.Year, period.Month);
         var run = new PayrollRun
         {
             Month = period.Month,
             Year = period.Year,
-            PayDate = new DateOnly(period.Year, period.Month, DateTime.DaysInMonth(period.Year, period.Month)),
+            PayDate = new DateOnly(period.Year, period.Month, daysInPeriod),
             PaymentMethod = PaymentMode.BankTransfer,
             Status = PayrollStatus.Processed,
             EmployeeCount = employees.Length,
             ProcessedAtUtc = now.AddDays(-20),
         };
 
-        foreach (var employee in employees)
+        for (var idx = 0; idx < employees.Length; idx++)
         {
-            var allowances = employee.HousingAllowance + employee.TransportAllowance + employee.MobileAllowance + employee.OtherAllowances;
-            const decimal deductions = 250m;
+            var employee = employees[idx];
+            var basic = employee.BasicSalary;
+            var dailyRate = daysInPeriod > 0 ? (basic / daysInPeriod) : 0m;
+            // Realistic distinct unpaid days for demo/seeded cycle: 0, 1, 0, 2, 0, 1, 0, 0
+            var unpaidDays = (idx == 1) ? 1 : (idx == 3) ? 2 : (idx == 5) ? 1 : 0;
+            var deductions = Math.Round(unpaidDays * dailyRate, 2);
+            var net = Math.Round(basic - deductions, 2);
 
             run.Payslips.Add(new Payslip
             {
@@ -294,18 +300,18 @@ public static class DbSeeder
                 EmployeeId = employee.Id,
                 Month = period.Month,
                 Year = period.Year,
-                BasicSalary = employee.BasicSalary,
-                Allowances = allowances,
+                BasicSalary = basic,
+                Allowances = 0m,
                 Deductions = deductions,
-                NetPay = employee.BasicSalary + allowances - deductions,
-                WorkingDays = DateTime.DaysInMonth(period.Year, period.Month),
+                NetPay = net,
+                WorkingDays = daysInPeriod,
                 Status = PayrollStatus.Processed,
                 PayDate = run.PayDate,
             });
         }
 
         run.TotalGross = run.Payslips.Sum(p => p.BasicSalary);
-        run.TotalAllowances = run.Payslips.Sum(p => p.Allowances);
+        run.TotalAllowances = 0m;
         run.TotalDeductions = run.Payslips.Sum(p => p.Deductions);
         run.TotalNet = run.Payslips.Sum(p => p.NetPay);
         db.PayrollRuns.Add(run);
@@ -337,15 +343,11 @@ public static class DbSeeder
             NewCompanyDocument("IT Security Policy", "0.6 MB"),
             NewCompanyDocument("Health & Safety Guidelines", "1.8 MB"));
 
-        // ── Approvals ──
+        // ── Approvals (Non-leave approvals; all Leave approvals are derived from LeaveRequests) ──
         db.ApprovalRequests.AddRange(
-            NewApproval(priya, ApprovalType.Leave, "Annual Leave", "5 days · next week", ApprovalPriority.High, now.AddDays(-1)),
-            NewApproval(tom, ApprovalType.Leave, "Sick Leave", "2 days · this week", ApprovalPriority.Medium, now.AddDays(-2)),
             NewApproval(ravi, ApprovalType.Overtime, "Overtime", "12 hrs · last week", ApprovalPriority.Low, now.AddDays(-1)),
             NewApproval(emma, ApprovalType.WorkFromHome, "Work From Home", "3 days · next week", ApprovalPriority.Low, now.AddDays(-3)),
-            NewApproval(sarah, ApprovalType.Leave, "Annual Leave", "5 days · next month", ApprovalPriority.Medium, now.AddDays(-4)),
             NewApproval(james, ApprovalType.Overtime, "Overtime", "8 hrs · last week", ApprovalPriority.Low, now.AddDays(-5)),
-            NewApproval(aisha, ApprovalType.Leave, "Sick Leave", "2 days · this week", ApprovalPriority.High, now.AddDays(-6)),
             NewApproval(carlos, ApprovalType.Overtime, "Overtime", "10 hrs · this week", ApprovalPriority.Medium, now.AddDays(-7)));
 
         // ── Announcements ──
