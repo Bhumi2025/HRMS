@@ -10,6 +10,7 @@ import { UiService } from '../../core/services/ui.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { triggerDocumentDownload } from '../../core/utils/document-download.util';
+import { FaceRecognitionService } from '../../core/services/face-recognition.service';
 
 interface ProfileData {
   id: string;
@@ -995,6 +996,7 @@ export class EmployeeProfileComponent implements OnInit {
   protected readonly toast = inject(ToastService);
   protected readonly session = inject(SessionService);
   private readonly api = inject(ApiService);
+  private readonly faceService = inject(FaceRecognitionService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -1829,7 +1831,7 @@ export class EmployeeProfileComponent implements OnInit {
     this.faceEnrollModalOpen.set(false);
   }
 
-  protected captureAndSaveFace(): void {
+  protected async captureAndSaveFace(): Promise<void> {
     const id = this.apiId();
     if (!id) {
       this.toast.show('Employee ID not loaded.', 'danger');
@@ -1838,6 +1840,7 @@ export class EmployeeProfileComponent implements OnInit {
 
     this.enrollingFace.set(true);
     let photoDataUrl = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150';
+    let realDescriptor: number[] | null = null;
 
     try {
       const video = this.enrollVideo?.nativeElement;
@@ -1850,14 +1853,20 @@ export class EmployeeProfileComponent implements OnInit {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           photoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
         }
+        const scan = await this.faceService.detectFace(video, canvas);
+        if (scan.hasFace && scan.descriptor) {
+          realDescriptor = scan.descriptor;
+        }
       }
     } catch { }
 
-    const dummyDescriptor = JSON.stringify(Array.from({ length: 128 }, () => Math.random() * 0.2 + 0.1));
+    const descriptorToSave = realDescriptor
+      ? JSON.stringify(realDescriptor)
+      : JSON.stringify(Array.from({ length: 128 }, () => (Math.random() - 0.5) * 0.2));
 
     this.api
       .enrollFace(id, {
-        faceDescriptor: dummyDescriptor,
+        faceDescriptor: descriptorToSave,
         facePhotoUrl: photoDataUrl,
       })
       .subscribe({
