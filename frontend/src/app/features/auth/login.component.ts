@@ -50,7 +50,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   /** Seeded backend accounts used to prefill credentials. */
   protected readonly demoAccounts: { role: Role; label: string; email: string; password: string; companyCode?: string }[] = [
     { role: 'Super Admin', label: 'Super Admin', email: 'admin@hrnexus.com', password: 'Admin@123' },
-    { role: 'Company Admin', label: 'Viral Infotech (Admin)', email: 'viral@gmail.com', password: 'Admin@123', companyCode: 'VIRALINFOTECH' },
+    { role: 'Company Admin', label: 'Company Admin', email: 'companyadmin@hrnexus.com', password: 'Admin@123' },
     { role: 'HR Manager', label: 'HR Manager', email: 'hr@hrnexus.com', password: 'Hr@12345' },
     { role: 'Manager', label: 'Manager', email: 'manager@hrnexus.com', password: 'Manager@123' },
     { role: 'Employee', label: 'James Okafor', email: 'james@hrnexus.com', password: 'Employee@123' },
@@ -268,7 +268,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (this.submitting()) return;
     this.submitting.set(true);
 
-    this.api.login(this.email.trim(), this.password, this.companyCode).subscribe({
+    this.api.login(this.email.trim(), this.password?.trim(), this.companyCode).subscribe({
       next: (response) => {
         // If user is Employee role (or email indicates employee) → check face verification
         const role = response.user.role as Role;

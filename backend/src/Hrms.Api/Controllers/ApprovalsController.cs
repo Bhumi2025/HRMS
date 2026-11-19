@@ -21,6 +21,7 @@ public sealed class ApprovalsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = "ManagerOrAbove")]
     [ProducesResponseType(typeof(IReadOnlyList<ApprovalDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<ApprovalDto>>> List(
         [FromQuery] ApprovalStatus? status,
@@ -29,6 +30,7 @@ public sealed class ApprovalsController : ControllerBase
         Ok(await _approvals.ListAsync(status, type, ct));
 
     [HttpGet("summary")]
+    [Authorize(Policy = "ManagerOrAbove")]
     [ProducesResponseType(typeof(ApprovalSummaryDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApprovalSummaryDto>> Summary(CancellationToken ct) =>
         Ok(await _approvals.GetSummaryAsync(ct));

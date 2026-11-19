@@ -713,12 +713,53 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
                             IsEdit = true,
                             IsDelete = true
                         });
+                        permKeySet.Add($"{r.Id}:{nav.Id}");
+                    }
+                }
+            }
+
+            // Grant role-appropriate permissions to Manager and Employee roles
+            var otherRoles = await db.Roles
+                .Where(r => r.Code == "Manager" || r.Code == "Employee" ||
+                            r.Name == "Manager" || r.Name == "Employee")
+                .ToListAsync(ct);
+
+            foreach (var r in otherRoles)
+            {
+                bool isManager = r.Code == "Manager" || r.Name == "Manager";
+                var allowedCodes = isManager
+                    ? new[] { "DASH", "ANAL", "EMPL", "PROF", "ATTD", "LEAV", "DOCS", "APPR", "REPT", "COMP", "PAYS" }
+                    : new[] { "DASH", "PROF", "ATTD", "LEAV", "PAYS", "DOCS" };
+
+                foreach (var nav in allCurrentNavs)
+                {
+                    if (allowedCodes.Contains(nav.Code) && !permKeySet.Contains($"{r.Id}:{nav.Id}"))
+                    {
+                        bool isFull = isManager && new[] { "DASH", "PROF", "APPR" }.Contains(nav.Code);
+                        bool isCreate = isManager
+                            ? new[] { "DASH", "PROF", "APPR", "ATTD", "LEAV", "DOCS" }.Contains(nav.Code)
+                            : new[] { "ATTD", "LEAV" }.Contains(nav.Code);
+                        bool isEdit = isManager
+                            ? new[] { "DASH", "PROF", "APPR", "ATTD", "LEAV", "DOCS" }.Contains(nav.Code)
+                            : new[] { "DASH", "PROF" }.Contains(nav.Code);
+
+                        db.RoleNavigations.Add(new RoleNavigation
+                        {
+                            RoleId = r.Id,
+                            NavigationItemId = nav.Id,
+                            IsFull = isFull,
+                            IsView = true,
+                            IsCreate = isCreate,
+                            IsEdit = isEdit,
+                            IsDelete = false
+                        });
+                        permKeySet.Add($"{r.Id}:{nav.Id}");
                     }
                 }
             }
 
             await db.SaveChangesAsync(ct);
-            logger.LogInformation("Seeded 14 standard navigation items and permissions into tenant database.");
+            logger.LogInformation("Seeded standard navigation items and permissions for all roles into tenant database.");
         }
         catch (Exception ex)
         {
