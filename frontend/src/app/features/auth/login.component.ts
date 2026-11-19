@@ -40,7 +40,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   private readonly faceService = inject(FaceRecognitionService);
 
   /** Disable the demo account switcher on the login screen in production builds. */
-  protected readonly showDemoAccounts = !environment.production;
+  protected readonly showDemoAccounts = false;
 
   /** Dynamic tenant branding resolved via query parameter (?code=...) or company code input. */
   protected readonly resolvedTenantName = signal<string>('HR Nexus');

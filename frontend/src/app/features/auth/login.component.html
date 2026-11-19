@@ -28,29 +28,6 @@
         }
       </p>
 
-      <!-- Quick Demo Login Switcher (Disabled in Production Builds) -->
-      @if (showDemoAccounts) {
-        <div style="margin: 16px 0; padding: 10px; background: rgba(37,99,235,0.06); border: 1px dashed rgba(37,99,235,0.25); border-radius: 8px;">
-          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p); margin-bottom: 6px;">
-            Quick Demo Accounts:
-          </div>
-          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-            @for (acc of demoAccounts; track acc.label) {
-              <button
-                type="button"
-                (click)="selectDemo(acc)"
-                style="font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; cursor: pointer; border: 1px solid var(--border); background: var(--bg-card, #ffffff); color: var(--text-color, #1e293b); transition: all 0.15s ease;"
-                [style.borderColor]="email === acc.email ? 'var(--p)' : 'var(--border)'"
-                [style.background]="email === acc.email ? 'rgba(37,99,235,0.1)' : 'var(--bg-card, #ffffff)'"
-                [style.color]="email === acc.email ? 'var(--p)' : 'inherit'"
-              >
-                {{ acc.label }}
-              </button>
-            }
-          </div>
-        </div>
-      }
-
       <form (submit)="go($event)">
         <div class="fg">
           <label>Email Address</label>
