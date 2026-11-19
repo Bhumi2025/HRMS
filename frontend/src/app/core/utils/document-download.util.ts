@@ -22,8 +22,8 @@ export function triggerDocumentDownload(
   const status = options?.status || 'Active';
   const type = options?.type || 'Record';
 
-  // 1. If fileUrl is provided (Base64 Data URL, Blob URL, or external link)
-  if (fileUrl && (fileUrl.startsWith('data:') || fileUrl.startsWith('http://') || fileUrl.startsWith('https://') || fileUrl.startsWith('blob:'))) {
+  // 1. If fileUrl is provided (Base64 Data URL, Blob URL, relative URL, or external link)
+  if (fileUrl && (fileUrl.startsWith('data:') || fileUrl.startsWith('http://') || fileUrl.startsWith('https://') || fileUrl.startsWith('blob:') || fileUrl.startsWith('/'))) {
     const a = document.createElement('a');
     a.href = fileUrl;
     let ext = '';
@@ -31,6 +31,10 @@ export function triggerDocumentDownload(
     else if (fileUrl.startsWith('data:image/jpeg') || fileUrl.startsWith('data:image/jpg')) ext = '.jpg';
     else if (fileUrl.startsWith('data:application/pdf')) ext = '.pdf';
     else if (fileUrl.startsWith('data:text/plain')) ext = '.txt';
+    else {
+      const match = fileUrl.match(/\.([a-zA-Z0-9]+)(?:[?#]|$)/);
+      if (match) ext = `.${match[1]}`;
+    }
 
     const filename = `${empCode}_${safeDocName.replace(/[^a-zA-Z0-9_-]/g, '_')}${ext}`;
     a.download = filename;
