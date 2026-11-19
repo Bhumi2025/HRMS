@@ -413,7 +413,7 @@ public sealed class AttendanceService : IAttendanceService
             PunchType = punchType,
             Note = request.Note,
             Device = request.Device ?? "Web Browser",
-            IsOpen = (punchType == PunchType.ClockIn)
+            IsOpen = (punchType != PunchType.ClockOut)
         };
 
         await _uow.Punches.AddAsync(punch, ct);
@@ -445,7 +445,9 @@ public sealed class AttendanceService : IAttendanceService
         TimeOnly? firstCheckIn = null;
         TimeOnly? lastCheckOut = null;
         long totalClosedSeconds = 0;
-        DateTime? activeIntervalOpen = null;
+        long totalBreakSeconds = 0;
+        DateTime? workIntervalOpen = null;
+        DateTime? breakIntervalOpen = null;
 
         foreach (var p in allPunches)
         {
@@ -455,25 +457,49 @@ public sealed class AttendanceService : IAttendanceService
             if (p.PunchType == PunchType.ClockIn)
             {
                 firstCheckIn ??= pTimeOnly;
-                activeIntervalOpen = p.PunchTime;
+                workIntervalOpen = p.PunchTime;
+            }
+            else if (p.PunchType == PunchType.BreakIn)
+            {
+                if (workIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - workIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalClosedSeconds += (long)diff.TotalSeconds;
+                    workIntervalOpen = null;
+                }
+                breakIntervalOpen = p.PunchTime;
+            }
+            else if (p.PunchType == PunchType.BreakOut)
+            {
+                if (breakIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - breakIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+                    breakIntervalOpen = null;
+                }
+                workIntervalOpen = p.PunchTime;
             }
             else if (p.PunchType == PunchType.ClockOut)
             {
                 lastCheckOut = pTimeOnly;
-                if (activeIntervalOpen.HasValue)
+                if (workIntervalOpen.HasValue)
                 {
-                    var diff = p.PunchTime - activeIntervalOpen.Value;
-                    if (diff.TotalSeconds > 0)
-                    {
-                        totalClosedSeconds += (long)diff.TotalSeconds;
-                    }
-                    activeIntervalOpen = null;
+                    var diff = p.PunchTime - workIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalClosedSeconds += (long)diff.TotalSeconds;
+                    workIntervalOpen = null;
+                }
+                if (breakIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - breakIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+                    breakIntervalOpen = null;
                 }
             }
         }
 
         var workedHours = Math.Round((decimal)totalClosedSeconds / 3600m, 2);
-        bool currentlyStillCheckedIn = (punchType == PunchType.ClockIn);
+        var breakMinutes = (int)(totalBreakSeconds / 60);
+        bool currentlyStillCheckedIn = (punchType != PunchType.ClockOut);
 
         var attendanceRecord = await _uow.Attendance.GetForEmployeeDateAsync(employeeId, attendanceDate, ct);
         if (attendanceRecord is null)
@@ -484,7 +510,7 @@ public sealed class AttendanceService : IAttendanceService
                 Date = attendanceDate,
                 CheckIn = firstCheckIn,
                 CheckOut = lastCheckOut,
-                BreakMinutes = 0,
+                BreakMinutes = breakMinutes,
                 WorkHours = workedHours,
                 Status = AttendanceStatus.Present
             };
@@ -504,6 +530,7 @@ public sealed class AttendanceService : IAttendanceService
                 attendanceRecord.CheckOut = lastCheckOut.Value;
             }
             attendanceRecord.WorkHours = workedHours;
+            attendanceRecord.BreakMinutes = breakMinutes;
 
             // Only finalize status to HalfDay or Absent if the employee is NOT currently checked in!
             if (currentlyStillCheckedIn)

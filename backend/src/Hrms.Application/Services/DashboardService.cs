@@ -244,7 +244,26 @@ public sealed class DashboardService : IDashboardService
         var result = new List<AttendanceTrendPointDto>();
         var totalDays = DateTime.DaysInMonth(targetYear, targetMonth);
 
-        for (var day = 1; day <= totalDays; day++)
+        // Requirement: Show only past dates and today (present date)
+        var maxDay = totalDays;
+        if (targetYear == today.Year && targetMonth == today.Month)
+        {
+            maxDay = today.Day;
+        }
+        else if (targetYear > today.Year || (targetYear == today.Year && targetMonth > today.Month))
+        {
+            maxDay = 0;
+        }
+
+        var todayStartUtc = DateTime.UtcNow.Date;
+        var todayEndUtc = todayStartUtc.AddDays(1);
+        var punchesToday = await _uow.Punches.ToListAsync(
+            _uow.Punches.Query()
+                .Where(p => p.PunchTime >= todayStartUtc && p.PunchTime < todayEndUtc)
+                .OrderBy(p => p.PunchTime),
+            ct);
+
+        for (var day = 1; day <= maxDay; day++)
         {
             var date = new DateOnly(targetYear, targetMonth, day);
             var prevDate = new DateOnly(prevMonthStart.Year, prevMonthStart.Month, Math.Min(day, prevMonthDays));
@@ -269,7 +288,80 @@ public sealed class DashboardService : IDashboardService
             decimal afterBreak = 0;
             decimal missing = 0;
 
-            if (date <= today && !isWeekend)
+            if (date == today)
+            {
+                // Dynamic punch tracking for present day
+                if (punchesToday.Count > 0)
+                {
+                    var clockIn = punchesToday.FirstOrDefault(p => p.PunchType == PunchType.ClockIn);
+                    if (clockIn != null)
+                    {
+                        var inTime = clockIn.PunchTime;
+                        var breakIn = punchesToday.FirstOrDefault(p => p.PunchType == PunchType.BreakIn);
+                        var breakOut = punchesToday.FirstOrDefault(p => p.PunchType == PunchType.BreakOut);
+                        var clockOut = punchesToday.FirstOrDefault(p => p.PunchType == PunchType.ClockOut);
+                        var nowUtc = DateTime.UtcNow;
+
+                        if (breakIn == null)
+                        {
+                            if (clockOut == null)
+                            {
+                                beforeBreak = Math.Round((decimal)(nowUtc - inTime).TotalHours, 1);
+                                breakHrs = 0;
+                                afterBreak = 0;
+                            }
+                            else
+                            {
+                                beforeBreak = Math.Round((decimal)(clockOut.PunchTime - inTime).TotalHours, 1);
+                                breakHrs = 0;
+                                afterBreak = 0;
+                            }
+                        }
+                        else
+                        {
+                            beforeBreak = Math.Round((decimal)(breakIn.PunchTime - inTime).TotalHours, 1);
+                            if (breakOut == null)
+                            {
+                                breakHrs = Math.Round((decimal)(nowUtc - breakIn.PunchTime).TotalHours, 1);
+                                afterBreak = 0;
+                            }
+                            else
+                            {
+                                breakHrs = Math.Round((decimal)(breakOut.PunchTime - breakIn.PunchTime).TotalHours, 1);
+                                if (clockOut == null)
+                                {
+                                    afterBreak = Math.Round((decimal)(nowUtc - breakOut.PunchTime).TotalHours, 1);
+                                }
+                                else
+                                {
+                                    afterBreak = Math.Round((decimal)(clockOut.PunchTime - breakOut.PunchTime).TotalHours, 1);
+                                }
+                            }
+                        }
+
+                        beforeBreak = Math.Max(0.1m, beforeBreak);
+                        if (breakHrs > 0) breakHrs = Math.Max(0.1m, breakHrs);
+                        if (afterBreak > 0) afterBreak = Math.Max(0.1m, afterBreak);
+                        decimal tot = beforeBreak + breakHrs + afterBreak;
+                        missing = Math.Max(0m, 8.5m - tot);
+                    }
+                    else if (curPresent > 0)
+                    {
+                        beforeBreak = 3.5m;
+                        breakHrs = 1.0m;
+                        afterBreak = 3.5m;
+                        missing = 0.5m;
+                    }
+                }
+                else if (curPresent > 0)
+                {
+                    beforeBreak = 3.5m;
+                    breakHrs = 1.0m;
+                    afterBreak = 3.5m;
+                    missing = 0.5m;
+                }
+            }
+            else if (date < today && !isWeekend)
             {
                 if (curPresent > 0)
                 {
