@@ -39,7 +39,7 @@ interface LeaveType {
   template: `
     @if (!isSuperAdmin() && perms.canCreate('Leave')) {
       <div class="flex justify-end items-center" style="margin-bottom: 15px">
-        <button class="btn btn-primary btn-sm" (click)="ui.open('applyModal')">+ Apply Leave</button>
+        <button class="btn btn-primary btn-sm" (click)="openApplyModal()">+ Apply Leave</button>
       </div>
     }
 
@@ -326,11 +326,17 @@ interface LeaveType {
           <div class="grid-2">
             <div class="form-group">
               <label class="form-label">From Date <span style="color: var(--danger)">*</span></label>
-              <input class="form-control" type="date" [value]="applyFrom()" (input)="applyFrom.set($any($event.target).value)" />
+              <input 
+                class="form-control" 
+                type="date" 
+                [value]="applyFrom()" 
+                [min]="todayIso"
+                (input)="onFromDateChange($any($event.target).value)" 
+              />
             </div>
             <div class="form-group">
               <label class="form-label">To Date <span style="color: var(--danger)">*</span></label>
-              <input class="form-control" type="date" [value]="applyTo()" (input)="applyTo.set($any($event.target).value)" />
+              <input class="form-control" type="date" [value]="applyTo()" [min]="applyFrom() || todayIso" (input)="applyTo.set($any($event.target).value)" />
             </div>
           </div>
           @if (calculatedDays() > 0) {
@@ -453,11 +459,28 @@ export class LeaveComponent implements OnInit, AfterViewInit {
   protected readonly typeForm = signal<LeaveType>({ id: '', name: '', days: 0, paid: true, color: '#2563eb', desc: '' });
   protected readonly viewTarget = signal<LeaveRequest | null>(null);
 
+  protected readonly todayIso = new Date().toISOString().split('T')[0];
   protected readonly applyType = signal('Annual Leave');
   protected readonly applyEmployeeId = signal('');
-  protected readonly applyFrom = signal('');
-  protected readonly applyTo = signal('');
+  protected readonly applyFrom = signal(this.todayIso);
+  protected readonly applyTo = signal(this.todayIso);
   protected readonly applyReason = signal('');
+
+  protected onFromDateChange(val: string): void {
+    this.applyFrom.set(val);
+    if (this.applyTo() && this.applyTo() < val) {
+      this.applyTo.set(val);
+    }
+  }
+
+  protected openApplyModal(): void {
+    const today = new Date().toISOString().split('T')[0];
+    this.applyFrom.set(today);
+    if (!this.applyTo() || this.applyTo() < today) {
+      this.applyTo.set(today);
+    }
+    this.ui.open('applyModal');
+  }
 
   // Duration calculation for leave application
   protected readonly calculatedDays = computed(() => {
@@ -497,7 +520,7 @@ export class LeaveComponent implements OnInit, AfterViewInit {
 
     this.route.queryParamMap.subscribe((params) => {
       if (params.get('action') === 'apply') {
-        this.ui.open('applyModal');
+        this.openApplyModal();
       }
     });
   }
@@ -759,8 +782,8 @@ export class LeaveComponent implements OnInit, AfterViewInit {
           this.toast.show('Leave request submitted!');
           this.notifState.refresh();
           this.applyReason.set('');
-          this.applyFrom.set('');
-          this.applyTo.set('');
+          this.applyFrom.set(this.todayIso);
+          this.applyTo.set(this.todayIso);
           this.loadRequests();
         },
         error: (error) => this.toast.show(error?.error?.detail || error?.error?.message || error?.error?.title || 'Could not submit the leave request.', 'danger'),

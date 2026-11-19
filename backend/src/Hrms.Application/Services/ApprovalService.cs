@@ -21,15 +21,20 @@ public sealed class ApprovalService : IApprovalService
 
     public async Task<ApprovalSummaryDto> GetSummaryAsync(CancellationToken ct = default)
     {
-        var pending = await _uow.Approvals.ListPendingAsync(ct);
+        var nonLeavePending = await _uow.Approvals.ToListAsync(
+            _uow.Approvals.Query().Where(a => a.Status == ApprovalStatus.Pending && a.Type != ApprovalType.Leave),
+            ct);
+        var pendingLeaves = await _uow.LeaveRequests.CountQueryAsync(
+            _uow.LeaveRequests.Query().Where(l => l.Status == LeaveStatus.Pending),
+            ct);
         var regularizations = await _uow.Regularizations.ToListAsync(
             _uow.Regularizations.Query().Where(r => r.Status == ApprovalStatus.Pending),
             ct);
 
         return new ApprovalSummaryDto(
-            pending.Count + regularizations.Count,
-            pending.Count(a => a.Type == ApprovalType.Leave),
-            pending.Count(a => a.Type == ApprovalType.Overtime),
+            nonLeavePending.Count + pendingLeaves + regularizations.Count,
+            pendingLeaves,
+            nonLeavePending.Count(a => a.Type == ApprovalType.Overtime),
             regularizations.Count);
     }
 
@@ -38,8 +43,43 @@ public sealed class ApprovalService : IApprovalService
         ApprovalType? type,
         CancellationToken ct = default)
     {
-        var items = await _uow.Approvals.ListWithEmployeeAsync(status, type, ct);
-        return items.Select(ToDto).ToList();
+        var result = new List<ApprovalDto>();
+
+        if (type == ApprovalType.Leave)
+        {
+            var leaveStatus = status switch
+            {
+                ApprovalStatus.Pending => LeaveStatus.Pending,
+                ApprovalStatus.Approved => LeaveStatus.Approved,
+                ApprovalStatus.Rejected => LeaveStatus.Rejected,
+                _ => (LeaveStatus?)null
+            };
+
+            var (leaves, _) = await _uow.LeaveRequests.SearchAsync(null, leaveStatus, 1, 100, ct);
+            return leaves.Select(ToDto).ToList();
+        }
+
+        if (type != null)
+        {
+            var items = await _uow.Approvals.ListWithEmployeeAsync(status, type, ct);
+            return items.Where(a => a.Type != ApprovalType.Leave).Select(ToDto).ToList();
+        }
+
+        // type is null -> all approvals (combine non-leave Approvals + LeaveRequests)
+        var approvalItems = await _uow.Approvals.ListWithEmployeeAsync(status, null, ct);
+        result.AddRange(approvalItems.Where(a => a.Type != ApprovalType.Leave).Select(ToDto));
+
+        var mappedLeaveStatus = status switch
+        {
+            ApprovalStatus.Pending => LeaveStatus.Pending,
+            ApprovalStatus.Approved => LeaveStatus.Approved,
+            ApprovalStatus.Rejected => LeaveStatus.Rejected,
+            _ => (LeaveStatus?)null
+        };
+        var (allLeaves, _) = await _uow.LeaveRequests.SearchAsync(null, mappedLeaveStatus, 1, 100, ct);
+        result.AddRange(allLeaves.Select(ToDto));
+
+        return result.OrderByDescending(x => x.SubmittedAtUtc).ToList();
     }
 
     public async Task<ApprovalDto> CreateAsync(CreateApprovalRequest request, CancellationToken ct = default)
@@ -86,6 +126,36 @@ public sealed class ApprovalService : IApprovalService
         ApprovalDecisionRequest? request,
         CancellationToken ct = default)
     {
+        var leave = await _uow.LeaveRequests.GetWithDetailsAsync(id, ct);
+        if (leave != null)
+        {
+            if (leave.Status != LeaveStatus.Pending)
+            {
+                throw new ConflictException("This leave request has already been decided.");
+            }
+
+            leave.Status = approved ? LeaveStatus.Approved : LeaveStatus.Rejected;
+            leave.DecidedAtUtc = DateTime.UtcNow;
+            leave.DecidedByUserId = _currentUser.UserId;
+            leave.DecisionNote = request?.Note;
+
+            _uow.LeaveRequests.Update(leave);
+
+            var empName = leave.Employee != null ? $"{leave.Employee.FirstName} {leave.Employee.LastName}".Trim() : "Employee";
+            await _uow.Notifications.AddAsync(new Notification
+            {
+                IconKey = approved ? "check" : "x",
+                Title = approved ? "Leave Request Approved" : "Leave Request Rejected",
+                Message = $"{leave.LeaveType?.Name ?? "Leave"} request for {empName} was {(approved ? "approved" : "rejected")}.",
+                TimeLabel = "Just now",
+                IsRead = false,
+                CreatedAtUtc = DateTime.UtcNow,
+            }, ct);
+
+            await _uow.SaveChangesAsync(ct);
+            return ToDto(leave);
+        }
+
         var approval = await _uow.Approvals.GetWithEmployeeAsync(id, ct)
                        ?? throw NotFoundException.For("Approval request", id);
 
@@ -101,12 +171,12 @@ public sealed class ApprovalService : IApprovalService
 
         _uow.Approvals.Update(approval);
 
-        var empName = approval.Employee != null ? $"{approval.Employee.FirstName} {approval.Employee.LastName}".Trim() : "Employee";
+        var employeeName = approval.Employee != null ? $"{approval.Employee.FirstName} {approval.Employee.LastName}".Trim() : "Employee";
         await _uow.Notifications.AddAsync(new Notification
         {
             IconKey = approved ? "check" : "x",
             Title = approved ? "Approval Request Approved" : "Approval Request Rejected",
-            Message = $"{approval.Title} request for {empName} was {(approved ? "approved" : "rejected")}.",
+            Message = $"{approval.Title} request for {employeeName} was {(approved ? "approved" : "rejected")}.",
             TimeLabel = "Just now",
             IsRead = false,
             CreatedAtUtc = DateTime.UtcNow,
@@ -118,9 +188,8 @@ public sealed class ApprovalService : IApprovalService
 
     public async Task<int> ApproveAllAsync(CancellationToken ct = default)
     {
-        var pending = await _uow.Approvals.ListPendingAsync(ct);
-
-        foreach (var approval in pending)
+        var pendingApprovals = await _uow.Approvals.ListPendingAsync(ct);
+        foreach (var approval in pendingApprovals.Where(a => a.Type != ApprovalType.Leave))
         {
             approval.Status = ApprovalStatus.Approved;
             approval.DecidedAtUtc = DateTime.UtcNow;
@@ -128,12 +197,24 @@ public sealed class ApprovalService : IApprovalService
             _uow.Approvals.Update(approval);
         }
 
-        if (pending.Count > 0)
+        var pendingLeaves = await _uow.LeaveRequests.ToListAsync(
+            _uow.LeaveRequests.Query().Where(l => l.Status == LeaveStatus.Pending),
+            ct);
+        foreach (var leave in pendingLeaves)
+        {
+            leave.Status = LeaveStatus.Approved;
+            leave.DecidedAtUtc = DateTime.UtcNow;
+            leave.DecidedByUserId = _currentUser.UserId;
+            _uow.LeaveRequests.Update(leave);
+        }
+
+        var total = pendingApprovals.Count(a => a.Type != ApprovalType.Leave) + pendingLeaves.Count;
+        if (total > 0)
         {
             await _uow.SaveChangesAsync(ct);
         }
 
-        return pending.Count;
+        return total;
     }
 
     private async Task<Guid> ResolveEmployeeIdAsync(Guid? explicitId, CancellationToken ct)
@@ -163,5 +244,25 @@ public sealed class ApprovalService : IApprovalService
             Formatting.Relative(a.SubmittedAtUtc),
             a.Priority.ToString(),
             a.Status.ToString());
+    }
+
+    private static ApprovalDto ToDto(LeaveRequest l)
+    {
+        var name = l.Employee is null ? "—" : $"{l.Employee.FirstName} {l.Employee.LastName}".Trim();
+        var typeName = l.LeaveType?.Name ?? "Leave";
+        var reason = string.IsNullOrWhiteSpace(l.Reason) ? "" : $" ({l.Reason})";
+        var details = $"{l.Days} day(s) · {l.FromDate:dd/MM/yyyy} - {l.ToDate:dd/MM/yyyy}{reason}";
+        return new ApprovalDto(
+            l.Id,
+            l.EmployeeId,
+            name,
+            Formatting.Initials(name),
+            "Leave",
+            typeName,
+            details,
+            l.SubmittedAtUtc,
+            Formatting.Relative(l.SubmittedAtUtc),
+            "Medium",
+            l.Status.ToString());
     }
 }

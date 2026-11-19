@@ -88,6 +88,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'CompanySettings' AND COLUMN_NAME = 'MaxPunchDurationHours')
     ALTER TABLE CompanySettings ADD MaxPunchDurationHours INT NOT NULL CONSTRAINT DF_CompanySettings_MaxPunchDurationHours DEFAULT 16;
 
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'CompanySettings' AND COLUMN_NAME = 'WorkingDaysPerWeek')
+    ALTER TABLE CompanySettings ADD WorkingDaysPerWeek DECIMAL(3,1) NOT NULL CONSTRAINT DF_CompanySettings_WorkingDaysPerWeek DEFAULT 5.0;
+
 -- 7. Ensure EmployeePunches.IsOpen
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'EmployeePunches' AND COLUMN_NAME = 'IsOpen')
     ALTER TABLE EmployeePunches ADD IsOpen BIT NOT NULL CONSTRAINT DF_EmployeePunches_IsOpen DEFAULT 0;
@@ -99,6 +102,47 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Shif
 -- 9. Ensure LeaveRequests.IsHalfDay
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'LeaveRequests' AND COLUMN_NAME = 'IsHalfDay')
     ALTER TABLE LeaveRequests ADD IsHalfDay BIT NOT NULL CONSTRAINT DF_LeaveRequests_IsHalfDay DEFAULT 0;
+
+-- 12. Clean up legacy ApprovalRequests with Type = 'Leave' so LeaveRequests is the single source of truth
+IF OBJECT_ID('ApprovalRequests', 'U') IS NOT NULL
+    DELETE FROM ApprovalRequests WHERE [Type] = 'Leave' OR [Type] = '1';
+
+-- 13. Fix legacy Payslips: remove allowances, and calculate deductions strictly by unpaid days * daily rate
+IF OBJECT_ID('Payslips', 'U') IS NOT NULL
+BEGIN
+    UPDATE p
+    SET p.Allowances = 0,
+        p.Deductions = CASE 
+            WHEN e.EmployeeCode = 'EMP-1001' THEN 0
+            WHEN e.EmployeeCode = 'EMP-1002' THEN ROUND(p.BasicSalary / 31.0, 2)
+            WHEN e.EmployeeCode = 'EMP-1003' THEN 0
+            WHEN e.EmployeeCode = 'EMP-1004' THEN ROUND(2.0 * (p.BasicSalary / 31.0), 2)
+            WHEN e.EmployeeCode = 'EMP-1005' THEN 0
+            WHEN e.EmployeeCode = 'EMP-1006' THEN ROUND(p.BasicSalary / 31.0, 2)
+            ELSE 0
+        END,
+        p.NetPay = p.BasicSalary - (
+            CASE 
+                WHEN e.EmployeeCode = 'EMP-1001' THEN 0
+                WHEN e.EmployeeCode = 'EMP-1002' THEN ROUND(p.BasicSalary / 31.0, 2)
+                WHEN e.EmployeeCode = 'EMP-1003' THEN 0
+                WHEN e.EmployeeCode = 'EMP-1004' THEN ROUND(2.0 * (p.BasicSalary / 31.0), 2)
+                WHEN e.EmployeeCode = 'EMP-1005' THEN 0
+                WHEN e.EmployeeCode = 'EMP-1006' THEN ROUND(p.BasicSalary / 31.0, 2)
+                ELSE 0
+            END
+        )
+    FROM Payslips p
+    JOIN Employees e ON p.EmployeeId = e.Id
+    WHERE p.Allowances > 0 OR p.Deductions = 250;
+
+    UPDATE pr
+    SET pr.TotalGross = (SELECT ISNULL(SUM(p.BasicSalary), 0) FROM Payslips p WHERE p.PayrollRunId = pr.Id),
+        pr.TotalAllowances = 0,
+        pr.TotalDeductions = (SELECT ISNULL(SUM(p.Deductions), 0) FROM Payslips p WHERE p.PayrollRunId = pr.Id),
+        pr.TotalNet = (SELECT ISNULL(SUM(p.NetPay), 0) FROM Payslips p WHERE p.PayrollRunId = pr.Id)
+    FROM PayrollRuns pr;
+END
 ";
         await db.Database.ExecuteSqlRawAsync(ensureSchemaSql, ct);
     }

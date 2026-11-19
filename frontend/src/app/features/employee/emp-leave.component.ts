@@ -115,11 +115,17 @@ interface LeaveHistory {
           <div class="grid-2">
             <div class="form-group">
               <label class="form-label">From Date</label>
-              <input class="form-control" type="date" [value]="from()" (input)="from.set($any($event.target).value)" />
+              <input 
+                class="form-control" 
+                type="date" 
+                [value]="from()" 
+                [min]="todayIso"
+                (input)="onFromDateChange($any($event.target).value)" 
+              />
             </div>
             <div class="form-group">
               <label class="form-label">To Date</label>
-              <input class="form-control" type="date" [value]="to()" (input)="to.set($any($event.target).value)" />
+              <input class="form-control" type="date" [value]="to()" [min]="from() || todayIso" (input)="to.set($any($event.target).value)" />
             </div>
           </div>
           <div class="form-group">
@@ -213,10 +219,18 @@ export class EmpLeaveComponent implements OnInit {
     })),
   );
 
+  protected readonly todayIso = new Date().toISOString().split('T')[0];
   protected readonly type = signal('');
-  protected readonly from = signal('');
-  protected readonly to = signal('');
+  protected readonly from = signal(this.todayIso);
+  protected readonly to = signal(this.todayIso);
   protected readonly reason = signal('');
+
+  protected onFromDateChange(val: string): void {
+    this.from.set(val);
+    if (this.to() && this.to() < val) {
+      this.to.set(val);
+    }
+  }
 
   ngOnInit(): void {
     this.api.leaveTypes().subscribe({

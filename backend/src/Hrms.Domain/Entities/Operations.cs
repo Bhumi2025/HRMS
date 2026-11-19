@@ -27,12 +27,13 @@ public class CompanySettings : BaseEntity
     public string Phone { get; set; } = string.Empty;
 
     public string HrEmail { get; set; } = string.Empty;
-    public string PayrollCurrency { get; set; } = "USD";
+    public string PayrollCurrency { get; set; } = "INR";
     public string? LogoUrl { get; set; }
     public string? TimeZone { get; set; }
     public string TaxNumberLabel { get; set; } = "TRN / Tax Number";
     public string RegistrationNumberLabel { get; set; } = "Trade License / Reg No";
     public int MaxPunchDurationHours { get; set; } = 16;
+    public decimal WorkingDaysPerWeek { get; set; } = 5.0m;
 }
 
 /// <summary>A task assigned to an employee (My Tasks).</summary>

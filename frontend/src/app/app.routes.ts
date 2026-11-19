@@ -75,6 +75,7 @@ export const routes: Routes = [
         path: 'company',
         data: { title: 'Company' },
         canActivate: [nonEmployeeGuard],
+        runGuardsAndResolvers: 'always',
         loadComponent: () => import('./features/hr/company.component').then((m) => m.CompanyComponent),
       },
       {

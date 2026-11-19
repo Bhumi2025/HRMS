@@ -23,7 +23,27 @@ export class KeyGroupCacheService {
     }
 
     const obs = this.api.keyStoresByGroup(key).pipe(
-      map((items) => items || []),
+      map((items) => {
+        const list = items ? [...items] : [];
+        if (key === 'PAYMENT_MODE') {
+          const standardModes = ['Bank Transfer', 'Cheque', 'Cash'];
+          for (const m of standardModes) {
+            const exists = list.some((i) => i.value.toLowerCase() === m.toLowerCase() || i.key.toLowerCase() === m.toLowerCase());
+            if (!exists) {
+              list.push({
+                id: `def-${m.replace(/\s+/g, '-').toLowerCase()}`,
+                keyGroupId: 'kg-payment-mode',
+                key: m,
+                value: m,
+                subValue: null,
+                displayOrder: list.length + 1,
+                isActive: true,
+              });
+            }
+          }
+        }
+        return list;
+      }),
       shareReplay(1)
     );
 
