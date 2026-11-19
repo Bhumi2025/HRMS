@@ -265,7 +265,7 @@ function emptyTenantForm(): CreateCompanyRequest {
               }
 
               <!-- Logo & Identity Card -->
-              <div class="card p-4" style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 24px;">
+              <div class="card" style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px;">
                 <div style="font-weight: 700; font-size: 15px; margin-bottom: 14px; color: var(--text);">
                   Company Branding & Logo
                 </div>
@@ -310,96 +310,102 @@ function emptyTenantForm(): CreateCompanyRequest {
 
               <!-- Main Details Form -->
               <form (ngSubmit)="saveCompanyProfile()" (submit)="$event.preventDefault()">
-                <!-- Section 1: Required General Information -->
-                <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p); margin-bottom: 14px;">
-                  General Information
-                </div>
-                <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
-                  <div style="flex: 1; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Company Name <span class="text-danger">*</span></label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.companyName" name="companyName" required [disabled]="!canEditCompany()" placeholder="e.g. Acme Corporation" />
+                <!-- Widget 1: General Information -->
+                <div class="card" style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px;">
+                  <div style="font-weight: 700; font-size: 15px; margin-bottom: 16px; color: var(--text);">
+                    General Information
                   </div>
-                  <div style="flex: 1; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Official HR Email <span class="text-danger">*</span></label>
-                    <input class="form-control" type="email" [(ngModel)]="profileForm.hrEmail" name="hrEmail" required [disabled]="!canEditCompany()" placeholder="hr@acme.com" />
-                  </div>
-                  <div style="flex: 1; min-width: 220px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Time Zone <span class="text-danger">*</span></label>
-                    <select class="form-control" [(ngModel)]="profileForm.timeZone" name="timeZone" required [disabled]="!canEditCompany()">
-                      <option value="Asia/Dubai">Asia/Dubai (GST +04:00)</option>
-                      <option value="Asia/Riyadh">Asia/Riyadh (AST +03:00)</option>
-                      <option value="Asia/Kolkata">Asia/Kolkata (IST +05:30)</option>
-                      <option value="UTC">UTC (+00:00)</option>
-                      <option value="UTC (+00:00)">UTC (+00:00)</option>
-                      <option value="Europe/London">Europe/London (GMT/BST)</option>
-                      <option value="America/New_York">America/New_York (EST/EDT)</option>
-                      <option value="Asia/Singapore">Asia/Singapore (SGT +08:00)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- Section 2: Configurable Jurisdiction / Tax & Registration -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                  <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p);">
-                    Tax & Statutory Registration
-                  </div>
-                  <span class="badge badge-info" style="font-size: 11px;">Configurable Field Labels</span>
-                </div>
-                <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; background: rgba(37,99,235,0.03); padding: 16px; border-radius: 8px; border: 1px dashed rgba(37,99,235,0.2);">
-                  <div style="flex: 1; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 12px; color: var(--muted);">Tax Label (e.g. TRN / VAT / GSTIN / Tax ID)</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.taxNumberLabel" name="taxNumberLabel" [disabled]="!canEditCompany()" placeholder="e.g. TRN / VAT No." style="margin-bottom: 8px;" />
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">{{ profileForm.taxNumberLabel || 'Tax Number' }}</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.trn" name="trn" [disabled]="!canEditCompany()" placeholder="Enter registered tax number" />
-                  </div>
-                  <div style="flex: 1; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 12px; color: var(--muted);">Registration Label (e.g. Trade License / CIN / Reg No.)</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.registrationNumberLabel" name="registrationNumberLabel" [disabled]="!canEditCompany()" placeholder="e.g. Trade License No." style="margin-bottom: 8px;" />
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">{{ profileForm.registrationNumberLabel || 'Registration Number' }}</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.tradeLicense" name="tradeLicense" [disabled]="!canEditCompany()" placeholder="Enter license / registration number" />
+                  <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px;">
+                    <div style="flex: 1; min-width: 260px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Company Name <span class="text-danger">*</span></label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.companyName" name="companyName" required [disabled]="!canEditCompany()" placeholder="e.g. Acme Corporation" />
+                    </div>
+                    <div style="flex: 1; min-width: 260px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Official HR Email <span class="text-danger">*</span></label>
+                      <input class="form-control" type="email" [(ngModel)]="profileForm.hrEmail" name="hrEmail" required [disabled]="!canEditCompany()" placeholder="hr@acme.com" />
+                    </div>
+                    <div style="flex: 1; min-width: 220px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Time Zone <span class="text-danger">*</span></label>
+                      <select class="form-control" [(ngModel)]="profileForm.timeZone" name="timeZone" required [disabled]="!canEditCompany()">
+                        <option value="Asia/Dubai">Asia/Dubai (GST +04:00)</option>
+                        <option value="Asia/Riyadh">Asia/Riyadh (AST +03:00)</option>
+                        <option value="Asia/Kolkata">Asia/Kolkata (IST +05:30)</option>
+                        <option value="UTC">UTC (+00:00)</option>
+                        <option value="UTC (+00:00)">UTC (+00:00)</option>
+                        <option value="Europe/London">Europe/London (GMT/BST)</option>
+                        <option value="America/New_York">America/New_York (EST/EDT)</option>
+                        <option value="Asia/Singapore">Asia/Singapore (SGT +08:00)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
-                <!-- Section 3: Optional Contact & Location -->
-                <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p); margin-bottom: 14px;">
-                  Contact & Location Details
+                <!-- Widget 2: Configurable Jurisdiction / Tax & Registration -->
+                <div class="card" style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div style="font-weight: 700; font-size: 15px; color: var(--text);">
+                      Tax & Statutory Registration
+                    </div>
+                    <span class="badge badge-info" style="font-size: 11px;">Configurable Field Labels</span>
+                  </div>
+                  <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px;">
+                    <div style="flex: 1; min-width: 260px; background: var(--surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                      <label class="form-label" style="font-weight: 600; font-size: 12px; color: var(--muted);">Tax Label (e.g. TRN / VAT / GSTIN / Tax ID)</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.taxNumberLabel" name="taxNumberLabel" [disabled]="!canEditCompany()" placeholder="e.g. TRN / VAT No." style="margin-bottom: 8px;" />
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">{{ profileForm.taxNumberLabel || 'Tax Number' }}</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.trn" name="trn" [disabled]="!canEditCompany()" placeholder="Enter registered tax number" />
+                    </div>
+                    <div style="flex: 1; min-width: 260px; background: var(--surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                      <label class="form-label" style="font-weight: 600; font-size: 12px; color: var(--muted);">Registration Label (e.g. Trade License / CIN / Reg No.)</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.registrationNumberLabel" name="registrationNumberLabel" [disabled]="!canEditCompany()" placeholder="e.g. Trade License No." style="margin-bottom: 8px;" />
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">{{ profileForm.registrationNumberLabel || 'Registration Number' }}</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.tradeLicense" name="tradeLicense" [disabled]="!canEditCompany()" placeholder="Enter license / registration number" />
+                    </div>
+                  </div>
                 </div>
-                <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
-                  <div style="flex: 1; min-width: 220px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Phone Number</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.phone" name="phone" [disabled]="!canEditCompany()" placeholder="+971 4 123 4567" />
+
+                <!-- Widget 3: Contact & Location Details -->
+                <div class="card" style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px;">
+                  <div style="font-weight: 700; font-size: 15px; margin-bottom: 16px; color: var(--text);">
+                    Contact & Location Details
                   </div>
-                  <div style="flex: 1; min-width: 220px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Website</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.website" name="website" [disabled]="!canEditCompany()" placeholder="https://example.com" />
+                  <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+                    <div style="flex: 1; min-width: 220px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Phone Number</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.phone" name="phone" [disabled]="!canEditCompany()" placeholder="+971 4 123 4567" />
+                    </div>
+                    <div style="flex: 1; min-width: 220px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Website</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.website" name="website" [disabled]="!canEditCompany()" placeholder="https://example.com" />
+                    </div>
+                    <div style="flex: 1; min-width: 180px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Industry</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.industry" name="industry" [disabled]="!canEditCompany()" placeholder="e.g. Information Technology" />
+                    </div>
+                    <div style="flex: 1; min-width: 140px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Payroll Currency</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.payrollCurrency" name="payrollCurrency" [disabled]="!canEditCompany()" placeholder="AED" />
+                    </div>
                   </div>
-                  <div style="flex: 1; min-width: 180px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Industry</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.industry" name="industry" [disabled]="!canEditCompany()" placeholder="e.g. Information Technology" />
-                  </div>
-                  <div style="flex: 1; min-width: 140px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Payroll Currency</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.payrollCurrency" name="payrollCurrency" [disabled]="!canEditCompany()" placeholder="AED" />
-                  </div>
-                </div>
-                <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
-                  <div style="flex: 2; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Address</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.address" name="address" [disabled]="!canEditCompany()" placeholder="Street, Building, Suite" />
-                  </div>
-                  <div style="flex: 1; min-width: 180px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">City</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.city" name="city" [disabled]="!canEditCompany()" placeholder="e.g. Dubai" />
-                  </div>
-                  <div style="flex: 1; min-width: 180px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Country</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.country" name="country" [disabled]="!canEditCompany()" placeholder="e.g. United Arab Emirates" />
+                  <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px;">
+                    <div style="flex: 2; min-width: 260px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Address</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.address" name="address" [disabled]="!canEditCompany()" placeholder="Street, Building, Suite" />
+                    </div>
+                    <div style="flex: 1; min-width: 180px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">City</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.city" name="city" [disabled]="!canEditCompany()" placeholder="e.g. Dubai" />
+                    </div>
+                    <div style="flex: 1; min-width: 180px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Country</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.country" name="country" [disabled]="!canEditCompany()" placeholder="e.g. United Arab Emirates" />
+                    </div>
                   </div>
                 </div>
 
                 <!-- Form Submit Button -->
                 @if (canEditCompany()) {
-                  <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 16px; border-top: 1px solid var(--border);">
+                  <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 8px;">
                     <button type="submit" class="btn btn-primary" [disabled]="savingProfile()" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px;">
                       <span [appIcon]="'check'"></span>
                       {{ savingProfile() ? 'Saving Profile...' : 'Save Profile Changes' }}
