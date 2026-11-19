@@ -430,29 +430,7 @@ interface MusterDay {
 
         <!-- ── RIGHT PANE: EMPLOYEE TIME MANAGEMENT & TIMELINE ── -->
         <div class="time-mgmt-detail">
-          <!-- Top Navigation Header -->
-          <div class="detail-top-nav">
-            <div class="emp-pager">
-              <button type="button" class="pager-btn" (click)="prevEmployee()" title="Previous employee">‹</button>
-              <button type="button" class="pager-btn" (click)="nextEmployee()" title="Next employee">›</button>
-              <span class="pager-info">{{ currentEmployeeIndex() + 1 }} out of {{ employees().length }}</span>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <button 
-                type="button" 
-                class="btn btn-outline btn-xs" 
-                (click)="exportCsv()" 
-                style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 11px; font-weight: 600;"
-                title="Export Monthly Muster CSV for {{ selectedEmployee()?.fullName }}"
-              >
-                <span [appIcon]="'download'"></span> Export CSV
-              </button>
-              <button type="button" class="detail-close-btn" (click)="tab.set('daily')" title="Close and return to Daily Punch Log">✕</button>
-            </div>
-          </div>
-
-          <!-- Employee Profile Banner -->
+          <!-- Employee Profile Banner (Top of Right Pane) -->
           <div class="emp-profile-banner">
             <div class="profile-left">
               <div class="profile-avatar">
@@ -477,19 +455,34 @@ interface MusterDay {
 
             <div class="profile-actions">
               <button 
+                type="button" 
+                class="btn btn-outline btn-sm" 
+                (click)="exportCsv()" 
+                style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;"
+                title="Export Monthly Muster CSV for {{ selectedEmployee()?.fullName }}"
+              >
+                <span [appIcon]="'download'"></span> Export CSV
+              </button>
+              <button 
                 type="button"
                 class="btn btn-outline btn-sm" 
                 (click)="viewEmployeeProfile()" 
-                style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;"
+                style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-weight: 600;"
                 title="View full profile for {{ selectedEmployee()?.fullName }}"
               >
                 View Details
               </button>
               @if (perms.canCreate('Attendance')) {
-                <button type="button" class="btn btn-primary btn-sm" (click)="openQuickPunchModal()" style="display: inline-flex; align-items: center; gap: 6px;">
+                <button type="button" class="btn btn-primary btn-sm" (click)="openQuickPunchModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
                   + Add Attendance
                 </button>
               }
+              <button 
+                type="button" 
+                class="detail-close-btn" 
+                (click)="tab.set('daily')" 
+                title="Close and return to Daily Punch Log"
+              >✕</button>
             </div>
           </div>
 
@@ -1193,8 +1186,26 @@ interface MusterDay {
         display: flex;
         flex-direction: column;
         gap: 6px;
-        max-height: 520px;
+        max-height: calc(100vh - 360px);
+        min-height: 280px;
         overflow-y: auto;
+        padding-right: 4px;
+        scrollbar-width: thin;
+        scrollbar-color: #94a3b8 #f1f5f9;
+      }
+      .roster-scroll-container::-webkit-scrollbar {
+        width: 6px;
+      }
+      .roster-scroll-container::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+      }
+      .roster-scroll-container::-webkit-scrollbar-thumb {
+        background: #94a3b8;
+        border-radius: 4px;
+      }
+      .roster-scroll-container::-webkit-scrollbar-thumb:hover {
+        background: #64748b;
       }
       .roster-item-card {
         display: flex;
@@ -1263,51 +1274,30 @@ interface MusterDay {
         min-width: 0;
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 12px;
       }
 
-      /* Top Navigation & Close */
-      .detail-top-nav {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .emp-pager {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .pager-btn {
-        width: 26px;
-        height: 26px;
-        border-radius: 6px;
+      /* Close Button */
+      .detail-close-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
         border: 1px solid var(--border);
-        background: var(--surface);
-        font-size: 14px;
-        font-weight: 800;
-        color: var(--muted);
+        background: var(--bg);
         display: inline-flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-      }
-      .pager-btn:hover { background: var(--bg); color: var(--text); }
-      .pager-info {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--muted);
-        margin-left: 4px;
-      }
-      .detail-close-btn {
-        background: none;
-        border: none;
-        font-size: 15px;
+        font-size: 14px;
         font-weight: 700;
         color: var(--muted);
-        cursor: pointer;
-        padding: 4px;
+        transition: all 0.15s ease;
       }
-      .detail-close-btn:hover { color: var(--text); }
+      .detail-close-btn:hover {
+        background: #fee2e2;
+        color: #ef4444;
+        border-color: #fca5a5;
+      }
 
       /* Employee Profile Banner */
       .emp-profile-banner {
@@ -1315,11 +1305,11 @@ interface MusterDay {
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
-        gap: 14px;
+        gap: 12px;
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 16px 20px;
+        padding: 12px 18px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.02);
       }
       .profile-left {
@@ -1385,7 +1375,7 @@ interface MusterDay {
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 10px;
-        padding: 12px 14px;
+        padding: 10px 12px;
         display: flex;
         flex-direction: column;
         box-shadow: 0 1px 3px rgba(0,0,0,0.02);
@@ -1397,10 +1387,10 @@ interface MusterDay {
         white-space: nowrap;
       }
       .stat-num {
-        font-size: 20px;
+        font-size: 19px;
         font-weight: 800;
         color: var(--text);
-        margin: 4px 0 2px 0;
+        margin: 2px 0 1px 0;
       }
       .stat-foot {
         font-size: 10px;
@@ -1412,7 +1402,7 @@ interface MusterDay {
       .timeline-widget-card {
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 14px;
+        border-radius: 12px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
         overflow: hidden;
         display: flex;
@@ -1424,29 +1414,31 @@ interface MusterDay {
         align-items: center;
         flex-wrap: wrap;
         gap: 12px;
-        padding: 14px 18px;
+        padding: 10px 16px;
         background: var(--surface);
         border-bottom: 1px solid var(--border);
       }
       .timeline-widget-scroll {
-        max-height: 560px;
+        max-height: calc(100vh - 330px);
+        min-height: 380px;
         overflow-y: auto;
-        padding: 16px 18px;
+        padding: 12px 16px;
         scrollbar-width: thin;
-        scrollbar-color: #cbd5e1 transparent;
+        scrollbar-color: #94a3b8 #f1f5f9;
       }
       .timeline-widget-scroll::-webkit-scrollbar {
-        width: 6px;
+        width: 7px;
       }
       .timeline-widget-scroll::-webkit-scrollbar-track {
-        background: transparent;
+        background: #f1f5f9;
+        border-radius: 6px;
       }
       .timeline-widget-scroll::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 4px;
+        background: #94a3b8;
+        border-radius: 6px;
       }
       .timeline-widget-scroll::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
+        background: #64748b;
       }
       .search-clear-mini {
         border: none;
