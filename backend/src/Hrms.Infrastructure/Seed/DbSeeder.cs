@@ -404,7 +404,7 @@ public static class DbSeeder
             NewAnnouncement("Office Closure", "The office will be closed for scheduled maintenance. All employees are requested to work from home.", "Notice", AnnouncementSeverity.Warning, now.AddDays(-1)),
             NewAnnouncement("New Leave Policy Effective Next Month", "Updated leave policy takes effect next month. Key changes include additional annual leave days and revised sick leave rules.", "Policy", AnnouncementSeverity.Info, now.AddDays(-2)),
             NewAnnouncement("Health Insurance Renewal", "Please submit your health insurance renewal documents to HR before the deadline. Failure to submit may result in a coverage lapse.", "Urgent", AnnouncementSeverity.Danger, now.AddDays(-3)),
-            NewAnnouncement("Team Building Event", "Join us for a team building event at Dubai Marina. Registration is mandatory. Please confirm your attendance.", "Event", AnnouncementSeverity.Info, now.AddDays(-4)),
+            NewAnnouncement("Team Building Event", "Join us for an annual team building event at Dumas Beach Resort, Surat. Registration is mandatory. Please confirm your attendance.", "Event", AnnouncementSeverity.Info, now.AddDays(-4)),
             NewAnnouncement("Salary Revision Effective Next Quarter", "Annual salary revision will be effective next quarter. Performance-based increments will be communicated by your manager.", "HR Update", AnnouncementSeverity.Info, now.AddDays(-7)));
 
         // ── Notifications ──
@@ -481,18 +481,18 @@ public static class DbSeeder
         {
             db.CompanySettings.Add(new CompanySettings
             {
-                CompanyName = "HRNexus Corp",
-                TradeLicense = "TL-2024-123456",
-                Trn = "100234567890003",
-                Industry = "Technology",
+                CompanyName = "Viral Infotech Nexus Pvt. Ltd.",
+                TradeLicense = "U72900GJ2018PTC104523",
+                Trn = "24AABCV1234F1Z5",
+                Industry = "Information Technology",
                 FoundedYear = 2018,
                 Website = "https://hrnexus.com",
-                Address = "Dubai Internet City, Building 3",
-                City = "Dubai",
-                Country = "UAE",
-                Phone = "+971 4 123 4567",
+                Address = "Nexus Tech Tower, Ring Road",
+                City = "Surat",
+                Country = "India",
+                Phone = "+91 261 245 8899",
                 HrEmail = "hr@hrnexus.com",
-                PayrollCurrency = "USD",
+                PayrollCurrency = "INR",
             });
         }
 
@@ -682,9 +682,9 @@ public static class DbSeeder
         TransportAllowance = transport,
         MobileAllowance = mobile,
         OtherAllowances = other,
-        Currency = "USD",
-        Country = "UAE",
-        City = "Dubai",
+        Currency = "INR",
+        Country = "India",
+        City = "Surat",
     };
 
     private static User NewUser(string email, string fullName, string initials, Role role, IPasswordHasher hasher, string password) => new()
