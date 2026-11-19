@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
+import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 
 interface Announcement {
@@ -22,9 +23,11 @@ interface Announcement {
     <div class="flex justify-end items-center" style="margin-bottom: 24px">
       <div style="display: flex; align-items: center; gap: 12px">
         <span class="badge badge-danger" style="font-size: 0.82rem; padding: 6px 14px">{{ announcements().length }} Total</span>
-        <button class="btn btn-primary" (click)="openCreateModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600">
-          <span>+</span> Post Announcement
-        </button>
+        @if (canManage()) {
+          <button class="btn btn-primary" (click)="openCreateModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600">
+            <span>+</span> Post Announcement
+          </button>
+        }
       </div>
     </div>
 
@@ -38,7 +41,7 @@ interface Announcement {
                 <span class="badge" [class]="badgeClass(a.type)">{{ a.tag }}</span>
                 <span class="ann-time" style="font-size: 11px; color: var(--muted); white-space: nowrap">{{ a.time }}</span>
               </div>
-              @if (a.id) {
+              @if (canManage() && a.id) {
                 <div style="display: flex; align-items: center; gap: 4px">
                   <button
                     type="button"
@@ -72,7 +75,9 @@ interface Announcement {
       } @empty {
         <div style="text-align: center; padding: 48px; background: var(--surface); border-radius: 14px; border: 1px dashed var(--border)">
           <p style="color: var(--muted); margin-bottom: 14px">No active announcements right now.</p>
-          <button class="btn btn-primary btn-sm" (click)="openCreateModal()">+ Post the First Announcement</button>
+          @if (canManage()) {
+            <button class="btn btn-primary btn-sm" (click)="openCreateModal()">+ Post the First Announcement</button>
+          }
         </div>
       }
     </div>
@@ -243,7 +248,10 @@ interface Announcement {
 })
 export class EmpAnnouncementsComponent implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly session = inject(SessionService);
   private readonly toast = inject(ToastService);
+
+  protected readonly canManage = computed(() => this.session.role() !== 'Employee');
 
   protected readonly announcements = signal<Announcement[]>([]);
   protected readonly showModal = signal(false);
@@ -287,6 +295,7 @@ export class EmpAnnouncementsComponent implements OnInit {
   }
 
   openCreateModal(): void {
+    if (!this.canManage()) return;
     this.editingId = null;
     this.formTitle = '';
     this.formTag = 'HR Update';
@@ -296,6 +305,7 @@ export class EmpAnnouncementsComponent implements OnInit {
   }
 
   openEditModal(a: Announcement): void {
+    if (!this.canManage()) return;
     this.editingId = a.id ?? null;
     this.formTitle = a.title;
     this.formTag = a.tag;
@@ -310,6 +320,7 @@ export class EmpAnnouncementsComponent implements OnInit {
   }
 
   submitAnnouncement(): void {
+    if (!this.canManage()) return;
     if (!this.formTitle.trim()) {
       this.toast.show('Please enter an announcement title.', 'warning');
       return;
@@ -347,7 +358,7 @@ export class EmpAnnouncementsComponent implements OnInit {
   }
 
   deleteItem(a: Announcement): void {
-    if (!a.id) return;
+    if (!this.canManage() || !a.id) return;
     if (!confirm(`Are you sure you want to delete notice "${a.title}"?`)) return;
 
     this.api.deleteAnnouncement(a.id).subscribe({
