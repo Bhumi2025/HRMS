@@ -110,9 +110,6 @@ interface Employee {
         <table>
           <thead>
             <tr>
-              <th style="width: 36px">
-                <input type="checkbox" class="cb" [checked]="allSelected()" (change)="toggleAll($any($event.target).checked)" />
-              </th>
               <th>Employee</th>
               <th>ID</th>
               <th class="emp-col-dept">Department</th>
@@ -126,14 +123,6 @@ interface Employee {
           <tbody>
             @for (e of paginatedEmployees(); track e.id) {
               <tr>
-                <td style="width: 36px; text-align: center">
-                  <input
-                    type="checkbox"
-                    class="cb cb-row"
-                    [checked]="selected().has(e.id)"
-                    (change)="toggleRow(e.id, $any($event.target).checked)"
-                  />
-                </td>
                 <td>
                   <div class="table-avatar">
                     <a 

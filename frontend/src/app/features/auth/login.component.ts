@@ -50,7 +50,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   /** Seeded backend accounts used to prefill credentials. */
   protected readonly demoAccounts: { role: Role; label: string; email: string; password: string; companyCode?: string }[] = [
     { role: 'Super Admin', label: 'Super Admin', email: 'admin@hrnexus.com', password: 'Admin@123' },
-    { role: 'Company Admin', label: 'Viral Infotech (Admin)', email: 'viral@gmail.com', password: 'Admin@123', companyCode: 'VIRALINFOTECH' },
+    { role: 'Company Admin', label: 'Company Admin', email: 'companyadmin@hrnexus.com', password: 'Admin@123' },
     { role: 'HR Manager', label: 'HR Manager', email: 'hr@hrnexus.com', password: 'Hr@12345' },
     { role: 'Manager', label: 'Manager', email: 'manager@hrnexus.com', password: 'Manager@123' },
     { role: 'Employee', label: 'James Okafor', email: 'james@hrnexus.com', password: 'Employee@123' },
@@ -162,9 +162,9 @@ export class LoginComponent implements OnInit, OnDestroy {
         <circle cx="172" cy="160" r="16" fill="#FCD34D"/>
         <text x="172" y="165" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" font-weight="900" fill="#92400e">$</text>
       </svg>`,
-      title: 'Smart Payroll & Analytics',
+      title: 'Smart Payroll & Insights',
       text: 'Process payroll in one click. Get real-time insights on salary, deductions, and workforce costs.',
-      pills: ['💰 Auto Payroll', '📊 Analytics', '🧾 Payslips'],
+      pills: ['💰 Auto Payroll', '📊 Insights', '🧾 Payslips'],
     },
     {
       svg: `<svg viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -268,7 +268,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (this.submitting()) return;
     this.submitting.set(true);
 
-    this.api.login(this.email.trim(), this.password, this.companyCode).subscribe({
+    this.api.login(this.email.trim(), this.password?.trim(), this.companyCode).subscribe({
       next: (response) => {
         // If user is Employee role (or email indicates employee) → check face verification
         const role = response.user.role as Role;

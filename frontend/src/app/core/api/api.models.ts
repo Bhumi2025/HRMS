@@ -171,6 +171,8 @@ export interface MonthlyMusterDay {
   checkOut?: string | null;
   workHours: number;
   status: string;
+  breakMinutes?: number;
+  punches?: EmployeePunch[];
 }
 
 export interface Regularization {
@@ -343,6 +345,15 @@ export interface AttendanceTrendPoint {
   present: number;
   absent: number;
   late: number;
+  date?: string;
+  weekNumber?: number;
+  prevPresent?: number;
+  prevAbsent?: number;
+  prevLate?: number;
+  beforeBreakHours?: number;
+  breakHours?: number;
+  afterBreakHours?: number;
+  missingHours?: number;
 }
 
 export interface Activity {
@@ -597,6 +608,32 @@ export interface HolidayDto {
   date: string;
   dayLabel: string;
   type: string;
+  holidayTemplateId?: string | null;
+  templateName?: string | null;
+  description?: string | null;
+  icon?: string | null;
+}
+
+export interface HolidayTemplateDto {
+  id: string;
+  name: string;
+  description?: string | null;
+  isDefault: boolean;
+  holidayCount: number;
+  assignmentCount: number;
+  holidays?: HolidayDto[] | null;
+}
+
+export interface HolidayTemplateAssignmentDto {
+  id: string;
+  holidayTemplateId: string;
+  templateName: string;
+  departmentId?: string | null;
+  departmentName?: string | null;
+  branchId?: string | null;
+  branchName?: string | null;
+  employeeId?: string | null;
+  employeeName?: string | null;
 }
 
 export interface ShiftDto {
@@ -632,6 +669,8 @@ export interface EmployeePunchStatus {
   hasForgottenCheckOut: boolean;
   forgottenCheckOutDate?: string | null;
   regularizationMessage?: string | null;
+  isOnBreak?: boolean;
+  breakSecondsToday?: number;
 }
 
 export interface EnrolledFace {

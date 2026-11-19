@@ -42,8 +42,11 @@ public sealed class DashboardController : ControllerBase
 
     [HttpGet("attendance-trend")]
     [ProducesResponseType(typeof(IReadOnlyList<AttendanceTrendPointDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<AttendanceTrendPointDto>>> AttendanceTrend(CancellationToken ct) =>
-        Ok(await _dashboard.GetAttendanceTrendAsync(ct));
+    public async Task<ActionResult<IReadOnlyList<AttendanceTrendPointDto>>> AttendanceTrend(
+        [FromQuery] int? year,
+        [FromQuery] int? month,
+        CancellationToken ct) =>
+        Ok(await _dashboard.GetAttendanceTrendAsync(year, month, ct));
 
     [HttpGet("activity")]
     [ProducesResponseType(typeof(IReadOnlyList<ActivityDto>), StatusCodes.Status200OK)]

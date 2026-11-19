@@ -807,7 +807,6 @@ export interface FlatNavigationItem {
               <input class="form-control" [(ngModel)]="navForm.route" list="standardRoutesList" placeholder="e.g. /employee-profile, /shift, or /settings#role" />
               <datalist id="standardRoutesList">
                 <option value="/dashboard">Dashboard</option>
-                <option value="/analytics">Analytics</option>
                 <option value="/company">Company</option>
                 <option value="/employees">Employees</option>
                 <option value="/employee-profile">Profile (Employee Profile)</option>

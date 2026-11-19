@@ -27,7 +27,6 @@ export const SYSTEM_MODULES: { id: string; name: string }[] = [
   { id: 'm12', name: 'Approvals' },
   { id: 'm13', name: 'Reports' },
   { id: 'm14', name: 'Settings' },
-  { id: 'm15', name: 'Analytics' },
 ];
 
 function fullPerm(id: string, name: string): ModulePermission {
@@ -56,7 +55,7 @@ function defaultForRole(roleCode: string): ModulePermission[] {
     });
   }
   if (code === 'MANAGER') {
-    const allowed = ['Dashboard', 'Employees', 'Profile', 'Attendance', 'Leave', 'Approvals', 'Documents', 'Reports', 'Analytics'];
+    const allowed = ['Dashboard', 'Employees', 'Profile', 'Attendance', 'Leave', 'Approvals', 'Documents', 'Reports'];
     return SYSTEM_MODULES.map((m) => {
       if (['Dashboard', 'Profile', 'Approvals'].includes(m.name)) {
         return fullPerm(m.id, m.name);
@@ -157,7 +156,7 @@ export class PermissionService {
 
   hasModuleAccess(moduleName: string): boolean {
     const role = this.session.activeRole();
-    if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
     const key = this.normKey(moduleName);
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canView : false;
@@ -165,7 +164,7 @@ export class PermissionService {
 
   canCreate(moduleName: string): boolean {
     const role = this.session.activeRole();
-    if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
     const key = this.normKey(moduleName);
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canCreate : false;
@@ -173,7 +172,7 @@ export class PermissionService {
 
   canEdit(moduleName: string): boolean {
     const role = this.session.activeRole();
-    if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
     const key = this.normKey(moduleName);
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canEdit : false;
@@ -182,6 +181,7 @@ export class PermissionService {
   canDelete(moduleName: string): boolean {
     const role = this.session.activeRole();
     if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (role === 'HR Manager' && moduleName !== 'Company') return true;
     const key = this.normKey(moduleName);
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canDelete : false;

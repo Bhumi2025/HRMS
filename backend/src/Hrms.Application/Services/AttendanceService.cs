@@ -26,7 +26,7 @@ public sealed class AttendanceService : IAttendanceService
     {
         var records = await LoadLatestDayAsync(ct);
         return new AttendanceSummaryDto(
-            records.Count(r => r.Status == AttendanceStatus.Present),
+            records.Count(r => r.Status == AttendanceStatus.Present || r.Status == AttendanceStatus.HalfDay),
             records.Count(r => r.Status == AttendanceStatus.Absent),
             records.Count(r => r.Status == AttendanceStatus.Late),
             records.Count(r => r.Status == AttendanceStatus.OnLeave));
@@ -54,16 +54,51 @@ public sealed class AttendanceService : IAttendanceService
         int month,
         CancellationToken ct = default)
     {
+        var (tz, _, maxPunchDurationHours) = await GetCompanyTimeZoneAsync(ct);
         var first = new DateOnly(year, month, 1);
         var daysInMonth = DateTime.DaysInMonth(year, month);
         var lastDay = new DateOnly(year, month, daysInMonth);
         var records = await _uow.Attendance.ListForEmployeeMonthAsync(employeeId, year, month, ct);
         var byDate = records.ToDictionary(r => r.Date);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
 
         var leaves = await _uow.LeaveRequests.ToListAsync(
             _uow.LeaveRequests.Query().Where(l => l.EmployeeId == employeeId && l.Status == LeaveStatus.Approved && l.FromDate <= lastDay && l.ToDate >= first),
             ct);
+
+        var holidays = await _uow.Holidays.ToListAsync(
+            _uow.Holidays.Query().Where(h => h.Date >= first && h.Date <= lastDay && h.Type != HolidayType.Optional),
+            ct);
+        var holidayByDate = holidays.ToDictionary(h => h.Date);
+
+        var monthStartUtc = TimeZoneInfo.ConvertTimeToUtc(first.ToDateTime(TimeOnly.MinValue), tz);
+        var monthEndUtc = TimeZoneInfo.ConvertTimeToUtc(lastDay.AddDays(1).ToDateTime(TimeOnly.MinValue), tz);
+
+        var emp = await _uow.Employees.GetWithDetailsAsync(employeeId, ct)
+               ?? await _uow.Employees.GetByIdAsync(employeeId, ct);
+        var empName = emp is null ? "—" : $"{emp.FirstName} {emp.LastName}".Trim();
+        var empCode = emp?.EmployeeCode ?? "—";
+
+        var (maxAllowedHours, targetDailyHours, lateGraceMinutes, shiftStart, isOvernight) = GetShiftParameters(emp?.Shift, maxPunchDurationHours);
+
+        var allMonthPunches = await _uow.Punches.ToListAsync(
+            _uow.Punches.Query()
+                .Where(p => p.EmployeeId == employeeId && p.PunchTime >= monthStartUtc && p.PunchTime < monthEndUtc)
+                .OrderBy(p => p.PunchTime),
+            ct);
+
+        var punchesByDate = allMonthPunches
+            .GroupBy(p => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(p.PunchTime, tz)))
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<EmployeePunchDto>)g.Select(p => new EmployeePunchDto(
+                p.Id,
+                p.EmployeeId,
+                empName,
+                empCode,
+                p.PunchTime,
+                p.PunchType.ToString(),
+                p.Note,
+                p.Device
+            )).ToList());
 
         var result = new List<MonthlyMusterDayDto>();
 
@@ -71,16 +106,164 @@ public sealed class AttendanceService : IAttendanceService
         {
             var date = first.AddDays(day - 1);
             var weekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+            punchesByDate.TryGetValue(date, out var dayPunches);
+            var hasPunches = dayPunches != null && dayPunches.Count > 0;
+            var hasRecord = byDate.TryGetValue(date, out var record);
 
-            if (byDate.TryGetValue(date, out var record))
+            // Step 4: Daily Attendance Calculation (Total duration, breaks, net working hours, late arrival, status)
+            if (hasRecord || hasPunches)
             {
+                TimeOnly? inTime = record?.CheckIn;
+                TimeOnly? outTime = record?.CheckOut;
+                decimal workHours = record?.WorkHours ?? 0m;
+                int breakMins = record?.BreakMinutes ?? 0;
+                string status = record?.Status.ToString() ?? "Present";
+
+                if (hasPunches)
+                {
+                    var sortedPunches = dayPunches!.OrderBy(p => p.PunchTime).ToList();
+                    var firstInPunch = sortedPunches.FirstOrDefault(p => p.PunchType == "ClockIn");
+                    var lastOutPunch = sortedPunches.LastOrDefault(p => p.PunchType == "ClockOut");
+
+                    if (firstInPunch != null && inTime == null)
+                    {
+                        var localIn = TimeZoneInfo.ConvertTimeFromUtc(firstInPunch.PunchTime, tz);
+                        inTime = TimeOnly.FromDateTime(localIn);
+                    }
+                    if (lastOutPunch != null && outTime == null)
+                    {
+                        var localOut = TimeZoneInfo.ConvertTimeFromUtc(lastOutPunch.PunchTime, tz);
+                        outTime = TimeOnly.FromDateTime(localOut);
+                    }
+
+                    // Calculate net working seconds and break seconds across all intervals
+                    long totalWorkSec = 0;
+                    long totalBreakSec = 0;
+                    DateTime? wOpen = null;
+                    DateTime? bOpen = null;
+
+                    foreach (var p in sortedPunches)
+                    {
+                        if (p.PunchType == "ClockIn")
+                        {
+                            wOpen = p.PunchTime;
+                            bOpen = null;
+                        }
+                        else if (p.PunchType == "BreakIn")
+                        {
+                            if (wOpen.HasValue)
+                            {
+                                var diff = p.PunchTime - wOpen.Value;
+                                if (diff.TotalSeconds > 0) totalWorkSec += (long)diff.TotalSeconds;
+                                wOpen = null;
+                            }
+                            bOpen = p.PunchTime;
+                        }
+                        else if (p.PunchType == "BreakOut")
+                        {
+                            if (bOpen.HasValue)
+                            {
+                                var diff = p.PunchTime - bOpen.Value;
+                                if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
+                                bOpen = null;
+                            }
+                            wOpen = p.PunchTime;
+                        }
+                        else if (p.PunchType == "ClockOut")
+                        {
+                            if (wOpen.HasValue)
+                            {
+                                var diff = p.PunchTime - wOpen.Value;
+                                if (diff.TotalSeconds > 0) totalWorkSec += (long)diff.TotalSeconds;
+                                wOpen = null;
+                            }
+                            if (bOpen.HasValue)
+                            {
+                                var diff = p.PunchTime - bOpen.Value;
+                                if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
+                                bOpen = null;
+                            }
+                        }
+                    }
+
+                    // If active today and still open
+                    if (date == today && (sortedPunches.Last().PunchType == "ClockIn" || sortedPunches.Last().PunchType == "BreakOut"))
+                    {
+                        var nowUtc = DateTime.UtcNow;
+                        if (wOpen.HasValue)
+                        {
+                            var diff = nowUtc - wOpen.Value;
+                            if (diff.TotalSeconds > 0) totalWorkSec += (long)diff.TotalSeconds;
+                        }
+                    }
+
+                    var calcHours = Math.Round((decimal)totalWorkSec / 3600m, 2);
+                    var calcBreak = (int)Math.Round((double)totalBreakSec / 60.0);
+
+                    if (record != null && record.WorkHours > 0)
+                    {
+                        workHours = record.WorkHours;
+                        breakMins = record.BreakMinutes;
+                    }
+                    else
+                    {
+                        if (calcHours > 0) workHours = calcHours;
+                        if (calcBreak > 0) breakMins = calcBreak;
+                    }
+
+                    // Step 4: Status Determination (Present, Late, HalfDay)
+                    var isLate = inTime.HasValue && inTime.Value > shiftStart.AddMinutes(lateGraceMinutes);
+
+                    if (outTime.HasValue)
+                    {
+                        if (workHours >= targetDailyHours * 0.9m || workHours >= 7.5m)
+                        {
+                            status = isLate ? "Late" : "Present";
+                        }
+                        else if (workHours >= targetDailyHours * 0.5m || workHours >= 4.0m)
+                        {
+                            status = "HalfDay";
+                        }
+                        else if (workHours > 0)
+                        {
+                            status = "HalfDay";
+                        }
+                    }
+                    else if (date == today)
+                    {
+                        status = isLate ? "Late" : "Present";
+                    }
+                    else
+                    {
+                        status = isLate ? "Late" : "Present";
+                    }
+                }
+                else if (inTime.HasValue && outTime.HasValue && workHours == 0)
+                {
+                    var durHours = (decimal)Math.Max(0, (outTime.Value.ToTimeSpan() - inTime.Value.ToTimeSpan()).TotalHours);
+                    if (durHours >= 5.0m && breakMins == 0) breakMins = 60;
+                    workHours = Math.Max(0, durHours - (breakMins / 60m));
+
+                    var isLate = inTime.Value > shiftStart.AddMinutes(lateGraceMinutes);
+                    if (workHours >= targetDailyHours * 0.9m || workHours >= 7.5m)
+                    {
+                        status = isLate ? "Late" : "Present";
+                    }
+                    else if (workHours >= targetDailyHours * 0.5m || workHours >= 4.0m)
+                    {
+                        status = "HalfDay";
+                    }
+                }
+
                 result.Add(new MonthlyMusterDayDto(
                     date,
                     date.ToString("MMM d"),
-                    record.CheckIn?.ToString("HH:mm"),
-                    record.CheckOut?.ToString("HH:mm"),
-                    record.WorkHours,
-                    record.Status.ToString()));
+                    inTime?.ToString("HH:mm"),
+                    outTime?.ToString("HH:mm"),
+                    workHours,
+                    status,
+                    breakMins,
+                    dayPunches));
             }
             else if (leaves.Any(l => l.FromDate <= date && l.ToDate >= date))
             {
@@ -91,6 +274,16 @@ public sealed class AttendanceService : IAttendanceService
                     null,
                     0,
                     AttendanceStatus.OnLeave.ToString()));
+            }
+            else if (holidayByDate.TryGetValue(date, out var hol))
+            {
+                result.Add(new MonthlyMusterDayDto(
+                    date,
+                    hol.Name,
+                    null,
+                    null,
+                    0,
+                    AttendanceStatus.Holiday.ToString()));
             }
             else if (weekend)
             {
@@ -194,8 +387,33 @@ public sealed class AttendanceService : IAttendanceService
 
         if (approved)
         {
+            var emp = entity.Employee ?? await _uow.Employees.GetByIdAsync(entity.EmployeeId, ct);
+            var (maxAllowedHours, targetDailyHours, lateGraceMinutes, shiftStart, isOvernight) = GetShiftParameters(emp?.Shift);
+            var (tz, _, _) = await GetCompanyTimeZoneAsync(ct);
+
+            // Step 4: Calculate total duration & break time (Net Working Hours = Total Duration - Break Time)
+            var totalDurationHours = (decimal)Math.Max(0, (entity.OutTime.ToTimeSpan() - entity.InTime.ToTimeSpan()).TotalHours);
+            var breakMinutes = totalDurationHours >= 5.0m ? 60 : 0;
+            var netWorkHours = Math.Max(0, Math.Round(totalDurationHours - (breakMinutes / 60m), 2));
+
+            // Step 4: Late arrival check (Check-In > Shift Start + Grace Period)
+            var isLate = entity.InTime > shiftStart.AddMinutes(lateGraceMinutes);
+            var status = AttendanceStatus.Present;
+
+            if (netWorkHours >= targetDailyHours * 0.9m || netWorkHours >= 7.5m)
+            {
+                status = isLate ? AttendanceStatus.Late : AttendanceStatus.Present;
+            }
+            else if (netWorkHours >= targetDailyHours * 0.5m || netWorkHours >= 4.0m)
+            {
+                status = AttendanceStatus.HalfDay;
+            }
+            else if (netWorkHours > 0)
+            {
+                status = AttendanceStatus.HalfDay;
+            }
+
             var record = await _uow.Attendance.GetForEmployeeDateAsync(entity.EmployeeId, entity.Date, ct);
-            var workHours = (decimal)Math.Max(0, Math.Round((entity.OutTime.ToTimeSpan() - entity.InTime.ToTimeSpan()).TotalHours, 2));
             if (record == null)
             {
                 record = new AttendanceRecord
@@ -204,9 +422,9 @@ public sealed class AttendanceService : IAttendanceService
                     Date = entity.Date,
                     CheckIn = entity.InTime,
                     CheckOut = entity.OutTime,
-                    BreakMinutes = 0,
-                    WorkHours = workHours,
-                    Status = AttendanceStatus.Present,
+                    BreakMinutes = breakMinutes,
+                    WorkHours = netWorkHours,
+                    Status = status,
                     Notes = $"Regularized: {entity.Reason}"
                 };
                 await _uow.Attendance.AddAsync(record, ct);
@@ -215,12 +433,49 @@ public sealed class AttendanceService : IAttendanceService
             {
                 record.CheckIn = entity.InTime;
                 record.CheckOut = entity.OutTime;
-                record.WorkHours = workHours;
-                record.Status = AttendanceStatus.Present;
+                record.BreakMinutes = breakMinutes;
+                record.WorkHours = netWorkHours;
+                record.Status = status;
                 record.Notes = string.IsNullOrWhiteSpace(record.Notes)
                     ? $"Regularized: {entity.Reason}"
                     : $"{record.Notes} | Regularized: {entity.Reason}";
                 _uow.Attendance.Update(record);
+            }
+
+            // Sync punches into EmployeePunches so all punch timeline and kiosk queries display regularized punches
+            var localInDateTime = entity.Date.ToDateTime(entity.InTime);
+            var inUtc = TimeZoneInfo.ConvertTimeToUtc(localInDateTime, tz);
+            var localOutDateTime = entity.Date.ToDateTime(entity.OutTime);
+            var outUtc = TimeZoneInfo.ConvertTimeToUtc(localOutDateTime, tz);
+
+            var existingPunches = await _uow.Punches.ToListAsync(
+                _uow.Punches.Query().Where(p => p.EmployeeId == entity.EmployeeId && p.PunchTime >= inUtc.AddMinutes(-5) && p.PunchTime <= outUtc.AddMinutes(5)),
+                ct);
+
+            if (!existingPunches.Any(p => p.PunchType == PunchType.ClockIn))
+            {
+                await _uow.Punches.AddAsync(new EmployeePunch
+                {
+                    EmployeeId = entity.EmployeeId,
+                    PunchTime = inUtc,
+                    PunchType = PunchType.ClockIn,
+                    Note = $"Regularized: {entity.Reason}",
+                    Device = "Regularization Approved",
+                    IsOpen = false
+                }, ct);
+            }
+
+            if (!existingPunches.Any(p => p.PunchType == PunchType.ClockOut))
+            {
+                await _uow.Punches.AddAsync(new EmployeePunch
+                {
+                    EmployeeId = entity.EmployeeId,
+                    PunchTime = outUtc,
+                    PunchType = PunchType.ClockOut,
+                    Note = $"Regularized: {entity.Reason}",
+                    Device = "Regularization Approved",
+                    IsOpen = false
+                }, ct);
             }
         }
 
@@ -243,28 +498,99 @@ public sealed class AttendanceService : IAttendanceService
     {
         var settings = await _uow.CompanySettings.FirstOrDefaultAsync(
             _uow.CompanySettings.Query().OrderBy(c => c.CreatedAtUtc), ct);
-        if (settings == null || string.IsNullOrWhiteSpace(settings.TimeZone))
-        {
-            throw new BadRequestException("The company's time zone is not configured. Please set a valid time zone in Company Profile settings before recording punches.");
-        }
-        var maxDuration = settings.MaxPunchDurationHours > 0 ? settings.MaxPunchDurationHours : 16;
-        return (ResolveTimeZone(settings.TimeZone), settings.TimeZone, maxDuration);
+        var timeZoneName = !string.IsNullOrWhiteSpace(settings?.TimeZone) ? settings.TimeZone : "UTC";
+        var maxDuration = (settings?.MaxPunchDurationHours ?? 0) > 0 ? settings!.MaxPunchDurationHours : 16;
+        return (ResolveTimeZone(timeZoneName), timeZoneName, maxDuration);
     }
 
-    private static TimeZoneInfo ResolveTimeZone(string timeZoneId)
+    private static TimeZoneInfo ResolveTimeZone(string? timeZoneId)
     {
-        try
+        if (string.IsNullOrWhiteSpace(timeZoneId))
         {
-            return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return TimeZoneInfo.Utc;
         }
-        catch
+
+        var trimmed = timeZoneId.Trim();
+
+        // 1. Direct TryFindSystemTimeZoneById on raw string
+        if (TimeZoneInfo.TryFindSystemTimeZoneById(trimmed, out var tz))
         {
-            if (TimeZoneInfo.TryFindSystemTimeZoneById(timeZoneId, out var tz))
+            return tz;
+        }
+
+        // 2. If it's UTC or starts with UTC (e.g. "UTC (+00:00)", "UTC")
+        if (trimmed.StartsWith("UTC", StringComparison.OrdinalIgnoreCase))
+        {
+            return TimeZoneInfo.Utc;
+        }
+
+        // 3. Extract base identifier if formatted with display label like "Asia/Dubai (GST +04:00)"
+        var cleanId = trimmed;
+        var parenIdx = cleanId.IndexOf('(');
+        if (parenIdx > 0)
+        {
+            cleanId = cleanId.Substring(0, parenIdx).Trim();
+        }
+
+        if (TimeZoneInfo.TryFindSystemTimeZoneById(cleanId, out tz))
+        {
+            return tz;
+        }
+
+        // 4. Common Windows vs IANA cross-mappings
+        var lower = cleanId.ToLowerInvariant();
+        if (lower.Contains("dubai") || lower.Contains("arabian") || lower.Contains("uae") || lower.Contains("gst"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("Arabian Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Dubai", out tz))
             {
                 return tz;
             }
-            throw new BadRequestException($"The company's configured time zone '{timeZoneId}' is invalid or not recognized by the server. Please update the time zone in Company Profile settings.");
         }
+        else if (lower.Contains("kolkata") || lower.Contains("india") || lower.Contains("calcutta") || lower.Contains("ist"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("India Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Kolkata", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Calcutta", out tz))
+            {
+                return tz;
+            }
+        }
+        else if (lower.Contains("riyadh") || lower.Contains("saudi") || lower.Contains("ast"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("Arab Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Riyadh", out tz))
+            {
+                return tz;
+            }
+        }
+        else if (lower.Contains("london") || lower.Contains("gmt") || lower.Contains("bst"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("GMT Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Europe/London", out tz))
+            {
+                return tz;
+            }
+        }
+        else if (lower.Contains("new_york") || lower.Contains("eastern") || lower.Contains("est"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("Eastern Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("America/New_York", out tz))
+            {
+                return tz;
+            }
+        }
+        else if (lower.Contains("singapore") || lower.Contains("sgt"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("Singapore Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Singapore", out tz))
+            {
+                return tz;
+            }
+        }
+
+        // Fallback gracefully to Utc instead of throwing a blocking error
+        return TimeZoneInfo.Utc;
     }
 
     private static (double MaxAllowedHours, decimal TargetDailyHours, int LateGraceMinutes, TimeOnly ShiftStart, bool IsOvernight) GetShiftParameters(Shift? shift, int maxPunchDurationHours = 16)
@@ -320,90 +646,73 @@ public sealed class AttendanceService : IAttendanceService
             _uow.Punches.Query().Where(p => p.EmployeeId == employeeId && p.IsOpen),
             ct);
 
-        EmployeePunch? activeOpenPunch = null;
+        // Fetch shift/today start window in UTC
+        var shiftDayStartUtc = TimeZoneInfo.ConvertTimeToUtc(localToday.ToDateTime(TimeOnly.MinValue), tz);
+        var shiftDayEndUtc = shiftDayStartUtc.AddHours(maxAllowedHours + 4);
 
-        if (punchType == PunchType.ClockIn)
+        // Expire older open punches from previous days
+        foreach (var open in existingOpenPunches.Where(p => p.PunchTime < shiftDayStartUtc))
         {
-            // If there are existing open punches, verify whether any is still within the active shift
-            foreach (var open in existingOpenPunches)
+            open.IsOpen = false;
+            open.Note = string.IsNullOrWhiteSpace(open.Note)
+                ? "Incomplete shift - missing check-out (auto-closed)"
+                : $"{open.Note} | Incomplete shift (auto-closed)";
+            _uow.Punches.Update(open);
+        }
+
+        // Find the most recent punch today for this employee
+        var todayPunches = await _uow.Punches.ToListAsync(
+            _uow.Punches.Query()
+                .Where(p => p.EmployeeId == employeeId && p.PunchTime >= shiftDayStartUtc && p.PunchTime <= shiftDayEndUtc)
+                .OrderBy(p => p.PunchTime),
+            ct);
+
+        var lastPunch = todayPunches.LastOrDefault();
+
+        // Validate state transitions cleanly
+        if (lastPunch == null || lastPunch.PunchType == PunchType.ClockOut)
+        {
+            if (punchType == PunchType.BreakIn)
             {
-                var duration = nowUtc - open.PunchTime;
-                if (duration.TotalHours <= maxAllowedHours)
-                {
-                    // Active shift still ongoing!
-                    throw new ConflictException("You are already checked in. Please check out before checking in again.");
-                }
-
-                // Older open punch past shift end + grace period: close it as incomplete in this same transaction
-                open.IsOpen = false;
-                open.Note = string.IsNullOrWhiteSpace(open.Note)
-                    ? "Incomplete shift - missing check-out (auto-closed)"
-                    : $"{open.Note} | Incomplete shift (auto-closed)";
-                _uow.Punches.Update(open);
-
-                var priorDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(open.PunchTime, tz));
-                var priorRecord = await _uow.Attendance.GetForEmployeeDateAsync(employeeId, priorDate, ct);
-                if (priorRecord != null && (priorRecord.Notes == null || !priorRecord.Notes.Contains("needs regularization")))
-                {
-                    priorRecord.Notes = string.IsNullOrWhiteSpace(priorRecord.Notes)
-                        ? "Incomplete punch - missing check-out (needs regularization)"
-                        : $"{priorRecord.Notes} | Incomplete punch (needs regularization)";
-                    _uow.Attendance.Update(priorRecord);
-                }
+                throw new ValidationException("Cannot start a break without checking in first.");
+            }
+            if (punchType == PunchType.BreakOut)
+            {
+                throw new ValidationException("Cannot end a break without checking in first.");
+            }
+            if (punchType == PunchType.ClockOut)
+            {
+                throw new ValidationException("Cannot check out without an active check-in.");
             }
         }
-        else if (punchType == PunchType.ClockOut)
+        else if (lastPunch.PunchType == PunchType.ClockIn || lastPunch.PunchType == PunchType.BreakOut)
         {
-            // Must have an active open punch
-            activeOpenPunch = existingOpenPunches.OrderByDescending(p => p.PunchTime).FirstOrDefault();
-            if (activeOpenPunch == null)
+            if (punchType == PunchType.ClockIn)
             {
-                throw new ConflictException("Cannot check out without an active check-in.");
+                throw new ConflictException("You are already checked in. Please check out or start a break.");
             }
-
-            var duration = nowUtc - activeOpenPunch.PunchTime;
-            if (duration.TotalHours > maxAllowedHours)
+            if (punchType == PunchType.BreakOut)
             {
-                // Open punch has exceeded the shift window: close it as incomplete in this transaction
-                activeOpenPunch.IsOpen = false;
-                activeOpenPunch.Note = string.IsNullOrWhiteSpace(activeOpenPunch.Note)
-                    ? "Incomplete shift - exceeded maximum shift duration (auto-closed)"
-                    : $"{activeOpenPunch.Note} | Exceeded maximum shift duration (auto-closed)";
-                _uow.Punches.Update(activeOpenPunch);
-
-                foreach (var extra in existingOpenPunches.Where(p => p.Id != activeOpenPunch.Id))
-                {
-                    extra.IsOpen = false;
-                    _uow.Punches.Update(extra);
-                }
-
-                var priorDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(activeOpenPunch.PunchTime, tz));
-                var priorRecord = await _uow.Attendance.GetForEmployeeDateAsync(employeeId, priorDate, ct);
-                if (priorRecord != null)
-                {
-                    priorRecord.Notes = string.IsNullOrWhiteSpace(priorRecord.Notes)
-                        ? "Incomplete shift - missing check-out past shift limit (needs regularization)"
-                        : $"{priorRecord.Notes} | Needs regularization";
-                    _uow.Attendance.Update(priorRecord);
-                }
-
-                await _uow.SaveChangesAsync(ct);
-
-                var priorLocalTime = TimeZoneInfo.ConvertTimeFromUtc(activeOpenPunch.PunchTime, tz);
-                throw new ConflictException(
-                    $"Your check-in from {priorLocalTime:MMM dd, yyyy hh:mm tt} exceeded the allowable shift limit ({maxAllowedHours:F0} hours) and has been closed as incomplete. Please submit an attendance regularization request.");
+                throw new ValidationException("You are not currently on a break. You can start a break with Break In.");
             }
-
-            // Normal active check-out within shift window
-            activeOpenPunch.IsOpen = false;
-            _uow.Punches.Update(activeOpenPunch);
-
-            // Close any other orphan open punches as well
-            foreach (var extra in existingOpenPunches.Where(p => p.Id != activeOpenPunch.Id))
+        }
+        else if (lastPunch.PunchType == PunchType.BreakIn)
+        {
+            if (punchType == PunchType.ClockIn)
             {
-                extra.IsOpen = false;
-                _uow.Punches.Update(extra);
+                throw new ConflictException("You are currently on break. Please end break (Break Out) before checking in.");
             }
+            if (punchType == PunchType.BreakIn)
+            {
+                throw new ConflictException("You are already on a break. Record Break Out when your break ends.");
+            }
+        }
+
+        // Close previous open punch(es) since the current punch transitions the employee to a new phase
+        foreach (var open in existingOpenPunches)
+        {
+            open.IsOpen = false;
+            _uow.Punches.Update(open);
         }
 
         var punch = new EmployeePunch
@@ -413,39 +722,22 @@ public sealed class AttendanceService : IAttendanceService
             PunchType = punchType,
             Note = request.Note,
             Device = request.Device ?? "Web Browser",
-            IsOpen = (punchType == PunchType.ClockIn)
+            IsOpen = (punchType != PunchType.ClockOut)
         };
 
         await _uow.Punches.AddAsync(punch, ct);
 
-        // Determine attendance record target date (for night shifts, date is based on check-in date)
-        DateOnly attendanceDate;
-        if (punchType == PunchType.ClockOut && activeOpenPunch != null)
-        {
-            var openLocal = TimeZoneInfo.ConvertTimeFromUtc(activeOpenPunch.PunchTime, tz);
-            attendanceDate = DateOnly.FromDateTime(openLocal);
-        }
-        else
-        {
-            attendanceDate = localToday;
-        }
+        // Determine attendance record target date
+        var attendanceDate = localToday;
 
-        // Query all punches associated with this shift / date window
-        var shiftDayStartUtc = TimeZoneInfo.ConvertTimeToUtc(attendanceDate.ToDateTime(TimeOnly.MinValue), tz);
-        var shiftDayEndUtc = shiftDayStartUtc.AddHours(maxAllowedHours + 4);
-
-        var shiftPunches = await _uow.Punches.ToListAsync(
-            _uow.Punches.Query()
-                .Where(p => p.EmployeeId == employeeId && p.PunchTime >= shiftDayStartUtc && p.PunchTime <= shiftDayEndUtc)
-                .OrderBy(p => p.PunchTime),
-            ct);
-
-        var allPunches = shiftPunches.Concat(new[] { punch }).OrderBy(p => p.PunchTime).ToList();
+        var allPunches = todayPunches.Concat(new[] { punch }).OrderBy(p => p.PunchTime).ToList();
 
         TimeOnly? firstCheckIn = null;
         TimeOnly? lastCheckOut = null;
         long totalClosedSeconds = 0;
-        DateTime? activeIntervalOpen = null;
+        long totalBreakSeconds = 0;
+        DateTime? workIntervalOpen = null;
+        DateTime? breakIntervalOpen = null;
 
         foreach (var p in allPunches)
         {
@@ -455,25 +747,97 @@ public sealed class AttendanceService : IAttendanceService
             if (p.PunchType == PunchType.ClockIn)
             {
                 firstCheckIn ??= pTimeOnly;
-                activeIntervalOpen = p.PunchTime;
+                workIntervalOpen = p.PunchTime;
+                breakIntervalOpen = null;
+            }
+            else if (p.PunchType == PunchType.BreakIn)
+            {
+                if (workIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - workIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalClosedSeconds += (long)diff.TotalSeconds;
+                    workIntervalOpen = null;
+                }
+                breakIntervalOpen = p.PunchTime;
+            }
+            else if (p.PunchType == PunchType.BreakOut)
+            {
+                if (breakIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - breakIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+                    breakIntervalOpen = null;
+                }
+                workIntervalOpen = p.PunchTime;
             }
             else if (p.PunchType == PunchType.ClockOut)
             {
                 lastCheckOut = pTimeOnly;
-                if (activeIntervalOpen.HasValue)
+                if (workIntervalOpen.HasValue)
                 {
-                    var diff = p.PunchTime - activeIntervalOpen.Value;
-                    if (diff.TotalSeconds > 0)
-                    {
-                        totalClosedSeconds += (long)diff.TotalSeconds;
-                    }
-                    activeIntervalOpen = null;
+                    var diff = p.PunchTime - workIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalClosedSeconds += (long)diff.TotalSeconds;
+                    workIntervalOpen = null;
+                }
+                if (breakIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - breakIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+                    breakIntervalOpen = null;
                 }
             }
         }
 
+        // Include ongoing interval up to nowUtc if shift is still open
+        if (punchType != PunchType.ClockOut)
+        {
+            if (workIntervalOpen.HasValue)
+            {
+                var diff = nowUtc - workIntervalOpen.Value;
+                if (diff.TotalSeconds > 0) totalClosedSeconds += (long)diff.TotalSeconds;
+            }
+            if (breakIntervalOpen.HasValue)
+            {
+                var diff = nowUtc - breakIntervalOpen.Value;
+                if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+            }
+        }
+
         var workedHours = Math.Round((decimal)totalClosedSeconds / 3600m, 2);
-        bool currentlyStillCheckedIn = (punchType == PunchType.ClockIn);
+        var breakMinutes = (int)Math.Round((double)totalBreakSeconds / 60.0);
+        bool currentlyStillCheckedIn = (punchType != PunchType.ClockOut);
+
+        // Step 4: Attendance calculations (Late arrival, early departure, overtime)
+        string? step4Note = null;
+        if (firstCheckIn.HasValue && firstCheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes))
+        {
+            var lateMins = (int)(firstCheckIn.Value.ToTimeSpan() - shiftStart.ToTimeSpan()).TotalMinutes;
+            step4Note = $"[Late: {lateMins}m]";
+        }
+
+        if (punchType == PunchType.ClockOut && lastCheckOut.HasValue && employee.Shift != null && !isOvernight)
+        {
+            if (lastCheckOut.Value < employee.Shift.EndTime)
+            {
+                var earlyMins = (int)(employee.Shift.EndTime.ToTimeSpan() - lastCheckOut.Value.ToTimeSpan()).TotalMinutes;
+                if (earlyMins >= 5)
+                {
+                    step4Note = string.IsNullOrEmpty(step4Note) ? $"[Early Departure: {earlyMins}m]" : $"{step4Note} [Early Departure: {earlyMins}m]";
+                }
+            }
+            else if (lastCheckOut.Value > employee.Shift.EndTime)
+            {
+                var otMins = (int)(lastCheckOut.Value.ToTimeSpan() - employee.Shift.EndTime.ToTimeSpan()).TotalMinutes;
+                if (otMins >= 15)
+                {
+                    step4Note = string.IsNullOrEmpty(step4Note) ? $"[Overtime: {otMins}m]" : $"{step4Note} [Overtime: {otMins}m]";
+                }
+            }
+        }
+
+        var combinedNotes = string.IsNullOrWhiteSpace(request.Note)
+            ? step4Note
+            : (string.IsNullOrEmpty(step4Note) ? request.Note : $"{request.Note} | {step4Note}");
 
         var attendanceRecord = await _uow.Attendance.GetForEmployeeDateAsync(employeeId, attendanceDate, ct);
         if (attendanceRecord is null)
@@ -483,10 +847,11 @@ public sealed class AttendanceService : IAttendanceService
                 EmployeeId = employeeId,
                 Date = attendanceDate,
                 CheckIn = firstCheckIn,
-                CheckOut = lastCheckOut,
-                BreakMinutes = 0,
+                CheckOut = (punchType == PunchType.ClockOut) ? lastCheckOut : null,
+                BreakMinutes = breakMinutes,
                 WorkHours = workedHours,
-                Status = AttendanceStatus.Present
+                Status = AttendanceStatus.Present,
+                Notes = combinedNotes
             };
 
             if (firstCheckIn.HasValue && firstCheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes))
@@ -499,11 +864,20 @@ public sealed class AttendanceService : IAttendanceService
         else
         {
             attendanceRecord.CheckIn = firstCheckIn ?? attendanceRecord.CheckIn;
-            if (lastCheckOut.HasValue)
+            if (punchType == PunchType.ClockOut)
             {
-                attendanceRecord.CheckOut = lastCheckOut.Value;
+                attendanceRecord.CheckOut = lastCheckOut;
+            }
+            else
+            {
+                attendanceRecord.CheckOut = null;
             }
             attendanceRecord.WorkHours = workedHours;
+            attendanceRecord.BreakMinutes = breakMinutes;
+            if (!string.IsNullOrWhiteSpace(combinedNotes))
+            {
+                attendanceRecord.Notes = combinedNotes;
+            }
 
             // Only finalize status to HalfDay or Absent if the employee is NOT currently checked in!
             if (currentlyStillCheckedIn)
@@ -641,8 +1015,10 @@ public sealed class AttendanceService : IAttendanceService
             ct);
 
         long closedSeconds = 0;
+        long breakSeconds = 0;
         TimeOnly? firstCheckIn = null;
         DateTime? activeCalcOpen = null;
+        DateTime? activeBreakOpen = null;
 
         foreach (var p in punchesQuery)
         {
@@ -653,18 +1029,59 @@ public sealed class AttendanceService : IAttendanceService
             {
                 firstCheckIn ??= pTimeOnly;
                 activeCalcOpen = p.PunchTime;
+                activeBreakOpen = null;
+            }
+            else if (p.PunchType == PunchType.BreakIn)
+            {
+                if (activeCalcOpen.HasValue)
+                {
+                    var diff = p.PunchTime - activeCalcOpen.Value;
+                    if (diff.TotalSeconds > 0) closedSeconds += (long)diff.TotalSeconds;
+                    activeCalcOpen = null;
+                }
+                activeBreakOpen = p.PunchTime;
+            }
+            else if (p.PunchType == PunchType.BreakOut)
+            {
+                if (activeBreakOpen.HasValue)
+                {
+                    var diff = p.PunchTime - activeBreakOpen.Value;
+                    if (diff.TotalSeconds > 0) breakSeconds += (long)diff.TotalSeconds;
+                    activeBreakOpen = null;
+                }
+                activeCalcOpen = p.PunchTime;
             }
             else if (p.PunchType == PunchType.ClockOut)
             {
                 if (activeCalcOpen.HasValue)
                 {
                     var diff = p.PunchTime - activeCalcOpen.Value;
-                    if (diff.TotalSeconds > 0)
-                    {
-                        closedSeconds += (long)diff.TotalSeconds;
-                    }
+                    if (diff.TotalSeconds > 0) closedSeconds += (long)diff.TotalSeconds;
                     activeCalcOpen = null;
                 }
+                if (activeBreakOpen.HasValue)
+                {
+                    var diff = p.PunchTime - activeBreakOpen.Value;
+                    if (diff.TotalSeconds > 0) breakSeconds += (long)diff.TotalSeconds;
+                    activeBreakOpen = null;
+                }
+            }
+        }
+
+        var lastPunch = punchesQuery.LastOrDefault();
+        bool isOnBreak = lastPunch != null && lastPunch.PunchType == PunchType.BreakIn;
+
+        if (isCheckedIn)
+        {
+            if (activeCalcOpen.HasValue)
+            {
+                var ongoing = nowUtc - activeCalcOpen.Value;
+                if (ongoing.TotalSeconds > 0) closedSeconds += (long)ongoing.TotalSeconds;
+            }
+            if (activeBreakOpen.HasValue)
+            {
+                var ongoing = nowUtc - activeBreakOpen.Value;
+                if (ongoing.TotalSeconds > 0) breakSeconds += (long)ongoing.TotalSeconds;
             }
         }
 
@@ -697,7 +1114,9 @@ public sealed class AttendanceService : IAttendanceService
             TodayPunches: punchDtos,
             HasForgottenCheckOut: hasForgottenCheckOut,
             ForgottenCheckOutDate: forgottenCheckOutDate,
-            RegularizationMessage: regularizationMsg);
+            RegularizationMessage: regularizationMsg,
+            IsOnBreak: isOnBreak,
+            BreakSecondsToday: breakSeconds);
     }
 
     public async Task<IReadOnlyList<EmployeePunchDto>> GetTodayPunchesAsync(Guid? employeeId, CancellationToken ct = default)
@@ -736,7 +1155,12 @@ public sealed class AttendanceService : IAttendanceService
 
     public async Task<TodayAttendanceOverviewDto> GetTodayOverviewAsync(DateOnly? targetDate = null, CancellationToken ct = default)
     {
-        var target = targetDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var (tz, _, _) = await GetCompanyTimeZoneAsync(ct);
+        var nowUtc = DateTime.UtcNow;
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
+        var localToday = DateOnly.FromDateTime(localNow);
+        var target = targetDate ?? localToday;
+
         var employees = await _uow.Employees.ListWithDepartmentAsync(ct);
         var dateRecords = await _uow.Attendance.ToListAsync(
             _uow.Attendance.Query()
@@ -750,6 +1174,22 @@ public sealed class AttendanceService : IAttendanceService
             ct);
         var leaveByEmp = dateLeaves.ToDictionary(l => l.EmployeeId);
 
+        // Fetch day's punches to capture any real-time punches
+        var targetStartUtc = TimeZoneInfo.ConvertTimeToUtc(target.ToDateTime(TimeOnly.MinValue), tz);
+        var targetEndUtc = TimeZoneInfo.ConvertTimeToUtc(target.AddDays(1).ToDateTime(TimeOnly.MinValue), tz);
+        var dayPunches = await _uow.Punches.ToListAsync(
+            _uow.Punches.Query()
+                .Where(p => p.PunchTime >= targetStartUtc && p.PunchTime < targetEndUtc),
+            ct);
+        var punchesByEmp = dayPunches
+            .GroupBy(p => p.EmployeeId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(p => p.PunchTime).ToList());
+
+        var holidays = await _uow.Holidays.ToListAsync(
+            _uow.Holidays.Query().Where(h => h.Date == target && h.Type != HolidayType.Optional),
+            ct);
+        var isHoliday = holidays.Any();
+
         var presentList = new List<AttendancePersonDto>();
         var absentList = new List<AttendancePersonDto>();
         var onLeaveList = new List<AttendancePersonDto>();
@@ -761,7 +1201,11 @@ public sealed class AttendanceService : IAttendanceService
             var dept = emp.Department?.Name ?? "General";
             var desig = emp.Designation?.Name ?? emp.JobTitle;
 
-            if (recordByEmp.TryGetValue(emp.Id, out var rec) && (rec.CheckIn is not null || rec.Status == AttendanceStatus.Present || rec.Status == AttendanceStatus.Late || rec.Status == AttendanceStatus.HalfDay))
+            punchesByEmp.TryGetValue(emp.Id, out var empPunches);
+            var hasPunches = empPunches != null && empPunches.Count > 0;
+            var hasRecord = recordByEmp.TryGetValue(emp.Id, out var rec);
+
+            if (hasRecord && rec != null && (rec.CheckIn is not null || rec.Status == AttendanceStatus.Present || rec.Status == AttendanceStatus.Late || rec.Status == AttendanceStatus.HalfDay))
             {
                 var person = new AttendancePersonDto(
                     emp.Id,
@@ -776,6 +1220,34 @@ public sealed class AttendanceService : IAttendanceService
                     rec.Status.ToString());
                 presentList.Add(person);
                 if (rec.Status == AttendanceStatus.Late)
+                {
+                    lateList.Add(person);
+                }
+            }
+            else if (hasPunches)
+            {
+                var firstIn = empPunches!.FirstOrDefault(p => p.PunchType == PunchType.ClockIn);
+                var lastOut = empPunches!.LastOrDefault(p => p.PunchType == PunchType.ClockOut);
+                TimeOnly? inTime = firstIn != null ? TimeOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(firstIn.PunchTime, tz)) : null;
+                TimeOnly? outTime = lastOut != null ? TimeOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(lastOut.PunchTime, tz)) : null;
+
+                var (_, _, lateGraceMinutes, shiftStart, _) = GetShiftParameters(emp.Shift);
+                var isLate = inTime.HasValue && inTime.Value > shiftStart.AddMinutes(lateGraceMinutes);
+                var statusStr = isLate ? "Late" : "Present";
+
+                var person = new AttendancePersonDto(
+                    emp.Id,
+                    name,
+                    emp.EmployeeCode,
+                    dept,
+                    desig,
+                    inTime?.ToString("hh:mm tt"),
+                    null,
+                    outTime?.ToString("hh:mm tt"),
+                    0m,
+                    statusStr);
+                presentList.Add(person);
+                if (isLate)
                 {
                     lateList.Add(person);
                 }
@@ -807,6 +1279,10 @@ public sealed class AttendanceService : IAttendanceService
                     null,
                     0,
                     "OnLeave"));
+            }
+            else if (isHoliday || IsEmployeeWeekOff(emp, target))
+            {
+                // Public Holiday or Scheduled Rest Day / Weekend: do not mark absent
             }
             else
             {

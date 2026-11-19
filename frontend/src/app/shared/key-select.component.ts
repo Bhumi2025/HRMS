@@ -6,6 +6,7 @@ import {
   HostListener,
   Input,
   OnChanges,
+  OnDestroy,
   OnInit,
   Output,
   SimpleChanges,
@@ -31,6 +32,9 @@ export interface KeyOptionItem {
 @Component({
   selector: 'app-key-select, app-key-group-select',
   imports: [CommonModule, IconDirective],
+  host: {
+    '[class.csel-host-open]': 'open()',
+  },
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -39,7 +43,7 @@ export interface KeyOptionItem {
     },
   ],
   template: `
-    <div class="csel-wrap key-select-wrap" [style.width]="width" (click)="$event.stopPropagation()">
+    <div class="csel-wrap key-select-wrap" [class.csel-open]="open()" [style.width]="width" (click)="$event.stopPropagation()">
       <button
         type="button"
         class="csel-btn key-select-btn"
@@ -67,7 +71,7 @@ export interface KeyOptionItem {
       </button>
 
       @if (open()) {
-        <div class="csel-menu key-select-menu" [class.drop-up]="dropUp()" style="display: block; max-height: 240px; overflow-y: auto; z-index: 1000;">
+        <div class="csel-menu key-select-menu" [class.drop-up]="dropUp()" style="display: block; max-height: 260px; overflow-y: auto; z-index: 99999;">
           @if (allowClear && innerValue()) {
             <div class="csel-opt text-muted" (click)="pickClear()" style="font-size: 12px; border-bottom: 1px solid var(--border);">
               <em>Clear selection</em>
@@ -106,9 +110,25 @@ export interface KeyOptionItem {
   `,
   styles: [
     `
+      :host {
+        display: inline-block;
+        position: relative;
+      }
+      :host(.csel-host-open) {
+        z-index: 1000 !important;
+      }
       .key-select-wrap {
         position: relative;
         display: inline-block;
+      }
+      .key-select-wrap.csel-open {
+        z-index: 1050 !important;
+        position: relative;
+      }
+      .key-select-menu {
+        background-color: var(--surface, #ffffff) !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+        z-index: 99999 !important;
       }
       .key-select-menu.drop-up {
         top: auto !important;
@@ -139,7 +159,7 @@ export interface KeyOptionItem {
     `,
   ],
 })
-export class KeyGroupSelectComponent implements OnInit, OnChanges, ControlValueAccessor {
+export class KeyGroupSelectComponent implements OnInit, OnChanges, OnDestroy, ControlValueAccessor {
   private readonly cache = inject(KeyGroupCacheService);
   private readonly elementRef = inject(ElementRef);
 
@@ -277,38 +297,104 @@ export class KeyGroupSelectComponent implements OnInit, OnChanges, ControlValueA
     if (this.disabledState()) return;
     if (!this.open()) {
       try {
-        const rect = (this.elementRef.nativeElement as HTMLElement).getBoundingClientRect();
+        const el = this.elementRef.nativeElement as HTMLElement;
+        const rect = el.getBoundingClientRect();
         const spaceBelow = window.innerHeight - rect.bottom;
-        const shouldDropUp = spaceBelow < 240 && rect.top > spaceBelow;
+
+        let bottomObstacleHeight = 0;
+        const obstacles = document.querySelectorAll(
+          '.tab-action-bar, .action-bar, .form-footer, .sticky-bottom, [class*="sticky-bottom"]'
+        );
+        for (let i = 0; i < obstacles.length; i++) {
+          const obRect = (obstacles[i] as HTMLElement).getBoundingClientRect();
+          if (obRect.top > rect.bottom && obRect.top < window.innerHeight && obRect.height > 0) {
+            const obstacleCutoff = window.innerHeight - obRect.top;
+            if (obstacleCutoff > bottomObstacleHeight) {
+              bottomObstacleHeight = obstacleCutoff;
+            }
+          }
+        }
+
+        const effectiveSpaceBelow = Math.max(0, spaceBelow - bottomObstacleHeight);
+        const shouldDropUp =
+          (effectiveSpaceBelow < 260 && rect.top > effectiveSpaceBelow) ||
+          (spaceBelow < 220 && rect.top > 220);
         this.dropUp.set(shouldDropUp);
       } catch {
         this.dropUp.set(false);
       }
       this.open.set(true);
+      this.setParentElevation(true);
       this.onTouched();
     } else {
-      this.open.set(false);
+      this.close();
     }
+  }
+
+  protected close(): void {
+    this.open.set(false);
+    this.setParentElevation(false);
   }
 
   protected pick(opt: KeyOptionItem): void {
     this.innerValue.set(opt.value);
     this.onChange(opt.value);
     this.valueChange.emit(opt.value);
-    this.open.set(false);
+    this.close();
   }
 
   protected pickClear(): void {
     this.innerValue.set('');
     this.onChange('');
     this.valueChange.emit('');
-    this.open.set(false);
+    this.close();
   }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
     if (this.open() && !this.elementRef.nativeElement.contains(event.target)) {
-      this.open.set(false);
+      this.close();
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.setParentElevation(false);
+  }
+
+  private setParentElevation(elevate: boolean): void {
+    try {
+      const el = this.elementRef.nativeElement as HTMLElement;
+      const parentCard = el.closest('.card') as HTMLElement | null;
+      const parentGrid = el.closest('.grid-2, .grid-3, .grid-4') as HTMLElement | null;
+      if (elevate) {
+        if (parentCard) {
+          parentCard.classList.add('has-open-dropdown');
+          parentCard.style.zIndex = '50';
+          parentCard.style.position = 'relative';
+        }
+        if (parentGrid) {
+          parentGrid.classList.add('has-open-dropdown');
+          parentGrid.style.zIndex = '50';
+          parentGrid.style.position = 'relative';
+        }
+      } else {
+        if (parentCard) {
+          parentCard.classList.remove('has-open-dropdown');
+          parentCard.style.zIndex = '';
+          if (parentCard.style.position === 'relative') {
+            parentCard.style.removeProperty('position');
+          }
+        }
+        if (parentGrid) {
+          parentGrid.classList.remove('has-open-dropdown');
+          parentGrid.style.zIndex = '';
+          if (parentGrid.style.position === 'relative') {
+            parentGrid.style.removeProperty('position');
+          }
+        }
+      }
+    } catch {
+      // Safe no-op
     }
   }
 

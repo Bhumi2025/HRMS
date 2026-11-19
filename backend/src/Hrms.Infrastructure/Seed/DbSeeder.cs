@@ -68,12 +68,14 @@ public static class DbSeeder
         var designer = new Designation { Name = "Designer", Grade = "L3", DepartmentId = design.Id };
         db.Designations.AddRange(seniorEngineer, engineer, financeAnalyst, hrExecutive, salesExecutive, marketingSpecialist, designer);
 
-        // ── Branches ──
-        var dubai = new Branch { Name = "Dubai HQ", Location = "Dubai, UAE", ManagerName = "Alex Johnson", EmployeeCount = 850 };
-        var abuDhabi = new Branch { Name = "Abu Dhabi", Location = "Abu Dhabi, UAE", ManagerName = "Maria Chen", EmployeeCount = 220 };
-        var riyadh = new Branch { Name = "Riyadh", Location = "Riyadh, KSA", ManagerName = "Omar Hassan", EmployeeCount = 145 };
-        var london = new Branch { Name = "London", Location = "London, UK", ManagerName = "James Smith", EmployeeCount = 69 };
-        db.Branches.AddRange(dubai, abuDhabi, riyadh, london);
+        // ── Branches (India) ──
+        var suratHq = new Branch { Name = "Surat HQ", Location = "Surat, Gujarat, India", ManagerName = "Aarav Mehta", EmployeeCount = 350, IsActive = true };
+        var ahmedabad = new Branch { Name = "Ahmedabad Center", Location = "Ahmedabad, Gujarat, India", ManagerName = "Rohan Verma", EmployeeCount = 180, IsActive = true };
+        var bengaluru = new Branch { Name = "Bengaluru Innovation Hub", Location = "Bengaluru, Karnataka, India", ManagerName = "Priya Sharma", EmployeeCount = 240, IsActive = true };
+        var mumbai = new Branch { Name = "Mumbai Corporate Office", Location = "Mumbai, Maharashtra, India", ManagerName = "Vikram Malhotra", EmployeeCount = 120, IsActive = true };
+        var pune = new Branch { Name = "Pune Tech Park", Location = "Pune, Maharashtra, India", ManagerName = "Ananya Joshi", EmployeeCount = 95, IsActive = true };
+        var hyderabad = new Branch { Name = "Hyderabad Tech Hub", Location = "Hyderabad, Telangana, India", ManagerName = "Siddharth Patel", EmployeeCount = 110, IsActive = true };
+        db.Branches.AddRange(suratHq, ahmedabad, bengaluru, mumbai, pune, hyderabad);
 
         // ── Shifts ──
         var morning = new Shift { Name = "Morning Shift", StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(18, 0), DailyHours = 9, WorkingDays = "Mon - Fri" };
@@ -81,12 +83,67 @@ public static class DbSeeder
         var night = new Shift { Name = "Night Shift", StartTime = new TimeOnly(22, 0), EndTime = new TimeOnly(7, 0), DailyHours = 9, WorkingDays = "Mon - Fri" };
         db.Shifts.AddRange(morning, evening, night);
 
-        // ── Holidays ──
-        db.Holidays.AddRange(
-            new Holiday { Name = "New Year's Day", Date = new DateOnly(today.Year, 1, 1), Type = HolidayType.National },
-            new Holiday { Name = "Eid Al Fitr", Date = new DateOnly(today.Year, 3, 30), Type = HolidayType.Religious },
-            new Holiday { Name = "Eid Al Adha", Date = new DateOnly(today.Year, 6, 6), Type = HolidayType.Religious },
-            new Holiday { Name = "UAE National Day", Date = new DateOnly(today.Year, 12, 2), Type = HolidayType.National });
+        // ── Holiday Templates (India) ──
+        var indiaTemplate = new HolidayTemplate
+        {
+            Name = "India National & Gazetted Holidays (2026)",
+            Description = "Standard national and gazetted public holidays for Indian establishments and corporate offices",
+            IsDefault = true,
+        };
+        var corporateTemplate = new HolidayTemplate
+        {
+            Name = "India Corporate & Optional Holidays (2026)",
+            Description = "Optional and restricted festival holidays for corporate teams in India",
+            IsDefault = false,
+        };
+        db.HolidayTemplates.AddRange(indiaTemplate, corporateTemplate);
+
+        // ── Holidays (India 2026) ──
+        var year = today.Year;
+        var indianHolidays = new List<Holiday>
+        {
+            new Holiday { Name = "New Year's Day", Date = new DateOnly(year, 1, 1), Type = HolidayType.Optional, HolidayTemplateId = indiaTemplate.Id, Icon = "calendar", Description = "First day of the Gregorian New Year" },
+            new Holiday { Name = "Makar Sankranti / Uttarayan", Date = new DateOnly(year, 1, 14), Type = HolidayType.Optional, HolidayTemplateId = indiaTemplate.Id, Icon = "sun", Description = "Harvest festival celebrated across India" },
+            new Holiday { Name = "Republic Day", Date = new DateOnly(year, 1, 26), Type = HolidayType.National, HolidayTemplateId = indiaTemplate.Id, Icon = "flag", Description = "National holiday commemorating the Constitution of India" },
+            new Holiday { Name = "Maha Shivratri", Date = new DateOnly(year, 2, 15), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "moon", Description = "Gazetted festival honoring Lord Shiva" },
+            new Holiday { Name = "Holi", Date = new DateOnly(year, 3, 4), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "sparkles", Description = "Spring festival of colors and unity" },
+            new Holiday { Name = "Eid-ul-Fitr", Date = new DateOnly(year, 3, 20), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "moon", Description = "Islamic festival marking the end of Ramadan" },
+            new Holiday { Name = "Mahavir Jayanti", Date = new DateOnly(year, 3, 31), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "sun", Description = "Birth anniversary of Bhagwan Mahavira" },
+            new Holiday { Name = "Good Friday", Date = new DateOnly(year, 4, 3), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "cross", Description = "Christian holy day marking crucifixion of Jesus Christ" },
+            new Holiday { Name = "Buddha Purnima", Date = new DateOnly(year, 5, 1), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "sun", Description = "Celebration of Gautama Buddha's birth and enlightenment" },
+            new Holiday { Name = "Bakrid / Eid al-Adha", Date = new DateOnly(year, 5, 27), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "moon", Description = "Feast of Sacrifice" },
+            new Holiday { Name = "Muharram", Date = new DateOnly(year, 6, 26), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "calendar", Description = "First month of Islamic calendar and Ashura" },
+            new Holiday { Name = "Independence Day", Date = new DateOnly(year, 8, 15), Type = HolidayType.National, HolidayTemplateId = indiaTemplate.Id, Icon = "flag", Description = "National holiday celebrating Independence of India" },
+            new Holiday { Name = "Milad-un-Nabi", Date = new DateOnly(year, 8, 26), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "moon", Description = "Observance of the Prophet Muhammad's birthday" },
+            new Holiday { Name = "Raksha Bandhan", Date = new DateOnly(year, 8, 28), Type = HolidayType.Optional, HolidayTemplateId = corporateTemplate.Id, Icon = "heart", Description = "Celebration of fraternal bond and protection" },
+            new Holiday { Name = "Janmashtami", Date = new DateOnly(year, 9, 4), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "sparkles", Description = "Birth celebration of Lord Krishna" },
+            new Holiday { Name = "Ganesh Chaturthi", Date = new DateOnly(year, 9, 14), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "star", Description = "Festival welcoming Lord Ganesha" },
+            new Holiday { Name = "Mahatma Gandhi Jayanti", Date = new DateOnly(year, 10, 2), Type = HolidayType.National, HolidayTemplateId = indiaTemplate.Id, Icon = "award", Description = "National holiday marking birth of Mahatma Gandhi" },
+            new Holiday { Name = "Dussehra (Vijaya Dashami)", Date = new DateOnly(year, 10, 20), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "zap", Description = "Triumph of righteousness over evil" },
+            new Holiday { Name = "Diwali (Deepavali)", Date = new DateOnly(year, 11, 8), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "flame", Description = "Festival of Lights and prosperity" },
+            new Holiday { Name = "Govardhan Puja / Bhai Dooj", Date = new DateOnly(year, 11, 10), Type = HolidayType.Optional, HolidayTemplateId = corporateTemplate.Id, Icon = "gift", Description = "Festive celebration following Diwali" },
+            new Holiday { Name = "Guru Nanak Jayanti", Date = new DateOnly(year, 11, 24), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "sun", Description = "Birth anniversary of Guru Nanak Dev Ji" },
+            new Holiday { Name = "Christmas Day", Date = new DateOnly(year, 12, 25), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "gift", Description = "Celebration of the birth of Jesus Christ" },
+        };
+        db.Holidays.AddRange(indianHolidays);
+
+        // ── Holiday Template Assignments ──
+        var holidayAssignments = new List<HolidayTemplateAssignment>
+        {
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = engineering.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = finance.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = hr.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = sales.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = marketing.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = design.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, BranchId = suratHq.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, BranchId = ahmedabad.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, BranchId = bengaluru.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = corporateTemplate.Id, BranchId = mumbai.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = corporateTemplate.Id, BranchId = pune.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = corporateTemplate.Id, BranchId = hyderabad.Id },
+        };
+        db.HolidayTemplateAssignments.AddRange(holidayAssignments);
 
         // ── Leave types ──
         var annual = new LeaveType { Name = "Annual Leave", MaxDaysPerYear = 21, IsPaid = true, Color = "#2563eb", Description = "Yearly paid vacation leave" };
@@ -99,39 +156,32 @@ public static class DbSeeder
 
         if (!isProduction)
         {
-            // ── Demo Employees (Development only) ──
-            var sarah = NewEmployee("EMP-1001", "Sarah", "Mitchell", engineering, seniorEngineer, "L5", EmploymentStatus.Active, new DateOnly(2022, 3, 15), 3200, 800, 400, 150, 650, "sarah@co.com", dubai, morning);
-        sarah.MiddleName = "Anne";
-        sarah.Phone = "+971 50 123 4567";
-        sarah.DateOfBirth = new DateOnly(1990, 6, 15);
+            // ── Demo Employees (Indian workforce) ──
+            var sarah = NewEmployee("EMP-1001", "Sarah", "Sharma", engineering, seniorEngineer, "L5", EmploymentStatus.Active, new DateOnly(2021, 3, 15), 37500, 22500, 3000, 1500, 10500, "sarah@co.com", suratHq, morning);
+        sarah.MiddleName = "K.";
+        sarah.Phone = "+91 98251 10001";
+        sarah.DateOfBirth = new DateOnly(1992, 6, 15);
         sarah.Gender = Gender.Female;
         sarah.MaritalStatus = MaritalStatus.Married;
         sarah.BloodGroup = "O+";
-        sarah.Nationality = "British";
-        sarah.Address = "Apt 4B, Marina Tower";
-        sarah.City = "Dubai";
-        sarah.State = "Dubai";
-        sarah.Country = "UAE";
-        sarah.BankName = "Emirates NBD";
-        sarah.AccountName = "Sarah Mitchell";
-        sarah.AccountNumber = "1234567890";
-        sarah.Iban = "AE070331234567890123456";
-        sarah.SwiftCode = "EBILAEAD";
+        sarah.Nationality = "Indian";
+        sarah.Address = "A-402, Green City Residences, Vesu";
+        sarah.City = "Surat";
+        sarah.State = "Gujarat";
+        sarah.Country = "India";
+        sarah.BankName = "State Bank of India";
+        sarah.AccountName = "Sarah Sharma";
+        sarah.AccountNumber = "30982145671";
+        sarah.IfscCode = "SBIN0001850";
         sarah.PaymentMode = PaymentMode.BankTransfer;
-        sarah.WpsId = "WPS-2024-001";
-        sarah.PassportNumber = "GB1234567";
-        sarah.PassportExpiry = today.AddDays(410);
-        sarah.VisaNumber = "UAE-2024-98765";
-        sarah.VisaExpiry = today.AddDays(820);
-        sarah.EmiratesId = "784-1992-1234567-1";
 
-        var james = NewEmployee("EMP-1002", "James", "Okafor", finance, financeAnalyst, "L4", EmploymentStatus.Active, new DateOnly(2021, 6, 1), 2800, 800, 400, 150, 650, "james@co.com", dubai, morning);
-        var priya = NewEmployee("EMP-1003", "Priya", "Sharma", hr, hrExecutive, "L3", EmploymentStatus.Active, new DateOnly(2023, 1, 10), 2200, 700, 400, 150, 450, "priya@co.com", abuDhabi, morning);
-        var carlos = NewEmployee("EMP-1004", "Carlos", "Rivera", sales, salesExecutive, "L4", EmploymentStatus.Offboarding, new DateOnly(2020, 8, 20), 2600, 800, 400, 150, 550, "carlos@co.com", riyadh, morning);
-        var emma = NewEmployee("EMP-1005", "Emma", "Wilson", marketing, marketingSpecialist, "L3", EmploymentStatus.Active, new DateOnly(2022, 11, 5), 2400, 700, 400, 150, 450, "emma@co.com", london, morning);
-        var tom = NewEmployee("EMP-1006", "Tom", "Bradley", engineering, engineer, "L4", EmploymentStatus.Active, new DateOnly(2021, 2, 14), 3000, 800, 400, 150, 650, "tom@co.com", dubai, evening);
-        var aisha = NewEmployee("EMP-1007", "Aisha", "Malik", design, designer, "L3", EmploymentStatus.OnLeave, new DateOnly(2023, 4, 3), 2200, 700, 400, 150, 350, "aisha@co.com", dubai, morning);
-        var ravi = NewEmployee("EMP-1008", "Ravi", "Kumar", engineering, seniorEngineer, "L5", EmploymentStatus.Active, new DateOnly(2019, 9, 12), 3300, 900, 450, 150, 700, "ravi@co.com", dubai, night);
+        var james = NewEmployee("EMP-1002", "Aarav", "Mehta", finance, financeAnalyst, "L4", EmploymentStatus.Active, new DateOnly(2019, 6, 1), 32500, 19500, 3000, 1500, 8500, "aarav@co.com", mumbai, morning);
+        var priya = NewEmployee("EMP-1003", "Priya", "Sharma", hr, hrExecutive, "L3", EmploymentStatus.Active, new DateOnly(2020, 1, 10), 40000, 24000, 3000, 1500, 11500, "priya@co.com", suratHq, morning);
+        var carlos = NewEmployee("EMP-1004", "Rohan", "Verma", sales, salesExecutive, "L4", EmploymentStatus.Offboarding, new DateOnly(2020, 8, 20), 29000, 17400, 3000, 1500, 7100, "rohan@co.com", ahmedabad, morning);
+        var emma = NewEmployee("EMP-1005", "Ananya", "Joshi", marketing, marketingSpecialist, "L3", EmploymentStatus.Active, new DateOnly(2022, 11, 5), 31000, 18600, 3000, 1500, 7900, "ananya@co.com", pune, morning);
+        var tom = NewEmployee("EMP-1006", "Vikram", "Malhotra", engineering, engineer, "L4", EmploymentStatus.Active, new DateOnly(2020, 2, 14), 42500, 25500, 3000, 1500, 12500, "vikram@co.com", bengaluru, evening);
+        var aisha = NewEmployee("EMP-1007", "Pooja", "Shah", design, designer, "L3", EmploymentStatus.OnLeave, new DateOnly(2022, 4, 3), 34000, 20400, 3000, 1500, 9100, "pooja@co.com", suratHq, morning);
+        var ravi = NewEmployee("EMP-1008", "Ravi", "Kumar", engineering, seniorEngineer, "L5", EmploymentStatus.Active, new DateOnly(2018, 9, 12), 60000, 36000, 3000, 1500, 19500, "ravi@co.com", bengaluru, night);
 
         sarah.ReportingManagerId = ravi.Id;
         james.ReportingManagerId = sarah.Id;

@@ -1117,13 +1117,20 @@ export class OnboardingComponent implements OnInit, OnDestroy {
             l: `${e.fullName} - ${designation}`,
           };
         });
-        this.managerOptions.set(emps.length > 0 ? emps : [{ v: '', l: 'No Managers Available' }]);
-        if (emps.length > 0 && !this.job().reportingManager) {
-          this.job.update((j) => ({ ...j, reportingManager: emps[0].v }));
+        this.managerOptions.set([
+          { v: 'HR Manager', l: 'HR Manager' },
+          { v: 'Company Admin', l: 'Company Admin' },
+          ...emps,
+        ]);
+        if (!this.job().reportingManager) {
+          this.job.update((j) => ({ ...j, reportingManager: 'HR Manager' }));
         }
       },
       error: () => {
-        this.managerOptions.set([]);
+        this.managerOptions.set([
+          { v: 'HR Manager', l: 'HR Manager' },
+          { v: 'Company Admin', l: 'Company Admin' },
+        ]);
       },
     });
   }
@@ -1330,7 +1337,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     { v: 'Part-time', l: 'Part-time' },
     { v: 'Contract', l: 'Contract' },
   ];
-  protected readonly managerOptions = signal<SelectOption[]>([]);
+  protected readonly managerOptions = signal<SelectOption[]>([
+    { v: 'HR Manager', l: 'HR Manager' },
+    { v: 'Company Admin', l: 'Company Admin' },
+  ]);
   protected readonly shiftOptions: SelectOption[] = [
     { v: 'Morning (9AM - 6PM)', l: 'Morning (9AM - 6PM)' },
     { v: 'Evening', l: 'Evening' },

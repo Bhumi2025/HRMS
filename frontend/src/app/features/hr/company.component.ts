@@ -11,6 +11,7 @@ import {
   SaveCompanySettingsRequest,
   UpdateCompanyRequest,
   STANDARD_TIMEZONES,
+  HolidayTemplateDto,
 } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { PermissionService } from '../../core/services/permission.service';
@@ -61,7 +62,10 @@ export interface HolidayRow {
   date: string;
   dayLabel: string;
   type: string;
-  description?: string;
+  description?: string | null;
+  holidayTemplateId?: string | null;
+  templateName?: string | null;
+  icon?: string | null;
 }
 
 function emptyTenantForm(): CreateCompanyRequest {
@@ -83,15 +87,15 @@ function emptyTenantForm(): CreateCompanyRequest {
   template: `
     <div class="company-page">
       @if (!isSuperAdmin()) {
-        <!-- Top Navigation Tabs (For regular tenant: Company Profile, Departments, Designations, Holiday) -->
-        <div class="card p-0" style="margin-bottom: 16px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
+        <!-- Top Navigation Tabs (Fixed at Top - Red Highlighted Portion) -->
+        <div class="card p-0 company-tabs-bar" style="margin-bottom: 14px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
           <div style="display: flex; gap: 4px; border-bottom: 1px solid var(--border); background: var(--surface); padding: 4px 16px 0 16px;">
             @for (tab of displayTabs(); track tab.id) {
               <button
                 class="tab-btn"
                 [class.active]="activeTab() === tab.id"
                 (click)="selectTab(tab.id)"
-                style="padding: 12px 22px; font-weight: 700; font-size: 13.5px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent; transition: all .15s;"
+                style="padding: 12px 22px; font-weight: 700; font-size: 13.5px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent; transition: all .15s; white-space: nowrap;"
                 [style.border-bottom-color]="activeTab() === tab.id ? 'var(--p)' : 'transparent'"
                 [style.color]="activeTab() === tab.id ? 'var(--p)' : 'var(--muted)'"
               >
@@ -102,56 +106,253 @@ function emptyTenantForm(): CreateCompanyRequest {
         </div>
       }
 
-      <!-- Main Card Container -->
-      <div class="card p-0" style="border-radius: 10px; overflow: visible; border: 1px solid var(--border);">
-        <!-- Card Header with Title and Filter/Plus buttons -->
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: var(--surface); border-bottom: 1px solid var(--border); border-radius: 10px 10px 0 0; flex-wrap: wrap; gap: 10px;">
-          <h4 style="margin: 0; font-weight: 700; font-size: 16px; color: var(--text);">
-            {{ currentHeaderTitle() }}
-          </h4>
-
-          @if (isSuperAdmin()) {
-            <!-- Super Admin Tenant Companies Search Header + New Company Button -->
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-              <div class="input-group" style="max-width: 280px;">
-                <span class="input-icon" [appIcon]="'search'"></span>
-                <input class="form-control" type="text" placeholder="Search name, code, email..." [ngModel]="tenantSearch()" (ngModelChange)="tenantSearch.set($event)" />
-              </div>
-              <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="openCreateTenant()">
-                <span [appIcon]="'plus'"></span> New Company
-              </button>
+      <!-- Scrollable Content Area (Yellow Highlighted Portion) -->
+      <div class="company-content-scroll">
+        @if (activeTab() === 'profile') {
+          <!-- Company Profile & Branding Widgets -->
+          @if (loadingProfile()) {
+            <div style="text-align: center; padding: 48px; color: var(--muted);">
+              <div class="spinner-sm" style="width: 24px; height: 24px; margin: 0 auto 8px auto; border: 2px solid var(--border); border-top-color: var(--p); border-radius: 50%; animation: spin .8s linear infinite;"></div>
+              <div>Loading company profile...</div>
             </div>
-          } @else if (activeTab() === 'profile') {
-            <!-- Bottom Save button is used -->
           } @else {
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <button 
-                type="button"
-                class="btn btn-outline btn-sm action-icon-btn" 
-                [class.btn-primary]="showFilterRow()" 
-                (click)="toggleFilterRow()" 
-                [attr.data-tooltip]="showFilterRow() ? 'Hide Filters' : 'Filter'"
-                style="width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;"
-              >
-                <span [appIcon]="'filter'"></span>
-              </button>
-              @if (perms.canCreate('Company')) {
-                <button 
-                  type="button"
-                  class="btn btn-primary btn-sm action-icon-btn" 
-                  (click)="openAddModal()" 
-                  [attr.data-tooltip]="addTooltipText()"
-                  style="width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;"
-                >
-                  <span [appIcon]="'plus'"></span>
-                </button>
+            @if (!canEditCompany()) {
+              <div class="alert alert-info" style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                <span [appIcon]="'info'"></span>
+                <span>You have read-only access to company settings. Only authorized administrators can modify these fields.</span>
+              </div>
+            }
+
+            <form (ngSubmit)="saveCompanyProfile()" (submit)="$event.preventDefault()">
+              <!-- Widget 1: Company Branding & Logo -->
+              <div class="card" style="margin-bottom: 18px; border-radius: 10px; border: 1px solid var(--border);">
+                <div class="card-header" style="background: var(--surface); padding: 14px 20px; border-bottom: 1px solid var(--border);">
+                  <div class="card-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--text);">
+                    <span [appIcon]="'building'"></span> Company Branding &amp; Logo
+                  </div>
+                </div>
+                <div class="card-body" style="padding: 20px;">
+                  <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                    <!-- Logo Preview Box -->
+                    <div style="width: 120px; height: 120px; border-radius: 12px; background: var(--bg); border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+                      @if (profileForm.logoUrl && !logoLoadFailed()) {
+                        <img [src]="profileForm.logoUrl" alt="Company Logo" (error)="logoLoadFailed.set(true)" style="max-width: 100%; max-height: 100%; object-fit: contain; padding: 8px;" />
+                      } @else {
+                        <div style="text-align: center; color: var(--muted);">
+                          <span [appIcon]="'company'" style="font-size: 28px; display: block; margin-bottom: 4px;"></span>
+                          <span style="font-size: 11px;">No Logo</span>
+                        </div>
+                      }
+                    </div>
+
+                    <!-- Logo Upload Actions -->
+                    <div style="flex: 1; min-width: 240px;">
+                      <div style="font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px;">
+                        Brand Logo (PNG, JPEG, SVG, WebP)
+                      </div>
+                      <div style="font-size: 12px; color: var(--muted); margin-bottom: 12px;">
+                        Max file size: 2MB. SVGs are automatically sanitized to prevent embedded scripts. Shown across sidebar, header, and login screen.
+                      </div>
+                      @if (canEditCompany()) {
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                          <label class="btn btn-primary btn-sm" [class.disabled]="uploadingLogo()" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                            <span [appIcon]="'upload'"></span>
+                            {{ uploadingLogo() ? 'Uploading...' : 'Upload Logo' }}
+                            <input type="file" (change)="onLogoSelected($event)" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="display: none;" [disabled]="uploadingLogo()" />
+                          </label>
+                          @if (profileForm.logoUrl) {
+                            <button type="button" class="btn btn-outline btn-sm text-danger" (click)="removeLogo()" [disabled]="uploadingLogo()">
+                              <span [appIcon]="'trash'"></span> Remove
+                            </button>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Widget 2: General Information -->
+              <div class="card" style="margin-bottom: 18px; border-radius: 10px; border: 1px solid var(--border);">
+                <div class="card-header" style="background: var(--surface); padding: 14px 20px; border-bottom: 1px solid var(--border);">
+                  <div class="card-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--text);">
+                    <span [appIcon]="'info'"></span> General Information
+                  </div>
+                </div>
+                <div class="card-body" style="padding: 20px;">
+                  <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px;">
+                    <div style="flex: 1; min-width: 260px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Company Name <span class="text-danger">*</span></label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.companyName" name="companyName" required [disabled]="!canEditCompany()" placeholder="e.g. Acme Corporation" />
+                    </div>
+                    <div style="flex: 1; min-width: 260px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Official HR Email <span class="text-danger">*</span></label>
+                      <input class="form-control" type="email" [(ngModel)]="profileForm.hrEmail" name="hrEmail" required [disabled]="!canEditCompany()" placeholder="hr@acme.com" />
+                    </div>
+                    <div style="flex: 1; min-width: 220px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Time Zone <span class="text-danger">*</span></label>
+                      <select class="form-control" [(ngModel)]="profileForm.timeZone" name="timeZone" required [disabled]="!canEditCompany()">
+                        <option value="Asia/Dubai">Asia/Dubai (GST +04:00)</option>
+                        <option value="Asia/Riyadh">Asia/Riyadh (AST +03:00)</option>
+                        <option value="Asia/Kolkata">Asia/Kolkata (IST +05:30)</option>
+                        <option value="UTC">UTC (+00:00)</option>
+                        <option value="Europe/London">Europe/London (GMT/BST)</option>
+                        <option value="America/New_York">America/New_York (EST/EDT)</option>
+                        <option value="Asia/Singapore">Asia/Singapore (SGT +08:00)</option>
+                      </select>
+                    </div>
+                    <div style="flex: 1; min-width: 220px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Payroll Currency <span class="text-danger">*</span></label>
+                      <select class="form-control" [(ngModel)]="profileForm.payrollCurrency" name="payrollCurrency" required [disabled]="!canEditCompany()">
+                        <option value="INR">INR (₹) — Indian Rupee (Default)</option>
+                        <option value="USD">USD ($) — US Dollar</option>
+                        <option value="AED">AED (AED) — UAE Dirham</option>
+                        <option value="EUR">EUR (€) — Euro</option>
+                        <option value="GBP">GBP (£) — British Pound</option>
+                        <option value="SAR">SAR (SAR) — Saudi Riyal</option>
+                        <option value="CAD">CAD (C$) — Canadian Dollar</option>
+                        <option value="AUD">AUD (A$) — Australian Dollar</option>
+                        <option value="SGD">SGD (S$) — Singapore Dollar</option>
+                      </select>
+                    </div>
+                    <div style="flex: 1; min-width: 220px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Working Days / Week <span class="text-danger">*</span></label>
+                      <select class="form-control" [(ngModel)]="profileForm.workingDaysPerWeek" name="workingDaysPerWeek" required [disabled]="!canEditCompany()">
+                        <option [ngValue]="5">5 Days</option>
+                        <option [ngValue]="5.5">5.5 Days</option>
+                        <option [ngValue]="6">6 Days</option>
+                        <option [ngValue]="7">7 Days</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Widget 3: Tax & Statutory Registration -->
+              <div class="card" style="margin-bottom: 18px; border-radius: 10px; border: 1px solid var(--border);">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--surface); padding: 14px 20px; border-bottom: 1px solid var(--border);">
+                  <div class="card-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--text);">
+                    <span [appIcon]="'documents'"></span> Tax &amp; Statutory Registration
+                  </div>
+                  <span class="badge badge-info" style="font-size: 11px;">Configurable Field Labels</span>
+                </div>
+                <div class="card-body" style="padding: 20px;">
+                  <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px;">
+                    <div style="flex: 1; min-width: 260px; background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                      <label class="form-label" style="font-weight: 600; font-size: 12px; color: var(--muted);">Tax Label (e.g. TRN / VAT / GSTIN / Tax ID)</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.taxNumberLabel" name="taxNumberLabel" [disabled]="!canEditCompany()" placeholder="e.g. TRN / VAT No." style="margin-bottom: 8px;" />
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">{{ profileForm.taxNumberLabel || 'Tax Number' }}</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.trn" name="trn" [disabled]="!canEditCompany()" placeholder="Enter registered tax number" />
+                    </div>
+                    <div style="flex: 1; min-width: 260px; background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                      <label class="form-label" style="font-weight: 600; font-size: 12px; color: var(--muted);">Registration Label (e.g. Trade License / CIN / Reg No.)</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.registrationNumberLabel" name="registrationNumberLabel" [disabled]="!canEditCompany()" placeholder="e.g. Trade License No." style="margin-bottom: 8px;" />
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">{{ profileForm.registrationNumberLabel || 'Registration Number' }}</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.tradeLicense" name="tradeLicense" [disabled]="!canEditCompany()" placeholder="Enter license / registration number" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Widget 4: Contact & Location Details -->
+              <div class="card" style="margin-bottom: 18px; border-radius: 10px; border: 1px solid var(--border);">
+                <div class="card-header" style="background: var(--surface); padding: 14px 20px; border-bottom: 1px solid var(--border);">
+                  <div class="card-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--text);">
+                    <span [appIcon]="'pin'"></span> Contact &amp; Location Details
+                  </div>
+                </div>
+                <div class="card-body" style="padding: 20px;">
+                  <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+                    <div style="flex: 1; min-width: 220px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Phone Number</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.phone" name="phone" [disabled]="!canEditCompany()" placeholder="+971 4 123 4567" />
+                    </div>
+                    <div style="flex: 1; min-width: 220px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Website</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.website" name="website" [disabled]="!canEditCompany()" placeholder="https://example.com" />
+                    </div>
+                    <div style="flex: 1; min-width: 180px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Industry</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.industry" name="industry" [disabled]="!canEditCompany()" placeholder="e.g. Information Technology" />
+                    </div>
+                  </div>
+                  <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px;">
+                    <div style="flex: 2; min-width: 260px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Address</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.address" name="address" [disabled]="!canEditCompany()" placeholder="Street, Building, Suite" />
+                    </div>
+                    <div style="flex: 1; min-width: 180px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">City</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.city" name="city" [disabled]="!canEditCompany()" placeholder="e.g. Dubai" />
+                    </div>
+                    <div style="flex: 1; min-width: 180px;">
+                      <label class="form-label" style="font-weight: 600; font-size: 13px;">Country</label>
+                      <input class="form-control" type="text" [(ngModel)]="profileForm.country" name="country" [disabled]="!canEditCompany()" placeholder="e.g. United Arab Emirates" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sticky Action Footer -->
+              @if (canEditCompany()) {
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 14px; position: sticky; bottom: 0; background: var(--surface); padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--r); box-shadow: 0 1px 3px rgba(0,0,0,0.04); z-index: 10;">
+                  <button type="submit" class="btn btn-primary" [disabled]="savingProfile()" style="display: inline-flex; align-items: center; gap: 8px; padding: 9px 22px;">
+                    <span [appIcon]="'check'"></span>
+                    {{ savingProfile() ? 'Saving Profile...' : 'Save Profile Changes' }}
+                  </button>
+                </div>
+              }
+            </form>
+          }
+        } @else {
+          <!-- Main Card Container for tables: directory, departments, designations, holiday -->
+          <div class="card p-0" style="border-radius: 10px; overflow: visible; border: 1px solid var(--border);">
+            <!-- Card Header with Title and Filter/Plus buttons -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: var(--surface); border-bottom: 1px solid var(--border); border-radius: 10px 10px 0 0; flex-wrap: wrap; gap: 10px;">
+              <h4 style="margin: 0; font-weight: 700; font-size: 16px; color: var(--text);">
+                {{ currentHeaderTitle() }}
+              </h4>
+
+              @if (isSuperAdmin() && activeTab() === 'directory') {
+                <!-- Super Admin Tenant Companies Search Header + New Company Button -->
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                  <div class="input-group" style="max-width: 280px;">
+                    <span class="input-icon" [appIcon]="'search'"></span>
+                    <input class="form-control" type="text" placeholder="Search name, code, email..." [ngModel]="tenantSearch()" (ngModelChange)="tenantSearch.set($event)" />
+                  </div>
+                  <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="openCreateTenant()">
+                    <span [appIcon]="'plus'"></span> New Company
+                  </button>
+                </div>
+              } @else {
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <button 
+                    type="button"
+                    class="btn btn-outline btn-sm action-icon-btn" 
+                    [class.btn-primary]="showFilterRow()" 
+                    (click)="toggleFilterRow()" 
+                    [attr.data-tooltip]="showFilterRow() ? 'Hide Filters' : 'Filter'"
+                    style="width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;"
+                  >
+                    <span [appIcon]="'filter'"></span>
+                  </button>
+                  @if (perms.canCreate('Company')) {
+                    <button 
+                      type="button"
+                      class="btn btn-primary btn-sm action-icon-btn" 
+                      (click)="openAddModal()" 
+                      [attr.data-tooltip]="addTooltipText()"
+                      style="width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;"
+                    >
+                      <span [appIcon]="'plus'"></span>
+                    </button>
+                  }
+                </div>
               }
             </div>
-          }
-        </div>
 
-        <!-- SUPER ADMIN TENANT COMPANIES TABLE -->
-        @if (isSuperAdmin()) {
+        <!-- TAB 1: SUPER ADMIN TENANT COMPANIES TABLE -->
+        @if (activeTab() === 'directory' && isSuperAdmin()) {
           <div class="table-wrap" style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse;">
               <thead>
@@ -166,16 +367,11 @@ function emptyTenantForm(): CreateCompanyRequest {
               <tbody>
                 @if (tenantLoading()) {
                   <tr>
-                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">
-                      <div class="spinner-sm" style="width: 24px; height: 24px; margin: 0 auto 8px auto; border: 2px solid var(--border); border-top-color: var(--p); border-radius: 50%; animation: spin .8s linear infinite;"></div>
-                      <div>Loading tenant companies…</div>
-                    </td>
+                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">Loading tenant companies…</td>
                   </tr>
-                } @else if (filteredTenantCompanies().length === 0) {
+                } @else if (tenantCompanies().length === 0) {
                   <tr>
-                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">
-                      {{ tenantSearch() ? 'No companies match your search filter.' : 'No companies yet. Create one to provision its dedicated database.' }}
-                    </td>
+                    <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">No companies yet. Create one to provision its dedicated database.</td>
                   </tr>
                 } @else {
                   @for (c of filteredTenantCompanies(); track c.id) {
@@ -250,188 +446,9 @@ function emptyTenantForm(): CreateCompanyRequest {
               </tbody>
             </table>
           </div>
-        } @else {
-          <!-- TAB 1: COMPANY PROFILE (Non-SuperAdmin) -->
-          @if (activeTab() === 'profile') {
-          <div style="padding: 24px;">
-            @if (loadingProfile()) {
-              <div style="text-align: center; padding: 48px; color: var(--muted);">
-                <div class="spinner-sm" style="width: 24px; height: 24px; margin: 0 auto 8px auto; border: 2px solid var(--border); border-top-color: var(--p); border-radius: 50%; animation: spin .8s linear infinite;"></div>
-                <div>Loading company profile...</div>
-              </div>
-            } @else {
-              <!-- Permission Notice if read-only -->
-              @if (!canEditCompany()) {
-                <div class="alert alert-info" style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
-                  <span [appIcon]="'info'"></span>
-                  <span>You have read-only access to company settings. Only authorized administrators can modify these fields.</span>
-                </div>
-              }
-
-              <!-- Logo & Identity Card -->
-              <div class="card p-4" style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 24px;">
-                <div style="font-weight: 700; font-size: 15px; margin-bottom: 14px; color: var(--text);">
-                  Company Branding & Logo
-                </div>
-                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                  <!-- Logo Preview Box -->
-                  <div style="width: 120px; height: 120px; border-radius: 12px; background: var(--surface); border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
-                    @if (profileForm.logoUrl && !logoLoadFailed()) {
-                      <img [src]="profileForm.logoUrl" alt="Company Logo" (error)="logoLoadFailed.set(true)" style="max-width: 100%; max-height: 100%; object-fit: contain; padding: 8px;" />
-                    } @else {
-                      <div style="text-align: center; color: var(--muted);">
-                        <span [appIcon]="'company'" style="font-size: 28px; display: block; margin-bottom: 4px;"></span>
-                        <span style="font-size: 11px;">No Logo</span>
-                      </div>
-                    }
-                  </div>
-
-                  <!-- Logo Upload Actions -->
-                  <div style="flex: 1; min-width: 240px;">
-                    <div style="font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px;">
-                      Brand Logo (PNG, JPEG, SVG, WebP)
-                    </div>
-                    <div style="font-size: 12px; color: var(--muted); margin-bottom: 12px;">
-                      Max file size: 2MB. SVGs are automatically sanitized to prevent embedded scripts. Shown across sidebar, header, and login screen.
-                    </div>
-                    @if (canEditCompany()) {
-                      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                        <label class="btn btn-primary btn-sm" [class.disabled]="uploadingLogo()" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                          <span [appIcon]="'upload'"></span>
-                          {{ uploadingLogo() ? 'Uploading...' : 'Upload Logo' }}
-                          <input type="file" (change)="onLogoSelected($event)" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="display: none;" [disabled]="uploadingLogo()" />
-                        </label>
-                        @if (profileForm.logoUrl) {
-                          <button type="button" class="btn btn-outline btn-sm text-danger" (click)="removeLogo()" [disabled]="uploadingLogo()">
-                            <span [appIcon]="'trash'"></span> Remove
-                          </button>
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
-              </div>
-
-              <!-- Main Details Form -->
-              <form (submit)="saveCompanyProfile()">
-                <!-- Section 1: Required General Information -->
-                <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p); margin-bottom: 14px;">
-                  General Information
-                </div>
-                <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
-                  <div style="flex: 1; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Company Name <span class="text-danger">*</span></label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.companyName" name="companyName" required [disabled]="!canEditCompany()" placeholder="e.g. Acme Corporation" />
-                  </div>
-                  <div style="flex: 1; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Official HR Email <span class="text-danger">*</span></label>
-                    <input class="form-control" type="email" [(ngModel)]="profileForm.hrEmail" name="hrEmail" required [disabled]="!canEditCompany()" placeholder="hr@acme.com" />
-                  </div>
-                  <div style="flex: 1; min-width: 220px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Payroll Currency <span class="text-danger">*</span></label>
-                    <select class="form-control" [(ngModel)]="profileForm.payrollCurrency" name="payrollCurrency" required [disabled]="!canEditCompany()">
-                      <option value="INR">INR (₹) — Indian Rupee (Default)</option>
-                      <option value="USD">USD ($) — US Dollar</option>
-                      <option value="AED">AED (AED) — UAE Dirham</option>
-                      <option value="EUR">EUR (€) — Euro</option>
-                      <option value="GBP">GBP (£) — British Pound</option>
-                      <option value="SAR">SAR (SAR) — Saudi Riyal</option>
-                      <option value="CAD">CAD (C$) — Canadian Dollar</option>
-                      <option value="AUD">AUD (A$) — Australian Dollar</option>
-                      <option value="SGD">SGD (S$) — Singapore Dollar</option>
-                    </select>
-                  </div>
-                  <div style="flex: 1; min-width: 220px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Time Zone <span class="text-danger">*</span></label>
-                    <select class="form-control" [(ngModel)]="profileForm.timeZone" name="timeZone" required [disabled]="!canEditCompany()">
-                      <option value="Asia/Dubai">Asia/Dubai (GST +04:00)</option>
-                      <option value="Asia/Riyadh">Asia/Riyadh (AST +03:00)</option>
-                      <option value="Asia/Kolkata">Asia/Kolkata (IST +05:30)</option>
-                      <option value="UTC">UTC (+00:00)</option>
-                      <option value="Europe/London">Europe/London (GMT/BST)</option>
-                      <option value="America/New_York">America/New_York (EST/EDT)</option>
-                      <option value="Asia/Singapore">Asia/Singapore (SGT +08:00)</option>
-                    </select>
-                  </div>
-                  <div style="flex: 1; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Company Working Days / Week <span class="text-danger">*</span></label>
-                    <select class="form-control" [(ngModel)]="profileForm.workingDaysPerWeek" name="workingDaysPerWeek" required [disabled]="!canEditCompany()">
-                      <option [ngValue]="5">5 Days</option>
-                      <option [ngValue]="5.5">5.5 Days</option>
-                      <option [ngValue]="6">6 Days</option>
-                      <option [ngValue]="7">7 Days</option>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- Section 2: Configurable Jurisdiction / Tax & Registration -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                  <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p);">
-                    Tax & Statutory Registration
-                  </div>
-                  <span class="badge badge-info" style="font-size: 11px;">Configurable Field Labels</span>
-                </div>
-                <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; background: rgba(37,99,235,0.03); padding: 16px; border-radius: 8px; border: 1px dashed rgba(37,99,235,0.2);">
-                  <div style="flex: 1; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 12px; color: var(--muted);">Tax Label (e.g. TRN / VAT / GSTIN / Tax ID)</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.taxNumberLabel" name="taxNumberLabel" [disabled]="!canEditCompany()" placeholder="e.g. TRN / VAT No." style="margin-bottom: 8px;" />
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">{{ profileForm.taxNumberLabel || 'Tax Number' }}</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.trn" name="trn" [disabled]="!canEditCompany()" placeholder="Enter registered tax number" />
-                  </div>
-                  <div style="flex: 1; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 12px; color: var(--muted);">Registration Label (e.g. Trade License / CIN / Reg No.)</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.registrationNumberLabel" name="registrationNumberLabel" [disabled]="!canEditCompany()" placeholder="e.g. Trade License No." style="margin-bottom: 8px;" />
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">{{ profileForm.registrationNumberLabel || 'Registration Number' }}</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.tradeLicense" name="tradeLicense" [disabled]="!canEditCompany()" placeholder="Enter license / registration number" />
-                  </div>
-                </div>
-
-                <!-- Section 3: Optional Contact & Location -->
-                <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p); margin-bottom: 14px;">
-                  Contact & Location Details
-                </div>
-                <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
-                  <div style="flex: 1; min-width: 220px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Phone Number</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.phone" name="phone" [disabled]="!canEditCompany()" placeholder="+971 4 123 4567" />
-                  </div>
-                  <div style="flex: 1; min-width: 220px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Website</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.website" name="website" [disabled]="!canEditCompany()" placeholder="https://example.com" />
-                  </div>
-                  <div style="flex: 1; min-width: 180px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Industry</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.industry" name="industry" [disabled]="!canEditCompany()" placeholder="e.g. Information Technology" />
-                  </div>
-                </div>
-                <div class="row" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
-                  <div style="flex: 2; min-width: 260px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Address</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.address" name="address" [disabled]="!canEditCompany()" placeholder="Street, Building, Suite" />
-                  </div>
-                  <div style="flex: 1; min-width: 180px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">City</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.city" name="city" [disabled]="!canEditCompany()" placeholder="e.g. Dubai" />
-                  </div>
-                  <div style="flex: 1; min-width: 180px;">
-                    <label class="form-label" style="font-weight: 600; font-size: 13px;">Country</label>
-                    <input class="form-control" type="text" [(ngModel)]="profileForm.country" name="country" [disabled]="!canEditCompany()" placeholder="e.g. United Arab Emirates" />
-                  </div>
-                </div>
-
-                <!-- Form Submit Button -->
-                @if (canEditCompany()) {
-                  <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 16px; border-top: 1px solid var(--border);">
-                    <button type="submit" class="btn btn-primary" [disabled]="savingProfile()" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px;">
-                      <span [appIcon]="'check'"></span>
-                      {{ savingProfile() ? 'Saving Profile...' : 'Save Profile Changes' }}
-                    </button>
-                  </div>
-                }
-              </form>
-            }
-          </div>
         }
+
+
 
         <!-- TAB 2: DEPARTMENTS -->
         @if (activeTab() === 'departments') {
@@ -636,6 +653,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                   <th style="width: 160px; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Date</th>
                   <th style="width: 140px; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Day</th>
                   <th style="width: 140px; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Type</th>
+                  <th style="width: 220px; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Holiday Template</th>
                   <th style="width: 100px; padding: 12px 16px; text-align: right; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Action</th>
                 </tr>
                 @if (showFilterRow()) {
@@ -668,6 +686,19 @@ function emptyTenantForm(): CreateCompanyRequest {
                       </div>
                     </th>
                     <th style="padding: 6px 16px;" colspan="3"></th>
+                    <th style="padding: 6px 16px;">
+                      <select 
+                        class="form-control" 
+                        [value]="selectedHolidayTemplateFilter()" 
+                        (change)="selectedHolidayTemplateFilter.set($any($event.target).value); currentPage.set(1)"
+                        style="font-size: 12px; padding: 4px 8px; width: 100%;"
+                      >
+                        <option value="all">All Templates</option>
+                        @for (t of holidayTemplates(); track t.id) {
+                          <option [value]="t.id">{{ t.name }}</option>
+                        }
+                      </select>
+                    </th>
                     <th style="padding: 6px 16px; text-align: right;">
                       <button type="button" class="btn btn-ghost btn-sm" (click)="closeAndClearFilter()" data-tooltip="Cancel / Close Filter" title="Cancel / Close Filter">
                         <span [appIcon]="'x'"></span>
@@ -684,8 +715,13 @@ function emptyTenantForm(): CreateCompanyRequest {
                     <td style="padding: 14px 16px; font-weight: 600; font-size: 13px;">{{ h.date }}</td>
                     <td style="padding: 14px 16px; color: var(--muted); font-size: 13px;">{{ h.dayLabel }}</td>
                     <td style="padding: 14px 16px;">
-                      <span class="badge" [style.background]="h.type === 'Public' ? 'rgba(5, 150, 105, 0.15)' : 'var(--p-soft)'" [style.color]="h.type === 'Public' ? '#059669' : 'var(--p)'" style="font-weight: 700; padding: 4px 8px; border-radius: 6px;">
+                      <span class="badge" [style.background]="h.type === 'Public' || h.type === 'National' ? 'rgba(5, 150, 105, 0.15)' : 'var(--p-soft)'" [style.color]="h.type === 'Public' || h.type === 'National' ? '#059669' : 'var(--p)'" style="font-weight: 700; padding: 4px 8px; border-radius: 6px;">
                         {{ h.type }}
+                      </span>
+                    </td>
+                    <td style="padding: 14px 16px;">
+                      <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: #2563eb; font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 12px;">
+                        {{ h.templateName || 'India National & Gazetted' }}
                       </span>
                     </td>
                     <td style="padding: 14px 16px; text-align: right;">
@@ -705,7 +741,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="6" style="text-align: center; padding: 32px; color: var(--muted);">
+                    <td colspan="7" style="text-align: center; padding: 32px; color: var(--muted);">
                       @if (holidayFilterName()) {
                         No holidays match "{{ holidayFilterName() }}".
                         <button type="button" class="btn btn-outline btn-sm" style="margin-left: 8px;" (click)="clearHolidayFilter()">Clear Filter</button>
@@ -782,6 +818,7 @@ function emptyTenantForm(): CreateCompanyRequest {
             </div>
           </div>
         }
+          </div>
         }
       </div>
     </div>
@@ -1267,13 +1304,26 @@ function emptyTenantForm(): CreateCompanyRequest {
               <label class="form-label">Date *</label>
               <input class="form-control" type="date" [(ngModel)]="holidayForm.date" />
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom: 12px;">
               <label class="form-label">Type</label>
               <select class="form-control" [(ngModel)]="holidayForm.type">
                 <option value="National">National / Public Holiday</option>
                 <option value="Religious">Religious Holiday</option>
                 <option value="Optional">Optional Holiday</option>
               </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label class="form-label">Holiday Template</label>
+              <select class="form-control" [(ngModel)]="holidayForm.holidayTemplateId">
+                <option value="">-- India National &amp; Gazetted (Default) --</option>
+                @for (t of holidayTemplates(); track t.id) {
+                  <option [value]="t.id">{{ t.name }} {{ t.isDefault ? '(Default)' : '' }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Description (Optional)</label>
+              <input class="form-control" [(ngModel)]="holidayForm.description" placeholder="e.g. Celebrated across India" />
             </div>
           </div>
           <div class="modal-footer">
@@ -1285,6 +1335,45 @@ function emptyTenantForm(): CreateCompanyRequest {
     }
   `,
   styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - var(--header-h) - 32px);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .company-page {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .company-tabs-bar {
+      flex-shrink: 0;
+      margin-bottom: 14px;
+    }
+    .company-content-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 4px;
+      padding-bottom: 14px;
+    }
+    .company-content-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .company-content-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .company-content-scroll::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    .company-content-scroll::-webkit-scrollbar-thumb:hover {
+      background: var(--muted);
+    }
     .icon-edit-btn {
       width: 28px;
       height: 28px;
@@ -1466,7 +1555,10 @@ export class CompanyComponent implements OnInit, OnDestroy {
   protected readonly savingProfile = signal(false);
   protected readonly uploadingLogo = signal(false);
   protected readonly logoLoadFailed = signal(false);
-  protected readonly canEditCompany = computed(() => this.perms.canEdit('Company'));
+  protected readonly canEditCompany = computed(() => {
+    const role = this.session.activeRole();
+    return ['Super Admin', 'Company Admin', 'HR Manager', 'HR'].includes(role) || this.perms.canEdit('Company');
+  });
 
   protected profileForm: SaveCompanySettingsRequest = {
     companyName: '',
@@ -1623,7 +1715,9 @@ export class CompanyComponent implements OnInit, OnDestroy {
 
   protected readonly showHolidayModal = signal(false);
   protected readonly editingHolidayId = signal<string | null>(null);
-  protected holidayForm = { name: '', date: '', type: 'National' };
+  protected readonly holidayTemplates = signal<HolidayTemplateDto[]>([]);
+  protected readonly selectedHolidayTemplateFilter = signal<string>('all');
+  protected holidayForm = { name: '', date: '', type: 'National', holidayTemplateId: '', description: '' };
 
   ngOnInit(): void {
     if (this.isSuperAdmin()) {
@@ -1667,10 +1761,17 @@ export class CompanyComponent implements OnInit, OnDestroy {
         }
       });
     } else {
-      this.activeTab.set('profile');
-      this.loadCompanyProfile();
-      this.loadBackendData();
+      this.route.queryParams.subscribe((params) => {
+        const tab = params['tab'] as CompanyTab | undefined;
+        if (tab && ['profile', 'departments', 'designations', 'holiday'].includes(tab)) {
+          this.selectTab(tab);
+        } else {
+          this.activeTab.set('profile');
+          this.loadCompanyProfile();
+        }
+      });
     }
+    this.loadBackendData();
   }
 
   ngOnDestroy(): void {
@@ -2181,19 +2282,26 @@ export class CompanyComponent implements OnInit, OnDestroy {
   });
 
   protected readonly filteredHolidays = computed(() => {
+    let list = this.holidays();
+    const tmplFilter = this.selectedHolidayTemplateFilter();
+    if (tmplFilter && tmplFilter !== 'all') {
+      list = list.filter((h) => h.holidayTemplateId === tmplFilter);
+    }
+
     const raw = (this.holidayFilterName() || '')
       .replace(/[\u00A0\u1680\u180e\u2000-\u200b\u202f\u205f\u3000\ufeff]/g, ' ')
       .trim()
       .toLowerCase();
     const tokens = raw ? raw.split(/\s+/).filter(Boolean) : [];
-    if (tokens.length === 0) return this.holidays();
+    if (tokens.length === 0) return list;
 
-    return this.holidays().filter((h) => {
+    return list.filter((h) => {
       const name = (h.name || '').toLowerCase();
       const date = (h.date || '').toLowerCase();
       const day = (h.dayLabel || '').toLowerCase();
       const type = (h.type || '').toLowerCase();
-      const text = `${name} ${date} ${day} ${type}`;
+      const tmpl = (h.templateName || '').toLowerCase();
+      const text = `${name} ${date} ${day} ${type} ${tmpl}`;
       if (text.includes(raw)) return true;
       return tokens.every((t) => text.includes(t));
     });
@@ -2352,7 +2460,13 @@ export class CompanyComponent implements OnInit, OnDestroy {
         break;
       case 'holiday':
         this.editingHolidayId.set(null);
-        this.holidayForm = { name: '', date: new Date().toISOString().slice(0, 10), type: 'National' };
+        this.holidayForm = {
+          name: '',
+          date: new Date().toISOString().slice(0, 10),
+          type: 'National',
+          holidayTemplateId: this.holidayTemplates().find((t) => t.isDefault)?.id || '',
+          description: '',
+        };
         this.showHolidayModal.set(true);
         break;
     }
@@ -2548,7 +2662,13 @@ export class CompanyComponent implements OnInit, OnDestroy {
   // Holiday Actions
   protected openEditHoliday(h: HolidayRow): void {
     this.editingHolidayId.set(h.id);
-    this.holidayForm = { name: h.name, date: h.date, type: h.type };
+    this.holidayForm = {
+      name: h.name,
+      date: h.date,
+      type: h.type,
+      holidayTemplateId: h.holidayTemplateId || '',
+      description: h.description || '',
+    };
     this.showHolidayModal.set(true);
   }
 
@@ -2563,6 +2683,8 @@ export class CompanyComponent implements OnInit, OnDestroy {
       name: this.holidayForm.name.trim(),
       date: this.holidayForm.date,
       type,
+      holidayTemplateId: this.holidayForm.holidayTemplateId || null,
+      description: this.holidayForm.description?.trim() || null,
     };
 
     const editId = this.editingHolidayId();
@@ -2664,6 +2786,13 @@ export class CompanyComponent implements OnInit, OnDestroy {
       error: () => { },
     });
 
+    this.api.holidayTemplates().subscribe({
+      next: (list) => {
+        this.holidayTemplates.set(list || []);
+      },
+      error: () => { },
+    });
+
     this.api.holidays().subscribe({
       next: (list) => {
         this.holidays.set(
@@ -2674,6 +2803,10 @@ export class CompanyComponent implements OnInit, OnDestroy {
             date: h.date,
             dayLabel: h.dayLabel,
             type: h.type,
+            holidayTemplateId: h.holidayTemplateId,
+            templateName: h.templateName,
+            description: h.description,
+            icon: h.icon,
           }))
         );
       },

@@ -31,7 +31,6 @@ interface MasterNavItem {
 const MASTER_NAV_CATALOGUE: MasterNavItem[] = [
   // Overview
   { label: 'Dashboard', section: 'Overview', icon: 'dashboard', path: '/dashboard', empPath: '/me/dashboard' },
-  { label: 'Analytics', section: 'Overview', icon: 'reports', path: '/analytics', empPath: '/analytics' },
 
   // HR Modules
   { label: 'Company', section: 'HR Modules', icon: 'company', path: '/company', empPath: '/company' },
@@ -158,6 +157,11 @@ export class ShellComponent implements OnInit, OnDestroy {
           ],
         },
       ];
+    }
+
+    // 2. In Employee: strictly self-service items under employee control
+    if (isEmp) {
+      return NAV_CONFIG['Employee'];
     }
 
     const backendItems = this.backendNavItems();
@@ -422,7 +426,10 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   private loadPendingApprovals(): void {
-    if (!this.session.isAuthenticated()) return;
+    if (!this.session.isAuthenticated() || this.role() === 'Employee') {
+      this.pendingApprovalsCount.set(0);
+      return;
+    }
     this.api.approvals({ status: 'Pending' }).subscribe({
       next: (res) => {
         this.pendingApprovalsCount.set(res?.length || 0);
@@ -434,7 +441,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   private loadUserNavigation(): void {
-    if (!this.session.isAuthenticated()) return;
+    if (!this.session.isAuthenticated() || this.role() === 'Employee') return;
     this.api.userNavigation().subscribe({
       next: (items) => {
         if (items && items.length > 0) {
@@ -455,7 +462,16 @@ export class ShellComponent implements OnInit, OnDestroy {
     this.ui.closePanel();
     const isEmp = this.role() === 'Employee';
     if (notification.actionUrl) {
-      this.router.navigate([notification.actionUrl]);
+      let target = notification.actionUrl;
+      if (isEmp) {
+        if (target.startsWith('/approvals') || target.startsWith('/leave')) target = '/me/leave';
+        else if (target.startsWith('/attendance')) target = '/me/attendance';
+        else if (target.startsWith('/dashboard')) target = '/me/dashboard';
+        else if (target.startsWith('/payslips') || target.startsWith('/payroll')) target = '/me/payslips';
+        else if (target.startsWith('/documents')) target = '/me/documents';
+        else if (target.startsWith('/company') || target.startsWith('/employees') || target.startsWith('/settings')) target = '/me/dashboard';
+      }
+      this.router.navigate([target]);
     } else {
       const t = (notification.title || '').toLowerCase();
       if (t.includes('birthday')) {

@@ -1,8 +1,22 @@
-import { Injectable, NgZone, inject, signal } from '@angular/core';
+import { Injectable, NgZone, computed, inject, signal } from '@angular/core';
 import { ApiService } from '../api/api.service';
 import { EmployeePunch } from '../api/api.models';
 
 export type PunchState = 'idle' | 'active';
+
+export interface PunchTimelineItem {
+  id: string;
+  kind: 'punch' | 'break';
+  punchType?: 'ClockIn' | 'ClockOut' | 'BreakIn' | 'BreakOut';
+  label?: 'Punch In' | 'Punch Out';
+  isPunchIn?: boolean;
+  timeStr?: string;
+  rawTime?: Date;
+  note?: string | null;
+  device?: string | null;
+  durationStr?: string;
+  minutes?: number;
+}
 
 /**
  * Punch / attendance timer shown in the header punch panel and dashboard.
@@ -20,10 +34,199 @@ export class PunchService {
 
   readonly state = this._state.asReadonly();
   readonly onBreak = this._onBreak.asReadonly();
+  readonly workSeconds = this._workSeconds.asReadonly();
+  readonly breakSeconds = this._breakSeconds.asReadonly();
 
   readonly workTime = signal('00:00:00');
   readonly breakTime = signal('00:00:00');
   readonly todayPunches = signal<EmployeePunch[]>([]);
+
+  readonly punchTimeline = computed<PunchTimelineItem[]>(() => {
+    const punches = this.todayPunches();
+    if (!punches || punches.length === 0) {
+      return [];
+    }
+
+    // Sort ascending: earliest punch of today first to latest punch last
+    const sorted = [...punches].sort(
+      (a, b) => new Date(a.punchTime).getTime() - new Date(b.punchTime).getTime()
+    );
+
+    const items: PunchTimelineItem[] = [];
+
+    for (let i = 0; i < sorted.length; i++) {
+      const p = sorted[i];
+      const isPunchIn = p.punchType === 'ClockIn' || p.punchType === 'BreakOut';
+      const label: 'Punch In' | 'Punch Out' = isPunchIn ? 'Punch In' : 'Punch Out';
+
+      // Format time as hh:mm am/pm (e.g. 09:38 am)
+      const d = new Date(p.punchTime);
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'pm' : 'am';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const timeStr = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+
+      // Check if previous punch was an Out and current is an In -> Break divider!
+      if (i > 0) {
+        const prev = sorted[i - 1];
+        const prevIsOut = prev.punchType === 'ClockOut' || prev.punchType === 'BreakIn';
+        if (prevIsOut && isPunchIn) {
+          const prevTime = new Date(prev.punchTime).getTime();
+          const currTime = d.getTime();
+          const diffMs = Math.max(0, currTime - prevTime);
+          const breakMinutes = Math.round(diffMs / 60000);
+          if (breakMinutes >= 1) {
+            let durationStr = `${breakMinutes} Min Break`;
+            if (breakMinutes >= 60) {
+              const h = Math.floor(breakMinutes / 60);
+              const m = breakMinutes % 60;
+              durationStr = m > 0 ? `${h}h ${m}m Break` : `${h}h Break`;
+            }
+            items.push({
+              id: `break-${prev.id}-${p.id}`,
+              kind: 'break',
+              durationStr,
+              minutes: breakMinutes,
+            });
+          }
+        }
+      }
+
+      items.push({
+        id: p.id,
+        kind: 'punch',
+        punchType: p.punchType as any,
+        label,
+        isPunchIn,
+        timeStr,
+        rawTime: d,
+        note: p.note,
+        device: p.device,
+      });
+    }
+
+    // If currently on break, append ongoing break pill
+    if (this._onBreak()) {
+      const lastPunch = sorted[sorted.length - 1];
+      if (lastPunch) {
+        const lastTime = new Date(lastPunch.punchTime).getTime();
+        const diffMs = Math.max(0, Date.now() - lastTime);
+        const breakMinutes = Math.floor(diffMs / 60000);
+        const durationStr = breakMinutes < 60
+          ? `${breakMinutes} Min Break (Ongoing)`
+          : `${Math.floor(breakMinutes / 60)}h ${breakMinutes % 60}m Break (Ongoing)`;
+        items.push({
+          id: 'break-ongoing',
+          kind: 'break',
+          durationStr,
+          minutes: breakMinutes,
+        });
+      }
+    }
+
+    return items;
+  });
+
+  readonly todayPunchBreakdown = computed(() => {
+    const punches = this.todayPunches();
+    if (!punches || punches.length === 0) {
+      return {
+        hasPunched: false,
+        beforeBreakHours: 0,
+        breakHours: 0,
+        afterBreakHours: 0,
+        totalHours: 0,
+        missingHours: 0,
+        phase: 'idle' as 'idle' | 'before_break' | 'on_break' | 'after_break' | 'clocked_out'
+      };
+    }
+
+    const sorted = [...punches].sort((a, b) => new Date(a.punchTime).getTime() - new Date(b.punchTime).getTime());
+    const inP = sorted.find((p) => p.punchType === 'ClockIn');
+    if (!inP) {
+      return {
+        hasPunched: false,
+        beforeBreakHours: 0,
+        breakHours: 0,
+        afterBreakHours: 0,
+        totalHours: 0,
+        missingHours: 0,
+        phase: 'idle' as 'idle' | 'before_break' | 'on_break' | 'after_break' | 'clocked_out'
+      };
+    }
+
+    const now = Date.now();
+    const inTime = new Date(inP.punchTime).getTime();
+    const bInP = sorted.find((p) => p.punchType === 'BreakIn');
+    const bOutP = sorted.find((p) => p.punchType === 'BreakOut');
+    const outP = sorted.find((p) => p.punchType === 'ClockOut');
+
+    let beforeBreak = 0;
+    let breakHrs = 0;
+    let afterBreak = 0;
+    let phase: 'idle' | 'before_break' | 'on_break' | 'after_break' | 'clocked_out' = 'before_break';
+
+    if (!bInP) {
+      // Phase 1: Clocked In, lower green portion active until break punch
+      if (outP) {
+        const outTime = new Date(outP.punchTime).getTime();
+        beforeBreak = Math.max(0.1, (outTime - inTime) / 3600000);
+        phase = 'clocked_out';
+      } else {
+        beforeBreak = Math.max(0.1, (now - inTime) / 3600000);
+        phase = 'before_break';
+      }
+    } else {
+      // Break punch occurred
+      const bInTime = new Date(bInP.punchTime).getTime();
+      beforeBreak = Math.max(0.1, (bInTime - inTime) / 3600000);
+
+      if (!bOutP) {
+        // Phase 2: On break, yellow break portion active
+        if (outP) {
+          const outTime = new Date(outP.punchTime).getTime();
+          breakHrs = Math.max(0.1, (outTime - bInTime) / 3600000);
+          phase = 'clocked_out';
+        } else {
+          breakHrs = Math.max(0.1, (now - bInTime) / 3600000);
+          phase = 'on_break';
+        }
+      } else {
+        // Phase 3 & 4: Break ended, converts to green for remaining time
+        const bOutTime = new Date(bOutP.punchTime).getTime();
+        breakHrs = Math.max(0.1, (bOutTime - bInTime) / 3600000);
+
+        if (outP) {
+          // Phase 4: Final logout punch completed
+          const outTime = new Date(outP.punchTime).getTime();
+          afterBreak = Math.max(0.1, (outTime - bOutTime) / 3600000);
+          phase = 'clocked_out';
+        } else {
+          // Phase 3: Working after break, green after-break portion grows dynamically
+          afterBreak = Math.max(0.1, (now - bOutTime) / 3600000);
+          phase = 'after_break';
+        }
+      }
+    }
+
+    beforeBreak = Math.round(beforeBreak * 10) / 10;
+    breakHrs = Math.round(breakHrs * 10) / 10;
+    afterBreak = Math.round(afterBreak * 10) / 10;
+    const totalHours = Math.round((beforeBreak + breakHrs + afterBreak) * 10) / 10;
+    const missingHours = Math.max(0, Math.round((8.5 - totalHours) * 10) / 10);
+
+    return {
+      hasPunched: true,
+      beforeBreakHours: beforeBreak,
+      breakHours: breakHrs,
+      afterBreakHours: afterBreak,
+      totalHours,
+      missingHours,
+      phase
+    };
+  });
 
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -50,22 +253,75 @@ export class PunchService {
   loadTodayPunches(): void {
     this.api.todayPunches().subscribe({
       next: (punches) => {
-        this.todayPunches.set(punches);
-        if (punches.length > 0) {
-          const latest = punches[0];
-          if (latest.punchType === 'ClockIn' || latest.punchType === 'BreakOut') {
-            this._state.set('active');
-            this._onBreak.set(false);
-            this.startTimer();
-          } else if (latest.punchType === 'BreakIn') {
-            this._state.set('active');
-            this._onBreak.set(true);
-            this.startTimer();
-          } else if (latest.punchType === 'ClockOut') {
-            this._state.set('idle');
-            this._onBreak.set(false);
-            this.stopTimer();
+        this.todayPunches.set(punches || []);
+        if (punches && punches.length > 0) {
+          const sorted = [...punches].sort((a, b) => new Date(a.punchTime).getTime() - new Date(b.punchTime).getTime());
+          const now = Date.now();
+
+          let workSec = 0;
+          let breakSec = 0;
+          let workStartMs: number | null = null;
+          let breakStartMs: number | null = null;
+
+          for (const p of sorted) {
+            const t = new Date(p.punchTime).getTime();
+            if (p.punchType === 'ClockIn' || p.punchType === 'BreakOut') {
+              if (breakStartMs !== null) {
+                breakSec += Math.max(0, Math.floor((t - breakStartMs) / 1000));
+                breakStartMs = null;
+              }
+              workStartMs = t;
+            } else if (p.punchType === 'BreakIn') {
+              if (workStartMs !== null) {
+                workSec += Math.max(0, Math.floor((t - workStartMs) / 1000));
+                workStartMs = null;
+              }
+              breakStartMs = t;
+            } else if (p.punchType === 'ClockOut') {
+              if (workStartMs !== null) {
+                workSec += Math.max(0, Math.floor((t - workStartMs) / 1000));
+                workStartMs = null;
+              }
+              if (breakStartMs !== null) {
+                breakSec += Math.max(0, Math.floor((t - breakStartMs) / 1000));
+                breakStartMs = null;
+              }
+            }
           }
+
+          const latest = sorted[sorted.length - 1];
+          if (latest) {
+            if (latest.punchType === 'ClockIn' || latest.punchType === 'BreakOut') {
+              if (workStartMs !== null) {
+                workSec += Math.max(0, Math.floor((now - workStartMs) / 1000));
+              }
+              this._state.set('active');
+              this._onBreak.set(false);
+              this.startTimer();
+            } else if (latest.punchType === 'BreakIn') {
+              if (breakStartMs !== null) {
+                breakSec += Math.max(0, Math.floor((now - breakStartMs) / 1000));
+              }
+              this._state.set('active');
+              this._onBreak.set(true);
+              this.startTimer();
+            } else if (latest.punchType === 'ClockOut') {
+              this._state.set('idle');
+              this._onBreak.set(false);
+              this.stopTimer();
+            }
+          }
+
+          this._workSeconds.set(workSec);
+          this._breakSeconds.set(breakSec);
+          this.render();
+        } else {
+          this._workSeconds.set(0);
+          this._breakSeconds.set(0);
+          this._state.set('idle');
+          this._onBreak.set(false);
+          this.render();
+          this.stopTimer();
         }
       },
       error: () => {
@@ -107,9 +363,10 @@ export class PunchService {
     this.render();
     this.startTimer();
 
-    this.api.recordPunch({ punchType: 'ClockIn', device: 'Face Biometric AI' }).subscribe({
+    this.api.recordPunch({ punchType: 'ClockIn', device: 'Web Dashboard' }).subscribe({
       next: (p) => {
-        this.todayPunches.update((list) => [p, ...list]);
+        this.todayPunches.update((list) => [p, ...list.filter(x => x.id !== p.id)]);
+        this.loadTodayPunches();
       },
       error: () => {
         const fallback: EmployeePunch = {
@@ -119,7 +376,7 @@ export class PunchService {
           employeeName: 'Sarah Jenkins',
           punchType: 'ClockIn',
           punchTime: new Date().toISOString(),
-          device: 'Face Biometric AI',
+          device: 'Web Dashboard',
         };
         this.todayPunches.update((list) => [fallback, ...list]);
       }
@@ -132,9 +389,10 @@ export class PunchService {
     this.render();
     this.stopTimer();
 
-    this.api.recordPunch({ punchType: 'ClockOut', device: 'Face Biometric AI' }).subscribe({
+    this.api.recordPunch({ punchType: 'ClockOut', device: 'Web Dashboard' }).subscribe({
       next: (p) => {
-        this.todayPunches.update((list) => [p, ...list]);
+        this.todayPunches.update((list) => [p, ...list.filter(x => x.id !== p.id)]);
+        this.loadTodayPunches();
       },
       error: () => {
         const fallback: EmployeePunch = {
@@ -144,7 +402,7 @@ export class PunchService {
           employeeName: 'Sarah Jenkins',
           punchType: 'ClockOut',
           punchTime: new Date().toISOString(),
-          device: 'Face Biometric AI',
+          device: 'Web Dashboard',
         };
         this.todayPunches.update((list) => [fallback, ...list]);
       }
@@ -156,9 +414,10 @@ export class PunchService {
     this._onBreak.set(true);
     this.render();
 
-    this.api.recordPunch({ punchType: 'BreakIn', device: 'Face Biometric AI' }).subscribe({
+    this.api.recordPunch({ punchType: 'BreakIn', device: 'Web Dashboard' }).subscribe({
       next: (p) => {
-        this.todayPunches.update((list) => [p, ...list]);
+        this.todayPunches.update((list) => [p, ...list.filter(x => x.id !== p.id)]);
+        this.loadTodayPunches();
       },
       error: () => {
         const fallback: EmployeePunch = {
@@ -168,7 +427,7 @@ export class PunchService {
           employeeName: 'Sarah Jenkins',
           punchType: 'BreakIn',
           punchTime: new Date().toISOString(),
-          device: 'Face Biometric AI',
+          device: 'Web Dashboard',
         };
         this.todayPunches.update((list) => [fallback, ...list]);
       }
@@ -180,9 +439,10 @@ export class PunchService {
     this._onBreak.set(false);
     this.render();
 
-    this.api.recordPunch({ punchType: 'BreakOut', device: 'Face Biometric AI' }).subscribe({
+    this.api.recordPunch({ punchType: 'BreakOut', device: 'Web Dashboard' }).subscribe({
       next: (p) => {
-        this.todayPunches.update((list) => [p, ...list]);
+        this.todayPunches.update((list) => [p, ...list.filter(x => x.id !== p.id)]);
+        this.loadTodayPunches();
       },
       error: () => {
         const fallback: EmployeePunch = {
@@ -192,7 +452,7 @@ export class PunchService {
           employeeName: 'Sarah Jenkins',
           punchType: 'BreakOut',
           punchTime: new Date().toISOString(),
-          device: 'Face Biometric AI',
+          device: 'Web Dashboard',
         };
         this.todayPunches.update((list) => [fallback, ...list]);
       }

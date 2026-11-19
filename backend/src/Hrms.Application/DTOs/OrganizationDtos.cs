@@ -27,12 +27,55 @@ public sealed record SaveBranchRequest(
     [Required, MaxLength(120)] string ManagerName,
     int EmployeeCount);
 
-public sealed record HolidayDto(Guid Id, string Name, DateOnly Date, string DayLabel, string Type);
+public sealed record HolidayDto(
+    Guid Id,
+    string Name,
+    DateOnly Date,
+    string DayLabel,
+    string Type,
+    Guid? HolidayTemplateId = null,
+    string? TemplateName = null,
+    string? Description = null,
+    string? Icon = null);
 
 public sealed record SaveHolidayRequest(
     [Required, MaxLength(120)] string Name,
     DateOnly Date,
-    HolidayType Type);
+    HolidayType Type,
+    Guid? HolidayTemplateId = null,
+    string? Description = null,
+    string? Icon = null);
+
+public sealed record HolidayTemplateDto(
+    Guid Id,
+    string Name,
+    string? Description,
+    bool IsDefault,
+    int HolidayCount,
+    int AssignmentCount,
+    IReadOnlyList<HolidayDto>? Holidays = null);
+
+public sealed record SaveHolidayTemplateRequest(
+    [Required, MaxLength(80)] string Name,
+    [MaxLength(250)] string? Description,
+    bool IsDefault = false);
+
+public sealed record HolidayTemplateAssignmentDto(
+    Guid Id,
+    Guid HolidayTemplateId,
+    string TemplateName,
+    Guid? DepartmentId,
+    string? DepartmentName,
+    Guid? BranchId,
+    string? BranchName,
+    Guid? EmployeeId,
+    string? EmployeeName);
+
+public sealed record SaveHolidayTemplateAssignmentRequest(
+    Guid HolidayTemplateId,
+    Guid? DepartmentId,
+    Guid? BranchId,
+    Guid? EmployeeId);
 
 public sealed record ShiftDto(Guid Id, string Name, string StartTime, string EndTime, int DailyHours, string WorkingDays);
 

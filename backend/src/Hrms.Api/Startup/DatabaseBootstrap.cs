@@ -196,6 +196,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
         await RunPunchAndTenantSettingsMigrationAsync(tenant, DefaultCompanyCode, defaultDbName, configuration, logger, ct);
         await DbSeeder.SeedAsync(tenant, hasher, isProduction, ct);
         await EnsureShiftTemplatesSeededAsync(tenant, logger, ct);
+        await EnsureHolidayTemplatesSeededAsync(tenant, logger, ct);
         await EnsureNavigationItemsSeededAsync(tenant, logger, ct);
 
         // In production, ensure initial SuperAdmin user if configured via environment
@@ -250,6 +251,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
                         await RunOneTimeKeyGroupCleanupMigrationAsync(tenantDb, company.Code, company.DatabaseName, logger, ct);
                         await RunPunchAndTenantSettingsMigrationAsync(tenantDb, company.Code, company.DatabaseName, configuration, logger, ct);
                         await EnsureShiftTemplatesSeededAsync(tenantDb, logger, ct);
+                        await EnsureHolidayTemplatesSeededAsync(tenantDb, logger, ct);
                         await EnsureNavigationItemsSeededAsync(tenantDb, logger, ct);
                         logger.LogInformation("Successfully updated schema on existing tenant database '{DatabaseName}'", company.DatabaseName);
                     }
@@ -670,6 +672,183 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
         }
     }
 
+    private static async Task EnsureHolidayTemplatesSeededAsync(
+        HrmsDbContext db,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var year = DateTime.UtcNow.Year; // 2026
+
+            // 1. Get or create India National Holiday Template
+            var indiaTemplate = await db.HolidayTemplates
+                .FirstOrDefaultAsync(t => t.Name.Contains("India") && t.IsDefault, ct);
+
+            if (indiaTemplate is null)
+            {
+                indiaTemplate = await db.HolidayTemplates.FirstOrDefaultAsync(t => t.IsDefault, ct);
+            }
+
+            if (indiaTemplate is null)
+            {
+                indiaTemplate = new HolidayTemplate
+                {
+                    Name = $"India National & Gazetted Holidays ({year})",
+                    Description = "Standard national and gazetted public holidays for Indian establishments and corporate offices",
+                    IsDefault = true,
+                };
+                db.HolidayTemplates.Add(indiaTemplate);
+                await db.SaveChangesAsync(ct);
+            }
+
+            // 2. Get or create India Corporate & Optional Template
+            var corporateTemplate = await db.HolidayTemplates
+                .FirstOrDefaultAsync(t => t.Name.Contains("Optional") || t.Name.Contains("Corporate"), ct);
+
+            if (corporateTemplate is null)
+            {
+                corporateTemplate = new HolidayTemplate
+                {
+                    Name = $"India Corporate & Optional Holidays ({year})",
+                    Description = "Optional and restricted festival holidays for corporate teams in India",
+                    IsDefault = false,
+                };
+                db.HolidayTemplates.Add(corporateTemplate);
+                await db.SaveChangesAsync(ct);
+            }
+
+            // 3. Remove obsolete non-Indian holidays (e.g. UAE National Day)
+            var obsoleteHolidays = await db.Holidays
+                .Where(h => h.Name.Contains("UAE") || h.Name.Contains("Emirates"))
+                .ToListAsync(ct);
+            if (obsoleteHolidays.Count > 0)
+            {
+                db.Holidays.RemoveRange(obsoleteHolidays);
+                await db.SaveChangesAsync(ct);
+            }
+
+            // 4. Ensure authentic Indian Holidays are seeded and linked
+            var indianHolidayDefinitions = new (string Name, DateOnly Date, HolidayType Type, bool IsCorporate, string Icon, string Description)[]
+            {
+                ("New Year's Day", new DateOnly(year, 1, 1), HolidayType.Optional, false, "calendar", "First day of the Gregorian New Year"),
+                ("Makar Sankranti / Uttarayan", new DateOnly(year, 1, 14), HolidayType.Optional, false, "sun", "Harvest festival celebrated across India"),
+                ("Republic Day", new DateOnly(year, 1, 26), HolidayType.National, false, "flag", "National holiday commemorating Constitution of India"),
+                ("Maha Shivratri", new DateOnly(year, 2, 15), HolidayType.Religious, false, "moon", "Gazetted festival honoring Lord Shiva"),
+                ("Holi", new DateOnly(year, 3, 4), HolidayType.Religious, false, "sparkles", "Spring festival of colors and unity"),
+                ("Eid-ul-Fitr", new DateOnly(year, 3, 20), HolidayType.Religious, false, "moon", "Islamic festival marking the end of Ramadan"),
+                ("Mahavir Jayanti", new DateOnly(year, 3, 31), HolidayType.Religious, false, "sun", "Birth anniversary of Bhagwan Mahavira"),
+                ("Good Friday", new DateOnly(year, 4, 3), HolidayType.Religious, false, "cross", "Christian holy day marking crucifixion of Jesus Christ"),
+                ("Buddha Purnima", new DateOnly(year, 5, 1), HolidayType.Religious, false, "sun", "Celebration of Gautama Buddha's birth and enlightenment"),
+                ("Bakrid / Eid al-Adha", new DateOnly(year, 5, 27), HolidayType.Religious, false, "moon", "Feast of Sacrifice"),
+                ("Muharram", new DateOnly(year, 6, 26), HolidayType.Religious, false, "calendar", "First month of Islamic calendar and Ashura"),
+                ("Independence Day", new DateOnly(year, 8, 15), HolidayType.National, false, "flag", "National holiday celebrating Independence of India"),
+                ("Milad-un-Nabi", new DateOnly(year, 8, 26), HolidayType.Religious, false, "moon", "Observance of the Prophet Muhammad's birthday"),
+                ("Raksha Bandhan", new DateOnly(year, 8, 28), HolidayType.Optional, true, "heart", "Celebration of fraternal bond and protection"),
+                ("Janmashtami", new DateOnly(year, 9, 4), HolidayType.Religious, false, "sparkles", "Birth celebration of Lord Krishna"),
+                ("Ganesh Chaturthi", new DateOnly(year, 9, 14), HolidayType.Religious, false, "star", "Festival welcoming Lord Ganesha"),
+                ("Mahatma Gandhi Jayanti", new DateOnly(year, 10, 2), HolidayType.National, false, "award", "National holiday marking birth of Mahatma Gandhi"),
+                ("Dussehra (Vijaya Dashami)", new DateOnly(year, 10, 20), HolidayType.Religious, false, "zap", "Triumph of righteousness over evil"),
+                ("Diwali (Deepavali)", new DateOnly(year, 11, 8), HolidayType.Religious, false, "flame", "Festival of Lights and prosperity"),
+                ("Govardhan Puja / Bhai Dooj", new DateOnly(year, 11, 10), HolidayType.Optional, true, "gift", "Festive celebration following Diwali"),
+                ("Guru Nanak Jayanti", new DateOnly(year, 11, 24), HolidayType.Religious, false, "sun", "Birth anniversary of Guru Nanak Dev Ji"),
+                ("Christmas Day", new DateOnly(year, 12, 25), HolidayType.Religious, false, "gift", "Celebration of the birth of Jesus Christ"),
+            };
+
+            var existingHolidays = await db.Holidays.ToListAsync(ct);
+            var holidaysChanged = false;
+
+            foreach (var item in indianHolidayDefinitions)
+            {
+                var targetTemplateId = item.IsCorporate ? corporateTemplate.Id : indiaTemplate.Id;
+                var match = existingHolidays.FirstOrDefault(h =>
+                    h.Name.Equals(item.Name, StringComparison.OrdinalIgnoreCase) ||
+                    (item.Name.Contains("Makar") && h.Name.Contains("Uttrayan", StringComparison.OrdinalIgnoreCase)) ||
+                    (item.Name.Contains("Christmas") && h.Name.Contains("Christmas", StringComparison.OrdinalIgnoreCase)) ||
+                    (item.Name.Contains("Eid-ul-Fitr") && h.Name.Contains("Eid Al Fitr", StringComparison.OrdinalIgnoreCase)) ||
+                    (item.Name.Contains("Eid al-Adha") && h.Name.Contains("Eid Al Adha", StringComparison.OrdinalIgnoreCase)));
+
+                if (match != null)
+                {
+                    match.Name = item.Name;
+                    match.Date = item.Date;
+                    match.Type = item.Type;
+                    match.HolidayTemplateId = targetTemplateId;
+                    match.Icon = item.Icon;
+                    match.Description = item.Description;
+                    holidaysChanged = true;
+                }
+                else
+                {
+                    db.Holidays.Add(new Holiday
+                    {
+                        Name = item.Name,
+                        Date = item.Date,
+                        Type = item.Type,
+                        HolidayTemplateId = targetTemplateId,
+                        Icon = item.Icon,
+                        Description = item.Description,
+                    });
+                    holidaysChanged = true;
+                }
+            }
+
+            if (holidaysChanged)
+            {
+                await db.SaveChangesAsync(ct);
+            }
+
+            // 5. Ensure Holiday Template Assignments are populated
+            var existingAssignments = await db.HolidayTemplateAssignments.ToListAsync(ct);
+            var assignmentsChanged = false;
+
+            // Assign indiaTemplate to all departments if not assigned
+            var departments = await db.Departments.ToListAsync(ct);
+            foreach (var dept in departments)
+            {
+                if (!existingAssignments.Any(a => a.HolidayTemplateId == indiaTemplate.Id && a.DepartmentId == dept.Id))
+                {
+                    db.HolidayTemplateAssignments.Add(new HolidayTemplateAssignment
+                    {
+                        HolidayTemplateId = indiaTemplate.Id,
+                        DepartmentId = dept.Id,
+                    });
+                    assignmentsChanged = true;
+                }
+            }
+
+            // Assign templates to branches
+            var branches = await db.Branches.ToListAsync(ct);
+            foreach (var branch in branches)
+            {
+                var targetTemplateId = (branch.Name.Contains("London", StringComparison.OrdinalIgnoreCase) || branch.Name.Contains("Riyadh", StringComparison.OrdinalIgnoreCase))
+                    ? corporateTemplate.Id
+                    : indiaTemplate.Id;
+
+                if (!existingAssignments.Any(a => a.HolidayTemplateId == targetTemplateId && a.BranchId == branch.Id))
+                {
+                    db.HolidayTemplateAssignments.Add(new HolidayTemplateAssignment
+                    {
+                        HolidayTemplateId = targetTemplateId,
+                        BranchId = branch.Id,
+                    });
+                    assignmentsChanged = true;
+                }
+            }
+
+            if (assignmentsChanged)
+            {
+                await db.SaveChangesAsync(ct);
+            }
+
+            logger.LogInformation("Ensured HolidayTemplates and HolidayTemplateAssignments seeded with Indian holidays.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to ensure Indian holiday templates seeded.");
+        }
+    }
+
     private static async Task EnsureNavigationItemsSeededAsync(
         HrmsDbContext db,
         ILogger logger,
@@ -677,14 +856,17 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
     {
         try
         {
-            // 1. Remove any legacy /loans, /erp, /kiosk, /announcements navigation items
+            // 1. Remove any legacy /loans, /erp, /kiosk, /announcements, /analytics navigation items
             var toRemove = await db.NavigationItems
                 .Where(n => n.Route.ToLower().Contains("/loans") ||
                             n.Route.ToLower().Contains("/erp") ||
                             n.Route.ToLower().Contains("/kiosk") ||
                             n.Route.ToLower().Contains("announcement") ||
+                            n.Route.ToLower().Contains("/analytics") ||
                             n.Title.ToLower() == "loans" ||
-                            n.Code.ToLower() == "loan")
+                            n.Title.ToLower() == "analytics" ||
+                            n.Code.ToLower() == "loan" ||
+                            n.Code.ToLower() == "anal")
                 .ToListAsync(ct);
 
             if (toRemove.Count > 0)
@@ -698,24 +880,23 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
                 await db.SaveChangesAsync(ct);
             }
 
-            // 2. Standard 14 navigation items matching Image 2
+            // 2. Standard navigation items matching sidebar
             var standardItems = new (string Code, string Title, string Route, string Icon, int Order)[]
             {
                 ("DASH", "Dashboard", "/dashboard", "dashboard", 1),
-                ("ANAL", "Analytics", "/analytics", "reports", 2),
-                ("COMP", "Company", "/company", "company", 3),
-                ("EMPL", "Employees", "/employees", "employees", 4),
-                ("PROF", "Profile", "/employee-profile", "user", 5),
-                ("SHIF", "Shift", "/shift", "clock", 6),
-                ("ATTD", "Attendance", "/attendance", "attendance", 7),
-                ("LEAV", "Leave", "/leave", "leave", 8),
-                ("PAYR", "Payroll", "/payroll", "payroll", 9),
-                ("PAYS", "Payslips", "/payslips", "payslip", 10),
-                ("ONBD", "Onboarding", "/onboarding", "onboarding", 11),
-                ("DOCS", "Documents", "/documents", "documents", 12),
-                ("APPR", "Approvals", "/approvals", "approvals", 13),
-                ("REPT", "Reports", "/reports", "reports", 14),
-                ("SETT", "Settings", "/settings", "settings", 15),
+                ("COMP", "Company", "/company", "company", 2),
+                ("EMPL", "Employees", "/employees", "employees", 3),
+                ("PROF", "Profile", "/employee-profile", "user", 4),
+                ("SHIF", "Shift", "/shift", "clock", 5),
+                ("ATTD", "Attendance", "/attendance", "attendance", 6),
+                ("LEAV", "Leave", "/leave", "leave", 7),
+                ("PAYR", "Payroll", "/payroll", "payroll", 8),
+                ("PAYS", "Payslips", "/payslips", "payslip", 9),
+                ("ONBD", "Onboarding", "/onboarding", "onboarding", 10),
+                ("DOCS", "Documents", "/documents", "documents", 11),
+                ("APPR", "Approvals", "/approvals", "approvals", 12),
+                ("REPT", "Reports", "/reports", "reports", 13),
+                ("SETT", "Settings", "/settings", "settings", 14),
             };
 
             var existingNavs = await db.NavigationItems.ToListAsync(ct);
@@ -774,12 +955,53 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
                             IsEdit = true,
                             IsDelete = true
                         });
+                        permKeySet.Add($"{r.Id}:{nav.Id}");
+                    }
+                }
+            }
+
+            // Grant role-appropriate permissions to Manager and Employee roles
+            var otherRoles = await db.Roles
+                .Where(r => r.Code == "Manager" || r.Code == "Employee" ||
+                            r.Name == "Manager" || r.Name == "Employee")
+                .ToListAsync(ct);
+
+            foreach (var r in otherRoles)
+            {
+                bool isManager = r.Code == "Manager" || r.Name == "Manager";
+                var allowedCodes = isManager
+                    ? new[] { "DASH", "ANAL", "EMPL", "PROF", "ATTD", "LEAV", "DOCS", "APPR", "REPT", "COMP", "PAYS" }
+                    : new[] { "DASH", "PROF", "ATTD", "LEAV", "PAYS", "DOCS" };
+
+                foreach (var nav in allCurrentNavs)
+                {
+                    if (allowedCodes.Contains(nav.Code) && !permKeySet.Contains($"{r.Id}:{nav.Id}"))
+                    {
+                        bool isFull = isManager && new[] { "DASH", "PROF", "APPR" }.Contains(nav.Code);
+                        bool isCreate = isManager
+                            ? new[] { "DASH", "PROF", "APPR", "ATTD", "LEAV", "DOCS" }.Contains(nav.Code)
+                            : new[] { "ATTD", "LEAV" }.Contains(nav.Code);
+                        bool isEdit = isManager
+                            ? new[] { "DASH", "PROF", "APPR", "ATTD", "LEAV", "DOCS" }.Contains(nav.Code)
+                            : new[] { "DASH", "PROF" }.Contains(nav.Code);
+
+                        db.RoleNavigations.Add(new RoleNavigation
+                        {
+                            RoleId = r.Id,
+                            NavigationItemId = nav.Id,
+                            IsFull = isFull,
+                            IsView = true,
+                            IsCreate = isCreate,
+                            IsEdit = isEdit,
+                            IsDelete = false
+                        });
+                        permKeySet.Add($"{r.Id}:{nav.Id}");
                     }
                 }
             }
 
             await db.SaveChangesAsync(ct);
-            logger.LogInformation("Seeded 14 standard navigation items and permissions into tenant database.");
+            logger.LogInformation("Seeded standard navigation items and permissions for all roles into tenant database.");
         }
         catch (Exception ex)
         {

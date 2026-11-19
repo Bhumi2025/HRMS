@@ -27,3 +27,16 @@ export const superAdminGuard: CanActivateFn = () => {
   const router = inject(Router);
   return session.role() === 'Super Admin' ? true : router.parseUrl(session.landingPath());
 };
+
+/**
+ * Restricts administrative HR/Company modules to Super Admin, Company Admin, HR Manager, and Manager.
+ * Employees attempting to access admin routes are redirected to their employee self-service dashboard (`/me/dashboard`).
+ */
+export const nonEmployeeGuard: CanActivateFn = () => {
+  const session = inject(SessionService);
+  const router = inject(Router);
+  if (session.role() === 'Employee') {
+    return router.parseUrl('/me/dashboard');
+  }
+  return true;
+};

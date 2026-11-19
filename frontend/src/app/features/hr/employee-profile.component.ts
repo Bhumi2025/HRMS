@@ -62,6 +62,22 @@ interface DocRow {
             <span class="profile-badge"><span [appIcon]="'lock'"></span> System Authenticated</span>
           </div>
         </div>
+        @if (employeeOptions().length > 0) {
+          <div class="profile-header-actions">
+            <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
+              <span [appIcon]="'arrow-left'"></span> Back to List
+            </button>
+            <div class="profile-switcher-dropdown">
+              <span class="switcher-label">Inspect Employee:</span>
+              <app-select
+                [options]="employeeOptions()"
+                [value]="selectedEmployeeId()"
+                (valueChange)="onEmployeeSelect($event)"
+                width="280px"
+              />
+            </div>
+          </div>
+        }
       </div>
 
       <div class="ptabs">
@@ -71,6 +87,8 @@ interface DocRow {
           </button>
         }
       </div>
+
+      <div class="profile-content-scroll">
 
       <!-- ADMIN TAB: ACCOUNT -->
       @if (adminTab() === 'account') {
@@ -189,6 +207,7 @@ interface DocRow {
           </div>
         </div>
       }
+      </div>
     } @else {
       <!-- EMPLOYEE MODE BANNER -->
       <div class="profile-banner">
@@ -206,18 +225,26 @@ interface DocRow {
           </div>
         </div>
 
-        @if (isAdmin()) {
-          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; position: relative; z-index: 101">
-            <button class="btn btn-outline btn-sm" (click)="switchToAdminView()">
-              <span [appIcon]="'shield'"></span> My Admin Profile
+        @if (canManageEmployees()) {
+          <div class="profile-header-actions">
+            <button class="btn btn-outline btn-sm" type="button" (click)="goBack()" title="Back to Employee Directory">
+              <span [appIcon]="'arrow-left'"></span> Back to List
             </button>
+            @if (isAdminViewAvailable()) {
+              <button class="btn btn-outline btn-sm" (click)="switchToAdminView()">
+                <span [appIcon]="'shield'"></span> Admin Mode
+              </button>
+            }
             @if (employeeOptions().length > 0) {
-              <app-select
-                [options]="employeeOptions()"
-                [value]="selectedEmployeeId()"
-                (valueChange)="onEmployeeSelect($event)"
-                width="240px"
-              />
+              <div class="profile-switcher-dropdown">
+                <span class="switcher-label">Select Employee:</span>
+                <app-select
+                  [options]="employeeOptions()"
+                  [value]="selectedEmployeeId()"
+                  (valueChange)="onEmployeeSelect($event)"
+                  width="260px"
+                />
+              </div>
             }
           </div>
         }
@@ -230,6 +257,8 @@ interface DocRow {
           </button>
         }
       </div>
+
+      <div class="profile-content-scroll">
 
     <!-- PERSONAL TAB -->
     @if (tab() === 'personal') {
@@ -260,10 +289,6 @@ interface DocRow {
             <div class="form-group">
               <label class="form-label">Blood Group</label>
               <app-key-select groupCode="BLOOD_GROUP" [value]="personal().blood" (valueChange)="patchPersonal('blood', $event)" width="100%" />
-            </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Personal details saved!')"><span [appIcon]="'check'"></span> Save</button>
             </div>
           </div>
         </div>
@@ -302,11 +327,21 @@ interface DocRow {
                 Controls module access &amp; permissions (HR Manager, Company Admin, or Employee)
               </div>
             </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Job info saved!')"><span [appIcon]="'check'"></span> Save</button>
-            </div>
           </div>
+        </div>
+      </div>
+
+      <div class="tab-action-bar">
+        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
+          <span [appIcon]="'arrow_left'"></span> Back
+        </button>
+        <div class="tab-action-group">
+          <button class="btn btn-outline btn-sm" type="button" (click)="save('Personal & Job details saved!')">
+            <span [appIcon]="'check'"></span> Save Changes
+          </button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="saveAndNext('Personal & Job details saved!')">
+            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
+          </button>
         </div>
       </div>
     }
@@ -341,10 +376,6 @@ interface DocRow {
               <label class="form-label">Country</label>
               <app-select [options]="countryOptions" [value]="contact().country" (valueChange)="patchContact('country', $event)" width="100%" />
             </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Contact details saved!')"><span [appIcon]="'check'"></span> Save</button>
-            </div>
           </div>
         </div>
 
@@ -371,11 +402,21 @@ interface DocRow {
               <label class="form-label">Emirates ID</label>
               <input class="form-control" [value]="identity().emiratesId" (input)="patchIdentity('emiratesId', $any($event.target).value)" />
             </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Identity info saved!')"><span [appIcon]="'check'"></span> Save</button>
-            </div>
           </div>
+        </div>
+      </div>
+
+      <div class="tab-action-bar">
+        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
+          <span [appIcon]="'arrow_left'"></span> Back
+        </button>
+        <div class="tab-action-group">
+          <button class="btn btn-outline btn-sm" type="button" (click)="save('Contact & Identity details saved!')">
+            <span [appIcon]="'check'"></span> Save Changes
+          </button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="saveAndNext('Contact & Identity details saved!')">
+            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
+          </button>
         </div>
       </div>
     }
@@ -422,10 +463,6 @@ interface DocRow {
               <label class="form-label">WPS ID</label>
               <input class="form-control" [value]="bank().wpsId" (input)="patchBank('wpsId', $any($event.target).value)" />
             </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Bank details saved!')"><span [appIcon]="'check'"></span> Save</button>
-            </div>
           </div>
         </div>
 
@@ -443,6 +480,20 @@ interface DocRow {
               </div>
             }
           </div>
+        </div>
+      </div>
+
+      <div class="tab-action-bar">
+        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
+          <span [appIcon]="'arrow_left'"></span> Back
+        </button>
+        <div class="tab-action-group">
+          <button class="btn btn-outline btn-sm" type="button" (click)="save('Bank details saved!')">
+            <span [appIcon]="'check'"></span> Save Changes
+          </button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="saveAndNext('Bank details saved!')">
+            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
+          </button>
         </div>
       </div>
     }
@@ -487,6 +538,20 @@ interface DocRow {
           </table>
         </div>
       </div>
+
+      <div class="tab-action-bar">
+        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
+          <span [appIcon]="'arrow_left'"></span> Back
+        </button>
+        <div class="tab-action-group">
+          <button class="btn btn-outline btn-sm" type="button" (click)="save('Document records saved!')">
+            <span [appIcon]="'check'"></span> Save Changes
+          </button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="nextTab()">
+            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
+          </button>
+        </div>
+      </div>
     }
 
     <!-- BIOMETRIC & FACE ID TAB -->
@@ -516,16 +581,16 @@ interface DocRow {
               </div>
             </div>
 
-            <div style="font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5;">
+            <div style="font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 16px;">
               Enrolling employee Face ID enables hands-free punch in/out on the Office Kiosk and self-service selfie attendance on their mobile or web portal.
             </div>
 
             <div style="display: flex; gap: 10px;">
-              <button class="btn btn-primary btn-sm" (click)="openFaceEnrollModal()">
+              <button class="btn btn-outline btn-sm" type="button" (click)="openFaceEnrollModal()">
                 📷 {{ isFaceEnrolled() ? 'Re-enroll Face ID' : 'Enroll Face ID' }}
               </button>
               @if (isFaceEnrolled()) {
-                <button class="btn btn-outline btn-sm" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" (click)="removeFaceId()">
+                <button class="btn btn-outline btn-sm" type="button" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" (click)="removeFaceId()">
                   Remove Face ID
                 </button>
               }
@@ -548,7 +613,19 @@ interface DocRow {
           </div>
         </div>
       </div>
+
+      <div class="tab-action-bar">
+        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
+          <span [appIcon]="'arrow_left'"></span> Back
+        </button>
+        <div class="tab-action-group">
+          <button class="btn btn-primary btn-sm" type="button" (click)="save('Biometric & Profile details saved!')">
+            <span [appIcon]="'check'"></span> Save Changes
+          </button>
+        </div>
+      </div>
     }
+    </div>
   }
 
     <!-- ENROLL FACE ID WEBCAM MODAL -->
@@ -693,31 +770,61 @@ interface DocRow {
   `,
   styles: [
     `
+      :host {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - var(--header-h, 52px) - 32px);
+        max-height: calc(100vh - var(--header-h, 52px) - 32px);
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+      .profile-content-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 4px;
+        padding-bottom: 14px;
+      }
+      .profile-content-scroll::-webkit-scrollbar {
+        width: 6px;
+      }
+      .profile-content-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .profile-content-scroll::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+      }
+      .profile-content-scroll::-webkit-scrollbar-thumb:hover {
+        background: var(--muted);
+      }
       .profile-banner {
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--r);
-        padding: 16px;
-        margin-bottom: 16px;
+        padding: 10px 16px;
+        margin-bottom: 8px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 14px;
+        gap: 12px;
         flex-wrap: wrap;
         box-shadow: var(--shadow);
         position: relative;
         z-index: 100;
+        flex-shrink: 0;
       }
       .profile-avatar {
-        width: 60px;
-        height: 60px;
+        width: 52px;
+        height: 52px;
         border-radius: 50%;
         background: var(--p);
         color: #fff;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.2rem;
+        font-size: 1.15rem;
         font-weight: 800;
         border: 2px solid #fff;
         box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
@@ -752,13 +859,39 @@ interface DocRow {
         color: #b45309;
         border-color: #fcd34d;
       }
+      .profile-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        position: relative;
+        z-index: 101;
+      }
+      .profile-switcher-dropdown {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg);
+        padding: 4px 8px 4px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .switcher-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+      }
       .ptabs {
         display: flex;
         gap: 0;
-        margin-bottom: 16px;
+        margin-bottom: 10px;
         border-bottom: 1px solid var(--border);
         overflow-x: auto;
         scrollbar-width: none;
+        flex-shrink: 0;
       }
       .ptabs::-webkit-scrollbar {
         display: none;
@@ -790,6 +923,35 @@ interface DocRow {
         border-bottom-color: var(--p);
         font-weight: 600;
       }
+      .tab-action-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 14px;
+        padding: 12px 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+      }
+      .grid-2:has(.csel-open),
+      .grid-2:has(.csel-host-open),
+      .grid-2.has-open-dropdown,
+      .card:has(.csel-open),
+      .card:has(.csel-host-open),
+      .card.has-open-dropdown {
+        position: relative !important;
+        z-index: 50 !important;
+      }
+      .tab-action-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
       .form-footer {
         display: flex;
         justify-content: flex-end;
@@ -811,25 +973,18 @@ interface DocRow {
         border-color: rgba(99, 102, 241, 0.35) !important;
         font-weight: 700 !important;
       }
-      .profile-switcher-card {
-        padding: 8px 12px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        position: relative;
-        z-index: 101;
-      }
       @media (max-width: 768px) {
         .profile-banner {
           padding: 10px;
           gap: 6px;
         }
-        .profile-switcher-card {
+        .profile-header-actions {
           width: 100%;
-          align-items: stretch;
+          justify-content: space-between;
+        }
+        .profile-switcher-dropdown {
+          width: 100%;
+          justify-content: space-between;
         }
       }
     `,
@@ -919,7 +1074,13 @@ export class EmployeeProfileComponent implements OnInit {
   protected readonly selectedEmployeeId = signal<string>('__admin__');
 
   protected readonly currentRole = computed(() => this.session.activeRole());
-  protected readonly isAdmin = computed(() => ['Super Admin', 'Company Admin'].includes(this.currentRole()) || !this.session.user()?.employeeId);
+  protected readonly canManageEmployees = computed(() =>
+    ['Super Admin', 'Company Admin', 'HR Manager', 'HR'].includes(this.currentRole())
+  );
+  protected readonly isAdminViewAvailable = computed(() =>
+    ['Super Admin', 'Company Admin'].includes(this.currentRole()) || !this.session.user()?.employeeId
+  );
+  protected readonly isAdmin = computed(() => this.isAdminViewAvailable());
   protected readonly currentAdminName = computed(() => this.session.user()?.name || 'Administrator');
   protected readonly currentAdminEmail = computed(() => this.session.user()?.email || 'admin@viralinfotech.com');
   protected readonly currentCompanyName = computed(() => this.session.user()?.companyName || 'Viral Infotech');
@@ -957,38 +1118,44 @@ export class EmployeeProfileComponent implements OnInit {
       },
     });
 
-    if (this.isAdmin()) {
+    if (this.canManageEmployees()) {
       this.loadEmployeeOptions();
-
-      this.route.queryParams.subscribe((params) => {
-        const id = params['id'] || params['employeeId'];
-        if (id) {
-          this.loadEmployeeById(id);
-        } else {
-          this.selectedEmployeeId.set('__admin__');
-          this.viewMode.set('admin');
-        }
-      });
-    } else {
-      this.viewMode.set('employee');
-      this.load();
     }
+
+    this.route.queryParams.subscribe((params) => {
+      const id = params['id'] || params['employeeId'];
+      if (id) {
+        this.loadEmployeeById(id);
+      } else if (this.isAdminViewAvailable() && !this.session.user()?.employeeId) {
+        this.selectedEmployeeId.set('__admin__');
+        this.viewMode.set('admin');
+      } else {
+        this.viewMode.set('employee');
+        this.load();
+      }
+    });
   }
 
   protected loadEmployeeOptions(): void {
-    if (!this.isAdmin()) return;
-    this.api.employees({ pageSize: 100 }).subscribe({
+    if (!this.canManageEmployees()) return;
+    this.api.employees({ pageSize: 150 }).subscribe({
       next: (res) => {
-        const opts: SelectOption[] = [
-          { v: '__admin__', l: `👤 My Admin Profile (${this.currentAdminName()})` },
+        const opts: SelectOption[] = [];
+        if (this.isAdminViewAvailable()) {
+          opts.push({ v: '__admin__', l: `👤 My Admin Profile (${this.currentAdminName()})` });
+        }
+        opts.push(
           ...res.items.map((e) => ({
             v: e.id,
             l: `${e.employeeCode} - ${e.fullName} (${e.jobTitle || e.department})`,
           })),
-        ];
+        );
         this.employeeOptions.set(opts);
         this.reportingOptions = [
           { v: '', l: 'None (Direct Report to Management)' },
+          { v: 'HR Manager', l: 'HR Manager' },
+          { v: 'Manager', l: 'Manager' },
+          { v: 'Company Admin', l: 'Company Admin' },
           ...res.items.map((e) => ({
             v: e.fullName,
             l: `${e.fullName} (${e.employeeCode})`,
@@ -996,6 +1163,42 @@ export class EmployeeProfileComponent implements OnInit {
         ];
       },
       error: () => {},
+    });
+  }
+
+  protected goBack(): void {
+    this.router.navigate(['/employees']);
+  }
+
+  protected readonly tabOrder: Array<'personal' | 'contact' | 'bank' | 'docs' | 'biometric'> = [
+    'personal',
+    'contact',
+    'bank',
+    'docs',
+    'biometric',
+  ];
+
+  protected previousTab(): void {
+    const current = this.tab();
+    const idx = this.tabOrder.indexOf(current as any);
+    if (idx > 0) {
+      this.tab.set(this.tabOrder[idx - 1]);
+    } else {
+      this.goBack();
+    }
+  }
+
+  protected nextTab(): void {
+    const current = this.tab();
+    const idx = this.tabOrder.indexOf(current as any);
+    if (idx >= 0 && idx < this.tabOrder.length - 1) {
+      this.tab.set(this.tabOrder[idx + 1]);
+    }
+  }
+
+  protected saveAndNext(message?: string): void {
+    this.save(message || 'Details saved successfully!', () => {
+      this.nextTab();
     });
   }
 
@@ -1112,6 +1315,7 @@ export class EmployeeProfileComponent implements OnInit {
     this.api.employeeMe().subscribe({
       next: (employee) => {
         this.populateEmployee(employee);
+        this.selectedEmployeeId.set(employee.id);
       },
       error: () => {
         this.toast.show('Could not load the employee profile.', 'danger');
@@ -1232,7 +1436,7 @@ export class EmployeeProfileComponent implements OnInit {
     });
   }
 
-  protected save(message: string): void {
+  protected save(message: string, onSuccess?: () => void): void {
     const id = this.apiId();
     const detail = this.detail();
     if (!id || !detail) {
@@ -1301,6 +1505,7 @@ export class EmployeeProfileComponent implements OnInit {
         this.populateEmployee(updated);
         this.loadEmployeeOptions();
         this.toast.show(message, 'success');
+        onSuccess?.();
       },
       error: (error) => this.toast.show(error?.error?.title ?? error?.error?.message ?? 'Could not save the profile.', 'danger'),
     });
@@ -1533,7 +1738,12 @@ export class EmployeeProfileComponent implements OnInit {
   ];
   protected readonly bloodOptions: SelectOption[] = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((b) => ({ v: b, l: b }));
   protected deptOptions: SelectOption[] = [];
-  protected reportingOptions: SelectOption[] = [];
+  protected reportingOptions: SelectOption[] = [
+    { v: '', l: 'None (Direct Report to Management)' },
+    { v: 'HR Manager', l: 'HR Manager' },
+    { v: 'Manager', l: 'Manager' },
+    { v: 'Company Admin', l: 'Company Admin' },
+  ];
   protected readonly countryOptions: SelectOption[] = [
     { v: 'UAE', l: 'UAE' },
     { v: 'Saudi Arabia', l: 'Saudi Arabia' },
