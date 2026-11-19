@@ -121,6 +121,7 @@ public sealed class PermissionAuthorizationFilter : IAsyncActionFilter
         if (path.StartsWith("/api/employees/me", StringComparison.OrdinalIgnoreCase) ||
             isOwnEmployeePath ||
             path.StartsWith("/api/documents", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/files", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/attendance/today", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/attendance/punch", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/attendance/punches/today", StringComparison.OrdinalIgnoreCase) ||
