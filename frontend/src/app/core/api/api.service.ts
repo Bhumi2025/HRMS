@@ -45,6 +45,8 @@ import {
   EmployeeDashboard,
   ErpOverview,
   HolidayDto,
+  HolidayTemplateDto,
+  HolidayTemplateAssignmentDto,
   LeaveReportRow,
   NotificationPreference,
   OvertimeReportRow,
@@ -467,8 +469,10 @@ export class ApiService {
     return this.branchesCache$;
   }
 
-  holidays(): Observable<HolidayDto[]> {
-    return this.http.get<HolidayDto[]>(this.url('/organization/holidays'));
+  holidays(templateId?: string): Observable<HolidayDto[]> {
+    let params = new HttpParams();
+    if (templateId) params = params.set('templateId', templateId);
+    return this.http.get<HolidayDto[]>(this.url('/organization/holidays'), { params });
   }
 
   createHoliday(body: unknown): Observable<HolidayDto> {
@@ -481,6 +485,34 @@ export class ApiService {
 
   deleteHoliday(id: string): Observable<void> {
     return this.http.delete<void>(this.url(`/organization/holidays/${id}`));
+  }
+
+  holidayTemplates(): Observable<HolidayTemplateDto[]> {
+    return this.http.get<HolidayTemplateDto[]>(this.url('/organization/holiday-templates'));
+  }
+
+  createHolidayTemplate(body: unknown): Observable<HolidayTemplateDto> {
+    return this.http.post<HolidayTemplateDto>(this.url('/organization/holiday-templates'), body);
+  }
+
+  updateHolidayTemplate(id: string, body: unknown): Observable<HolidayTemplateDto> {
+    return this.http.put<HolidayTemplateDto>(this.url(`/organization/holiday-templates/${id}`), body);
+  }
+
+  deleteHolidayTemplate(id: string): Observable<void> {
+    return this.http.delete<void>(this.url(`/organization/holiday-templates/${id}`));
+  }
+
+  holidayTemplateAssignments(): Observable<HolidayTemplateAssignmentDto[]> {
+    return this.http.get<HolidayTemplateAssignmentDto[]>(this.url('/organization/holiday-template-assignments'));
+  }
+
+  createHolidayTemplateAssignment(body: unknown): Observable<HolidayTemplateAssignmentDto> {
+    return this.http.post<HolidayTemplateAssignmentDto>(this.url('/organization/holiday-template-assignments'), body);
+  }
+
+  deleteHolidayTemplateAssignment(id: string): Observable<void> {
+    return this.http.delete<void>(this.url(`/organization/holiday-template-assignments/${id}`));
   }
 
   shifts(): Observable<ShiftDto[]> {

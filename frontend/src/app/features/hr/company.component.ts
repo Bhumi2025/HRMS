@@ -11,6 +11,7 @@ import {
   SaveCompanySettingsRequest,
   UpdateCompanyRequest,
   STANDARD_TIMEZONES,
+  HolidayTemplateDto,
 } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { PermissionService } from '../../core/services/permission.service';
@@ -61,7 +62,10 @@ export interface HolidayRow {
   date: string;
   dayLabel: string;
   type: string;
-  description?: string;
+  description?: string | null;
+  holidayTemplateId?: string | null;
+  templateName?: string | null;
+  icon?: string | null;
 }
 
 function emptyTenantForm(): CreateCompanyRequest {
@@ -630,6 +634,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                   <th style="width: 160px; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Date</th>
                   <th style="width: 140px; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Day</th>
                   <th style="width: 140px; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Type</th>
+                  <th style="width: 220px; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Holiday Template</th>
                   <th style="width: 100px; padding: 12px 16px; text-align: right; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Action</th>
                 </tr>
                 @if (showFilterRow()) {
@@ -662,6 +667,19 @@ function emptyTenantForm(): CreateCompanyRequest {
                       </div>
                     </th>
                     <th style="padding: 6px 16px;" colspan="3"></th>
+                    <th style="padding: 6px 16px;">
+                      <select 
+                        class="form-control" 
+                        [value]="selectedHolidayTemplateFilter()" 
+                        (change)="selectedHolidayTemplateFilter.set($any($event.target).value); currentPage.set(1)"
+                        style="font-size: 12px; padding: 4px 8px; width: 100%;"
+                      >
+                        <option value="all">All Templates</option>
+                        @for (t of holidayTemplates(); track t.id) {
+                          <option [value]="t.id">{{ t.name }}</option>
+                        }
+                      </select>
+                    </th>
                     <th style="padding: 6px 16px; text-align: right;">
                       <button type="button" class="btn btn-ghost btn-sm" (click)="closeAndClearFilter()" data-tooltip="Cancel / Close Filter" title="Cancel / Close Filter">
                         <span [appIcon]="'x'"></span>
@@ -678,8 +696,13 @@ function emptyTenantForm(): CreateCompanyRequest {
                     <td style="padding: 14px 16px; font-weight: 600; font-size: 13px;">{{ h.date }}</td>
                     <td style="padding: 14px 16px; color: var(--muted); font-size: 13px;">{{ h.dayLabel }}</td>
                     <td style="padding: 14px 16px;">
-                      <span class="badge" [style.background]="h.type === 'Public' ? 'rgba(5, 150, 105, 0.15)' : 'var(--p-soft)'" [style.color]="h.type === 'Public' ? '#059669' : 'var(--p)'" style="font-weight: 700; padding: 4px 8px; border-radius: 6px;">
+                      <span class="badge" [style.background]="h.type === 'Public' || h.type === 'National' ? 'rgba(5, 150, 105, 0.15)' : 'var(--p-soft)'" [style.color]="h.type === 'Public' || h.type === 'National' ? '#059669' : 'var(--p)'" style="font-weight: 700; padding: 4px 8px; border-radius: 6px;">
                         {{ h.type }}
+                      </span>
+                    </td>
+                    <td style="padding: 14px 16px;">
+                      <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: #2563eb; font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 12px;">
+                        {{ h.templateName || 'India National & Gazetted' }}
                       </span>
                     </td>
                     <td style="padding: 14px 16px; text-align: right;">
@@ -699,7 +722,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="6" style="text-align: center; padding: 32px; color: var(--muted);">
+                    <td colspan="7" style="text-align: center; padding: 32px; color: var(--muted);">
                       @if (holidayFilterName()) {
                         No holidays match "{{ holidayFilterName() }}".
                         <button type="button" class="btn btn-outline btn-sm" style="margin-left: 8px;" (click)="clearHolidayFilter()">Clear Filter</button>
@@ -1262,13 +1285,26 @@ function emptyTenantForm(): CreateCompanyRequest {
               <label class="form-label">Date *</label>
               <input class="form-control" type="date" [(ngModel)]="holidayForm.date" />
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom: 12px;">
               <label class="form-label">Type</label>
               <select class="form-control" [(ngModel)]="holidayForm.type">
                 <option value="National">National / Public Holiday</option>
                 <option value="Religious">Religious Holiday</option>
                 <option value="Optional">Optional Holiday</option>
               </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label class="form-label">Holiday Template</label>
+              <select class="form-control" [(ngModel)]="holidayForm.holidayTemplateId">
+                <option value="">-- India National &amp; Gazetted (Default) --</option>
+                @for (t of holidayTemplates(); track t.id) {
+                  <option [value]="t.id">{{ t.name }} {{ t.isDefault ? '(Default)' : '' }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Description (Optional)</label>
+              <input class="form-control" [(ngModel)]="holidayForm.description" placeholder="e.g. Celebrated across India" />
             </div>
           </div>
           <div class="modal-footer">
@@ -1647,7 +1683,9 @@ export class CompanyComponent implements OnInit, OnDestroy {
 
   protected readonly showHolidayModal = signal(false);
   protected readonly editingHolidayId = signal<string | null>(null);
-  protected holidayForm = { name: '', date: '', type: 'National' };
+  protected readonly holidayTemplates = signal<HolidayTemplateDto[]>([]);
+  protected readonly selectedHolidayTemplateFilter = signal<string>('all');
+  protected holidayForm = { name: '', date: '', type: 'National', holidayTemplateId: '', description: '' };
 
   ngOnInit(): void {
     if (this.isSuperAdmin()) {
@@ -2210,19 +2248,26 @@ export class CompanyComponent implements OnInit, OnDestroy {
   });
 
   protected readonly filteredHolidays = computed(() => {
+    let list = this.holidays();
+    const tmplFilter = this.selectedHolidayTemplateFilter();
+    if (tmplFilter && tmplFilter !== 'all') {
+      list = list.filter((h) => h.holidayTemplateId === tmplFilter);
+    }
+
     const raw = (this.holidayFilterName() || '')
       .replace(/[\u00A0\u1680\u180e\u2000-\u200b\u202f\u205f\u3000\ufeff]/g, ' ')
       .trim()
       .toLowerCase();
     const tokens = raw ? raw.split(/\s+/).filter(Boolean) : [];
-    if (tokens.length === 0) return this.holidays();
+    if (tokens.length === 0) return list;
 
-    return this.holidays().filter((h) => {
+    return list.filter((h) => {
       const name = (h.name || '').toLowerCase();
       const date = (h.date || '').toLowerCase();
       const day = (h.dayLabel || '').toLowerCase();
       const type = (h.type || '').toLowerCase();
-      const text = `${name} ${date} ${day} ${type}`;
+      const tmpl = (h.templateName || '').toLowerCase();
+      const text = `${name} ${date} ${day} ${type} ${tmpl}`;
       if (text.includes(raw)) return true;
       return tokens.every((t) => text.includes(t));
     });
@@ -2381,7 +2426,13 @@ export class CompanyComponent implements OnInit, OnDestroy {
         break;
       case 'holiday':
         this.editingHolidayId.set(null);
-        this.holidayForm = { name: '', date: new Date().toISOString().slice(0, 10), type: 'National' };
+        this.holidayForm = {
+          name: '',
+          date: new Date().toISOString().slice(0, 10),
+          type: 'National',
+          holidayTemplateId: this.holidayTemplates().find((t) => t.isDefault)?.id || '',
+          description: '',
+        };
         this.showHolidayModal.set(true);
         break;
     }
@@ -2577,7 +2628,13 @@ export class CompanyComponent implements OnInit, OnDestroy {
   // Holiday Actions
   protected openEditHoliday(h: HolidayRow): void {
     this.editingHolidayId.set(h.id);
-    this.holidayForm = { name: h.name, date: h.date, type: h.type };
+    this.holidayForm = {
+      name: h.name,
+      date: h.date,
+      type: h.type,
+      holidayTemplateId: h.holidayTemplateId || '',
+      description: h.description || '',
+    };
     this.showHolidayModal.set(true);
   }
 
@@ -2592,6 +2649,8 @@ export class CompanyComponent implements OnInit, OnDestroy {
       name: this.holidayForm.name.trim(),
       date: this.holidayForm.date,
       type,
+      holidayTemplateId: this.holidayForm.holidayTemplateId || null,
+      description: this.holidayForm.description?.trim() || null,
     };
 
     const editId = this.editingHolidayId();
@@ -2693,6 +2752,13 @@ export class CompanyComponent implements OnInit, OnDestroy {
       error: () => { },
     });
 
+    this.api.holidayTemplates().subscribe({
+      next: (list) => {
+        this.holidayTemplates.set(list || []);
+      },
+      error: () => { },
+    });
+
     this.api.holidays().subscribe({
       next: (list) => {
         this.holidays.set(
@@ -2703,6 +2769,10 @@ export class CompanyComponent implements OnInit, OnDestroy {
             date: h.date,
             dayLabel: h.dayLabel,
             type: h.type,
+            holidayTemplateId: h.holidayTemplateId,
+            templateName: h.templateName,
+            description: h.description,
+            icon: h.icon,
           }))
         );
       },

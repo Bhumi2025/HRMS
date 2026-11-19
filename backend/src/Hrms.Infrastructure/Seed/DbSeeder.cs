@@ -81,12 +81,65 @@ public static class DbSeeder
         var night = new Shift { Name = "Night Shift", StartTime = new TimeOnly(22, 0), EndTime = new TimeOnly(7, 0), DailyHours = 9, WorkingDays = "Mon - Fri" };
         db.Shifts.AddRange(morning, evening, night);
 
-        // ── Holidays ──
-        db.Holidays.AddRange(
-            new Holiday { Name = "New Year's Day", Date = new DateOnly(today.Year, 1, 1), Type = HolidayType.National },
-            new Holiday { Name = "Eid Al Fitr", Date = new DateOnly(today.Year, 3, 30), Type = HolidayType.Religious },
-            new Holiday { Name = "Eid Al Adha", Date = new DateOnly(today.Year, 6, 6), Type = HolidayType.Religious },
-            new Holiday { Name = "UAE National Day", Date = new DateOnly(today.Year, 12, 2), Type = HolidayType.National });
+        // ── Holiday Templates (India) ──
+        var indiaTemplate = new HolidayTemplate
+        {
+            Name = "India National & Gazetted Holidays (2026)",
+            Description = "Standard national and gazetted public holidays for Indian establishments and corporate offices",
+            IsDefault = true,
+        };
+        var corporateTemplate = new HolidayTemplate
+        {
+            Name = "India Corporate & Optional Holidays (2026)",
+            Description = "Optional and restricted festival holidays for corporate teams in India",
+            IsDefault = false,
+        };
+        db.HolidayTemplates.AddRange(indiaTemplate, corporateTemplate);
+
+        // ── Holidays (India 2026) ──
+        var year = today.Year;
+        var indianHolidays = new List<Holiday>
+        {
+            new Holiday { Name = "New Year's Day", Date = new DateOnly(year, 1, 1), Type = HolidayType.Optional, HolidayTemplateId = indiaTemplate.Id, Icon = "calendar", Description = "First day of the Gregorian New Year" },
+            new Holiday { Name = "Makar Sankranti / Uttarayan", Date = new DateOnly(year, 1, 14), Type = HolidayType.Optional, HolidayTemplateId = indiaTemplate.Id, Icon = "sun", Description = "Harvest festival celebrated across India" },
+            new Holiday { Name = "Republic Day", Date = new DateOnly(year, 1, 26), Type = HolidayType.National, HolidayTemplateId = indiaTemplate.Id, Icon = "flag", Description = "National holiday commemorating the Constitution of India" },
+            new Holiday { Name = "Maha Shivratri", Date = new DateOnly(year, 2, 15), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "moon", Description = "Gazetted festival honoring Lord Shiva" },
+            new Holiday { Name = "Holi", Date = new DateOnly(year, 3, 4), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "sparkles", Description = "Spring festival of colors and unity" },
+            new Holiday { Name = "Eid-ul-Fitr", Date = new DateOnly(year, 3, 20), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "moon", Description = "Islamic festival marking the end of Ramadan" },
+            new Holiday { Name = "Mahavir Jayanti", Date = new DateOnly(year, 3, 31), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "sun", Description = "Birth anniversary of Bhagwan Mahavira" },
+            new Holiday { Name = "Good Friday", Date = new DateOnly(year, 4, 3), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "cross", Description = "Christian holy day marking crucifixion of Jesus Christ" },
+            new Holiday { Name = "Buddha Purnima", Date = new DateOnly(year, 5, 1), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "sun", Description = "Celebration of Gautama Buddha's birth and enlightenment" },
+            new Holiday { Name = "Bakrid / Eid al-Adha", Date = new DateOnly(year, 5, 27), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "moon", Description = "Feast of Sacrifice" },
+            new Holiday { Name = "Muharram", Date = new DateOnly(year, 6, 26), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "calendar", Description = "First month of Islamic calendar and Ashura" },
+            new Holiday { Name = "Independence Day", Date = new DateOnly(year, 8, 15), Type = HolidayType.National, HolidayTemplateId = indiaTemplate.Id, Icon = "flag", Description = "National holiday celebrating Independence of India" },
+            new Holiday { Name = "Milad-un-Nabi", Date = new DateOnly(year, 8, 26), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "moon", Description = "Observance of the Prophet Muhammad's birthday" },
+            new Holiday { Name = "Raksha Bandhan", Date = new DateOnly(year, 8, 28), Type = HolidayType.Optional, HolidayTemplateId = corporateTemplate.Id, Icon = "heart", Description = "Celebration of fraternal bond and protection" },
+            new Holiday { Name = "Janmashtami", Date = new DateOnly(year, 9, 4), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "sparkles", Description = "Birth celebration of Lord Krishna" },
+            new Holiday { Name = "Ganesh Chaturthi", Date = new DateOnly(year, 9, 14), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "star", Description = "Festival welcoming Lord Ganesha" },
+            new Holiday { Name = "Mahatma Gandhi Jayanti", Date = new DateOnly(year, 10, 2), Type = HolidayType.National, HolidayTemplateId = indiaTemplate.Id, Icon = "award", Description = "National holiday marking birth of Mahatma Gandhi" },
+            new Holiday { Name = "Dussehra (Vijaya Dashami)", Date = new DateOnly(year, 10, 20), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "zap", Description = "Triumph of righteousness over evil" },
+            new Holiday { Name = "Diwali (Deepavali)", Date = new DateOnly(year, 11, 8), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "flame", Description = "Festival of Lights and prosperity" },
+            new Holiday { Name = "Govardhan Puja / Bhai Dooj", Date = new DateOnly(year, 11, 10), Type = HolidayType.Optional, HolidayTemplateId = corporateTemplate.Id, Icon = "gift", Description = "Festive celebration following Diwali" },
+            new Holiday { Name = "Guru Nanak Jayanti", Date = new DateOnly(year, 11, 24), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "sun", Description = "Birth anniversary of Guru Nanak Dev Ji" },
+            new Holiday { Name = "Christmas Day", Date = new DateOnly(year, 12, 25), Type = HolidayType.Religious, HolidayTemplateId = indiaTemplate.Id, Icon = "gift", Description = "Celebration of the birth of Jesus Christ" },
+        };
+        db.Holidays.AddRange(indianHolidays);
+
+        // ── Holiday Template Assignments ──
+        var holidayAssignments = new List<HolidayTemplateAssignment>
+        {
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = engineering.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = finance.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = hr.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = sales.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = marketing.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, DepartmentId = design.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, BranchId = dubai.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = indiaTemplate.Id, BranchId = abuDhabi.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = corporateTemplate.Id, BranchId = london.Id },
+            new HolidayTemplateAssignment { HolidayTemplateId = corporateTemplate.Id, BranchId = riyadh.Id },
+        };
+        db.HolidayTemplateAssignments.AddRange(holidayAssignments);
 
         // ── Leave types ──
         var annual = new LeaveType { Name = "Annual Leave", MaxDaysPerYear = 21, IsPaid = true, Color = "#2563eb", Description = "Yearly paid vacation leave" };
