@@ -213,8 +213,8 @@ interface MusterDay {
               type="date" 
               class="form-control" 
               style="width: 140px; font-size: 12px; padding: 6px 10px;"
-              [(ngModel)]="filterDate"
-              (change)="onFilterDateChange()"
+              [ngModel]="filterDate()"
+              (ngModelChange)="onFilterDateChange($event)"
             />
 
             <!-- Status Dropdown Filter -->
@@ -316,7 +316,7 @@ interface MusterDay {
                         @if (searchKeyword() || filterStatus()) {
                           No attendance records found matching filters: "{{ searchKeyword() || filterStatus() }}".
                         } @else {
-                          No attendance records found for {{ filterDate }}.
+                          No attendance records found for {{ filterDate() }}.
                         }
                       </div>
                       @if (searchKeyword() || filterStatus()) {
@@ -347,9 +347,17 @@ interface MusterDay {
           <div class="sidebar-header-box">
             <div class="sidebar-main-title">Attendance</div>
             <div class="date-switcher-pill">
-              <button class="nav-arrow-mini" (click)="prevDay()" title="Previous day">‹</button>
-              <span class="switcher-date-text">{{ filterDateFormatted() }}</span>
-              <button class="nav-arrow-mini" (click)="nextDay()" title="Next day">›</button>
+              <button type="button" class="nav-arrow-mini" (click)="prevDay()" title="Previous day">‹</button>
+              <label class="switcher-date-wrapper" title="Click to choose a date">
+                <span class="switcher-date-text">{{ filterDateFormatted() }}</span>
+                <input
+                  type="date"
+                  class="pill-date-native"
+                  [ngModel]="filterDate()"
+                  (ngModelChange)="onFilterDateChange($event)"
+                />
+              </label>
+              <button type="button" class="nav-arrow-mini" (click)="nextDay()" title="Next day">›</button>
             </div>
           </div>
 
@@ -363,17 +371,14 @@ interface MusterDay {
               <div class="sum-col">
                 <div class="sum-lbl">On time</div>
                 <div class="sum-val">{{ onTimeCount() }}</div>
-                <div class="sum-diff text-success">+{{ onTimeCount() }} vs yesterday</div>
               </div>
               <div class="sum-col">
                 <div class="sum-lbl">Late clock-in</div>
                 <div class="sum-val" [class.text-warning]="lateInCount() > 0">{{ lateInCount() }}</div>
-                <div class="sum-diff text-muted">-{{ lateInCount() }} vs yesterday</div>
               </div>
               <div class="sum-col">
                 <div class="sum-lbl">Early clock-out</div>
                 <div class="sum-val" [class.text-danger]="earlyOutCount() > 0">{{ earlyOutCount() }}</div>
-                <div class="sum-diff text-muted">0 vs yesterday</div>
               </div>
             </div>
           </div>
@@ -447,8 +452,8 @@ interface MusterDay {
                   <span class="meta-label">Employee ID:</span>
                   <span class="emp-id-badge">#{{ selectedEmployee()?.employeeCode }}</span>
                   <span class="meta-divider">•</span>
-                  <span class="meta-label">Phone:</span>
-                  <span class="phone-badge">{{ selectedEmployee()?.email || '+971 4 999 8888' }}</span>
+                  <span class="meta-label">Email:</span>
+                  <span class="phone-badge">{{ selectedEmployee()?.email || '—' }}</span>
                 </div>
               </div>
             </div>
@@ -491,32 +496,26 @@ interface MusterDay {
             <div class="stat-box">
               <div class="stat-title">Day off</div>
               <div class="stat-num">{{ musterSummary().dayOff }}</div>
-              <div class="stat-foot text-success">+2 vs last month</div>
             </div>
             <div class="stat-box">
               <div class="stat-title">Late clock-in</div>
               <div class="stat-num" [class.text-warning]="musterSummary().lateIn > 0">{{ musterSummary().lateIn }}</div>
-              <div class="stat-foot text-success">-1 vs last month</div>
             </div>
             <div class="stat-box">
               <div class="stat-title">Late clock-out</div>
               <div class="stat-num">{{ musterSummary().lateOut }}</div>
-              <div class="stat-foot text-success">+4 vs last month</div>
             </div>
             <div class="stat-box">
               <div class="stat-title">No clock-out</div>
               <div class="stat-num" [class.text-danger]="musterSummary().noClockOut > 0">{{ musterSummary().noClockOut }}</div>
-              <div class="stat-foot text-muted">0 vs last month</div>
             </div>
             <div class="stat-box">
-              <div class="stat-title">Off time quota</div>
+              <div class="stat-title">Available leaves</div>
               <div class="stat-num">{{ musterSummary().offTimeQuota }}</div>
-              <div class="stat-foot text-muted">Available leaves</div>
             </div>
             <div class="stat-box">
               <div class="stat-title">Absent</div>
               <div class="stat-num" [class.text-danger]="musterSummary().absent > 0">{{ musterSummary().absent }}</div>
-              <div class="stat-foot text-muted">0 vs last month</div>
             </div>
           </div>
 
@@ -1101,6 +1100,22 @@ interface MusterDay {
         font-size: 11px;
         font-weight: 700;
         color: var(--text);
+        user-select: none;
+      }
+      .switcher-date-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        cursor: pointer;
+      }
+      .pill-date-native {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
       }
 
       /* Present Summary Card */
@@ -2013,7 +2028,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   // Reactive signals for instant search & filtering
   protected readonly searchKeyword = signal('');
   protected readonly filterStatus = signal('');
-  protected filterDate = new Date().toISOString().slice(0, 10);
+  protected readonly filterDate = signal<string>(new Date().toISOString().slice(0, 10));
 
   // Time Management split-view & muster signals
   protected readonly selectedMusterEmpId = signal<string>('');
@@ -2130,8 +2145,11 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   });
 
   protected readonly filterDateFormatted = computed(() => {
-    const d = new Date(this.filterDate + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+    const cur = this.filterDate();
+    if (!cur) return '';
+    const [y, m, d] = cur.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   });
 
   protected readonly selectedMonthFormatted = computed(() => {
@@ -2267,7 +2285,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   private startLivePolling(): void {
     this.pollInterval = setInterval(() => {
       const todayStr = new Date().toISOString().slice(0, 10);
-      if (this.tab() === 'daily' && this.filterDate === todayStr) {
+      if (this.tab() === 'daily' && this.filterDate() === todayStr) {
         this.loadDailyAttendance(true);
       }
     }, 10000);
@@ -2325,7 +2343,8 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected loadDailyAttendance(silent: boolean = false): void {
-    this.api.todayAttendanceOverview(this.filterDate).subscribe({
+    const curDate = this.filterDate();
+    this.api.todayAttendanceOverview(curDate).subscribe({
       next: (res: TodayAttendanceOverview) => {
         if (res) {
           const presentCount = res.presentCount ?? 0;
@@ -2349,7 +2368,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
               employeeCode: p.employeeCode,
               employeeName: p.employeeName,
               department: p.department,
-              date: this.filterDate,
+              date: curDate,
               checkIn: p.checkInTime || '—',
               checkOut: p.checkOutTime || '—',
               workHours: p.workHours ?? 0,
@@ -2368,7 +2387,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
               employeeCode: p.employeeCode,
               employeeName: p.employeeName,
               department: p.department,
-              date: this.filterDate,
+              date: curDate,
               checkIn: '—',
               checkOut: '—',
               workHours: 0,
@@ -2387,7 +2406,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
               employeeCode: p.employeeCode,
               employeeName: p.employeeName,
               department: p.department,
-              date: this.filterDate,
+              date: curDate,
               checkIn: '—',
               checkOut: '—',
               workHours: 0,
@@ -2412,7 +2431,10 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  protected onFilterDateChange(): void {
+  protected onFilterDateChange(newDate?: string): void {
+    if (newDate) {
+      this.filterDate.set(newDate);
+    }
     this.loadDailyAttendance();
   }
 
@@ -2450,16 +2472,26 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected prevDay(): void {
-    const d = new Date(this.filterDate + 'T00:00:00');
-    d.setDate(d.getDate() - 1);
-    this.filterDate = d.toISOString().slice(0, 10);
+    const cur = this.filterDate();
+    const [y, m, d] = cur.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    dateObj.setDate(dateObj.getDate() - 1);
+    const newY = dateObj.getFullYear();
+    const newM = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const newD = String(dateObj.getDate()).padStart(2, '0');
+    this.filterDate.set(`${newY}-${newM}-${newD}`);
     this.loadDailyAttendance();
   }
 
   protected nextDay(): void {
-    const d = new Date(this.filterDate + 'T00:00:00');
-    d.setDate(d.getDate() + 1);
-    this.filterDate = d.toISOString().slice(0, 10);
+    const cur = this.filterDate();
+    const [y, m, d] = cur.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    dateObj.setDate(dateObj.getDate() + 1);
+    const newY = dateObj.getFullYear();
+    const newM = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const newD = String(dateObj.getDate()).padStart(2, '0');
+    this.filterDate.set(`${newY}-${newM}-${newD}`);
     this.loadDailyAttendance();
   }
 
@@ -3383,7 +3415,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Attendance_${this.filterDate}.csv`;
+    a.download = `Attendance_${this.filterDate()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     this.toast.show('Attendance exported to CSV');
