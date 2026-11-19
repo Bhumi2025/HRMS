@@ -524,7 +524,15 @@ interface MusterDay {
             <!-- Widget Header: Month Selector & Controls -->
             <div class="timeline-widget-header">
               <div class="month-nav-cluster">
-                <span class="current-month-heading">{{ selectedMonthFormatted() }}</span>
+                <label class="month-heading-wrapper" title="Click to choose a month">
+                  <span class="current-month-heading">{{ selectedMonthFormatted() }}</span>
+                  <input
+                    type="month"
+                    class="month-native-picker"
+                    [ngModel]="selectedMusterMonth()"
+                    (ngModelChange)="onMusterMonthChange($event)"
+                  />
+                </label>
                 <div class="month-arrows">
                   <button type="button" class="m-arrow-btn" (click)="prevMonth()" title="Previous month">‹</button>
                   <button type="button" class="m-arrow-btn" (click)="nextMonth()" title="Next month">›</button>
@@ -1480,15 +1488,33 @@ interface MusterDay {
         align-items: center;
         gap: 8px;
       }
+      .month-heading-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        cursor: pointer;
+      }
+      .month-native-picker {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+      }
       .current-month-heading {
         font-size: 16px;
         font-weight: 800;
         color: var(--text);
+        user-select: none;
       }
       .month-arrows {
         display: inline-flex;
         align-items: center;
         gap: 3px;
+        position: relative;
+        z-index: 2;
       }
       .m-arrow-btn {
         width: 24px;
@@ -1503,6 +1529,8 @@ interface MusterDay {
         align-items: center;
         justify-content: center;
         cursor: pointer;
+        position: relative;
+        z-index: 2;
       }
       .m-arrow-btn:hover { background: var(--bg); color: var(--text); }
 
@@ -2200,8 +2228,16 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const q = this.timelineSearch().toLowerCase().trim();
     const st = this.timelineStatusFilter().toLowerCase().trim();
     const days = this.musterDays();
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const curMonthStr = todayStr.slice(0, 7);
+    const isCurrentMonth = this.selectedMusterMonth() === curMonthStr;
 
     return days.filter((d) => {
+      // In current month, only show past dates and today (hide future dates)
+      if (isCurrentMonth && d.dateStr > todayStr) {
+        return false;
+      }
+
       const matchQ =
         !q ||
         d.dateFormatted.toLowerCase().includes(q) ||
@@ -2496,17 +2532,38 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected prevMonth(): void {
-    const [y, m] = this.selectedMusterMonth().split('-').map(Number);
-    const d = new Date(y, m - 2, 1);
-    this.selectedMusterMonth.set(d.toISOString().slice(0, 7));
+    const parts = this.selectedMusterMonth().split('-');
+    let y = parseInt(parts[0], 10) || new Date().getFullYear();
+    let m = parseInt(parts[1], 10) || new Date().getMonth() + 1;
+    m--;
+    if (m < 1) {
+      m = 12;
+      y--;
+    }
+    const newMonthStr = `${y}-${String(m).padStart(2, '0')}`;
+    this.selectedMusterMonth.set(newMonthStr);
     this.generateMuster();
   }
 
   protected nextMonth(): void {
-    const [y, m] = this.selectedMusterMonth().split('-').map(Number);
-    const d = new Date(y, m, 1);
-    this.selectedMusterMonth.set(d.toISOString().slice(0, 7));
+    const parts = this.selectedMusterMonth().split('-');
+    let y = parseInt(parts[0], 10) || new Date().getFullYear();
+    let m = parseInt(parts[1], 10) || new Date().getMonth() + 1;
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+    const newMonthStr = `${y}-${String(m).padStart(2, '0')}`;
+    this.selectedMusterMonth.set(newMonthStr);
     this.generateMuster();
+  }
+
+  protected onMusterMonthChange(val: string): void {
+    if (val) {
+      this.selectedMusterMonth.set(val);
+      this.generateMuster();
+    }
   }
 
   protected getEmpTodayCheckIn(employeeId: string): string {
