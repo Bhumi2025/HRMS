@@ -340,8 +340,11 @@ import { ToastService } from '../../core/services/toast.service';
                             class="page-nav-btn"
                             [disabled]="empModalPage() <= 1"
                             (click)="changeEmpModalPage(empModalPage() - 1)"
+                            title="Previous Page"
+                            aria-label="Previous Page"
+                            style="display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; padding: 0 8px;"
                           >
-                            ‹ Previous
+                            <span [appIcon]="'chevron_left'"></span>
                           </button>
                           <span class="page-indicator">
                             Page {{ empModalPage() }} of {{ empModalTotalPages() }}
@@ -351,8 +354,11 @@ import { ToastService } from '../../core/services/toast.service';
                             class="page-nav-btn"
                             [disabled]="empModalPage() >= empModalTotalPages()"
                             (click)="changeEmpModalPage(empModalPage() + 1)"
+                            title="Next Page"
+                            aria-label="Next Page"
+                            style="display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; padding: 0 8px;"
                           >
-                            Next ›
+                            <span [appIcon]="'chevron_right'"></span>
                           </button>
                         </div>
                       </div>

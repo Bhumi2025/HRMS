@@ -31,8 +31,9 @@ public sealed class TenantResolutionMiddleware
 
             ResolvedTenant? tenant = null;
 
-            // Only Super Admins are permitted to switch company database contexts dynamically via headers
-            if (isSuperAdmin)
+            // Only Super Admins are permitted to switch company database contexts dynamically via headers,
+            // but self account actions under /api/auth (change password, me, profile) must stay in the user's home/default context
+            if (isSuperAdmin && !context.Request.Path.StartsWithSegments("/api/auth"))
             {
                 if (context.Request.Headers.TryGetValue("X-Company-Id", out var companyIdHeader) &&
                     Guid.TryParse(companyIdHeader.ToString(), out var requestedCompanyId))

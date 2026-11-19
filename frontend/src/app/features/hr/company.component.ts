@@ -309,7 +309,7 @@ function emptyTenantForm(): CreateCompanyRequest {
               </div>
 
               <!-- Main Details Form -->
-              <form (submit)="saveCompanyProfile()">
+              <form (ngSubmit)="saveCompanyProfile()" (submit)="$event.preventDefault()">
                 <!-- Section 1: Required General Information -->
                 <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p); margin-bottom: 14px;">
                   General Information
@@ -330,6 +330,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                       <option value="Asia/Riyadh">Asia/Riyadh (AST +03:00)</option>
                       <option value="Asia/Kolkata">Asia/Kolkata (IST +05:30)</option>
                       <option value="UTC">UTC (+00:00)</option>
+                      <option value="UTC (+00:00)">UTC (+00:00)</option>
                       <option value="Europe/London">Europe/London (GMT/BST)</option>
                       <option value="America/New_York">America/New_York (EST/EDT)</option>
                       <option value="Asia/Singapore">Asia/Singapore (SGT +08:00)</option>
@@ -1012,11 +1013,13 @@ function emptyTenantForm(): CreateCompanyRequest {
                         <button
                           type="button"
                           class="btn btn-outline btn-sm"
-                          style="padding: 4px 12px; font-size: 12px;"
+                          style="padding: 4px 8px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; min-width: 32px;"
                           [disabled]="tenantEmpPage() <= 1"
                           (click)="changeTenantEmpPage(tenantEmpPage() - 1)"
+                          title="Previous Page"
+                          aria-label="Previous Page"
                         >
-                          ‹ Previous
+                          <span [appIcon]="'chevron_left'"></span>
                         </button>
                         <span style="font-weight: 600; color: var(--text); padding: 0 4px;">
                           Page {{ tenantEmpPage() }} of {{ tenantEmpTotalPages() }}
@@ -1024,11 +1027,13 @@ function emptyTenantForm(): CreateCompanyRequest {
                         <button
                           type="button"
                           class="btn btn-outline btn-sm"
-                          style="padding: 4px 12px; font-size: 12px;"
+                          style="padding: 4px 8px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; min-width: 32px;"
                           [disabled]="tenantEmpPage() >= tenantEmpTotalPages()"
                           (click)="changeTenantEmpPage(tenantEmpPage() + 1)"
+                          title="Next Page"
+                          aria-label="Next Page"
                         >
-                          Next ›
+                          <span [appIcon]="'chevron_right'"></span>
                         </button>
                       </div>
                     </div>
@@ -1426,7 +1431,10 @@ export class CompanyComponent implements OnInit, OnDestroy {
   protected readonly savingProfile = signal(false);
   protected readonly uploadingLogo = signal(false);
   protected readonly logoLoadFailed = signal(false);
-  protected readonly canEditCompany = computed(() => this.perms.canEdit('Company'));
+  protected readonly canEditCompany = computed(() => {
+    const role = this.session.activeRole();
+    return ['Super Admin', 'Company Admin', 'HR Manager', 'HR'].includes(role) || this.perms.canEdit('Company');
+  });
 
   protected profileForm: SaveCompanySettingsRequest = {
     companyName: '',

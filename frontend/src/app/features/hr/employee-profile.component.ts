@@ -52,26 +52,30 @@ interface DocRow {
             </span>
           </div>
           <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px">
-            {{ currentAdminEmail() }} &bull; {{ currentCompanyName() }} ({{ currentCompanyCode() }})
+            {{ currentAdminEmail() }}@if (currentRole() !== 'Super Admin') { &bull; {{ currentCompanyName() }} ({{ currentCompanyCode() }}) }
           </div>
           <div style="display: flex; gap: 6px; flex-wrap: wrap">
             <span class="profile-badge active">Active Administrator</span>
-            <span class="profile-badge"><span [appIcon]="'company'"></span> {{ currentCompanyName() }}</span>
+            @if (currentRole() !== 'Super Admin') {
+              <span class="profile-badge"><span [appIcon]="'company'"></span> {{ currentCompanyName() }}</span>
+            }
             <span class="profile-badge"><span [appIcon]="'lock'"></span> System Authenticated</span>
           </div>
         </div>
-
         @if (employeeOptions().length > 0) {
-          <div class="profile-switcher-card">
-            <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px">
-              Inspect Employee Profile
+          <div class="profile-header-actions">
+            <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
+              <span [appIcon]="'arrow-left'"></span> Back to List
+            </button>
+            <div class="profile-switcher-dropdown">
+              <span class="switcher-label">Inspect Employee:</span>
+              <app-select
+                [options]="employeeOptions()"
+                [value]="selectedEmployeeId()"
+                (valueChange)="onEmployeeSelect($event)"
+                width="280px"
+              />
             </div>
-            <app-select
-              [options]="employeeOptions()"
-              [value]="selectedEmployeeId()"
-              (valueChange)="onEmployeeSelect($event)"
-              width="280px"
-            />
           </div>
         }
       </div>
@@ -84,10 +88,12 @@ interface DocRow {
         }
       </div>
 
+      <div class="profile-content-scroll">
+
       <!-- ADMIN TAB: ACCOUNT -->
       @if (adminTab() === 'account') {
-        <div class="grid-2">
-          <div class="card" style="overflow: visible">
+        <div style="width: 100%">
+          <div class="card" style="width: 100%; overflow: visible">
             <div class="card-header"><div class="card-title">Administrator Account Information</div></div>
             <div class="card-body" style="overflow: visible">
               <div class="form-group">
@@ -120,64 +126,21 @@ interface DocRow {
                   style="background: var(--bg); color: var(--muted); cursor: not-allowed"
                 />
               </div>
-              <div class="form-group">
-                <label class="form-label">Company &amp; Tenant Workspace</label>
-                <input
-                  class="form-control"
-                  [value]="currentCompanyName() + ' (' + currentCompanyCode() + ')'"
-                  readonly
-                  style="background: var(--bg); color: var(--muted); cursor: not-allowed"
-                />
-              </div>
+              @if (currentRole() !== 'Super Admin') {
+                <div class="form-group">
+                  <label class="form-label">Company &amp; Tenant Workspace</label>
+                  <input
+                    class="form-control"
+                    [value]="currentCompanyName() + ' (' + currentCompanyCode() + ')'"
+                    readonly
+                    style="background: var(--bg); color: var(--muted); cursor: not-allowed"
+                  />
+                </div>
+              }
               <div class="form-footer">
                 <button class="btn btn-primary btn-sm" [disabled]="savingAdminProfile()" (click)="saveAdminProfile()">
                   <span [appIcon]="'check'"></span> Save Administrator Profile
                 </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header"><div class="card-title">Tenant &amp; Infrastructure Overview</div></div>
-            <div class="card-body">
-              <div style="display: flex; flex-direction: column; gap: 12px">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border)">
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Organization Workspace</div>
-                    <div style="font-size: 11px; color: var(--muted)">Tenant Code: {{ currentCompanyCode() }}</div>
-                  </div>
-                  <span class="badge badge-info">{{ currentCompanyName() }}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border)">
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Database Isolation</div>
-                    <div style="font-size: 11px; color: var(--muted)">Dedicated schema &amp; tenant DB</div>
-                  </div>
-                  <span class="badge badge-success">Active &bull; Isolated</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border)">
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Face ID &amp; Biometric Sync</div>
-                    <div style="font-size: 11px; color: var(--muted)">Office kiosk &amp; mobile attendance</div>
-                  </div>
-                  <span class="badge badge-success">Online</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border)">
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Performance Caching</div>
-                    <div style="font-size: 11px; color: var(--muted)">IMemoryCache + SplitQuery Engine</div>
-                  </div>
-                  <span class="badge badge-info">Optimized</span>
-                </div>
-              </div>
-
-              <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; gap: 8px">
-                <a class="btn btn-outline btn-sm" [routerLink]="['/employees']" style="text-decoration: none">
-                  <span [appIcon]="'employees'"></span> Manage Employees
-                </a>
-                <a class="btn btn-outline btn-sm" [routerLink]="['/company']" style="text-decoration: none">
-                  <span [appIcon]="'company'"></span> Company Settings
-                </a>
               </div>
             </div>
           </div>
@@ -186,8 +149,8 @@ interface DocRow {
 
       <!-- ADMIN TAB: SECURITY -->
       @if (adminTab() === 'security') {
-        <div class="grid-2">
-          <div class="card">
+        <div style="width: 100%">
+          <div class="card" style="width: 100%">
             <div class="card-header"><div class="card-title">Change Password</div></div>
             <div class="card-body">
               <div class="form-group">
@@ -209,6 +172,21 @@ interface DocRow {
                   (input)="newPwd.set($any($event.target).value)"
                   placeholder="At least 8 characters"
                 />
+                <!-- Inline Mini Spotify Volume Bar -->
+                @if (newPwd().length > 0) {
+                  <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                    <div style="flex: 1; height: 5px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
+                      <div
+                        [style.width.%]="passwordStrength().score"
+                        [style.background]="passwordStrength().color"
+                        style="height: 100%; border-radius: 999px; transition: width 0.3s ease, background-color 0.3s ease;"
+                      ></div>
+                    </div>
+                    <span [style.color]="passwordStrength().color" style="font-size: 11px; font-weight: 700; min-width: 60px; text-align: right;">
+                      {{ passwordStrength().label }}
+                    </span>
+                  </div>
+                }
               </div>
               <div class="form-group">
                 <label class="form-label">Confirm New Password</label>
@@ -227,110 +205,9 @@ interface DocRow {
               </div>
             </div>
           </div>
-
-          <div class="card">
-            <div class="card-header"><div class="card-title">Security &amp; Session Status</div></div>
-            <div class="card-body">
-              <div style="display: flex; flex-direction: column; gap: 14px">
-                <div style="display: flex; gap: 12px; align-items: flex-start">
-                  <div style="width: 38px; height: 38px; border-radius: 8px; background: var(--p-soft); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--p)">
-                    <span [appIcon]="'lock'"></span>
-                  </div>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Token-Based JWT Authentication</div>
-                    <div style="font-size: 12px; color: var(--muted); margin-top: 2px">
-                      Your session is secured using HMAC-SHA256 signed tokens with role-based policies.
-                    </div>
-                  </div>
-                </div>
-
-                <div style="display: flex; gap: 12px; align-items: flex-start">
-                  <div style="width: 38px; height: 38px; border-radius: 8px; background: var(--success-soft); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--success)">
-                    <span [appIcon]="'shield'"></span>
-                  </div>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text)">Policy Level: {{ currentRole() }}</div>
-                    <div style="font-size: 12px; color: var(--muted); margin-top: 2px">
-                      Authorized for tenant administration, payroll runs, and biometric synchronization.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       }
-
-      <!-- ADMIN TAB: PRIVILEGES -->
-      @if (adminTab() === 'privileges') {
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px">
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">🏢</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Multi-Tenant Workspace</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              Company configuration, branches, departments, designations, and tenant database isolation.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">👥</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Employee Directory</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              Add, update, deactivate employees, manage salaries, reporting structures, and access roles.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">⏱️</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Attendance &amp; Biometrics</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              Manage Face ID biometric enrollment, office entrance kiosk, daily muster, and regularization.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">💰</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Payroll &amp; Compensation</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              Execute monthly payroll calculations, manage allowances/deductions, view &amp; print payslips.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">📑</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Leave &amp; Shift Management</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              Configure leave types, approve employee requests, manage shift working hours.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-
-          <div class="card" style="padding: 18px">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
-              <span style="font-size: 20px">🛡️</span>
-              <div style="font-weight: 700; font-size: 14px; color: var(--text)">Security &amp; Governance</div>
-            </div>
-            <div style="font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px">
-              User password resets, role-based authorization policies, session audit &amp; security tokens.
-            </div>
-            <span class="badge badge-success">Full Admin Access</span>
-          </div>
-        </div>
-      }
+      </div>
     } @else {
       <!-- EMPLOYEE MODE BANNER -->
       <div class="profile-banner">
@@ -348,18 +225,26 @@ interface DocRow {
           </div>
         </div>
 
-        @if (isAdmin()) {
-          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; position: relative; z-index: 101">
-            <button class="btn btn-outline btn-sm" (click)="switchToAdminView()">
-              <span [appIcon]="'shield'"></span> My Admin Profile
+        @if (canManageEmployees()) {
+          <div class="profile-header-actions">
+            <button class="btn btn-outline btn-sm" type="button" (click)="goBack()" title="Back to Employee Directory">
+              <span [appIcon]="'arrow-left'"></span> Back to List
             </button>
+            @if (isAdminViewAvailable()) {
+              <button class="btn btn-outline btn-sm" (click)="switchToAdminView()">
+                <span [appIcon]="'shield'"></span> Admin Mode
+              </button>
+            }
             @if (employeeOptions().length > 0) {
-              <app-select
-                [options]="employeeOptions()"
-                [value]="selectedEmployeeId()"
-                (valueChange)="onEmployeeSelect($event)"
-                width="240px"
-              />
+              <div class="profile-switcher-dropdown">
+                <span class="switcher-label">Select Employee:</span>
+                <app-select
+                  [options]="employeeOptions()"
+                  [value]="selectedEmployeeId()"
+                  (valueChange)="onEmployeeSelect($event)"
+                  width="260px"
+                />
+              </div>
             }
           </div>
         }
@@ -372,6 +257,8 @@ interface DocRow {
           </button>
         }
       </div>
+
+      <div class="profile-content-scroll">
 
     <!-- PERSONAL TAB -->
     @if (tab() === 'personal') {
@@ -402,10 +289,6 @@ interface DocRow {
             <div class="form-group">
               <label class="form-label">Blood Group</label>
               <app-key-select groupCode="BLOOD_GROUP" [value]="personal().blood" (valueChange)="patchPersonal('blood', $event)" width="100%" />
-            </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Personal details saved!')"><span [appIcon]="'check'"></span> Save</button>
             </div>
           </div>
         </div>
@@ -444,11 +327,19 @@ interface DocRow {
                 Controls module access &amp; permissions (HR Manager, Company Admin, or Employee)
               </div>
             </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Job info saved!')"><span [appIcon]="'check'"></span> Save</button>
-            </div>
           </div>
+        </div>
+      </div>
+
+      <div class="tab-action-bar">
+        <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
+          <span [appIcon]="'arrow-left'"></span> Back
+        </button>
+        <div class="tab-action-group">
+          <button class="btn btn-outline btn-sm" type="button" (click)="cancelEdit()">Discard</button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="save('Personal & Job details saved!')">
+            <span [appIcon]="'check'"></span> Save Changes
+          </button>
         </div>
       </div>
     }
@@ -483,10 +374,6 @@ interface DocRow {
               <label class="form-label">Country</label>
               <app-select [options]="countryOptions" [value]="contact().country" (valueChange)="patchContact('country', $event)" width="100%" />
             </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Contact details saved!')"><span [appIcon]="'check'"></span> Save</button>
-            </div>
           </div>
         </div>
 
@@ -513,11 +400,19 @@ interface DocRow {
               <label class="form-label">Emirates ID</label>
               <input class="form-control" [value]="identity().emiratesId" (input)="patchIdentity('emiratesId', $any($event.target).value)" />
             </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Identity info saved!')"><span [appIcon]="'check'"></span> Save</button>
-            </div>
           </div>
+        </div>
+      </div>
+
+      <div class="tab-action-bar">
+        <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
+          <span [appIcon]="'arrow-left'"></span> Back
+        </button>
+        <div class="tab-action-group">
+          <button class="btn btn-outline btn-sm" type="button" (click)="cancelEdit()">Discard</button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="save('Contact & Identity details saved!')">
+            <span [appIcon]="'check'"></span> Save Changes
+          </button>
         </div>
       </div>
     }
@@ -564,10 +459,6 @@ interface DocRow {
               <label class="form-label">WPS ID</label>
               <input class="form-control" [value]="bank().wpsId" (input)="patchBank('wpsId', $any($event.target).value)" />
             </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm" (click)="cancelEdit()">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Bank details saved!')"><span [appIcon]="'check'"></span> Save</button>
-            </div>
           </div>
         </div>
 
@@ -585,6 +476,18 @@ interface DocRow {
               </div>
             }
           </div>
+        </div>
+      </div>
+
+      <div class="tab-action-bar">
+        <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
+          <span [appIcon]="'arrow-left'"></span> Back
+        </button>
+        <div class="tab-action-group">
+          <button class="btn btn-outline btn-sm" type="button" (click)="cancelEdit()">Discard</button>
+          <button class="btn btn-primary btn-sm" type="button" (click)="save('Bank details saved!')">
+            <span [appIcon]="'check'"></span> Save Changes
+          </button>
         </div>
       </div>
     }
@@ -629,6 +532,15 @@ interface DocRow {
           </table>
         </div>
       </div>
+
+      <div class="tab-action-bar">
+        <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
+          <span [appIcon]="'arrow-left'"></span> Back
+        </button>
+        <button class="btn btn-primary btn-sm" (click)="ui.open('uploadDocModal')">
+          <span [appIcon]="'upload2'"></span> Upload Document
+        </button>
+      </div>
     }
 
     <!-- BIOMETRIC & FACE ID TAB -->
@@ -658,19 +570,8 @@ interface DocRow {
               </div>
             </div>
 
-            <div style="font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5;">
+            <div style="font-size: 13px; color: var(--muted); line-height: 1.5;">
               Enrolling employee Face ID enables hands-free punch in/out on the Office Kiosk and self-service selfie attendance on their mobile or web portal.
-            </div>
-
-            <div style="display: flex; gap: 10px;">
-              <button class="btn btn-primary btn-sm" (click)="openFaceEnrollModal()">
-                📷 {{ isFaceEnrolled() ? 'Re-enroll Face ID' : 'Enroll Face ID' }}
-              </button>
-              @if (isFaceEnrolled()) {
-                <button class="btn btn-outline btn-sm" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" (click)="removeFaceId()">
-                  Remove Face ID
-                </button>
-              }
             </div>
           </div>
         </div>
@@ -690,7 +591,24 @@ interface DocRow {
           </div>
         </div>
       </div>
+
+      <div class="tab-action-bar">
+        <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
+          <span [appIcon]="'arrow-left'"></span> Back
+        </button>
+        <div class="tab-action-group">
+          @if (isFaceEnrolled()) {
+            <button class="btn btn-outline btn-sm" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" (click)="removeFaceId()">
+              Remove Face ID
+            </button>
+          }
+          <button class="btn btn-primary btn-sm" (click)="openFaceEnrollModal()">
+            📷 {{ isFaceEnrolled() ? 'Re-enroll Face ID' : 'Enroll Face ID' }}
+          </button>
+        </div>
+      </div>
     }
+    </div>
   }
 
     <!-- ENROLL FACE ID WEBCAM MODAL -->
@@ -835,31 +753,61 @@ interface DocRow {
   `,
   styles: [
     `
+      :host {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - var(--header-h, 52px) - 32px);
+        max-height: calc(100vh - var(--header-h, 52px) - 32px);
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+      .profile-content-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 4px;
+        padding-bottom: 14px;
+      }
+      .profile-content-scroll::-webkit-scrollbar {
+        width: 6px;
+      }
+      .profile-content-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .profile-content-scroll::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+      }
+      .profile-content-scroll::-webkit-scrollbar-thumb:hover {
+        background: var(--muted);
+      }
       .profile-banner {
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--r);
-        padding: 16px;
-        margin-bottom: 16px;
+        padding: 10px 16px;
+        margin-bottom: 8px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 14px;
+        gap: 12px;
         flex-wrap: wrap;
         box-shadow: var(--shadow);
         position: relative;
         z-index: 100;
+        flex-shrink: 0;
       }
       .profile-avatar {
-        width: 60px;
-        height: 60px;
+        width: 52px;
+        height: 52px;
         border-radius: 50%;
         background: var(--p);
         color: #fff;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.2rem;
+        font-size: 1.15rem;
         font-weight: 800;
         border: 2px solid #fff;
         box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
@@ -894,13 +842,39 @@ interface DocRow {
         color: #b45309;
         border-color: #fcd34d;
       }
+      .profile-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        position: relative;
+        z-index: 101;
+      }
+      .profile-switcher-dropdown {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg);
+        padding: 4px 8px 4px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .switcher-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+      }
       .ptabs {
         display: flex;
         gap: 0;
-        margin-bottom: 16px;
+        margin-bottom: 10px;
         border-bottom: 1px solid var(--border);
         overflow-x: auto;
         scrollbar-width: none;
+        flex-shrink: 0;
       }
       .ptabs::-webkit-scrollbar {
         display: none;
@@ -932,6 +906,26 @@ interface DocRow {
         border-bottom-color: var(--p);
         font-weight: 600;
       }
+      .tab-action-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 14px;
+        padding: 12px 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+      }
+      .tab-action-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
       .form-footer {
         display: flex;
         justify-content: flex-end;
@@ -953,25 +947,18 @@ interface DocRow {
         border-color: rgba(99, 102, 241, 0.35) !important;
         font-weight: 700 !important;
       }
-      .profile-switcher-card {
-        padding: 8px 12px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        position: relative;
-        z-index: 101;
-      }
       @media (max-width: 768px) {
         .profile-banner {
           padding: 10px;
           gap: 6px;
         }
-        .profile-switcher-card {
+        .profile-header-actions {
           width: 100%;
-          align-items: stretch;
+          justify-content: space-between;
+        }
+        .profile-switcher-dropdown {
+          width: 100%;
+          justify-content: space-between;
         }
       }
     `,
@@ -993,18 +980,81 @@ export class EmployeeProfileComponent implements OnInit {
 
   // Profile View Mode: admin vs employee
   protected readonly viewMode = signal<'admin' | 'employee'>('admin');
-  protected readonly adminTab = signal<'account' | 'security' | 'privileges'>('account');
+  protected readonly adminTab = signal<'account' | 'security'>('account');
   protected readonly adminTabs = [
     { id: 'account', label: 'Admin Account', icon: 'user' },
     { id: 'security', label: 'Security & Password', icon: 'lock' },
-    { id: 'privileges', label: 'System Privileges', icon: 'shield' },
   ] as const;
+
+  // Password strength computation for Spotify Volume Slider UI
+  protected readonly passwordStrength = computed(() => {
+    const pwd = this.newPwd() || '';
+    if (!pwd) {
+      return {
+        score: 0,
+        label: 'No Password',
+        color: '#94a3b8',
+        hasMinLength: false,
+        hasMixedCase: false,
+        hasNumber: false,
+        hasSymbol: false,
+      };
+    }
+
+    const hasMinLength = pwd.length >= 8;
+    const hasMixedCase = /[a-z]/.test(pwd) && /[A-Z]/.test(pwd);
+    const hasNumber = /\d/.test(pwd);
+    const hasSymbol = /[^A-Za-z0-9]/.test(pwd);
+
+    let score = 0;
+    if (pwd.length > 0) score += 10;
+    if (hasMinLength) score += 25;
+    if (pwd.length >= 12) score += 15;
+    if (hasMixedCase) score += 20;
+    if (hasNumber) score += 15;
+    if (hasSymbol) score += 15;
+
+    score = Math.min(100, score);
+
+    let label = 'Very Weak';
+    let color = '#ef4444'; // Red
+
+    if (score >= 80) {
+      label = 'Strong';
+      color = '#1db954'; // Spotify Green
+    } else if (score >= 60) {
+      label = 'Good';
+      color = '#22c55e'; // Green
+    } else if (score >= 40) {
+      label = 'Fair';
+      color = '#f59e0b'; // Amber
+    } else if (score >= 20) {
+      label = 'Weak';
+      color = '#f97316'; // Orange
+    }
+
+    return {
+      score,
+      label,
+      color,
+      hasMinLength,
+      hasMixedCase,
+      hasNumber,
+      hasSymbol,
+    };
+  });
 
   protected readonly employeeOptions = signal<SelectOption[]>([]);
   protected readonly selectedEmployeeId = signal<string>('__admin__');
 
   protected readonly currentRole = computed(() => this.session.activeRole());
-  protected readonly isAdmin = computed(() => ['Super Admin', 'Company Admin'].includes(this.currentRole()) || !this.session.user()?.employeeId);
+  protected readonly canManageEmployees = computed(() =>
+    ['Super Admin', 'Company Admin', 'HR Manager', 'HR'].includes(this.currentRole())
+  );
+  protected readonly isAdminViewAvailable = computed(() =>
+    ['Super Admin', 'Company Admin'].includes(this.currentRole()) || !this.session.user()?.employeeId
+  );
+  protected readonly isAdmin = computed(() => this.isAdminViewAvailable());
   protected readonly currentAdminName = computed(() => this.session.user()?.name || 'Administrator');
   protected readonly currentAdminEmail = computed(() => this.session.user()?.email || 'admin@viralinfotech.com');
   protected readonly currentCompanyName = computed(() => this.session.user()?.companyName || 'Viral Infotech');
@@ -1042,35 +1092,38 @@ export class EmployeeProfileComponent implements OnInit {
       },
     });
 
-    if (this.isAdmin()) {
+    if (this.canManageEmployees()) {
       this.loadEmployeeOptions();
-
-      this.route.queryParams.subscribe((params) => {
-        const id = params['id'] || params['employeeId'];
-        if (id) {
-          this.loadEmployeeById(id);
-        } else {
-          this.selectedEmployeeId.set('__admin__');
-          this.viewMode.set('admin');
-        }
-      });
-    } else {
-      this.viewMode.set('employee');
-      this.load();
     }
+
+    this.route.queryParams.subscribe((params) => {
+      const id = params['id'] || params['employeeId'];
+      if (id) {
+        this.loadEmployeeById(id);
+      } else if (this.isAdminViewAvailable() && !this.session.user()?.employeeId) {
+        this.selectedEmployeeId.set('__admin__');
+        this.viewMode.set('admin');
+      } else {
+        this.viewMode.set('employee');
+        this.load();
+      }
+    });
   }
 
   protected loadEmployeeOptions(): void {
-    if (!this.isAdmin()) return;
-    this.api.employees({ pageSize: 100 }).subscribe({
+    if (!this.canManageEmployees()) return;
+    this.api.employees({ pageSize: 150 }).subscribe({
       next: (res) => {
-        const opts: SelectOption[] = [
-          { v: '__admin__', l: `👤 My Admin Profile (${this.currentAdminName()})` },
+        const opts: SelectOption[] = [];
+        if (this.isAdminViewAvailable()) {
+          opts.push({ v: '__admin__', l: `👤 My Admin Profile (${this.currentAdminName()})` });
+        }
+        opts.push(
           ...res.items.map((e) => ({
             v: e.id,
             l: `${e.employeeCode} - ${e.fullName} (${e.jobTitle || e.department})`,
           })),
-        ];
+        );
         this.employeeOptions.set(opts);
         this.reportingOptions = [
           { v: '', l: 'None (Direct Report to Management)' },
@@ -1082,6 +1135,10 @@ export class EmployeeProfileComponent implements OnInit {
       },
       error: () => {},
     });
+  }
+
+  protected goBack(): void {
+    this.router.navigate(['/employees']);
   }
 
   protected saveAdminProfile(): void {
@@ -1099,7 +1156,8 @@ export class EmployeeProfileComponent implements OnInit {
       },
       error: (err) => {
         this.savingAdminProfile.set(false);
-        this.toast.show(err?.error?.message || 'Could not update administrator profile.', 'danger');
+        const msg = err?.error?.detail || err?.error?.title || err?.error?.message || 'Could not update administrator profile.';
+        this.toast.show(msg, 'danger');
       },
     });
   }
@@ -1132,7 +1190,8 @@ export class EmployeeProfileComponent implements OnInit {
       },
       error: (err) => {
         this.changingPwd.set(false);
-        this.toast.show(err?.error?.message || 'Could not change password.', 'danger');
+        const msg = err?.error?.detail || err?.error?.title || err?.error?.message || 'Could not change password.';
+        this.toast.show(msg, 'danger');
       },
     });
   }
@@ -1195,6 +1254,7 @@ export class EmployeeProfileComponent implements OnInit {
     this.api.employeeMe().subscribe({
       next: (employee) => {
         this.populateEmployee(employee);
+        this.selectedEmployeeId.set(employee.id);
       },
       error: () => {
         this.toast.show('Could not load the employee profile.', 'danger');
