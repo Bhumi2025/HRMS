@@ -1075,12 +1075,16 @@ export class OnboardingComponent implements OnInit, OnDestroy {
           l: e.fullName,
         }));
         this.managerOptions.set([
+          { v: 'HR Manager', l: 'HR Manager' },
           { v: 'Company Admin', l: 'Company Admin' },
           ...emps,
         ]);
       },
       error: () => {
-        this.managerOptions.set([{ v: 'Company Admin', l: 'Company Admin' }]);
+        this.managerOptions.set([
+          { v: 'HR Manager', l: 'HR Manager' },
+          { v: 'Company Admin', l: 'Company Admin' },
+        ]);
       },
     });
   }
@@ -1226,7 +1230,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     { v: 'Part-time', l: 'Part-time' },
     { v: 'Contract', l: 'Contract' },
   ];
-  protected readonly managerOptions = signal<SelectOption[]>([{ v: 'Company Admin', l: 'Company Admin' }]);
+  protected readonly managerOptions = signal<SelectOption[]>([
+    { v: 'HR Manager', l: 'HR Manager' },
+    { v: 'Company Admin', l: 'Company Admin' },
+  ]);
   protected readonly shiftOptions: SelectOption[] = [
     { v: 'Morning (9AM - 6PM)', l: 'Morning (9AM - 6PM)' },
     { v: 'Evening', l: 'Evening' },
