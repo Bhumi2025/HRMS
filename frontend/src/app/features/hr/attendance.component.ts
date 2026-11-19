@@ -512,250 +512,259 @@ interface MusterDay {
             </div>
           </div>
 
-          <!-- Month Selector & Controls -->
-          <div class="timeline-toolbar">
-            <div class="month-nav-cluster">
-              <span class="current-month-heading">{{ selectedMonthFormatted() }}</span>
-              <div class="month-arrows">
-                <button class="m-arrow-btn" (click)="prevMonth()" title="Previous month">‹</button>
-                <button class="m-arrow-btn" (click)="nextMonth()" title="Next month">›</button>
-              </div>
-            </div>
-
-            <div class="toolbar-right-cluster">
-              <!-- Search box -->
-              <div class="search-box-pill">
-                <span class="pill-search-icon">🔍</span>
-                <input 
-                  type="text" 
-                  placeholder="Search day..." 
-                  [ngModel]="timelineSearch()" 
-                  (ngModelChange)="timelineSearch.set($event)"
-                />
-              </div>
-
-              <!-- Status select filter -->
-              <select class="status-dropdown-pill" [ngModel]="timelineStatusFilter()" (ngModelChange)="timelineStatusFilter.set($event)">
-                <option value="">All Status</option>
-                <option value="present">Present</option>
-                <option value="late">Late</option>
-                <option value="dayoff">Day Off</option>
-                <option value="overtime">Overtime</option>
-                <option value="absent">Absent</option>
-              </select>
-
-              <!-- View mode toggle (Timeline vs Table) -->
-              <div class="view-mode-toggle">
-                <button 
-                  class="toggle-btn" 
-                  [class.active]="musterViewMode() === 'timeline'" 
-                  (click)="musterViewMode.set('timeline')"
-                  title="Gantt Timeline View"
-                >
-                  ▤ Timeline
-                </button>
-                <button 
-                  class="toggle-btn" 
-                  [class.active]="musterViewMode() === 'table'" 
-                  (click)="musterViewMode.set('table')"
-                  title="Muster Table View"
-                >
-                  ▦ Table
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- ── VIEW 1: TIMELINE CARDS (IMAGE 2 STYLE) ── -->
-          @if (musterViewMode() === 'timeline') {
-            <div class="timeline-cards-list">
-              @for (day of filteredMusterDays(); track day.dateStr) {
-                <div class="day-gantt-card" [class.is-today-card]="day.isToday">
-                  <div class="gantt-card-header">
-                    <div class="gantt-day-name">
-                      {{ day.dayLabel }}
-                    </div>
-
-                    <div class="gantt-header-right">
-                      @if (day.workHoursRaw > 8) {
-                        @if (isOvertimeApproved(day.dateStr)) {
-                          <span class="ot-badge-approved">✓ Approved</span>
-                        } @else {
-                          <div class="ot-approval-box">
-                            <span class="ot-approval-txt">Overtime approval</span>
-                            <button class="btn-ot-reject" (click)="rejectOvertime(day.dateStr, $event)" title="Reject Overtime">✕</button>
-                            <button class="btn-ot-approve" (click)="approveOvertime(day.dateStr, $event)" title="Approve Overtime">✓ Approve</button>
-                          </div>
-                        }
-                      } @else if (day.status === 'OnLeave') {
-                        <span class="badge-requested-off">Requested day off</span>
-                      } @else if (day.status === 'Weekend') {
-                        <span class="badge-weekend-pill">Weekend</span>
-                      } @else if (day.status === 'Present') {
-                        <span class="badge-present-pill">✓ Present</span>
-                      }
-                    </div>
-                  </div>
-
-                  <!-- Timeline Gantt Bar Track -->
-                  <div class="gantt-bar-row">
-                    <!-- Left: Clock-in -->
-                    <div class="gantt-time-col in-col">
-                      <span class="col-lbl">Clock-in</span>
-                      <span class="col-val">{{ day.inTime }}</span>
-                    </div>
-
-                    <!-- Center: Timeline visualization -->
-                    <div class="gantt-track-center">
-                      <!-- Scale hours -->
-                      <div class="gantt-scale-hours">
-                        <span>09:00</span>
-                        <span>11:00</span>
-                        <span>13:00</span>
-                        <span>15:00</span>
-                        <span>17:00</span>
-                        <span>19:00</span>
-                        <span>21:00</span>
-                        <span>23:59</span>
-                      </div>
-
-                      <!-- The visual bar container -->
-                      <div class="gantt-bar-track">
-                        @for (seg of day.timelineSegments; track seg.label + seg.leftPercent) {
-                          <div 
-                            class="gantt-segment" 
-                            [class]="'seg-kind-' + seg.type"
-                            [style.left.%]="seg.leftPercent"
-                            [style.width.%]="seg.widthPercent"
-                          >
-                            <span class="seg-label-txt">{{ seg.label }}</span>
-
-                            <!-- Hover Tooltip -->
-                            <div class="seg-popup-tooltip">
-                              <div class="tip-heading">{{ seg.label }}</div>
-                              <div class="tip-body">{{ seg.timeRange }} ({{ seg.durationLabel }})</div>
-                            </div>
-                          </div>
-                        }
-                      </div>
-                    </div>
-
-                    <!-- Right: Clock-out & Duration -->
-                    <div class="gantt-time-col out-col">
-                      <div class="time-block">
-                        <span class="col-lbl">Clock-out</span>
-                        <span class="col-val" [class.early-out-alert]="day.isEarlyOut">{{ day.outTime }}</span>
-                      </div>
-                      <div class="dur-block">
-                        <span class="col-lbl">Duration</span>
-                        <span class="col-val">{{ day.durationStr }}</span>
-                      </div>
-                    </div>
-                  </div>
+          <!-- ── TIMELINE MAIN WIDGET CARD WITH INTERNAL SCROLLBAR ── -->
+          <div class="timeline-widget-card">
+            <!-- Widget Header: Month Selector & Controls -->
+            <div class="timeline-widget-header">
+              <div class="month-nav-cluster">
+                <span class="current-month-heading">{{ selectedMonthFormatted() }}</span>
+                <div class="month-arrows">
+                  <button type="button" class="m-arrow-btn" (click)="prevMonth()" title="Previous month">‹</button>
+                  <button type="button" class="m-arrow-btn" (click)="nextMonth()" title="Next month">›</button>
                 </div>
-              } @empty {
-                <div style="text-align: center; padding: 40px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--muted);">
-                  No attendance records found matching filters for this period.
+              </div>
+
+              <div class="toolbar-right-cluster">
+                <!-- Search box -->
+                <div class="search-box-pill">
+                  <span class="pill-search-icon">🔍</span>
+                  <input 
+                    type="text" 
+                    placeholder="Search day..." 
+                    [ngModel]="timelineSearch()" 
+                    (ngModelChange)="timelineSearch.set($event)"
+                  />
+                  @if (timelineSearch()) {
+                    <button type="button" class="search-clear-mini" (click)="timelineSearch.set('')" title="Clear search">✕</button>
+                  }
+                </div>
+
+                <!-- Status select filter -->
+                <select class="status-dropdown-pill" [ngModel]="timelineStatusFilter()" (ngModelChange)="timelineStatusFilter.set($event)">
+                  <option value="">All Status</option>
+                  <option value="present">Present</option>
+                  <option value="late">Late</option>
+                  <option value="dayoff">Day Off</option>
+                  <option value="overtime">Overtime</option>
+                  <option value="absent">Absent</option>
+                </select>
+
+                <!-- View mode toggle (Timeline vs Table) -->
+                <div class="view-mode-toggle">
+                  <button 
+                    type="button"
+                    class="toggle-btn" 
+                    [class.active]="musterViewMode() === 'timeline'" 
+                    (click)="musterViewMode.set('timeline')"
+                    title="Gantt Timeline View"
+                  >
+                    ▤ Timeline
+                  </button>
+                  <button 
+                    type="button"
+                    class="toggle-btn" 
+                    [class.active]="musterViewMode() === 'table'" 
+                    (click)="musterViewMode.set('table')"
+                    title="Muster Table View"
+                  >
+                    ▦ Table
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Scrollable Widget Body with Dedicated Scrollbar -->
+            <div class="timeline-widget-scroll">
+              <!-- ── VIEW 1: TIMELINE CARDS (IMAGE 2 STYLE) ── -->
+              @if (musterViewMode() === 'timeline') {
+                <div class="timeline-cards-list">
+                  @for (day of filteredMusterDays(); track day.dateStr) {
+                    <div class="day-gantt-card" [class.is-today-card]="day.isToday">
+                      <div class="gantt-card-header">
+                        <div class="gantt-day-name">
+                          {{ day.dayLabel }}
+                        </div>
+
+                        <div class="gantt-header-right">
+                          @if (day.workHoursRaw > 8) {
+                            @if (isOvertimeApproved(day.dateStr)) {
+                              <span class="ot-badge-approved">✓ Approved</span>
+                            } @else {
+                              <div class="ot-approval-box">
+                                <span class="ot-approval-txt">Overtime approval</span>
+                                <button type="button" class="btn-ot-reject" (click)="rejectOvertime(day.dateStr, $event)" title="Reject Overtime">✕</button>
+                                <button type="button" class="btn-ot-approve" (click)="approveOvertime(day.dateStr, $event)" title="Approve Overtime">✓ Approve</button>
+                              </div>
+                            }
+                          } @else if (day.status === 'OnLeave') {
+                            <span class="badge-requested-off">Requested day off</span>
+                          } @else if (day.status === 'Weekend') {
+                            <span class="badge-weekend-pill">Weekend</span>
+                          } @else if (day.status === 'Present') {
+                            <span class="badge-present-pill">✓ Present</span>
+                          }
+                        </div>
+                      </div>
+
+                      <!-- Timeline Gantt Bar Track -->
+                      <div class="gantt-bar-row">
+                        <!-- Left: Clock-in -->
+                        <div class="gantt-time-col in-col">
+                          <span class="col-lbl">Clock-in</span>
+                          <span class="col-val">{{ day.inTime }}</span>
+                        </div>
+
+                        <!-- Center: Timeline visualization -->
+                        <div class="gantt-track-center">
+                          <!-- Scale hours -->
+                          <div class="gantt-scale-hours">
+                            <span>09:00</span>
+                            <span>11:00</span>
+                            <span>13:00</span>
+                            <span>15:00</span>
+                            <span>17:00</span>
+                            <span>19:00</span>
+                            <span>21:00</span>
+                            <span>23:59</span>
+                          </div>
+
+                          <!-- The visual bar container -->
+                          <div class="gantt-bar-track">
+                            @for (seg of day.timelineSegments; track seg.label + seg.leftPercent) {
+                              <div 
+                                class="gantt-segment" 
+                                [class]="'seg-kind-' + seg.type"
+                                [style.left.%]="seg.leftPercent"
+                                [style.width.%]="seg.widthPercent"
+                              >
+                                <span class="seg-label-txt">{{ seg.label }}</span>
+
+                                <!-- Hover Tooltip -->
+                                <div class="seg-popup-tooltip">
+                                  <div class="tip-heading">{{ seg.label }}</div>
+                                  <div class="tip-body">{{ seg.timeRange }} ({{ seg.durationLabel }})</div>
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        </div>
+
+                        <!-- Right: Clock-out & Duration -->
+                        <div class="gantt-time-col out-col">
+                          <div class="time-block">
+                            <span class="col-lbl">Clock-out</span>
+                            <span class="col-val" [class.early-out-alert]="day.isEarlyOut">{{ day.outTime }}</span>
+                          </div>
+                          <div class="dur-block">
+                            <span class="col-lbl">Duration</span>
+                            <span class="col-val">{{ day.durationStr }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  } @empty {
+                    <div style="text-align: center; padding: 40px; background: var(--bg); border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); font-weight: 500;">
+                      No attendance records found matching filters for this period.
+                    </div>
+                  }
+                </div>
+              }
+
+              <!-- ── VIEW 2: 15-COLUMN MUSTER TABLE (TABLE MODE) ── -->
+              @if (musterViewMode() === 'table') {
+                <div class="table-wrap" style="overflow-x: auto;">
+                  <table class="muster-data-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Display Name</th>
+                        <th>Day Status</th>
+                        <th>Attendance Status</th>
+                        <th>Attendance Action</th>
+                        <th>Clock IN</th>
+                        <th>Clock OUT</th>
+                        <th>Total Time</th>
+                        <th>Break Hours</th>
+                        <th>Productive Hours</th>
+                        <th>Extra Time</th>
+                        <th>Shift</th>
+                        <th>Location</th>
+                        <th>Job</th>
+                        <th style="text-align: center;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (day of filteredMusterDays(); track day.dateStr) {
+                        <tr [class.row-weekend]="day.isWeekend" [class.row-today]="day.isToday">
+                          <td class="cell-date">{{ day.dateFormatted }}</td>
+                          <td class="cell-name"><span class="name-text">{{ selectedEmployee()?.fullName || '—' }}</span></td>
+                          <td>
+                            <span class="day-status-pill" [style.background]="day.dayStatusBg" [style.color]="day.dayStatusColor">
+                              {{ day.dayStatusBadge }}
+                            </span>
+                          </td>
+                          <td>
+                            @if (day.attendanceIcon === '⚠️') {
+                              <span class="status-icon-box warn" title="Ongoing or Incomplete Punch">⚠️</span>
+                            } @else if (day.attendanceIcon === 'P') {
+                              <span class="status-icon-box success" title="Present">P</span>
+                            } @else if (day.attendanceIcon === 'A') {
+                              <span class="status-icon-box danger" title="Absent">A</span>
+                            } @else if (day.attendanceIcon === 'L') {
+                              <span class="status-icon-box warn" title="Late Arrival">L</span>
+                            } @else {
+                              <span class="status-icon-dash">—</span>
+                            }
+                          </td>
+                          <td>
+                            <div class="action-select-box">
+                              <span class="action-bullet" 
+                                [class.bullet-ongoing]="day.actionStatus === 'On Going'" 
+                                [class.bullet-present]="day.actionStatus === 'Present (P)'" 
+                                [class.bullet-weekend]="day.actionStatus === 'Weekend'" 
+                                [class.bullet-absent]="day.actionStatus === 'Absent (A)'"
+                              ></span>
+                              <select class="action-dropdown" [ngModel]="day.actionStatus" (ngModelChange)="onAttendanceActionChange(day, $event)">
+                                <option value="Present (P)">Present (P)</option>
+                                <option value="On Going">On Going</option>
+                                <option value="Weekend">Weekend</option>
+                                <option value="Absent (A)">Absent (A)</option>
+                                <option value="Half Day">Half Day</option>
+                                <option value="On Leave">On Leave</option>
+                              </select>
+                            </div>
+                          </td>
+                          <td class="cell-clock-in">
+                            @if (day.inTime !== '—') {
+                              <span class="time-with-icon">{{ day.inTime }} <span class="punch-device-badge">💻</span></span>
+                            } @else { <span class="dash">—</span> }
+                          </td>
+                          <td class="cell-clock-out">
+                            @if (day.outTime !== '—') {
+                              <span class="time-with-icon" [class.early-out-text]="day.isEarlyOut">{{ day.outTime }} <span class="punch-device-badge">💻</span></span>
+                            } @else { <span class="dash">—</span> }
+                          </td>
+                          <td class="cell-total-time" [class.time-short]="day.workHoursRaw > 0 && day.workHoursRaw < 8" [class.time-good]="day.workHoursRaw >= 8">{{ day.totalTimeStr }}</td>
+                          <td>{{ day.breakHoursStr }}</td>
+                          <td>{{ day.productiveHoursStr }}</td>
+                          <td [class.extra-positive]="day.extraTimeStr !== '—'">{{ day.extraTimeStr }}</td>
+                          <td><span class="shift-badge-link">{{ day.shiftName }}</span></td>
+                          <td>{{ day.locationName }}</td>
+                          <td>{{ day.jobRole }}</td>
+                          <td style="text-align: center;">
+                            <div class="row-actions-group">
+                              <button type="button" class="action-icon-btn" (click)="openDayDetails(day)" title="View Punch Timeline">👁️</button>
+                              <button type="button" class="action-icon-btn" (click)="openRegularizeForDay(day)" title="Regularize Punch">✏️</button>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
                 </div>
               }
             </div>
-          }
-
-          <!-- ── VIEW 2: 15-COLUMN MUSTER TABLE (TABLE MODE) ── -->
-          @if (musterViewMode() === 'table') {
-            <div class="muster-table-card">
-              <div class="table-wrap" style="overflow-x: auto;">
-                <table class="muster-data-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Display Name</th>
-                      <th>Day Status</th>
-                      <th>Attendance Status</th>
-                      <th>Attendance Action</th>
-                      <th>Clock IN</th>
-                      <th>Clock OUT</th>
-                      <th>Total Time</th>
-                      <th>Break Hours</th>
-                      <th>Productive Hours</th>
-                      <th>Extra Time</th>
-                      <th>Shift</th>
-                      <th>Location</th>
-                      <th>Job</th>
-                      <th style="text-align: center;">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (day of filteredMusterDays(); track day.dateStr) {
-                      <tr [class.row-weekend]="day.isWeekend" [class.row-today]="day.isToday">
-                        <td class="cell-date">{{ day.dateFormatted }}</td>
-                        <td class="cell-name"><span class="name-text">{{ selectedEmployee()?.fullName || '—' }}</span></td>
-                        <td>
-                          <span class="day-status-pill" [style.background]="day.dayStatusBg" [style.color]="day.dayStatusColor">
-                            {{ day.dayStatusBadge }}
-                          </span>
-                        </td>
-                        <td>
-                          @if (day.attendanceIcon === '⚠️') {
-                            <span class="status-icon-box warn" title="Ongoing or Incomplete Punch">⚠️</span>
-                          } @else if (day.attendanceIcon === 'P') {
-                            <span class="status-icon-box success" title="Present">P</span>
-                          } @else if (day.attendanceIcon === 'A') {
-                            <span class="status-icon-box danger" title="Absent">A</span>
-                          } @else if (day.attendanceIcon === 'L') {
-                            <span class="status-icon-box warn" title="Late Arrival">L</span>
-                          } @else {
-                            <span class="status-icon-dash">—</span>
-                          }
-                        </td>
-                        <td>
-                          <div class="action-select-box">
-                            <span class="action-bullet" 
-                              [class.bullet-ongoing]="day.actionStatus === 'On Going'" 
-                              [class.bullet-present]="day.actionStatus === 'Present (P)'" 
-                              [class.bullet-weekend]="day.actionStatus === 'Weekend'" 
-                              [class.bullet-absent]="day.actionStatus === 'Absent (A)'"
-                            ></span>
-                            <select class="action-dropdown" [ngModel]="day.actionStatus" (ngModelChange)="onAttendanceActionChange(day, $event)">
-                              <option value="Present (P)">Present (P)</option>
-                              <option value="On Going">On Going</option>
-                              <option value="Weekend">Weekend</option>
-                              <option value="Absent (A)">Absent (A)</option>
-                              <option value="Half Day">Half Day</option>
-                              <option value="On Leave">On Leave</option>
-                            </select>
-                          </div>
-                        </td>
-                        <td class="cell-clock-in">
-                          @if (day.inTime !== '—') {
-                            <span class="time-with-icon">{{ day.inTime }} <span class="punch-device-badge">💻</span></span>
-                          } @else { <span class="dash">—</span> }
-                        </td>
-                        <td class="cell-clock-out">
-                          @if (day.outTime !== '—') {
-                            <span class="time-with-icon" [class.early-out-text]="day.isEarlyOut">{{ day.outTime }} <span class="punch-device-badge">💻</span></span>
-                          } @else { <span class="dash">—</span> }
-                        </td>
-                        <td class="cell-total-time" [class.time-short]="day.workHoursRaw > 0 && day.workHoursRaw < 8" [class.time-good]="day.workHoursRaw >= 8">{{ day.totalTimeStr }}</td>
-                        <td>{{ day.breakHoursStr }}</td>
-                        <td>{{ day.productiveHoursStr }}</td>
-                        <td [class.extra-positive]="day.extraTimeStr !== '—'">{{ day.extraTimeStr }}</td>
-                        <td><span class="shift-badge-link">{{ day.shiftName }}</span></td>
-                        <td>{{ day.locationName }}</td>
-                        <td>{{ day.jobRole }}</td>
-                        <td style="text-align: center;">
-                          <div class="row-actions-group">
-                            <button class="action-icon-btn" (click)="openDayDetails(day)" title="View Punch Timeline">👁️</button>
-                            <button class="action-icon-btn" (click)="openRegularizeForDay(day)" title="Regularize Punch">✏️</button>
-                          </div>
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          }
+          </div>
         </div>
       </div>
     }
@@ -1358,6 +1367,58 @@ interface MusterDay {
         font-weight: 600;
         white-space: nowrap;
       }
+
+      /* ── Timeline Widget Card with Dedicated Internal Scrollbar ── */
+      .timeline-widget-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .timeline-widget-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 14px 18px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .timeline-widget-scroll {
+        max-height: 560px;
+        overflow-y: auto;
+        padding: 16px 18px;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+      }
+      .timeline-widget-scroll::-webkit-scrollbar {
+        width: 6px;
+      }
+      .timeline-widget-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .timeline-widget-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .timeline-widget-scroll::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      .search-clear-mini {
+        border: none;
+        background: none;
+        font-size: 11px;
+        color: var(--muted);
+        cursor: pointer;
+        padding: 0 2px;
+        display: inline-flex;
+        align-items: center;
+      }
+      .search-clear-mini:hover { color: var(--text); }
 
       /* Timeline Toolbar */
       .timeline-toolbar {
