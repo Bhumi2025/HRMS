@@ -3,6 +3,7 @@ import {
   Component,
   ElementRef,
   HostListener,
+  OnDestroy,
   computed,
   inject,
   input,
@@ -72,7 +73,7 @@ export interface SelectOption {
     }
   `],
 })
-export class SelectComponent {
+export class SelectComponent implements OnDestroy {
   private readonly elementRef = inject(ElementRef);
 
   readonly options = input<SelectOption[]>([]);
@@ -92,17 +93,37 @@ export class SelectComponent {
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
     if (this.open() && !this.elementRef.nativeElement.contains(event.target)) {
-      this.open.set(false);
+      this.close();
     }
   }
 
   toggle(): void {
     if (!this.open()) {
       try {
-        const rect = (this.elementRef.nativeElement as HTMLElement).getBoundingClientRect();
+        const el = this.elementRef.nativeElement as HTMLElement;
+        const rect = el.getBoundingClientRect();
         const spaceBelow = window.innerHeight - rect.bottom;
-        // If space below is less than 240px and there is more space above, open upwards!
-        const shouldDropUp = spaceBelow < 240 && rect.top > spaceBelow;
+
+        // Check for any sticky bottom obstacles (e.g. .tab-action-bar, .action-bar, fixed footers)
+        let bottomObstacleHeight = 0;
+        const obstacles = document.querySelectorAll(
+          '.tab-action-bar, .action-bar, .form-footer, .sticky-bottom, [class*="sticky-bottom"]'
+        );
+        for (let i = 0; i < obstacles.length; i++) {
+          const obRect = (obstacles[i] as HTMLElement).getBoundingClientRect();
+          if (obRect.top > rect.bottom && obRect.top < window.innerHeight && obRect.height > 0) {
+            const obstacleCutoff = window.innerHeight - obRect.top;
+            if (obstacleCutoff > bottomObstacleHeight) {
+              bottomObstacleHeight = obstacleCutoff;
+            }
+          }
+        }
+
+        const effectiveSpaceBelow = Math.max(0, spaceBelow - bottomObstacleHeight);
+        // If effective space below is less than 280px (standard menu height) and there is more space above, open upwards!
+        const shouldDropUp =
+          (effectiveSpaceBelow < 280 && rect.top > effectiveSpaceBelow) ||
+          (spaceBelow < 220 && rect.top > 220);
         this.dropUp.set(shouldDropUp);
         const shouldAlignRight = rect.right + 60 > window.innerWidth;
         this.alignRight.set(shouldAlignRight);
@@ -111,13 +132,60 @@ export class SelectComponent {
         this.alignRight.set(false);
       }
       this.open.set(true);
+      this.setParentElevation(true);
     } else {
-      this.open.set(false);
+      this.close();
     }
+  }
+
+  close(): void {
+    this.open.set(false);
+    this.setParentElevation(false);
   }
 
   pick(option: SelectOption): void {
     this.valueChange.emit(option.v);
-    this.open.set(false);
+    this.close();
+  }
+
+  ngOnDestroy(): void {
+    this.setParentElevation(false);
+  }
+
+  private setParentElevation(elevate: boolean): void {
+    try {
+      const el = this.elementRef.nativeElement as HTMLElement;
+      const parentCard = el.closest('.card') as HTMLElement | null;
+      const parentGrid = el.closest('.grid-2, .grid-3, .grid-4') as HTMLElement | null;
+      if (elevate) {
+        if (parentCard) {
+          parentCard.classList.add('has-open-dropdown');
+          parentCard.style.zIndex = '50';
+          parentCard.style.position = 'relative';
+        }
+        if (parentGrid) {
+          parentGrid.classList.add('has-open-dropdown');
+          parentGrid.style.zIndex = '50';
+          parentGrid.style.position = 'relative';
+        }
+      } else {
+        if (parentCard) {
+          parentCard.classList.remove('has-open-dropdown');
+          parentCard.style.zIndex = '';
+          if (parentCard.style.position === 'relative') {
+            parentCard.style.removeProperty('position');
+          }
+        }
+        if (parentGrid) {
+          parentGrid.classList.remove('has-open-dropdown');
+          parentGrid.style.zIndex = '';
+          if (parentGrid.style.position === 'relative') {
+            parentGrid.style.removeProperty('position');
+          }
+        }
+      }
+    } catch {
+      // Safe no-op
+    }
   }
 }

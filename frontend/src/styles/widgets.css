@@ -64,6 +64,37 @@
   overflow-y: auto;
 }
 
+.csel-menu.drop-up {
+  top: auto !important;
+  bottom: calc(100% + 4px) !important;
+  box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.18), 0 -8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Elevate card and grid stacking context above sticky bars when dropdown is open */
+.card:has(.csel-open),
+.card:has(.csel-host-open),
+.card:has(.key-select-wrap.csel-open),
+.card:has(.csel-menu),
+.card.has-open-dropdown,
+.grid-2:has(.csel-open),
+.grid-2:has(.csel-host-open),
+.grid-2:has(.key-select-wrap.csel-open),
+.grid-2:has(.csel-menu),
+.grid-2.has-open-dropdown,
+.grid-3:has(.csel-open),
+.grid-3:has(.csel-host-open),
+.grid-3:has(.key-select-wrap.csel-open),
+.grid-3:has(.csel-menu),
+.grid-3.has-open-dropdown,
+.grid-4:has(.csel-open),
+.grid-4:has(.csel-host-open),
+.grid-4:has(.key-select-wrap.csel-open),
+.grid-4:has(.csel-menu),
+.grid-4.has-open-dropdown {
+  position: relative !important;
+  z-index: 50 !important;
+}
+
 .csel-opt {
   padding: 8px 10px;
   border-radius: 7px;
