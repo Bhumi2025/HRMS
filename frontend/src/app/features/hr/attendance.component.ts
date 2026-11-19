@@ -122,43 +122,35 @@ interface MusterDay {
     }
 
     <!-- Main Navigation Tabs -->
-    <div class="tabs-nav-bar" style="display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 20px;">
-      <button 
-        class="tab-btn" 
-        [class.active]="tab() === 'daily'" 
-        (click)="tab.set('daily')"
-        style="padding: 10px 18px; font-weight: 700; font-size: 13px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent;"
-        [style.border-bottom-color]="tab() === 'daily' ? 'var(--p)' : 'transparent'"
-        [style.color]="tab() === 'daily' ? 'var(--p)' : 'var(--muted)'"
-      >
-        Daily Punch Log
-      </button>
-      <button 
-        class="tab-btn" 
-        [class.active]="tab() === 'muster'" 
-        (click)="tab.set('muster')"
-        style="padding: 10px 18px; font-weight: 700; font-size: 13px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent;"
-        [style.border-bottom-color]="tab() === 'muster' ? 'var(--p)' : 'transparent'"
-        [style.color]="tab() === 'muster' ? 'var(--p)' : 'var(--muted)'"
-      >
-        Monthly Muster Register
-      </button>
-      @if (canReg()) {
+    @if (tab() !== 'muster') {
+      <div class="tabs-nav-bar" style="display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 20px;">
         <button 
           class="tab-btn" 
-          [class.active]="tab() === 'reg'" 
-          (click)="tab.set('reg')"
+          [class.active]="tab() === 'daily'" 
+          (click)="tab.set('daily')"
           style="padding: 10px 18px; font-weight: 700; font-size: 13px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent;"
-          [style.border-bottom-color]="tab() === 'reg' ? 'var(--p)' : 'transparent'"
-          [style.color]="tab() === 'reg' ? 'var(--p)' : 'var(--muted)'"
+          [style.border-bottom-color]="tab() === 'daily' ? 'var(--p)' : 'transparent'"
+          [style.color]="tab() === 'daily' ? 'var(--p)' : 'var(--muted)'"
         >
-          Regularization Requests
-          <span style="background: var(--p); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-left: 6px;">
-            {{ pendingCount() }}
-          </span>
+          Daily Punch Log
         </button>
-      }
-    </div>
+        @if (canReg()) {
+          <button 
+            class="tab-btn" 
+            [class.active]="tab() === 'reg'" 
+            (click)="tab.set('reg')"
+            style="padding: 10px 18px; font-weight: 700; font-size: 13px; border: none; background: transparent; cursor: pointer; border-bottom: 2.5px solid transparent;"
+            [style.border-bottom-color]="tab() === 'reg' ? 'var(--p)' : 'transparent'"
+            [style.color]="tab() === 'reg' ? 'var(--p)' : 'var(--muted)'"
+          >
+            Regularization Requests
+            <span style="background: var(--p); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-left: 6px;">
+              {{ pendingCount() }}
+            </span>
+          </button>
+        }
+      </div>
+    }
 
     <!-- TAB 1: DAILY PUNCH LOG -->
     @if (tab() === 'daily') {
