@@ -33,24 +33,49 @@ interface DynamicAttendanceRow {
   workHours: number;
   status: string;
   device?: string;
+  dayStatusBadge: 'FD' | 'HD' | 'WK' | 'AB' | 'LV' | 'HL' | 'OD' | '—';
+  dayStatusColor: string;
+  dayStatusBg: string;
 }
 
 interface MusterDay {
   day: number;
   dateStr: string;
+  dateFormatted: string;
   dayOfWeek: string;
   isWeekend: boolean;
+  isToday: boolean;
+  isFuture: boolean;
+  dayStatusBadge: 'FD' | 'HD' | 'WK' | 'AB' | 'LV' | 'HL' | 'OD' | '—';
+  dayStatusColor: string;
+  dayStatusBg: string;
+  attendanceIcon: 'P' | 'A' | 'L' | '⚠️' | '—';
+  attendanceIconClass: string;
+  actionStatus: string;
   inTime: string;
+  inTimeRaw: string;
   outTime: string;
-  hours: string;
+  outTimeRaw: string;
+  isEarlyOut: boolean;
+  isLateIn: boolean;
+  totalTimeStr: string;
+  breakHoursStr: string;
+  productiveHoursStr: string;
+  extraTimeStr: string;
+  shiftName: string;
+  locationName: string;
+  jobRole: string;
+  workHoursRaw: number;
   status: string;
   color: string;
+  hours: string;
 }
 
 @Component({
   selector: 'app-attendance',
   imports: [CommonModule, FormsModule, IconDirective, RouterModule],
   template: `
+    <!-- Top Action Header -->
     <div class="flex justify-end items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div class="flex gap-2">
         <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="exportCsv()">
@@ -68,18 +93,20 @@ interface MusterDay {
       </div>
     </div>
 
-    <!-- KPIs -->
-    <div class="grid-4" style="margin-bottom: 20px;">
-      @for (k of kpis(); track k.l) {
-        <div class="kpi-card">
-          <div class="kpi-icon" [style.background]="k.c + '18'" [style.color]="k.c">
-            <span [appIcon]="'clock'"></span>
+    <!-- Daily KPIs (when on daily or reg tab) -->
+    @if (tab() !== 'muster') {
+      <div class="grid-4" style="margin-bottom: 20px;">
+        @for (k of kpis(); track k.l) {
+          <div class="kpi-card">
+            <div class="kpi-icon" [style.background]="k.c + '18'" [style.color]="k.c">
+              <span [appIcon]="'clock'"></span>
+            </div>
+            <div class="kpi-value">{{ k.v }}</div>
+            <div class="kpi-label">{{ k.l }}</div>
           </div>
-          <div class="kpi-value">{{ k.v }}</div>
-          <div class="kpi-label">{{ k.l }}</div>
-        </div>
-      }
-    </div>
+        }
+      </div>
+    }
 
     <!-- Main Navigation Tabs -->
     <div class="tabs-nav-bar" style="display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 20px;">
@@ -216,29 +243,36 @@ interface MusterDay {
                 <th>Employee</th>
                 <th>Department</th>
                 <th>Date</th>
+                <th>Day Status</th>
                 <th>Check In</th>
                 <th>Check Out</th>
                 <th>Work Hours</th>
                 <th>Status</th>
                 <th>Device/Method</th>
+                <th style="text-align: right;">Action</th>
               </tr>
             </thead>
             <tbody>
               @for (row of filteredDailyRows(); track row.id) {
                 <tr>
                   <td>
-                    <div class="table-avatar">
+                    <div class="table-avatar" style="cursor: pointer;" (click)="viewEmployeeMuster(row.id)">
                       <div class="avatar-placeholder avatar-sm" style="background: var(--p-soft); color: var(--p); font-weight: 700;">
                         {{ row.employeeName.charAt(0) }}
                       </div>
                       <div>
-                        <div style="font-weight: 700; font-size: 13px;">{{ row.employeeName }}</div>
+                        <div style="font-weight: 700; font-size: 13px; color: var(--p);">{{ row.employeeName }}</div>
                         <div style="font-size: 11px; color: var(--muted);">{{ row.employeeCode }}</div>
                       </div>
                     </div>
                   </td>
                   <td style="font-size: 13px; color: var(--muted);">{{ row.department }}</td>
                   <td style="font-size: 13px; font-weight: 600;">{{ row.date }}</td>
+                  <td>
+                    <span class="day-status-pill" [style.background]="row.dayStatusBg" [style.color]="row.dayStatusColor">
+                      {{ row.dayStatusBadge }}
+                    </span>
+                  </td>
                   <td style="font-size: 13px; font-weight: 700; color: var(--text);">
                     {{ row.checkIn || '—' }}
                   </td>
@@ -259,10 +293,15 @@ interface MusterDay {
                       {{ row.device || 'Face Terminal' }}
                     </span>
                   </td>
+                  <td style="text-align: right;">
+                    <button class="btn btn-ghost btn-sm" style="color: var(--p); font-size: 12px; font-weight: 700;" (click)="viewEmployeeMuster(row.id)">
+                      View Muster ›
+                    </button>
+                  </td>
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="8" style="text-align: center; padding: 36px 20px; color: var(--muted);">
+                  <td colspan="10" style="text-align: center; padding: 36px 20px; color: var(--muted);">
                     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
                       <div style="font-size: 13px; font-weight: 500;">
                         @if (searchKeyword() || filterStatus()) {
@@ -291,76 +330,289 @@ interface MusterDay {
       </div>
     }
 
-    <!-- TAB 2: MONTHLY MUSTER -->
+    <!-- TAB 2: MONTHLY MUSTER REGISTER (IMAGE 2 DESIGN & LOGIC) -->
     @if (tab() === 'muster') {
-      <div class="card">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div class="card-title">Employee Monthly Muster</div>
-            <div style="font-size: 12px; color: var(--muted);">Comprehensive month-long attendance calendar breakdown</div>
+      <div class="muster-container">
+        <!-- 1. Header & Context Control Strip -->
+        <div class="muster-top-bar">
+          <div class="breadcrumb-container">
+            <button class="back-link-btn" (click)="tab.set('daily')" title="Back to Daily Punch Log">
+              ‹ Employee Attendance
+            </button>
+            <span class="breadcrumb-separator">/</span>
+            <span class="employee-title">
+              {{ selectedEmployee()?.fullName || 'Employee' }} - {{ selectedEmployee()?.employeeCode || 'EMP-1001' }}
+            </span>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <select class="form-control" style="width: 200px; font-size: 12px;" [(ngModel)]="selectedMusterEmpId" (change)="generateMuster()">
-              @for (emp of employees(); track emp.id) {
-                <option [value]="emp.id">{{ emp.fullName }} ({{ emp.department }})</option>
-              }
-            </select>
-            <input 
-              type="month" 
-              class="form-control" 
-              style="width: 140px; font-size: 12px;" 
-              [(ngModel)]="selectedMusterMonth" 
-              (change)="generateMuster()"
-            />
+          <div class="muster-controls">
+            <!-- Employee Selector Dropdown -->
+            <div class="selector-wrapper">
+              <span class="selector-icon">👤</span>
+              <select class="muster-emp-select" [(ngModel)]="selectedMusterEmpId" (change)="onEmployeeSelectChange()">
+                @for (emp of employees(); track emp.id) {
+                  <option [value]="emp.id">{{ emp.fullName }} ({{ emp.employeeCode }})</option>
+                }
+              </select>
+            </div>
+
+            <!-- Date / Month Range Picker with Next / Prev buttons -->
+            <div class="date-picker-wrapper">
+              <button class="month-nav-btn" (click)="prevMonth()" title="Previous Month">‹</button>
+              <span class="selector-icon">📅</span>
+              <input type="month" class="muster-month-input" [(ngModel)]="selectedMusterMonth" (change)="generateMuster()" />
+              <button class="month-nav-btn" (click)="nextMonth()" title="Next Month">›</button>
+            </div>
+
+            <!-- Export Button -->
+            <button class="btn btn-outline btn-sm muster-btn" (click)="exportCsv()" title="Export Muster CSV">
+              <span [appIcon]="'download'"></span>
+            </button>
+
+            <!-- Quick Punch Button -->
+            @if (perms.canCreate('Attendance')) {
+              <button class="btn btn-primary btn-sm muster-add-btn" (click)="openQuickPunchModal()" title="Record Live Punch">
+                +
+              </button>
+            }
           </div>
         </div>
 
-        <div class="table-wrap" style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <thead>
-              <tr>
-                <th style="padding: 8px 12px;">Day &amp; Date</th>
-                <th style="padding: 8px 12px;">Weekday</th>
-                <th style="padding: 8px 12px;">In Time</th>
-                <th style="padding: 8px 12px;">Out Time</th>
-                <th style="padding: 8px 12px;">Work Hours</th>
-                <th style="padding: 8px 12px;">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (day of musterDays(); track day.day) {
-                <tr [style.background]="day.isWeekend ? 'var(--bg)' : 'transparent'">
-                  <td style="padding: 8px 12px; font-weight: 700;">
-                    Day {{ day.day }} ({{ day.dateStr }})
-                  </td>
-                  <td style="padding: 8px 12px; color: var(--muted);">
-                    {{ day.dayOfWeek }}
-                  </td>
-                  <td style="padding: 8px 12px; font-weight: 600;">
-                    {{ day.inTime }}
-                  </td>
-                  <td style="padding: 8px 12px; font-weight: 600;">
-                    {{ day.outTime }}
-                  </td>
-                  <td style="padding: 8px 12px; font-weight: 700;">
-                    {{ day.hours }}
-                  </td>
-                  <td style="padding: 8px 12px;">
-                    <span [style.color]="day.color" style="font-weight: 700; font-size: 12px;">
-                      {{ day.status }}
-                    </span>
-                  </td>
-                </tr>
-              } @empty {
+        <!-- 2. The 16-Metric Ribbon (KPI Summary Bar matching Image 2) -->
+        <div class="muster-kpi-card">
+          <div class="kpi-ribbon-scroll">
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">{{ musterKpis().workingHours }}</div>
+              <div class="kpi-lbl">Working Hours</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">
+                {{ musterKpis().actualWorkingTime }}
+                <span class="info-tip" title="Total hours clocked by employee this month">ℹ</span>
+              </div>
+              <div class="kpi-lbl">Actual Working Time</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">{{ musterKpis().trackedHours }}</div>
+              <div class="kpi-lbl">Tracked Hours</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val" [class.val-green]="musterKpis().diffPositive" [class.val-danger]="!musterKpis().diffPositive">
+                {{ musterKpis().timeDifference }}
+                <span class="info-tip" title="Variance between actual and expected shift hours">ℹ</span>
+              </div>
+              <div class="kpi-lbl">Time Difference</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val val-green">{{ musterKpis().clockInDays }}</div>
+              <div class="kpi-lbl">Clock In Days</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">{{ musterKpis().payrollPresentDays }}</div>
+              <div class="kpi-lbl">Payroll Present Days</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">{{ musterKpis().odRemoteWork }}</div>
+              <div class="kpi-lbl">OD/Remote work</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val val-danger">{{ musterKpis().absentDays }}</div>
+              <div class="kpi-lbl">Absent</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">{{ musterKpis().shiftNotStart }}</div>
+              <div class="kpi-lbl">Shift Not Start</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">{{ musterKpis().onLeaveDays }}</div>
+              <div class="kpi-lbl">On Leave</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val val-warning">{{ musterKpis().lateIn }}</div>
+              <div class="kpi-lbl">Late IN</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val val-warning">{{ musterKpis().earlyOut }}</div>
+              <div class="kpi-lbl">Early OUT</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">{{ musterKpis().paidLeave }}</div>
+              <div class="kpi-lbl">Paid Leave</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">{{ musterKpis().unpaidLeave }}</div>
+              <div class="kpi-lbl">Unpaid Leave</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">{{ musterKpis().odHourlyRemote }}</div>
+              <div class="kpi-lbl">OD/Hourly Remote work</div>
+            </div>
+            <div class="kpi-ribbon-item">
+              <div class="kpi-val">{{ musterKpis().hourlyPaidLeave }}</div>
+              <div class="kpi-lbl">Hourly Paid Leave</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. The Rich Data Table matching Image 2 -->
+        <div class="muster-table-card">
+          <div class="table-wrap" style="overflow-x: auto;">
+            <table class="muster-data-table">
+              <thead>
                 <tr>
-                  <td colspan="6" style="text-align: center; padding: 24px; color: var(--muted);">
-                    No muster data available for this employee and month.
-                  </td>
+                  <th>Date</th>
+                  <th>Display Name</th>
+                  <th>Day Status</th>
+                  <th>Attendance Status</th>
+                  <th>Attendance Action</th>
+                  <th>Clock IN</th>
+                  <th>Clock OUT</th>
+                  <th>Total Time</th>
+                  <th>Break Hours</th>
+                  <th>Productive Hours</th>
+                  <th>Extra Time</th>
+                  <th>Shift</th>
+                  <th>Location</th>
+                  <th>Job</th>
+                  <th style="text-align: center;">Actions</th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (day of musterDays(); track day.dateStr) {
+                  <tr [class.row-weekend]="day.isWeekend" [class.row-today]="day.isToday">
+                    <!-- 1. Date -->
+                    <td class="cell-date">
+                      {{ day.dateFormatted }}
+                    </td>
+
+                    <!-- 2. Display Name -->
+                    <td class="cell-name">
+                      <span class="name-text">{{ selectedEmployee()?.fullName || '—' }}</span>
+                    </td>
+
+                    <!-- 3. Day Status -->
+                    <td class="cell-day-status">
+                      <span class="day-status-pill" [style.background]="day.dayStatusBg" [style.color]="day.dayStatusColor">
+                        {{ day.dayStatusBadge }}
+                      </span>
+                    </td>
+
+                    <!-- 4. Attendance Status -->
+                    <td class="cell-att-status">
+                      @if (day.attendanceIcon === '⚠️') {
+                        <span class="status-icon-box warn" title="Ongoing or Incomplete Punch">⚠️</span>
+                      } @else if (day.attendanceIcon === 'P') {
+                        <span class="status-icon-box success" title="Present">P</span>
+                      } @else if (day.attendanceIcon === 'A') {
+                        <span class="status-icon-box danger" title="Absent">A</span>
+                      } @else if (day.attendanceIcon === 'L') {
+                        <span class="status-icon-box warn" title="Late Arrival">L</span>
+                      } @else {
+                        <span class="status-icon-dash">—</span>
+                      }
+                    </td>
+
+                    <!-- 5. Attendance Action -->
+                    <td class="cell-action">
+                      <div class="action-select-box">
+                        <span class="action-bullet" 
+                          [class.bullet-ongoing]="day.actionStatus === 'On Going'" 
+                          [class.bullet-present]="day.actionStatus === 'Present (P)'" 
+                          [class.bullet-weekend]="day.actionStatus === 'Weekend'" 
+                          [class.bullet-absent]="day.actionStatus === 'Absent (A)'"
+                        ></span>
+                        <select class="action-dropdown" [ngModel]="day.actionStatus" (ngModelChange)="onAttendanceActionChange(day, $event)">
+                          <option value="Present (P)">Present (P)</option>
+                          <option value="On Going">On Going</option>
+                          <option value="Weekend">Weekend</option>
+                          <option value="Absent (A)">Absent (A)</option>
+                          <option value="Half Day">Half Day</option>
+                          <option value="On Leave">On Leave</option>
+                        </select>
+                      </div>
+                    </td>
+
+                    <!-- 6. Clock IN -->
+                    <td class="cell-clock-in">
+                      @if (day.inTime !== '—') {
+                        <span class="time-with-icon">
+                          {{ day.inTime }}
+                          <span class="punch-device-badge" title="Web / Biometric Punch">💻</span>
+                        </span>
+                      } @else {
+                        <span class="dash">—</span>
+                      }
+                    </td>
+
+                    <!-- 7. Clock OUT -->
+                    <td class="cell-clock-out">
+                      @if (day.outTime !== '—') {
+                        <span class="time-with-icon" [class.early-out-text]="day.isEarlyOut" [title]="day.isEarlyOut ? 'Early Out (Departed before 05:00 PM)' : 'Normal Out'">
+                          {{ day.outTime }}
+                          <span class="punch-device-badge">💻</span>
+                        </span>
+                      } @else {
+                        <span class="dash">—</span>
+                      }
+                    </td>
+
+                    <!-- 8. Total Time -->
+                    <td class="cell-total-time" [class.time-short]="day.workHoursRaw > 0 && day.workHoursRaw < 8" [class.time-good]="day.workHoursRaw >= 8">
+                      {{ day.totalTimeStr }}
+                    </td>
+
+                    <!-- 9. Break Hours -->
+                    <td class="cell-break-hours">
+                      {{ day.breakHoursStr }}
+                    </td>
+
+                    <!-- 10. Productive Hours -->
+                    <td class="cell-productive">
+                      {{ day.productiveHoursStr }}
+                    </td>
+
+                    <!-- 11. Extra Time -->
+                    <td class="cell-extra-time" [class.extra-positive]="day.extraTimeStr !== '—'">
+                      {{ day.extraTimeStr }}
+                    </td>
+
+                    <!-- 12. Shift -->
+                    <td class="cell-shift">
+                      <span class="shift-badge-link" title="Shift Roster: 09:00 AM - 06:00 PM">{{ day.shiftName }}</span>
+                    </td>
+
+                    <!-- 13. Location -->
+                    <td class="cell-location">
+                      {{ day.locationName }}
+                    </td>
+
+                    <!-- 14. Job -->
+                    <td class="cell-job">
+                      {{ day.jobRole }}
+                    </td>
+
+                    <!-- 15. Actions -->
+                    <td class="cell-actions" style="text-align: center;">
+                      <div class="row-actions-group">
+                        <button class="action-icon-btn" (click)="openDayDetails(day)" title="View Punch Timeline">
+                          👁️
+                        </button>
+                        <button class="action-icon-btn" (click)="openRegularizeForDay(day)" title="Regularize / Edit Punch">
+                          ✏️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="15" style="text-align: center; padding: 40px; color: var(--muted);">
+                      No muster records found for this employee and period.
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     }
@@ -399,34 +651,26 @@ interface MusterDay {
                   <td style="font-size: 13px; font-weight: 600;">{{ r.date }}</td>
                   <td style="font-size: 13px; font-weight: 700;">{{ r.inTime }}</td>
                   <td style="font-size: 13px; font-weight: 700;">{{ r.outTime }}</td>
-                  <td style="font-size: 13px; color: var(--muted); max-width: 220px;">{{ r.reason }}</td>
+                  <td style="font-size: 13px; color: var(--muted);">{{ r.reason }}</td>
                   <td>
-                    <span class="badge" [class]="regClass(r.status)">{{ r.status }}</span>
+                    <span class="badge" [class]="regClass(r.status)">
+                      {{ r.status }}
+                    </span>
                   </td>
                   <td>
                     @if (r.status === 'Pending') {
-                      @if (perms.canEdit('Attendance')) {
-                        <div style="display: flex; gap: 6px;">
-                          <button class="tbl-btn success" (click)="regAction(r, 'Approved')" data-tooltip="Approve">
-                            <span [appIcon]="'check'"></span>
-                          </button>
-                          <button class="tbl-btn danger" (click)="regAction(r, 'Rejected')" data-tooltip="Reject">
-                            <span [appIcon]="'x'"></span>
-                          </button>
-                        </div>
-                      } @else {
-                        <span style="font-size: 12px; color: var(--muted);">Pending</span>
-                      }
+                      <div class="flex gap-1">
+                        <button class="btn btn-outline btn-xs" style="color: var(--success); border-color: var(--success);" (click)="regAction(r, 'Approved')">Approve</button>
+                        <button class="btn btn-outline btn-xs" style="color: var(--danger); border-color: var(--danger);" (click)="regAction(r, 'Rejected')">Reject</button>
+                      </div>
                     } @else {
-                      <span style="font-size: 12px; color: var(--muted); font-weight: 600;">Resolved</span>
+                      <span style="font-size: 12px; color: var(--muted);">—</span>
                     }
                   </td>
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="7" style="text-align: center; padding: 24px; color: var(--muted);">
-                    No regularization requests found.
-                  </td>
+                  <td colspan="7" style="text-align: center; padding: 24px; color: var(--muted);">No regularization requests found.</td>
                 </tr>
               }
             </tbody>
@@ -435,18 +679,77 @@ interface MusterDay {
       </div>
     }
 
-    <!-- Modal: Request Regularization -->
+    <!-- Modal: Day Punch Details -->
+    @if (showDayDetailModal() && selectedDetailDay()) {
+      <div class="modal-overlay open" (click)="showDayDetailModal.set(false)">
+        <div class="modal" style="max-width: 500px;" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <div style="font-size: 1.1rem; font-weight: 700;">Attendance Day Details</div>
+            <button class="btn btn-ghost btn-sm" (click)="showDayDetailModal.set(false)"><span [appIcon]="'x'"></span></button>
+          </div>
+          <div class="modal-body">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg); border-radius: 8px; margin-bottom: 16px;">
+              <div class="avatar-placeholder avatar-md" style="background: var(--p-soft); color: var(--p); font-weight: 800; font-size: 16px;">
+                {{ selectedEmployee()?.fullName?.charAt(0) || 'E' }}
+              </div>
+              <div>
+                <div style="font-weight: 800; font-size: 14px;">{{ selectedEmployee()?.fullName }}</div>
+                <div style="font-size: 12px; color: var(--muted);">{{ selectedEmployee()?.employeeCode }} · {{ selectedEmployee()?.department }}</div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
+              <div style="padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                <div style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Date</div>
+                <div style="font-weight: 700; margin-top: 3px;">{{ selectedDetailDay()?.dateFormatted }}</div>
+              </div>
+              <div style="padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                <div style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Shift &amp; Location</div>
+                <div style="font-weight: 700; margin-top: 3px;">{{ selectedDetailDay()?.shiftName }} · {{ selectedDetailDay()?.locationName }}</div>
+              </div>
+              <div style="padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                <div style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Clock IN</div>
+                <div style="font-weight: 800; color: #16a34a; margin-top: 3px;">{{ selectedDetailDay()?.inTime }}</div>
+              </div>
+              <div style="padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                <div style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Clock OUT</div>
+                <div style="font-weight: 800; margin-top: 3px;" [class.early-out-text]="selectedDetailDay()?.isEarlyOut">
+                  {{ selectedDetailDay()?.outTime }}
+                  @if (selectedDetailDay()?.isEarlyOut) { <span style="font-size: 10px; font-weight: 700;">(Early Out)</span> }
+                </div>
+              </div>
+              <div style="padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                <div style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Total Hours</div>
+                <div style="font-weight: 800; color: #0284c7; margin-top: 3px;">{{ selectedDetailDay()?.totalTimeStr }}</div>
+              </div>
+              <div style="padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                <div style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Productive Hours</div>
+                <div style="font-weight: 800; margin-top: 3px;">{{ selectedDetailDay()?.productiveHoursStr }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" (click)="showDayDetailModal.set(false)">Close</button>
+            <button class="btn btn-primary" (click)="showDayDetailModal.set(false); openRegularizeForDay(selectedDetailDay()!)">
+              ✏️ Regularize This Day
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Modal: Regularization Request -->
     @if (showRegModal()) {
       <div class="modal-overlay open" (click)="showRegModal.set(false)">
         <div class="modal" style="max-width: 480px;" (click)="$event.stopPropagation()">
           <div class="modal-header">
-            <div style="font-size: 1.1rem; font-weight: 700;">Submit Regularization Request</div>
+            <div style="font-size: 1.1rem; font-weight: 700;">Request Attendance Regularization</div>
             <button class="btn btn-ghost btn-sm" (click)="showRegModal.set(false)"><span [appIcon]="'x'"></span></button>
           </div>
           <div class="modal-body">
             <div class="form-group">
               <label class="form-label">Employee <span style="color: var(--danger)">*</span></label>
-              <select class="form-control" [(ngModel)]="newReg.employeeId">
+              <select class="form-control" [(ngModel)]="newReg.employeeId" (ngModelChange)="onRegEmpChange($event)">
                 @for (e of employees(); track e.id) {
                   <option [value]="e.id">{{ e.fullName }} ({{ e.department }})</option>
                 }
@@ -456,19 +759,19 @@ interface MusterDay {
               <label class="form-label">Date <span style="color: var(--danger)">*</span></label>
               <input class="form-control" type="date" [(ngModel)]="newReg.date" />
             </div>
-            <div class="grid-2">
+            <div class="grid-2" style="gap: 12px;">
               <div class="form-group">
-                <label class="form-label">In Time</label>
+                <label class="form-label">Check-In Time <span style="color: var(--danger)">*</span></label>
                 <input class="form-control" type="time" [(ngModel)]="newReg.inTime" />
               </div>
               <div class="form-group">
-                <label class="form-label">Out Time</label>
+                <label class="form-label">Check-Out Time <span style="color: var(--danger)">*</span></label>
                 <input class="form-control" type="time" [(ngModel)]="newReg.outTime" />
               </div>
             </div>
             <div class="form-group">
               <label class="form-label">Reason <span style="color: var(--danger)">*</span></label>
-              <textarea class="form-control" rows="3" [(ngModel)]="newReg.reason" placeholder="Reason for missed punch..."></textarea>
+              <textarea class="form-control" rows="3" [(ngModel)]="newReg.reason" placeholder="Reason for missed punch or regularization..."></textarea>
             </div>
           </div>
           <div class="modal-footer">
@@ -543,6 +846,355 @@ interface MusterDay {
           box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
         }
       }
+
+      /* ── Image 2 Muster Layout & Components ── */
+      .muster-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .muster-top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 12px 18px;
+        border-radius: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      }
+      .breadcrumb-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .back-link-btn {
+        background: none;
+        border: none;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--muted);
+        cursor: pointer;
+        padding: 0;
+        transition: color 0.15s ease;
+      }
+      .back-link-btn:hover {
+        color: var(--p);
+      }
+      .breadcrumb-separator {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .employee-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .muster-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .selector-wrapper, .date-picker-wrapper {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 4px 10px;
+      }
+      .selector-icon {
+        font-size: 13px;
+        opacity: 0.8;
+      }
+      .muster-emp-select, .muster-month-input {
+        border: none;
+        background: transparent;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text);
+        cursor: pointer;
+        outline: none;
+      }
+      .month-nav-btn {
+        background: none;
+        border: none;
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--muted);
+        cursor: pointer;
+        padding: 0 4px;
+        line-height: 1;
+        transition: color 0.15s ease;
+      }
+      .month-nav-btn:hover {
+        color: var(--p);
+      }
+      .muster-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 12px;
+      }
+      .muster-add-btn {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: 700;
+        border-radius: 8px;
+      }
+
+      /* 16-Metric Horizontal Ribbon (Image 2) */
+      .muster-kpi-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        overflow: hidden;
+      }
+      .kpi-ribbon-scroll {
+        display: flex;
+        overflow-x: auto;
+        scrollbar-width: thin;
+      }
+      .kpi-ribbon-item {
+        flex: 1;
+        min-width: 120px;
+        padding: 12px 14px;
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .kpi-ribbon-item:last-child {
+        border-right: none;
+      }
+      .kpi-val {
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+      }
+      .kpi-lbl {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        margin-top: 4px;
+        white-space: nowrap;
+      }
+      .val-green {
+        color: #16a34a !important;
+      }
+      .val-danger {
+        color: #dc2626 !important;
+      }
+      .val-warning {
+        color: #ea580c !important;
+      }
+      .info-tip {
+        font-size: 10px;
+        color: var(--muted);
+        cursor: help;
+        border-radius: 50%;
+        display: inline-flex;
+        width: 13px;
+        height: 13px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border);
+      }
+
+      /* Data Table */
+      .muster-table-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      }
+      .muster-data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      .muster-data-table th {
+        background: var(--bg);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        padding: 11px 12px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        white-space: nowrap;
+      }
+      .muster-data-table td {
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+        white-space: nowrap;
+      }
+      .muster-data-table tr:hover td {
+        background: rgba(0, 0, 0, 0.015);
+      }
+      .row-weekend td {
+        background: rgba(241, 245, 249, 0.4);
+      }
+      .row-today td {
+        background: rgba(59, 130, 246, 0.04);
+      }
+
+      .cell-date {
+        font-weight: 700;
+        color: var(--text);
+      }
+      .name-text {
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .day-status-pill {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 6px;
+        text-align: center;
+        min-width: 28px;
+      }
+      .status-icon-box {
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 800;
+      }
+      .status-icon-box.success {
+        background: #dcfce7;
+        color: #16a34a;
+      }
+      .status-icon-box.danger {
+        background: #fee2e2;
+        color: #dc2626;
+      }
+      .status-icon-box.warn {
+        background: #fef3c7;
+        color: #d97706;
+      }
+      .status-icon-dash {
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .action-select-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 2px 8px;
+      }
+      .action-bullet {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .bullet-present {
+        background: #16a34a;
+      }
+      .bullet-ongoing {
+        background: #0284c7;
+        box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+      }
+      .bullet-weekend {
+        background: #94a3b8;
+      }
+      .bullet-absent {
+        background: #dc2626;
+      }
+      .action-dropdown {
+        border: none;
+        background: transparent;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text);
+        outline: none;
+        cursor: pointer;
+      }
+
+      .time-with-icon {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-weight: 700;
+      }
+      .punch-device-badge {
+        font-size: 10px;
+        opacity: 0.7;
+      }
+      .early-out-text {
+        color: #dc2626 !important;
+        font-weight: 800;
+      }
+      .cell-total-time {
+        font-weight: 700;
+      }
+      .time-short {
+        color: #0284c7;
+      }
+      .time-good {
+        color: var(--text);
+      }
+      .extra-positive {
+        color: #16a34a;
+        font-weight: 700;
+      }
+      .shift-badge-link {
+        color: #0284c7;
+        font-weight: 700;
+        font-size: 11px;
+        cursor: pointer;
+        text-decoration: underline;
+        text-decoration-style: dotted;
+      }
+      .row-actions-group {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .action-icon-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+        padding: 2px 4px;
+        border-radius: 4px;
+        transition: background 0.15s ease;
+      }
+      .action-icon-btn:hover {
+        background: var(--bg);
+      }
+      .dash {
+        color: var(--muted);
+      }
+
       input[type="search"]::-webkit-search-decoration,
       input[type="search"]::-webkit-search-cancel-button,
       input[type="search"]::-webkit-search-results-button,
@@ -602,6 +1254,8 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly musterDays = signal<MusterDay[]>([]);
   protected readonly showRegModal = signal(false);
   protected readonly showPunchModal = signal(false);
+  protected readonly showDayDetailModal = signal(false);
+  protected readonly selectedDetailDay = signal<MusterDay | null>(null);
 
   private pollInterval: any = null;
 
@@ -631,6 +1285,101 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected readonly pendingCount = computed(() => this.regData().filter((r) => r.status === 'Pending').length);
 
+  // Selected Employee object computed
+  protected readonly selectedEmployee = computed(() => {
+    const id = this.selectedMusterEmpId;
+    return this.employees().find((e) => e.id === id) || this.employees()[0] || null;
+  });
+
+  // 16-Metric Horizontal Ribbon computed for selected employee and month
+  protected readonly musterKpis = computed(() => {
+    const days = this.musterDays();
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    let workingDaysCount = 0;
+    let clockedInDays = 0;
+    let presentDays = 0;
+    let halfDays = 0;
+    let absentDays = 0;
+    let scheduledDays = 0;
+    let onLeaveDays = 0;
+    let lateInCount = 0;
+    let earlyOutCount = 0;
+    let paidLeaveDays = 0;
+    let unpaidLeaveDays = 0;
+    let totalWorkMinutes = 0;
+
+    for (const d of days) {
+      if (!d.isWeekend && !d.isFuture) {
+        workingDaysCount++;
+      }
+      if (d.inTime && d.inTime !== '—') {
+        clockedInDays++;
+      }
+      if (d.status === 'Present') {
+        presentDays++;
+      } else if (d.status === 'HalfDay') {
+        halfDays++;
+      } else if (d.status === 'Absent') {
+        absentDays++;
+      } else if (d.status === 'OnLeave') {
+        onLeaveDays++;
+        paidLeaveDays++;
+      } else if (d.status === 'Scheduled' || d.isFuture) {
+        scheduledDays++;
+      }
+
+      if (d.isLateIn) lateInCount++;
+      if (d.isEarlyOut) earlyOutCount++;
+
+      totalWorkMinutes += Math.round((d.workHoursRaw || 0) * 60);
+    }
+
+    // Expected working hours = working days * 8 hours
+    const expectedTotalMinutes = Math.max(workingDaysCount * 8 * 60, 0);
+    const expH = Math.floor(expectedTotalMinutes / 60);
+    const expM = expectedTotalMinutes % 60;
+    const workingHoursStr = `${String(expH).padStart(2, '0')} H : ${String(expM).padStart(2, '0')} M : 00 S`;
+
+    // Actual working hours
+    const actH = Math.floor(totalWorkMinutes / 60);
+    const actM = totalWorkMinutes % 60;
+    const actualWorkingStr = `${String(actH).padStart(2, '0')} H : ${String(actM).padStart(2, '0')} M : 00 S`;
+
+    // Tracked hours
+    const trackedHoursStr = actualWorkingStr;
+
+    // Time difference
+    const diffMinutes = totalWorkMinutes - expectedTotalMinutes;
+    const sign = diffMinutes >= 0 ? '+' : '-';
+    const absDiff = Math.abs(diffMinutes);
+    const diffH = Math.floor(absDiff / 60);
+    const diffM = absDiff % 60;
+    const timeDiffStr = `${sign}${String(diffH).padStart(2, '0')} H : ${String(diffM).padStart(2, '0')} M : 00 S`;
+
+    const payrollPresent = presentDays + halfDays * 0.5 + paidLeaveDays;
+
+    return {
+      workingHours: workingHoursStr,
+      actualWorkingTime: actualWorkingStr,
+      trackedHours: trackedHoursStr,
+      timeDifference: timeDiffStr,
+      diffPositive: diffMinutes >= 0,
+      clockInDays: clockedInDays,
+      payrollPresentDays: payrollPresent,
+      odRemoteWork: 0,
+      absentDays: absentDays,
+      shiftNotStart: scheduledDays,
+      onLeaveDays: onLeaveDays,
+      lateIn: lateInCount,
+      earlyOut: earlyOutCount,
+      paidLeave: paidLeaveDays,
+      unpaidLeave: unpaidLeaveDays,
+      odHourlyRemote: '00H : 00M',
+      hourlyPaidLeave: '00H : 00M',
+    };
+  });
+
   // Reactive computed for instant filter & search matching
   protected readonly filteredDailyRows = computed(() => {
     const q = this.searchKeyword().toLowerCase().trim();
@@ -658,6 +1407,9 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
         if (params['month']) {
           this.selectedMusterMonth = params['month'];
         }
+        if (params['employeeId']) {
+          this.selectedMusterEmpId = params['employeeId'];
+        }
         if (this.selectedMusterEmpId) {
           this.generateMuster();
         }
@@ -675,7 +1427,6 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    // Prevent browser password/contact managers from autofilling user's email into search box
     const wipeAutofill = () => {
       if (this.searchInputRef?.nativeElement && !this.searchKeyword()) {
         this.searchInputRef.nativeElement.value = '';
@@ -693,7 +1444,6 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private startLivePolling(): void {
-    // Automatically poll every 10 seconds to keep Live Records updated in real-time
     this.pollInterval = setInterval(() => {
       const todayStr = new Date().toISOString().slice(0, 10);
       if (this.tab() === 'daily' && this.filterDate === todayStr) {
@@ -772,6 +1522,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
           // 1. Present employees
           for (const p of res.present || []) {
+            const isLate = p.status === 'Late';
             rows.push({
               id: p.employeeId,
               employeeCode: p.employeeCode,
@@ -783,6 +1534,9 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
               workHours: p.workHours ?? 0,
               status: p.status || 'Present',
               device: 'Face Terminal / Web',
+              dayStatusBadge: isLate ? 'HD' : 'FD',
+              dayStatusColor: isLate ? '#ea580c' : '#15803d',
+              dayStatusBg: isLate ? '#ffedd5' : '#dcfce7',
             });
           }
 
@@ -799,6 +1553,9 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
               workHours: 0,
               status: 'On Leave',
               device: p.leaveReason ? `Leave: ${p.leaveReason}` : 'Approved Leave',
+              dayStatusBadge: 'LV',
+              dayStatusColor: '#9333ea',
+              dayStatusBg: '#f3e8ff',
             });
           }
 
@@ -815,6 +1572,9 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
               workHours: 0,
               status: 'Absent',
               device: '—',
+              dayStatusBadge: 'AB',
+              dayStatusColor: '#dc2626',
+              dayStatusBg: '#fee2e2',
             });
           }
 
@@ -833,6 +1593,247 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected onFilterDateChange(): void {
     this.loadDailyAttendance();
+  }
+
+  protected viewEmployeeMuster(employeeId: string): void {
+    this.selectedMusterEmpId = employeeId;
+    this.tab.set('muster');
+    this.generateMuster();
+  }
+
+  protected onEmployeeSelectChange(): void {
+    const emp = this.selectedEmployee();
+    if (emp) {
+      this.newReg.employeeId = emp.id;
+      this.newReg.employeeName = emp.fullName;
+      this.punchForm.employeeId = emp.id;
+    }
+    this.generateMuster();
+  }
+
+  protected prevMonth(): void {
+    const [y, m] = this.selectedMusterMonth.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    this.selectedMusterMonth = d.toISOString().slice(0, 7);
+    this.generateMuster();
+  }
+
+  protected nextMonth(): void {
+    const [y, m] = this.selectedMusterMonth.split('-').map(Number);
+    const d = new Date(y, m, 1);
+    this.selectedMusterMonth = d.toISOString().slice(0, 7);
+    this.generateMuster();
+  }
+
+  protected generateMuster(): void {
+    if (!this.selectedMusterEmpId) return;
+
+    const parts = this.selectedMusterMonth.split('-');
+    const year = parseInt(parts[0], 10) || new Date().getFullYear();
+    const month = parseInt(parts[1], 10) || new Date().getMonth() + 1;
+    const emp = this.selectedEmployee();
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    this.api.muster(this.selectedMusterEmpId, year, month).subscribe({
+      next: (data: MonthlyMusterDay[]) => {
+        const mapped: MusterDay[] = (data || []).map((d) => {
+          const dateObj = new Date(d.date + 'T00:00:00');
+          const dayNum = dateObj.getDate();
+          const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+          const dateFormatted = `${dayOfWeek} ${String(dayNum).padStart(2, '0')} ${dateObj.toLocaleDateString('en-US', { month: 'short' })}, ${dateObj.getFullYear()}`;
+          const isWeekend = d.status === 'Weekend' || dateObj.getDay() === 0 || dateObj.getDay() === 6;
+          const isToday = d.date === todayStr;
+          const isFuture = d.date > todayStr;
+
+          const inTime12 = this.formatTime12(d.checkIn);
+          const outTime12 = this.formatTime12(d.checkOut);
+
+          const workHours = d.workHours || 0;
+          const isLateIn = !!(d.checkIn && this.isLateCheckIn(d.checkIn));
+          const isEarlyOut = !!(d.checkOut && this.isEarlyCheckOut(d.checkOut));
+
+          let dayStatusBadge: 'FD' | 'HD' | 'WK' | 'AB' | 'LV' | 'HL' | 'OD' | '—' = 'FD';
+          let dayStatusColor = '#15803d';
+          let dayStatusBg = '#dcfce7';
+
+          if (d.status === 'Weekend') {
+            dayStatusBadge = 'WK';
+            dayStatusColor = '#0284c7';
+            dayStatusBg = '#e0f2fe';
+          } else if (d.status === 'OnLeave') {
+            dayStatusBadge = 'LV';
+            dayStatusColor = '#9333ea';
+            dayStatusBg = '#f3e8ff';
+          } else if (d.status === 'Absent') {
+            dayStatusBadge = 'AB';
+            dayStatusColor = '#dc2626';
+            dayStatusBg = '#fee2e2';
+          } else if (d.status === 'HalfDay') {
+            dayStatusBadge = 'HD';
+            dayStatusColor = '#ea580c';
+            dayStatusBg = '#ffedd5';
+          } else if (d.status === 'Scheduled' || isFuture) {
+            dayStatusBadge = '—';
+            dayStatusColor = '#94a3b8';
+            dayStatusBg = '#f1f5f9';
+          }
+
+          // Attendance Status Icon
+          let attendanceIcon: 'P' | 'A' | 'L' | '⚠️' | '—' = '—';
+          let attendanceIconClass = 'status-box-gray';
+          if (d.status === 'Present' && (!d.checkOut || d.checkOut === '—')) {
+            attendanceIcon = '⚠️';
+            attendanceIconClass = 'status-box-warn';
+          } else if (d.status === 'Present') {
+            attendanceIcon = isLateIn ? 'L' : 'P';
+            attendanceIconClass = isLateIn ? 'status-box-warn' : 'status-box-success';
+          } else if (d.status === 'Absent') {
+            attendanceIcon = 'A';
+            attendanceIconClass = 'status-box-danger';
+          } else if (d.status === 'Late') {
+            attendanceIcon = 'L';
+            attendanceIconClass = 'status-box-warn';
+          }
+
+          // Action Status
+          let actionStatus = 'Present (P)';
+          if (d.status === 'Present' && (!d.checkOut || d.checkOut === '—')) {
+            actionStatus = 'On Going';
+          } else if (d.status === 'Present') {
+            actionStatus = 'Present (P)';
+          } else if (d.status === 'Weekend') {
+            actionStatus = 'Weekend';
+          } else if (d.status === 'Absent') {
+            actionStatus = 'Absent (A)';
+          } else if (d.status === 'HalfDay') {
+            actionStatus = 'Half Day';
+          } else if (d.status === 'OnLeave') {
+            actionStatus = 'On Leave';
+          } else if (isFuture) {
+            actionStatus = 'Scheduled';
+          }
+
+          // Durations
+          const totalTimeStr = workHours > 0 ? this.formatDuration(workHours) : '—';
+          const breakHoursStr = workHours >= 5 ? '01 H : 00 M' : '—';
+          const productiveHoursStr = workHours > 0 ? this.formatDuration(workHours >= 5 ? workHours - 1 : workHours) : '—';
+          const extraTimeStr = this.formatExtraTime(workHours);
+
+          return {
+            day: dayNum,
+            dateStr: d.date,
+            dateFormatted,
+            dayOfWeek,
+            isWeekend,
+            isToday,
+            isFuture,
+            dayStatusBadge,
+            dayStatusColor,
+            dayStatusBg,
+            attendanceIcon,
+            attendanceIconClass,
+            actionStatus,
+            inTime: inTime12,
+            inTimeRaw: d.checkIn || '',
+            outTime: outTime12,
+            outTimeRaw: d.checkOut || '',
+            isEarlyOut,
+            isLateIn,
+            totalTimeStr,
+            breakHoursStr,
+            productiveHoursStr,
+            extraTimeStr,
+            shiftName: 'DEFAULT',
+            locationName: 'Surat',
+            jobRole: emp?.jobTitle || emp?.department || 'Executive',
+            workHoursRaw: workHours,
+            status: d.status,
+            color: dayStatusColor,
+            hours: totalTimeStr,
+          };
+        });
+        this.musterDays.set(mapped);
+      },
+      error: () => {
+        this.musterDays.set([]);
+      },
+    });
+  }
+
+  private formatTime12(timeStr?: string | null): string {
+    if (!timeStr || timeStr === '—') return '—';
+    if (timeStr.includes('T')) {
+      const d = new Date(timeStr);
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      let h = parseInt(parts[0], 10);
+      const m = parts[1].padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      h = h ? h : 12;
+      return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+    }
+    return timeStr;
+  }
+
+  private formatDuration(hoursDecimal: number): string {
+    if (!hoursDecimal || hoursDecimal <= 0) return '—';
+    const totalMin = Math.round(hoursDecimal * 60);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return `${String(h).padStart(2, '0')} H : ${String(m).padStart(2, '0')} M`;
+  }
+
+  private formatExtraTime(hoursDecimal: number): string {
+    if (!hoursDecimal || hoursDecimal <= 8) return '—';
+    const extraMin = Math.round((hoursDecimal - 8) * 60);
+    const h = Math.floor(extraMin / 60);
+    const m = extraMin % 60;
+    return `${String(h).padStart(2, '0')} H : ${String(m).padStart(2, '0')} M`;
+  }
+
+  private isLateCheckIn(timeStr: string): boolean {
+    if (!timeStr) return false;
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      return h > 9 || (h === 9 && m > 30);
+    }
+    return false;
+  }
+
+  private isEarlyCheckOut(timeStr: string): boolean {
+    if (!timeStr) return false;
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      const h = parseInt(parts[0], 10);
+      return h < 17;
+    }
+    return false;
+  }
+
+  protected openDayDetails(day: MusterDay): void {
+    this.selectedDetailDay.set(day);
+    this.showDayDetailModal.set(true);
+  }
+
+  protected openRegularizeForDay(day: MusterDay): void {
+    const emp = this.selectedEmployee();
+    this.newReg.employeeId = emp?.id || this.selectedMusterEmpId;
+    this.newReg.employeeName = emp?.fullName || '';
+    this.newReg.date = day.dateStr;
+    this.newReg.inTime = day.inTimeRaw || '09:30';
+    this.newReg.outTime = day.outTimeRaw || '18:00';
+    this.newReg.reason = 'Attendance Regularization';
+    this.showRegModal.set(true);
+  }
+
+  protected onAttendanceActionChange(day: MusterDay, newAction: string): void {
+    if (newAction === day.actionStatus) return;
+    this.openRegularizeForDay(day);
   }
 
   protected openQuickPunchModal(): void {
@@ -861,54 +1862,14 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           this.punchForm.note = '';
           this.toast.show(`Recorded ${p.punchType} for ${p.employeeName}!`);
           this.loadDailyAttendance();
+          if (this.tab() === 'muster') {
+            this.generateMuster();
+          }
         },
         error: (err) => {
           this.toast.show(err?.error?.message || 'Failed to record punch', 'danger');
         },
       });
-  }
-
-  protected generateMuster(): void {
-    if (!this.selectedMusterEmpId) return;
-
-    const parts = this.selectedMusterMonth.split('-');
-    const year = parseInt(parts[0], 10) || new Date().getFullYear();
-    const month = parseInt(parts[1], 10) || new Date().getMonth() + 1;
-
-    this.api.muster(this.selectedMusterEmpId, year, month).subscribe({
-      next: (data: MonthlyMusterDay[]) => {
-        const mapped: MusterDay[] = (data || []).map((d) => {
-          const dateObj = new Date(d.date + 'T00:00:00');
-          const dayNum = dateObj.getDate();
-          const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-          const isWeekend = d.status === 'Weekend' || dateObj.getDay() === 0 || dateObj.getDay() === 6;
-
-          let color = '#16a34a';
-          if (d.status === 'Weekend') color = '#9ca3af';
-          else if (d.status === 'Late') color = '#d97706';
-          else if (d.status === 'Absent') color = '#dc2626';
-          else if (d.status === 'OnLeave') color = '#0284c7';
-          else if (d.status === 'Scheduled') color = '#8b5cf6';
-          else if (d.status === 'HalfDay') color = '#ea580c';
-
-          return {
-            day: dayNum,
-            dateStr: d.date,
-            dayOfWeek,
-            isWeekend,
-            inTime: d.checkIn || '—',
-            outTime: d.checkOut || '—',
-            hours: d.workHours ? `${d.workHours} hrs` : '0',
-            status: d.status,
-            color,
-          };
-        });
-        this.musterDays.set(mapped);
-      },
-      error: () => {
-        this.musterDays.set([]);
-      },
-    });
   }
 
   protected loadRegularizations(): void {
@@ -947,9 +1908,40 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected exportCsv(): void {
-    const headers = ['Employee Code', 'Employee Name', 'Department', 'Date', 'Check In', 'Check Out', 'Hours', 'Status'];
+    if (this.tab() === 'muster') {
+      const emp = this.selectedEmployee();
+      const headers = ['Date', 'Day', 'Day Status', 'Status', 'In Time', 'Out Time', 'Total Hours', 'Break Hours', 'Productive Hours', 'Extra Time', 'Shift', 'Location'];
+      const rows = this.musterDays().map((d) =>
+        [
+          `"${d.dateFormatted}"`,
+          d.dayOfWeek,
+          d.dayStatusBadge,
+          d.status,
+          d.inTime,
+          d.outTime,
+          `"${d.totalTimeStr}"`,
+          `"${d.breakHoursStr}"`,
+          `"${d.productiveHoursStr}"`,
+          `"${d.extraTimeStr}"`,
+          d.shiftName,
+          d.locationName,
+        ].join(',')
+      );
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Muster_${emp?.employeeCode || 'EMP'}_${this.selectedMusterMonth}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      this.toast.show(`Monthly muster for ${emp?.fullName || 'employee'} exported to CSV`);
+      return;
+    }
+
+    const headers = ['Employee Code', 'Employee Name', 'Department', 'Date', 'Day Status', 'Check In', 'Check Out', 'Hours', 'Status'];
     const rows = this.filteredDailyRows().map((r) =>
-      [r.employeeCode, `"${r.employeeName}"`, `"${r.department}"`, r.date, r.checkIn, r.checkOut, r.workHours, r.status].join(',')
+      [r.employeeCode, `"${r.employeeName}"`, `"${r.department}"`, r.date, r.dayStatusBadge, r.checkIn, r.checkOut, r.workHours, r.status].join(',')
     );
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -960,6 +1952,13 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     a.click();
     URL.revokeObjectURL(url);
     this.toast.show('Attendance exported to CSV');
+  }
+
+  protected onRegEmpChange(empId: string): void {
+    const e = this.employees().find((x) => x.id === empId);
+    if (e) {
+      this.newReg.employeeName = e.fullName;
+    }
   }
 
   protected openRegModal(): void {
@@ -991,6 +1990,9 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           this.toast.show('Regularization request submitted successfully!');
           this.loadRegularizations();
           this.loadDailyAttendance();
+          if (this.tab() === 'muster') {
+            this.generateMuster();
+          }
         },
         error: (err) => {
           this.toast.show(err?.error?.message || 'Failed to submit regularization request', 'danger');
