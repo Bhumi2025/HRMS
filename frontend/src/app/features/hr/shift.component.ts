@@ -23,22 +23,18 @@ export interface ShiftTemplateItem {
   selector: 'app-shift',
   imports: [CommonModule, FormsModule, IconDirective],
   template: `
-    <!-- Top Action Bar (Right aligned) -->
-    <div class="flex justify-end items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-      <div class="flex gap-2">
+    <!-- SHIFT TEMPLATES CARD -->
+    <div class="card">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="card-title" style="margin: 0;">Configured Shifts</div>
+          <span style="font-size: 12px; color: var(--muted)">{{ templates().length }} Active Shift{{ templates().length === 1 ? '' : 's' }}</span>
+        </div>
         @if (perms.canCreate('Shift')) {
           <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="openAddShift()">
             <span [appIcon]="'plus'"></span> Add Shift
           </button>
         }
-      </div>
-    </div>
-
-    <!-- SHIFT TEMPLATES CARD -->
-    <div class="card">
-      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-        <div class="card-title">Configured Shifts</div>
-        <span style="font-size: 12px; color: var(--muted)">{{ templates().length }} Active Shift{{ templates().length === 1 ? '' : 's' }}</span>
       </div>
       <div class="table-wrap">
         <table>

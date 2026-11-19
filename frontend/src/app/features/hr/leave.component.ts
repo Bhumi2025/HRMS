@@ -37,23 +37,17 @@ interface LeaveType {
   selector: 'app-leave',
   imports: [CommonModule, FormsModule, IconDirective, SelectComponent],
   template: `
-    @if (!isSuperAdmin() && perms.canCreate('Leave')) {
-      <div class="flex justify-end items-center" style="margin-bottom: 15px">
-        <button class="btn btn-primary btn-sm" (click)="openApplyModal()">+ Apply Leave</button>
-      </div>
-    }
-
     @if (isAdmin()) {
-      <div class="card" style="margin-bottom: 16px; overflow: visible;">
-        <div class="card-header" style="overflow: visible;">
+      <div class="card" style="margin-bottom: 16px; overflow: hidden; display: flex; flex-direction: column;">
+        <div class="card-header" style="overflow: visible; flex-shrink: 0;">
           <div class="card-title">Leave Types</div>
           @if (perms.canCreate('Leave')) {
             <button class="btn btn-primary btn-sm" (click)="openType(null)">+ Add Leave Type</button>
           }
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" style="max-height: 260px; overflow-y: auto; overflow-x: auto;">
           <table>
-            <thead>
+            <thead style="position: sticky; top: 0; z-index: 2; background: var(--surface, #fff);">
               <tr>
                 <th>Leave Type</th>
                 <th>Max Days/Year</th>
@@ -100,8 +94,8 @@ interface LeaveType {
       </div>
     }
 
-    <div class="card" style="overflow: visible;">
-      <div class="card-header" style="margin-bottom: 12px; flex-wrap: wrap; gap: 8px; overflow: visible; position: relative; z-index: 30;">
+    <div class="card" style="overflow: hidden; display: flex; flex-direction: column;">
+      <div class="card-header" style="margin-bottom: 0; flex-wrap: wrap; gap: 8px; overflow: visible; position: relative; z-index: 30; flex-shrink: 0; padding-bottom: 10px; border-bottom: 1px solid var(--border);">
         <div class="card-title">All Leave Requests</div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; overflow: visible; position: relative; z-index: 30;">
           <!-- Instant Search Box with Icon, Clear Button, and Anti-Autofill -->
@@ -151,11 +145,14 @@ interface LeaveType {
               Clear Filters
             </button>
           }
+          @if (!isSuperAdmin() && perms.canCreate('Leave')) {
+            <button class="btn btn-primary btn-sm" style="margin-left: 4px; white-space: nowrap;" (click)="openApplyModal()">+ Apply Leave</button>
+          }
         </div>
       </div>
-      <div class="table-wrap" style="position: relative; z-index: 1; min-height: 180px;">
+      <div class="table-wrap" style="position: relative; z-index: 1; max-height: 360px; overflow-y: auto; overflow-x: auto;">
         <table>
-          <thead>
+          <thead style="position: sticky; top: 0; z-index: 2; background: var(--surface, #fff);">
             <tr>
               <th>Employee</th>
               <th>Type</th>

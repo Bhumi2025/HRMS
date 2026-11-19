@@ -35,22 +35,11 @@ interface Employee {
   selector: 'app-employees',
   imports: [CommonModule, IconDirective, SelectComponent, RouterLink, KeyGroupSelectComponent],
   template: `
-    <div class="flex justify-end items-center" style="margin-bottom: 15px">
-      <div class="flex gap-2">
-        <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="exportCsv()">
-          <span [appIcon]="'download'"></span> Export
-        </button>
-        @if (perms.canCreate('Employees')) {
-          <button class="btn btn-primary btn-sm" (click)="openAdd()"><span [appIcon]="'plus'"></span> Add Employee</button>
-        }
-      </div>
-    </div>
-
     <!-- Single Card: Filter + Table -->
     <div class="card" style="overflow: visible;">
-      <div style="padding: 12px; border-bottom: 1px solid var(--border); position: relative; z-index: 25;">
-        <div class="filter-bar" style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center">
-          <div class="input-group" style="flex: 1; min-width: 150px; position: relative;">
+      <div style="padding: 10px 12px; border-bottom: 1px solid var(--border); position: relative; z-index: 25;">
+        <div class="filter-bar" style="display: flex; gap: 6px; flex-wrap: nowrap; align-items: center">
+          <div class="input-group" style="flex: 1; min-width: 120px; max-width: 320px; position: relative;">
             <span class="input-icon" style="display: flex" [appIcon]="'search'"></span>
             <input
               #searchInput
@@ -58,7 +47,7 @@ interface Employee {
               id="emp_search_filter_query"
               name="emp_search_filter_query"
               class="form-control"
-              placeholder="Search employees by name, ID, department..."
+              placeholder="Search by name, ID, dept..."
               [value]="search()"
               (input)="onSearchInput($any($event.target).value)"
               (change)="onSearchInput($any($event.target).value)"
@@ -71,7 +60,7 @@ interface Employee {
               data-lpignore="true"
               data-form-type="other"
               role="searchbox"
-              style="padding-right: 28px;"
+              style="padding-right: 28px; font-size: 13px;"
             />
             @if (search()) {
               <button
@@ -88,17 +77,25 @@ interface Employee {
             [options]="departmentOptions()"
             [value]="dept()"
             (valueChange)="onDeptChange($event)"
-            width="150px"
+            width="140px"
           />
           <app-select
             [options]="statusOptions"
             [value]="status()"
             (valueChange)="onStatusChange($event)"
-            width="110px"
+            width="105px"
           />
-          <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 4px" (click)="clearFilters()">
+          <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 4px; white-space: nowrap;" (click)="clearFilters()">
             <span [appIcon]="'x'"></span> Clear
           </button>
+          <div style="display: flex; gap: 6px; margin-left: auto; flex-shrink: 0;">
+            <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px; white-space: nowrap;" (click)="exportCsv()">
+              <span [appIcon]="'download'"></span> Export
+            </button>
+            @if (perms.canCreate('Employees')) {
+              <button class="btn btn-primary btn-sm" style="white-space: nowrap;" (click)="openAdd()"><span [appIcon]="'plus'"></span> Add Employee</button>
+            }
+          </div>
         </div>
       </div>
 

@@ -245,9 +245,9 @@ interface MusterDay {
           </div>
         </div>
 
-        <div class="table-wrap" style="overflow-x: auto; width: 100%; padding-bottom: 6px;">
+        <div class="table-wrap" style="overflow-x: auto; overflow-y: auto; width: 100%; max-height: 460px; padding-bottom: 0;">
           <table class="daily-punch-table" style="width: 100%; min-width: 1080px; border-collapse: collapse;">
-            <thead>
+            <thead style="position: sticky; top: 0; z-index: 3; background: var(--surface, #fff);">
               <tr>
                 <th style="min-width: 180px;">Employee</th>
                 <th style="min-width: 110px;">Department</th>
@@ -791,9 +791,9 @@ interface MusterDay {
           <div class="card-title">Regularization Requests</div>
           <button class="btn btn-primary btn-sm" (click)="openRegModal()">+ New Request</button>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" style="max-height: 460px; overflow-y: auto; overflow-x: auto;">
           <table>
-            <thead>
+            <thead style="position: sticky; top: 0; z-index: 3; background: var(--surface, #fff);">
               <tr>
                 <th>Employee</th>
                 <th>Date</th>
