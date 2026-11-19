@@ -130,8 +130,8 @@ import { KeyGroupSelectComponent } from '../../shared/key-select.component';
                   <input class="form-control" placeholder="1234567890" [class.invalid]="isInvalid('accountNumber')" [value]="bank().accountNumber" (input)="patchB('accountNumber', $any($event.target).value)" />
                 </div>
                 <div>
-                  <label class="form-label">IBAN</label>
-                  <input class="form-control" placeholder="AE07 0331 2345 6789 0123 456" [value]="bank().iban" (input)="patchB('iban', $any($event.target).value)" />
+                  <label class="form-label">IFSC Code</label>
+                  <input class="form-control" placeholder="e.g. HDFC0001234" [value]="bank().ifscCode" (input)="patchB('ifscCode', $any($event.target).value)" />
                 </div>
                 <div>
                   <label class="form-label">Swift Code</label>
@@ -772,6 +772,7 @@ export class EmpOnboardingComponent implements OnDestroy {
     bankName: '',
     accountName: '',
     accountNumber: '',
+    ifscCode: '',
     iban: '',
     swift: '',
     branch: '',
@@ -992,8 +993,8 @@ export class EmpOnboardingComponent implements OnDestroy {
             bankName: bank.bankName,
             accountName: bank.accountName,
             accountNumber: bank.accountNumber,
-            iban: bank.iban,
-            ifscCode: employee.ifscCode,
+            iban: bank.ifscCode || bank.iban,
+            ifscCode: bank.ifscCode || bank.iban,
             swiftCode: bank.swift,
             paymentMode: employee.paymentMode,
             wpsId: employee.wpsId,

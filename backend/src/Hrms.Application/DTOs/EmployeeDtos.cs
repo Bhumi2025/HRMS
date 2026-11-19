@@ -107,6 +107,7 @@ public sealed record CreateEmployeeRequest(
     string? AccountName = null,
     string? AccountNumber = null,
     string? Iban = null,
+    string? IfscCode = null,
     PaymentMode? PaymentMode = null,
     string? Password = null,
     string? RoleCode = null);
