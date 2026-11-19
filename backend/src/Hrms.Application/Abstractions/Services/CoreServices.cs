@@ -128,4 +128,10 @@ public interface IPayrollService
     Task<IReadOnlyList<PayslipDto>> GetPayslipsForEmployeeAsync(Guid employeeId, CancellationToken ct = default);
 
     Task<PayrollRunDto> RunPayrollAsync(RunPayrollRequest request, CancellationToken ct = default);
+
+    Task<PayrollPreflightCheckDto> PreflightCheckAsync(int month, int year, CancellationToken ct = default);
+
+    Task<SendPayslipsResultDto> SendPayslipsAsync(SendPayslipsRequest request, CancellationToken ct = default);
+
+    Task<bool> DeletePayrollRunAsync(Guid runId, CancellationToken ct = default);
 }

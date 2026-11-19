@@ -16,14 +16,15 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   if (token) {
     setHeaders['Authorization'] = `Bearer ${token}`;
   }
-  const isSelfAuth = request.url.includes('/auth/change-password') ||
-                     request.url.includes('/auth/profile') ||
-                     request.url.includes('/auth/me');
+  const isPlatformOrSelfAuth = request.url.includes('/auth/change-password') ||
+                               request.url.includes('/auth/profile') ||
+                               request.url.includes('/auth/me') ||
+                               request.url.includes('/companies');
 
-  if (!isSelfAuth && companyCode && companyCode !== 'ALL' && !request.headers.has('X-Company-Code')) {
+  if (!isPlatformOrSelfAuth && companyCode && companyCode !== 'ALL' && !request.headers.has('X-Company-Code')) {
     setHeaders['X-Company-Code'] = companyCode;
   }
-  if (!isSelfAuth && companyId && companyId !== 'all' && !request.headers.has('X-Company-Id')) {
+  if (!isPlatformOrSelfAuth && companyId && companyId !== 'all' && !request.headers.has('X-Company-Id')) {
     setHeaders['X-Company-Id'] = companyId;
   }
 

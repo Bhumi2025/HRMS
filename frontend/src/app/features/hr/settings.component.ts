@@ -947,7 +947,7 @@ export class SettingsComponent implements OnInit {
   private originalEditingKg: KeyGroup | null = null;
   protected readonly isEnumLocked = computed(() => {
     const code = (this.keyGroupEditForm.code || '').toUpperCase().trim();
-    return !!(this.originalEditingKg?.isEnumLocked || ['GENDER', 'MARITAL_STATUS', 'EMPLOYMENT_TYPE', 'PAYMENT_MODE'].includes(code));
+    return !!(this.originalEditingKg?.isEnumLocked || ['GENDER', 'MARITAL_STATUS', 'EMPLOYMENT_TYPE'].includes(code));
   });
 
   // Navigations State (from backend tree)

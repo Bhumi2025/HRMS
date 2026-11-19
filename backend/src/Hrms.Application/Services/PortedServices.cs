@@ -849,8 +849,7 @@ public sealed class OptionsService : IOptionsService
     {
         "GENDER",
         "MARITAL_STATUS",
-        "EMPLOYMENT_TYPE",
-        "PAYMENT_MODE"
+        "EMPLOYMENT_TYPE"
     };
 
     public async Task<IReadOnlyList<KeyGroupDto>> GetKeyGroupsAsync(CancellationToken ct = default)
@@ -1061,6 +1060,48 @@ public sealed class OptionsService : IOptionsService
 
         var stores = await _uow.KeyStores.ToListAsync(
             _uow.KeyStores.Query().Where(s => s.KeyGroupId == group.Id && s.IsActive).OrderBy(s => s.DisplayOrder), ct);
+
+        if (groupCode.Equals("PAYMENT_MODE", StringComparison.OrdinalIgnoreCase))
+        {
+            var defaultModes = new[] { "Bank Transfer", "Cheque", "Cash" };
+            bool modified = false;
+            int order = stores.Count > 0 ? stores.Max(s => s.DisplayOrder) + 1 : 1;
+            var allStoresForGroup = await _uow.KeyStores.ToListAsync(
+                _uow.KeyStores.Query().Where(s => s.KeyGroupId == group.Id), ct);
+
+            foreach (var mode in defaultModes)
+            {
+                var existing = allStoresForGroup.FirstOrDefault(s =>
+                    s.Key.Equals(mode, StringComparison.OrdinalIgnoreCase) ||
+                    s.Value.Equals(mode, StringComparison.OrdinalIgnoreCase));
+
+                if (existing == null)
+                {
+                    await _uow.KeyStores.AddAsync(new KeyStore
+                    {
+                        KeyGroupId = group.Id,
+                        Key = mode,
+                        Value = mode,
+                        DisplayOrder = order++,
+                        IsActive = true
+                    }, ct);
+                    modified = true;
+                }
+                else if (!existing.IsActive)
+                {
+                    existing.IsActive = true;
+                    _uow.KeyStores.Update(existing);
+                    modified = true;
+                }
+            }
+
+            if (modified)
+            {
+                await _uow.SaveChangesAsync(ct);
+                stores = await _uow.KeyStores.ToListAsync(
+                    _uow.KeyStores.Query().Where(s => s.KeyGroupId == group.Id && s.IsActive).OrderBy(s => s.DisplayOrder), ct);
+            }
+        }
 
         return stores.Select(s => new KeyStoreDto(s.Id, s.KeyGroupId, s.Key, s.Value, s.SubValue, s.DisplayOrder, s.IsActive)).ToList();
     }
@@ -1442,7 +1483,7 @@ public sealed class OptionsService : IOptionsService
             ("MARITAL_STATUS", "Marital Status", true, new[] { "Single", "Married", "Divorced", "Widowed" }),
             ("EMPLOYMENT_TYPE", "Employment Type", true, new[] { "Full-time", "Part-time", "Contract", "Internship" }),
             ("GRADE_LEVEL", "Grade / Level", false, new[] { "L1", "L2", "L3", "L4", "L5", "L6" }),
-            ("PAYMENT_MODE", "Payment Mode", true, new[] { "Bank Transfer", "WPS", "Cheque", "Cash" }),
+            ("PAYMENT_MODE", "Payment Mode", false, new[] { "Bank Transfer", "Cheque", "Cash" }),
             ("DOCUMENT_TYPE", "Document Type", false, new[] { "Passport", "Visa", "National ID", "Work Permit", "Medical Insurance", "Other" }),
             ("ASSET_TYPE", "Asset Type", false, new[] { "Laptop", "Monitor", "Keyboard", "Mouse", "Phone", "Access Card", "Other" }),
             ("SUPPORT_TYPE", "Support Type", false, new[] { "IT Hardware", "Software Access", "HR Policy", "Payroll Inquiry", "Facilities" }),

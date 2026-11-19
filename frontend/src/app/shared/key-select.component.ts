@@ -202,6 +202,23 @@ export class KeyGroupSelectComponent implements OnInit, OnChanges, OnDestroy, Co
         isActive: o.isActive,
       }));
 
+    // Ensure standard active payment modes are always present if PAYMENT_MODE group is selected
+    if (this.groupCode?.trim().toUpperCase() === 'PAYMENT_MODE') {
+      const defaultModes = ['Bank Transfer', 'Cheque', 'Cash'];
+      for (const mode of defaultModes) {
+        const found = result.find(
+          (o) => o.value.toLowerCase() === mode.toLowerCase() || o.key.toLowerCase() === mode.toLowerCase()
+        );
+        if (!found) {
+          result.push({
+            key: mode,
+            value: mode,
+            isActive: true,
+          });
+        }
+      }
+    }
+
     // If current value is set and not present in active options, find in raw or append as legacy
     if (curr) {
       const matchInActive = result.find(

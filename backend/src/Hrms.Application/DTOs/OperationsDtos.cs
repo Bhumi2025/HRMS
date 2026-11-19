@@ -20,7 +20,8 @@ public sealed record CompanySettingsDto(
     string? LogoUrl,
     string? TimeZone,
     string? TaxNumberLabel,
-    string? RegistrationNumberLabel);
+    string? RegistrationNumberLabel,
+    decimal WorkingDaysPerWeek = 5.0m);
 
 public sealed record SaveCompanySettingsRequest(
     [Required, MaxLength(160)] string CompanyName,
@@ -38,7 +39,8 @@ public sealed record SaveCompanySettingsRequest(
     string? PayrollCurrency = null,
     string? LogoUrl = null,
     string? TaxNumberLabel = null,
-    string? RegistrationNumberLabel = null);
+    string? RegistrationNumberLabel = null,
+    [Range(1.0, 7.0)] decimal? WorkingDaysPerWeek = 5.0m);
 
 public sealed record CompanyLogoResponse(string LogoUrl);
 

@@ -1714,7 +1714,7 @@ export class EmployeeProfileComponent implements OnInit {
     iban: '',
     ifsc: '',
     swift: '',
-    currency: 'AED',
+    currency: 'INR',
     paymentMode: 'Bank Transfer',
     wpsId: '',
   });
@@ -1758,7 +1758,7 @@ export class EmployeeProfileComponent implements OnInit {
     { v: 'HSBC', l: 'HSBC' },
     { v: 'Other', l: 'Other' },
   ];
-  protected readonly bankCurrencyOptions: SelectOption[] = ['AED', 'USD', 'SAR', 'GBP'].map((c) => ({ v: c, l: c }));
+  protected readonly bankCurrencyOptions: SelectOption[] = ['INR', 'USD', 'AED', 'SAR', 'EUR', 'GBP'].map((c) => ({ v: c, l: c }));
   protected readonly paymentModeOptions: SelectOption[] = [
     { v: 'Bank Transfer', l: 'Bank Transfer' },
     { v: 'WPS', l: 'WPS' },

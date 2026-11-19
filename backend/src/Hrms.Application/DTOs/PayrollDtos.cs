@@ -13,7 +13,8 @@ public sealed record PayrollRunDto(
     decimal TotalGross,
     decimal TotalAllowances,
     decimal TotalDeductions,
-    decimal TotalNet);
+    decimal TotalNet,
+    decimal ReductionPercent = 0m);
 
 public sealed record PayslipDto(
     Guid Id,
@@ -29,13 +30,24 @@ public sealed record PayslipDto(
     int WorkingDays,
     string Status,
     DateOnly PayDate,
-    string? EmployeeCode = null);
+    string? EmployeeCode = null,
+    string? Designation = null,
+    string? BankName = null,
+    string? AccountNumber = null,
+    string? IfscCode = null,
+    int WorkedDays = 0,
+    int PaidLeaveDays = 0,
+    int UnpaidDays = 0,
+    int WeeklyOffDays = 0,
+    string? Email = null,
+    decimal ReductionPercent = 0m);
 
 public sealed record RunPayrollRequest(
     [Range(1, 12)] int Month,
     [Range(2000, 2100)] int Year,
     DateOnly PayDate,
-    PaymentMode PaymentMethod);
+    PaymentMode PaymentMethod,
+    decimal? ReductionPercent = 0);
 
 public sealed record PayrollSummaryDto(
     decimal GrossPayroll,
@@ -44,3 +56,20 @@ public sealed record PayrollSummaryDto(
     decimal NetPayable,
     int EmployeeCount,
     decimal BasicSalary = 0m);
+
+public sealed record PayrollPreflightCheckDto(
+    bool CanRun,
+    int PendingLeavesCount,
+    string Message,
+    IReadOnlyList<string> PendingEmployeeNames);
+
+public sealed record SendPayslipsRequest(
+    IReadOnlyList<Guid> EmployeeIds,
+    int Month,
+    int Year,
+    string? CustomMessage = null);
+
+public sealed record SendPayslipsResultDto(
+    int TotalRequested,
+    int SuccessfullySent,
+    string Message);
