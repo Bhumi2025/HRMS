@@ -146,7 +146,7 @@ import { EmployeePunchWidgetComponent } from '../../shared/employee-punch-widget
           </div>
           <div class="card-body">
             @for (a of announcements(); track a.title) {
-              <div class="ann-card" [class.warning]="a.type === 'warning'" [class.danger]="a.type === 'danger'" style="margin-bottom: 8px">
+              <div class="ann-card" [class.warning]="a.type === 'warning'" [class.danger]="a.type === 'danger'" style="margin-bottom: 8px; cursor: pointer" routerLink="/me/announcements">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 3px">
                   <div style="font-size: 14px; font-weight: 700; color: var(--text)">{{ a.title }}</div>
                   <div style="font-size: 12px; color: var(--muted); white-space: nowrap; margin-left: 8px">{{ a.time }}</div>
