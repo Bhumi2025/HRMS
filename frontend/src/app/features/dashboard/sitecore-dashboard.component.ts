@@ -11,6 +11,7 @@ interface Tile {
   icon: string;
   label: string;
   path: string;
+  queryParams?: Record<string, string>;
   iconClass: string;
   desc?: string;
   badge?: number;
@@ -56,11 +57,13 @@ const tile = (
   iconClass: string,
   desc?: string,
   badge?: number,
+  queryParams?: Record<string, string>,
 ): Tile => ({
   key,
   icon: T[key].replace('<svg ', '<svg width="18" height="18" '),
   label,
   path,
+  queryParams,
   iconClass,
   desc,
   badge,
@@ -110,7 +113,7 @@ const tile = (
           <div class="sc-section-title">{{ section.title }}</div>
           <div class="sc-tiles">
             @for (t of section.tiles; track t.key + t.label) {
-              <div class="sc-tile" [routerLink]="t.path">
+              <div class="sc-tile" [routerLink]="t.path" [queryParams]="t.queryParams">
                 @if (t.badge) {
                   <span class="sc-tile-badge">{{ t.badge }}</span>
                 }
@@ -543,7 +546,7 @@ export class SitecoreDashboardComponent implements OnInit {
       tiles: [
         tile('attendance', 'Attendance', '/attendance', 'ic-teal', 'Daily check-in/out'),
         tile('leave', 'Leave', '/leave', 'ic-green', 'Apply & track leave'),
-        tile('holiday', 'Holiday Calendar', '/attendance', 'ic-orange', 'Public & optional'),
+        tile('holiday', 'Holiday Calendar', '/company', 'ic-orange', 'Public & optional', undefined, { tab: 'holiday' }),
         tile('shift', 'Shift Management', '/shift', 'ic-blue', 'Rosters & timings'),
       ],
     },
@@ -577,8 +580,8 @@ export class SitecoreDashboardComponent implements OnInit {
       tiles: [
         tile('company', 'Company Setup', '/company', 'ic-cyan', 'Org info & branding'),
         tile('roles', 'Roles & Permissions', '/settings', 'ic-purple', 'Access control & RBAC'),
-        tile('departments', 'Departments', '/company', 'ic-green', 'Teams & divisions'),
-        tile('designations', 'Designations', '/company', 'ic-amber', 'Job titles & grades'),
+        tile('departments', 'Departments', '/company', 'ic-green', 'Teams & divisions', undefined, { tab: 'departments' }),
+        tile('designations', 'Designations', '/company', 'ic-amber', 'Job titles & grades', undefined, { tab: 'designations' }),
       ],
     },
   ];

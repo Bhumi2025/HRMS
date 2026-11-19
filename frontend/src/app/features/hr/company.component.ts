@@ -1692,8 +1692,15 @@ export class CompanyComponent implements OnInit, OnDestroy {
         }
       });
     } else {
-      this.activeTab.set('profile');
-      this.loadCompanyProfile();
+      this.route.queryParams.subscribe((params) => {
+        const tab = params['tab'] as CompanyTab | undefined;
+        if (tab && ['profile', 'departments', 'designations', 'holiday'].includes(tab)) {
+          this.selectTab(tab);
+        } else {
+          this.activeTab.set('profile');
+          this.loadCompanyProfile();
+        }
+      });
     }
     this.loadBackendData();
   }

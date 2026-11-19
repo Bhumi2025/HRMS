@@ -505,13 +505,13 @@
           <span class="badge badge-warning">{{ upcomingHolidays().length }} Scheduled</span>
           }
         </div>
-        <a routerLink="/attendance" class="view-link">Calendar ›</a>
+        <a routerLink="/company" [queryParams]="{ tab: 'holiday' }" class="view-link">Calendar ›</a>
       </div>
 
       <div class="widget-body widget-scroll-list">
         <div class="holiday-list">
           @for (h of upcomingHolidays(); track h.id) {
-          <div class="holiday-card">
+          <a routerLink="/company" [queryParams]="{ tab: 'holiday' }" class="holiday-card" style="text-decoration: none; color: inherit; cursor: pointer; display: flex;">
             <div class="holiday-date-badge">
               <span class="month">{{ h.date | date:'MMM' }}</span>
               <span class="day">{{ h.date | date:'d' }}</span>
@@ -520,7 +520,7 @@
               <div class="holiday-name">{{ h.name }}</div>
               <div class="holiday-sub">{{ h.dayLabel }} · <span class="holiday-pill">{{ h.type }}</span></div>
             </div>
-          </div>
+          </a>
           } @empty {
           <div class="empty-state">
             <span class="empty-icon">🏖️</span>

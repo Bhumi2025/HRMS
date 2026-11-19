@@ -1079,6 +1079,16 @@
     background: var(--bg, #f9fafb);
     border: 1px solid var(--border, #f3f4f6);
     border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #fff7ed;
+      border-color: #fdba74;
+      transform: translateY(-1px);
+    }
 
     .holiday-date-badge {
       width: 32px;
