@@ -213,6 +213,16 @@ import { ToastService } from '../core/services/toast.service';
                 🔄 Re-enroll
               </button>
             }
+
+            <button
+              type="button"
+              class="btn-bypass-punch"
+              title="Record punch directly without camera"
+              [disabled]="faceVerifying()"
+              (click)="directPunch()"
+            >
+              ⚡ Direct Punch
+            </button>
           </div>
         </div>
       </div>
@@ -449,7 +459,16 @@ import { ToastService } from '../core/services/toast.service';
       background: rgba(255, 255, 255, 0.05); color: #94a3b8; font-size: 12px; font-weight: 600;
       cursor: pointer; transition: all 0.15s;
     }
-    .btn-re-enroll:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+    .btn-re-enroll:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+    .btn-bypass-punch {
+      padding: 0 14px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08); color: #e2e8f0; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 5px;
+    }
+    .btn-bypass-punch:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.16); color: #fff; border-color: rgba(255, 255, 255, 0.35);
+    }
 
     .spinner-sm {
       width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, 0.3);
@@ -764,5 +783,23 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
         'danger'
       );
     }
+  }
+
+  protected directPunch(): void {
+    const act = this.action();
+    if (act === 'ClockIn') {
+      this.punch.clockIn();
+      this.toast.show('Clock In recorded directly.', 'success');
+    } else if (act === 'ClockOut') {
+      this.punch.clockOut();
+      this.toast.show('Clock Out recorded directly.', 'success');
+    } else if (act === 'StartBreak') {
+      this.punch.startBreak();
+      this.toast.show('Break started directly.', 'warning');
+    } else {
+      this.punch.endBreak();
+      this.toast.show('Break ended directly.', 'success');
+    }
+    this.closeModal();
   }
 }

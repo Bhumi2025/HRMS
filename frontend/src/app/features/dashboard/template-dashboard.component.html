@@ -493,15 +493,52 @@
           </svg>
           Attendance Activity
         </div>
+
         <div class="history-timeline">
-          @for (p of punchService.todayPunches(); track p.id) {
-          <div class="timeline-entry">
-            <span class="timeline-dot" [class]="'type-' + p.punchType.toLowerCase()"></span>
-            <span class="timeline-time">{{ p.punchTime | date:'hh:mm a' }}</span>
-            <span class="timeline-type">{{ p.punchType }}</span>
-          </div>
-          } @empty {
-          <div class="timeline-empty">No punch activity recorded today.</div>
+          @if (punchService.punchTimeline().length > 0) {
+            <div class="timeline-stream">
+              @for (item of punchService.punchTimeline(); track item.id) {
+                @if (item.kind === 'punch') {
+                  <div class="timeline-punch-row" [class.is-in]="item.isPunchIn" [class.is-out]="!item.isPunchIn" [title]="(item.punchType ?? '') + (item.note ? ' - ' + item.note : '')">
+                    <div class="punch-icon-circle" [class.in]="item.isPunchIn" [class.out]="!item.isPunchIn">
+                      @if (item.isPunchIn) {
+                        <!-- Punch In: Bracket on left, arrow entering/pointing right -->
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                          <polyline points="10 17 15 12 10 7" />
+                          <line x1="15" y1="12" x2="3" y2="12" />
+                        </svg>
+                      } @else {
+                        <!-- Punch Out: Bracket on left, arrow exiting to right -->
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                          <polyline points="16 17 21 12 16 7" />
+                          <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
+                      }
+                    </div>
+                    <span class="punch-label">{{ item.label }}</span>
+                    <span class="punch-time">{{ item.timeStr }}</span>
+                  </div>
+                } @else if (item.kind === 'break') {
+                  <div class="timeline-break-row">
+                    <div class="break-line"></div>
+                    <div class="break-pill">
+                      <span class="coffee-icon">☕</span>
+                      <span class="break-text">{{ item.durationStr }}</span>
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+          } @else {
+            <div class="timeline-empty">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="empty-icon">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>No punch activity recorded today.</span>
+            </div>
           }
         </div>
       </div>
