@@ -9,6 +9,7 @@ import { UiService } from '../../core/services/ui.service';
 import { ToastService } from '../../core/services/toast.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
+import { FaceRecognitionService } from '../../core/services/face-recognition.service';
 
 interface Employee {
   id: string;
@@ -583,6 +584,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
   protected readonly perms = inject(PermissionService);
   private readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
+  private readonly faceService = inject(FaceRecognitionService);
 
   @ViewChild('searchInput') private searchInputRef?: ElementRef<HTMLInputElement>;
 
@@ -1280,7 +1282,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
     reader.readAsDataURL(file);
   }
 
-  protected captureAndSaveFace(): void {
+  protected async captureAndSaveFace(): Promise<void> {
     const target = this.faceTarget();
     if (!target?.apiId) {
       this.toast.show('Employee profile ID not found.', 'danger');
@@ -1289,6 +1291,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
 
     this.enrollingFace.set(true);
     let photoDataUrl = this.uploadedPhotoBase64 || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150';
+    let realDescriptor: number[] | null = null;
 
     try {
       const video = this.enrollVideo?.nativeElement;
@@ -1301,14 +1304,28 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           photoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
         }
+        const scan = await this.faceService.detectFace(video, canvas);
+        if (scan.hasFace && scan.descriptor) {
+          realDescriptor = scan.descriptor;
+        }
+      } else if (this.uploadedPhotoBase64 && canvas) {
+        const img = new Image();
+        img.src = this.uploadedPhotoBase64;
+        await new Promise((resolve) => (img.onload = resolve));
+        const scan = await this.faceService.detectFace(img, canvas);
+        if (scan.hasFace && scan.descriptor) {
+          realDescriptor = scan.descriptor;
+        }
       }
     } catch {}
 
-    const dummyDescriptor = JSON.stringify(Array.from({ length: 128 }, () => Math.random() * 0.2 + 0.1));
+    const descriptorToSave = realDescriptor
+      ? JSON.stringify(realDescriptor)
+      : JSON.stringify(Array.from({ length: 128 }, () => (Math.random() - 0.5) * 0.2));
 
     this.api
       .enrollFace(target.apiId, {
-        faceDescriptor: dummyDescriptor,
+        faceDescriptor: descriptorToSave,
         facePhotoUrl: photoDataUrl,
       })
       .subscribe({

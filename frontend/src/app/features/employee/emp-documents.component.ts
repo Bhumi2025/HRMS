@@ -6,6 +6,7 @@ import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { triggerDocumentDownload } from '../../core/utils/document-download.util';
+import { SelectComponent, SelectOption } from '../../shared/select.component';
 
 interface DocRow {
   doc: string;
@@ -30,10 +31,10 @@ interface CompanyDoc {
 /** My Documents — ported from pages/emp-documents.html. */
 @Component({
   selector: 'app-emp-documents',
-  imports: [CommonModule, IconDirective],
+  imports: [CommonModule, IconDirective, SelectComponent],
   template: `
     <div class="flex justify-end items-center" style="margin-bottom: 15px">
-      <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="toast.show('Upload dialog')">
+      <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="openUploadModal()">
         <span [appIcon]="'upload2'"></span> Upload
       </button>
     </div>
@@ -59,6 +60,13 @@ interface CompanyDoc {
                 </tr>
               </thead>
               <tbody>
+                @if (docs().length === 0) {
+                  <tr>
+                    <td colspan="6" style="text-align: center; padding: 24px; color: var(--muted)">
+                      No personal documents uploaded yet. Click <strong>Upload</strong> above to add one.
+                    </td>
+                  </tr>
+                }
                 @for (r of docs(); track r.doc + r.num) {
                   <tr>
                     <td style="font-weight: 600; white-space: nowrap">{{ r.doc }}</td>
@@ -100,6 +108,68 @@ interface CompanyDoc {
       }
     </div>
 
+    <!-- Upload Document Modal -->
+    <div class="modal-overlay" [class.open]="ui.isOpen('empDocUploadModal')" (click)="ui.onOverlayClick($event, 'empDocUploadModal')">
+      <div class="modal" style="max-width: 550px">
+        <div class="modal-header">
+          <div style="font-size: 15px; font-weight: 700">Upload Document</div>
+          <button class="btn btn-ghost btn-sm" (click)="closeUploadModal()"><span [appIcon]="'x'"></span></button>
+        </div>
+        <div class="modal-body" style="overflow: visible">
+          <div class="form-group" style="margin-bottom: 14px">
+            <label class="form-label">Document Type</label>
+            <app-select [options]="uploadTypeOptions" [value]="uploadType()" (valueChange)="uploadType.set($event)" width="100%" />
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px">
+            <label class="form-label">Document Title (Optional)</label>
+            <input class="form-control" [placeholder]="uploadType() + ' Document'" [value]="customDocName()" (input)="customDocName.set($any($event.target).value)" />
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px">
+            <div class="form-group">
+              <label class="form-label">Issue Date</label>
+              <input class="form-control" type="date" [value]="uploadIssueDate()" (input)="uploadIssueDate.set($any($event.target).value)" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Expiry Date</label>
+              <input class="form-control" type="date" [value]="uploadExpiryDate()" (input)="uploadExpiryDate.set($any($event.target).value)" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Document File</label>
+            <input #empDocFileInput type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" (change)="onFileSelected($event)" style="display: none" />
+            <div
+              style="border: 2px dashed var(--border); border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; transition: 0.2s"
+              [style.borderColor]="selectedFile() ? 'var(--p)' : 'var(--border)'"
+              [style.background]="selectedFile() ? 'var(--p-soft)' : 'var(--bg)'"
+              (click)="empDocFileInput.click()"
+              (dragover)="$event.preventDefault()"
+              (drop)="onFileDrop($event)"
+            >
+              @if (selectedFile()) {
+                <div style="color: var(--p); font-size: 26px; margin-bottom: 6px"><span [appIcon]="'check'"></span></div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: var(--text)">{{ selectedFile()?.name }}</div>
+                <div style="font-size: 0.78rem; color: var(--muted); margin-top: 3px">{{ formatFileSize(selectedFile()?.size || 0) }} &bull; Click to change file</div>
+              } @else {
+                <div style="color: var(--p); font-size: 26px; margin-bottom: 6px"><span [appIcon]="'upload2'"></span></div>
+                <div style="font-size: 0.88rem; font-weight: 600">Drop file here or click to browse</div>
+                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG, DOC up to 10MB</div>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="closeUploadModal()">Cancel</button>
+          <button class="btn btn-primary" [disabled]="uploading() || !selectedFile()" (click)="executeUpload()">
+            {{ uploading() ? 'Uploading...' : 'Upload Document' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Document Modal -->
     <div class="modal-overlay" [class.open]="ui.isOpen('docModal')" (click)="ui.onOverlayClick($event, 'docModal')">
       <div class="modal" style="max-width: 700px">
         <div class="modal-header">
@@ -122,9 +192,15 @@ interface CompanyDoc {
               }
             </div>
 
-            @if (r.fileUrl && (r.fileUrl.startsWith('data:image') || r.fileUrl.endsWith('.jpg') || r.fileUrl.endsWith('.png'))) {
+            @if (r.fileUrl && (r.fileUrl.startsWith('data:image') || r.fileUrl.endsWith('.jpg') || r.fileUrl.endsWith('.png') || r.fileUrl.endsWith('.jpeg'))) {
               <div style="text-align: center; background: #0f172a; border-radius: 8px; padding: 12px; margin-bottom: 12px; max-height: 240px; overflow: hidden;">
                 <img [src]="r.fileUrl" alt="Document Preview" style="max-height: 220px; max-width: 100%; object-fit: contain; border-radius: 6px;" />
+              </div>
+            } @else if (r.fileUrl) {
+              <div style="border: 1px dashed var(--border); border-radius: 8px; padding: 16px; text-align: center; background: var(--bg); margin-bottom: 12px;">
+                <div style="color: var(--p); font-size: 24px; margin-bottom: 4px"><span [appIcon]="'documents'"></span></div>
+                <div style="font-size: 13px; font-weight: 600">{{ r.doc }}</div>
+                <div style="font-size: 11px; color: var(--muted); margin-top: 2px">File attached &bull; Click download below to view</div>
               </div>
             }
           </div>
@@ -159,20 +235,36 @@ export class EmpDocumentsComponent implements OnInit {
   protected readonly docs = signal<DocRow[]>([]);
   protected readonly companyDocs = signal<CompanyDoc[]>([]);
 
-  private readonly currentEmpName = signal<string>('Employee');
-  private readonly currentEmpCode = signal<string>('EMP');
+  protected readonly currentEmpId = signal<string | null>(null);
+  protected readonly currentEmpName = signal<string>('Employee');
+  protected readonly currentEmpCode = signal<string>('EMP');
+
+  // ── Upload Document State ──
+  protected readonly selectedFile = signal<File | null>(null);
+  protected readonly uploading = signal(false);
+  protected readonly uploadType = signal('Passport');
+  protected readonly customDocName = signal('');
+  protected readonly uploadIssueDate = signal(new Date().toISOString().slice(0, 10));
+  protected readonly uploadExpiryDate = signal('');
+
+  protected readonly uploadTypeOptions: SelectOption[] = [
+    'Passport',
+    'Visa',
+    'Work Permit',
+    'Emirates ID',
+    'Medical Insurance',
+    'Driving License',
+    'Degree Certificate',
+    'Other',
+  ].map((t) => ({ v: t, l: t }));
 
   ngOnInit(): void {
     this.api.employeeMe().subscribe({
       next: (employee) => {
+        this.currentEmpId.set(employee.id);
         this.currentEmpName.set(employee.fullName || `${employee.firstName} ${employee.lastName}`);
         this.currentEmpCode.set(employee.employeeCode || 'EMP');
-        this.api.documents({ employeeId: employee.id }).subscribe({
-          next: (rows) => this.docs.set(rows.map((row) => this.toRow(row))),
-          error: () => {
-            /* API offline — no personal documents. */
-          },
-        });
+        this.loadMyDocuments(employee.id);
       },
       error: () => {
         /* API offline — no personal documents. */
@@ -188,6 +280,122 @@ export class EmpDocumentsComponent implements OnInit {
         ),
       error: () => {
         /* API offline — no company documents. */
+      },
+    });
+  }
+
+  protected openUploadModal(): void {
+    this.selectedFile.set(null);
+    this.customDocName.set('');
+    this.uploadType.set('Passport');
+    this.uploadIssueDate.set(new Date().toISOString().slice(0, 10));
+    this.uploadExpiryDate.set('');
+    this.ui.open('empDocUploadModal');
+  }
+
+  protected closeUploadModal(): void {
+    this.selectedFile.set(null);
+    this.customDocName.set('');
+    this.ui.close('empDocUploadModal');
+  }
+
+  protected onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.selectedFile.set(input.files[0]);
+    }
+  }
+
+  protected onFileDrop(event: DragEvent): void {
+    event.preventDefault();
+    if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+      this.selectedFile.set(event.dataTransfer.files[0]);
+    }
+  }
+
+  protected formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  protected executeUpload(): void {
+    const employeeId = this.currentEmpId();
+    if (!employeeId) {
+      this.toast.show('Employee profile is still loading.', 'danger');
+      return;
+    }
+
+    const file = this.selectedFile();
+    if (!file) {
+      this.toast.show('Please select a file to upload.', 'warning');
+      return;
+    }
+
+    const type = this.uploadType();
+    const documentType = type === 'Visa' || type === 'Work Permit'
+      ? 'Legal'
+      : type === 'Medical Insurance'
+        ? 'Benefits'
+        : type === 'Other'
+          ? 'Other'
+          : 'Identity';
+
+    const docName = this.customDocName().trim() || file.name || `${type} Document`;
+    const fileSize = this.formatFileSize(file.size);
+
+    this.uploading.set(true);
+
+    const saveDocumentRecord = (url: string | null, size: string) => {
+      this.api
+        .createDocument({
+          employeeId,
+          name: docName,
+          type: documentType,
+          issueDate: this.uploadIssueDate() || new Date().toISOString().slice(0, 10),
+          expiryDate: this.uploadExpiryDate() || null,
+          notes: null,
+          fileUrl: url,
+          fileSize: size,
+          isCompanyDocument: false,
+        })
+        .subscribe({
+          next: () => {
+            this.uploading.set(false);
+            this.closeUploadModal();
+            this.toast.show('Document uploaded successfully!', 'success');
+            this.loadMyDocuments(employeeId);
+          },
+          error: (error) => {
+            this.uploading.set(false);
+            this.toast.show(error?.error?.title ?? error?.error?.message ?? 'Could not upload the document.', 'danger');
+          },
+        });
+    };
+
+    // 1. Physically upload file via storage API
+    this.api.uploadFile(file).subscribe({
+      next: (uploadRes) => {
+        saveDocumentRecord(uploadRes.url, uploadRes.size || fileSize);
+      },
+      error: () => {
+        // Fallback: Read as base64 data URL if storage API is unreachable
+        const reader = new FileReader();
+        reader.onload = () => saveDocumentRecord(reader.result as string, fileSize);
+        reader.onerror = () => {
+          this.uploading.set(false);
+          this.toast.show('Failed to read document file.', 'danger');
+        };
+        reader.readAsDataURL(file);
+      },
+    });
+  }
+
+  private loadMyDocuments(employeeId: string): void {
+    this.api.documents({ employeeId }).subscribe({
+      next: (rows) => this.docs.set(rows.map((row) => this.toRow(row))),
+      error: () => {
+        /* API offline — no personal documents. */
       },
     });
   }

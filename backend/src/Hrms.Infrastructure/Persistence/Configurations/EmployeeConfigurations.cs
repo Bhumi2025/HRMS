@@ -84,7 +84,7 @@ public sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<Emp
         builder.Property(d => d.IssuedBy).HasMaxLength(120);
         builder.Property(d => d.Notes).HasMaxLength(500);
         builder.Property(d => d.FileSize).HasMaxLength(20);
-        builder.Property(d => d.FileUrl).HasMaxLength(500);
+        builder.Property(d => d.FileUrl).HasColumnType("nvarchar(max)");
         builder.Property(d => d.Type).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(d => d.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
 

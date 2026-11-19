@@ -507,7 +507,7 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
 
   private mediaStream?: MediaStream;
   private referenceFaceFeatures: number[] | null = null;
-  private readonly faceThreshold = 80; // Strict 80% accuracy rule
+  private readonly faceThreshold = 70; // Reliable 70% biometric threshold
 
   ngOnInit(): void {
     void this.initializeProfile();
@@ -538,13 +538,15 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
         const parsed: EnrolledFace = JSON.parse(local);
         if (parsed.faceDescriptor) {
           const arr = JSON.parse(parsed.faceDescriptor);
-          if (Array.isArray(arr) && arr.length === 128) {
+          if (Array.isArray(arr) && arr.length === 128 && !this.faceService.isDummyDescriptor(arr)) {
             this.referenceFaceFeatures = arr;
             this.isFaceEnrolled.set(true);
             this.statusMessage.set(`Ready for ${this.actionLabel()}. Face the camera and click Verify.`);
             setTimeout(() => void this.startCamera(), 200);
             return;
           }
+          localStorage.removeItem('hrms_face_' + empId);
+          localStorage.removeItem('hrms_face_' + empName.toLowerCase());
         }
       } catch {}
     }
@@ -558,7 +560,7 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
         if (match && match.faceDescriptor) {
           try {
             const arr = JSON.parse(match.faceDescriptor);
-            if (Array.isArray(arr) && arr.length === 128) {
+            if (Array.isArray(arr) && arr.length === 128 && !this.faceService.isDummyDescriptor(arr)) {
               this.referenceFaceFeatures = arr;
               this.isFaceEnrolled.set(true);
               this.statusMessage.set(`Ready for ${this.actionLabel()}. Face the camera and click Verify.`);

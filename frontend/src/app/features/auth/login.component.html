@@ -314,21 +314,33 @@
               }
             </button>
           } @else {
-            <button
-              type="button"
-              class="btn-verify-face"
-              (click)="verifyFace()"
-              [disabled]="faceVerifying() || faceStatus() === 'matched'"
-            >
-              @if (faceVerifying()) {
-                <span class="spin-indicator"></span>
-                <span>Analyzing Facial Biometrics...</span>
-              } @else if (faceStatus() === 'matched') {
-                <span>✓ Verified ({{ faceMatchScore() }}%) — Logging in...</span>
-              } @else {
-                <span>📸 Scan & Verify Face</span>
-              }
-            </button>
+            <div style="display: flex; gap: 8px; width: 100%;">
+              <button
+                type="button"
+                class="btn-verify-face"
+                style="flex: 2;"
+                (click)="verifyFace()"
+                [disabled]="faceVerifying() || faceStatus() === 'matched'"
+              >
+                @if (faceVerifying()) {
+                  <span class="spin-indicator"></span>
+                  <span>Analyzing Facial Biometrics...</span>
+                } @else if (faceStatus() === 'matched') {
+                  <span>✓ Verified ({{ faceMatchScore() }}%) — Logging in...</span>
+                } @else {
+                  <span>📸 Scan & Verify Face</span>
+                }
+              </button>
+              <button
+                type="button"
+                style="flex: 1; background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; color: #93c5fd; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 4px;"
+                (click)="reEnrollFace()"
+                [disabled]="faceVerifying() || faceStatus() === 'matched'"
+                title="Update or re-register your face template"
+              >
+                🔄 Re-scan Face
+              </button>
+            </div>
           }
 
           <button

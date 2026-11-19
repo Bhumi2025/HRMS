@@ -585,8 +585,9 @@ export class EmpProfileComponent implements OnInit {
     const docName = file ? file.name : `${type} Document`;
     const fileSize = file ? this.formatFileSize(file.size) : '1.2 MB';
 
-    const executeSave = (fileDataUrl: string | null) => {
-      this.uploadingDoc.set(true);
+    this.uploadingDoc.set(true);
+
+    const executeSave = (fileUrl: string | null, size: string) => {
       this.api
         .createDocument({
           employeeId,
@@ -595,8 +596,8 @@ export class EmpProfileComponent implements OnInit {
           issueDate: this.uploadIssueDate() || new Date().toISOString().slice(0, 10),
           expiryDate: this.uploadExpiryDate() || null,
           notes: null,
-          fileUrl: fileDataUrl,
-          fileSize,
+          fileUrl,
+          fileSize: size,
           isCompanyDocument: false,
         })
         .subscribe({
@@ -614,12 +615,22 @@ export class EmpProfileComponent implements OnInit {
     };
 
     if (file) {
-      const reader = new FileReader();
-      reader.onload = () => executeSave(reader.result as string);
-      reader.onerror = () => executeSave(null);
-      reader.readAsDataURL(file);
+      this.api.uploadFile(file).subscribe({
+        next: (uploadRes) => {
+          executeSave(uploadRes.url, uploadRes.size || fileSize);
+        },
+        error: () => {
+          const reader = new FileReader();
+          reader.onload = () => executeSave(reader.result as string, fileSize);
+          reader.onerror = () => {
+            this.uploadingDoc.set(false);
+            this.toast.show('Failed to read document file.', 'danger');
+          };
+          reader.readAsDataURL(file);
+        },
+      });
     } else {
-      executeSave(null);
+      executeSave(null, fileSize);
     }
   }
 
