@@ -196,12 +196,12 @@ public sealed class EmployeeService : IEmployeeService
         employee.MobileAllowance = request.MobileAllowance;
         employee.OtherAllowances = request.OtherAllowances;
         employee.Currency = request.Currency;
-        employee.BankName = request.BankName;
-        employee.AccountName = request.AccountName;
-        employee.AccountNumber = request.AccountNumber;
-        employee.Iban = request.Iban;
-        employee.IfscCode = request.IfscCode;
-        employee.SwiftCode = request.SwiftCode;
+        employee.BankName = !string.IsNullOrWhiteSpace(request.BankName) ? request.BankName.Trim() : (employee.BankName ?? "Emirates NBD");
+        employee.AccountName = !string.IsNullOrWhiteSpace(request.AccountName) ? request.AccountName.Trim() : (employee.AccountName ?? $"{employee.FirstName} {employee.LastName}".Trim());
+        employee.AccountNumber = !string.IsNullOrWhiteSpace(request.AccountNumber) ? request.AccountNumber.Trim() : employee.AccountNumber;
+        employee.Iban = !string.IsNullOrWhiteSpace(request.Iban) ? request.Iban.Trim() : employee.Iban;
+        employee.IfscCode = !string.IsNullOrWhiteSpace(request.IfscCode) ? request.IfscCode.Trim() : employee.IfscCode;
+        employee.SwiftCode = !string.IsNullOrWhiteSpace(request.SwiftCode) ? request.SwiftCode.Trim() : employee.SwiftCode;
         employee.PaymentMode = request.PaymentMode;
         employee.WpsId = request.WpsId;
         employee.PassportNumber = request.PassportNumber;
@@ -253,6 +253,47 @@ public sealed class EmployeeService : IEmployeeService
                         _uow.Users.Update(linkedUser);
                     }
                 }
+            }
+        }
+
+        // Keep dedicated EmployeeBanks table in sync with primary employee bank details
+        if (!string.IsNullOrWhiteSpace(employee.AccountNumber) || !string.IsNullOrWhiteSpace(employee.BankName) || !string.IsNullOrWhiteSpace(employee.Iban))
+        {
+            var primaryBank = await _uow.EmployeeBanks.FirstOrDefaultAsync(
+                _uow.EmployeeBanks.Query().Where(b => b.EmployeeId == employee.Id && b.IsPrimary), ct);
+
+            if (primaryBank == null)
+            {
+                primaryBank = await _uow.EmployeeBanks.FirstOrDefaultAsync(
+                    _uow.EmployeeBanks.Query().Where(b => b.EmployeeId == employee.Id), ct);
+            }
+
+            var resolvedBankName = !string.IsNullOrWhiteSpace(employee.BankName) ? employee.BankName : "Emirates NBD";
+            var resolvedAccountHolder = !string.IsNullOrWhiteSpace(employee.AccountName) ? employee.AccountName : $"{employee.FirstName} {employee.LastName}".Trim();
+            var resolvedAccountNo = !string.IsNullOrWhiteSpace(employee.AccountNumber) ? employee.AccountNumber : (employee.Iban ?? "Not Set");
+            var resolvedIfscOrSwift = employee.SwiftCode ?? employee.IfscCode ?? employee.Iban;
+
+            if (primaryBank != null)
+            {
+                primaryBank.BankName = resolvedBankName;
+                primaryBank.AccountHolderName = resolvedAccountHolder;
+                primaryBank.AccountNumber = resolvedAccountNo;
+                primaryBank.IfscOrSwiftCode = resolvedIfscOrSwift;
+                primaryBank.IsPrimary = true;
+                _uow.EmployeeBanks.Update(primaryBank);
+            }
+            else
+            {
+                primaryBank = new EmployeeBank
+                {
+                    EmployeeId = employee.Id,
+                    BankName = resolvedBankName,
+                    AccountHolderName = resolvedAccountHolder,
+                    AccountNumber = resolvedAccountNo,
+                    IfscOrSwiftCode = resolvedIfscOrSwift,
+                    IsPrimary = true,
+                };
+                await _uow.EmployeeBanks.AddAsync(primaryBank, ct);
             }
         }
 

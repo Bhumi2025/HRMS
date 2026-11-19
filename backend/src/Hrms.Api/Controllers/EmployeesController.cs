@@ -72,14 +72,44 @@ public sealed class EmployeesController : ControllerBase
         return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
     }
 
+    [HttpPut("me")]
+    [Authorize]
+    [ProducesResponseType(typeof(EmployeeDetailDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<EmployeeDetailDto>> UpdateMe(
+        [FromBody] UpdateEmployeeRequest request,
+        CancellationToken ct)
+    {
+        var id = await _employees.ResolveEmployeeIdAsync(null, ct);
+        return Ok(await _employees.UpdateAsync(id, request, ct));
+    }
+
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize]
     [ProducesResponseType(typeof(EmployeeDetailDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<EmployeeDetailDto>> Update(
         Guid id,
         [FromBody] UpdateEmployeeRequest request,
-        CancellationToken ct) =>
-        Ok(await _employees.UpdateAsync(id, request, ct));
+        CancellationToken ct)
+    {
+        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
+        var isHrAdmin = role.Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
+                        role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) ||
+                        role.Equals("Company Admin", StringComparison.OrdinalIgnoreCase) ||
+                        role.Equals("CompanyAdmin", StringComparison.OrdinalIgnoreCase) ||
+                        role.Equals("HR Manager", StringComparison.OrdinalIgnoreCase) ||
+                        role.Equals("HrManager", StringComparison.OrdinalIgnoreCase);
+
+        if (!isHrAdmin)
+        {
+            var empClaim = User.FindFirst("employeeId")?.Value;
+            if (string.IsNullOrWhiteSpace(empClaim) || !Guid.TryParse(empClaim, out var userEmpId) || userEmpId != id)
+            {
+                return Forbid();
+            }
+        }
+
+        return Ok(await _employees.UpdateAsync(id, request, ct));
+    }
 
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = "HrAdmin")]

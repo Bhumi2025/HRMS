@@ -134,10 +134,6 @@ interface DocRow {
               <app-select [options]="deptOptions" [value]="job().dept" (valueChange)="patchJob('dept', $event)" width="100%" />
             </div>
             <div class="form-group">
-              <label class="form-label">Reporting To</label>
-              <app-select [options]="reportingOptions" [value]="job().reportsTo" (valueChange)="patchJob('reportsTo', $event)" width="100%" />
-            </div>
-            <div class="form-group">
               <label class="form-label">Join Date</label>
               <input class="form-control" type="date" [value]="job().joinDate" (input)="patchJob('joinDate', $any($event.target).value)" />
             </div>
@@ -662,6 +658,13 @@ export class EmpProfileComponent implements OnInit {
           joinDate: employee.joinDate,
         });
 
+        if (employee.reportingManager && !this.reportingOptions.some((o) => o.v.toLowerCase() === employee.reportingManager?.toLowerCase())) {
+          this.reportingOptions = [
+            ...this.reportingOptions,
+            { v: employee.reportingManager, l: employee.reportingManager },
+          ];
+        }
+
         this.contact.set({
           phone: employee.phone ?? '',
           email: employee.email,
@@ -681,14 +684,14 @@ export class EmpProfileComponent implements OnInit {
         });
 
         this.bank.set({
-          bankName: employee.bankName ?? '',
-          accountName: employee.accountName ?? '',
+          bankName: employee.bankName || 'Emirates NBD',
+          accountName: employee.accountName || employee.fullName || '',
           accountNo: employee.accountNumber ?? '',
           iban: employee.iban ?? '',
           ifsc: employee.ifscCode ?? '',
           swift: employee.swiftCode ?? '',
-          currency: employee.currency,
-          paymentMode: employee.paymentMode,
+          currency: employee.currency || 'AED',
+          paymentMode: employee.paymentMode || 'Bank Transfer',
           wpsId: employee.wpsId ?? '',
         });
 
@@ -738,18 +741,48 @@ export class EmpProfileComponent implements OnInit {
     const [firstName, ...rest] = personal.fullName.trim().split(' ');
     const lastName = rest.join(' ') || detail.lastName;
 
+    const normalizeGender = (g: string | null | undefined): string | null => {
+      if (!g || !g.trim()) return null;
+      const v = g.trim().toLowerCase();
+      if (v === 'male') return 'Male';
+      if (v === 'female') return 'Female';
+      if (v === 'other') return 'Other';
+      if (v === 'prefer not to say' || v === 'prefernottosay') return 'PreferNotToSay';
+      return g.trim();
+    };
+
+    const normalizeMarital = (m: string | null | undefined): string | null => {
+      if (!m || !m.trim()) return null;
+      const v = m.trim().toLowerCase();
+      if (v === 'single') return 'Single';
+      if (v === 'married') return 'Married';
+      if (v === 'divorced') return 'Divorced';
+      if (v === 'widowed') return 'Widowed';
+      return m.trim();
+    };
+
+    const normalizePaymentMode = (p: string | null | undefined): string => {
+      if (!p) return 'BankTransfer';
+      const clean = p.replace(/\s+/g, '').toLowerCase();
+      if (clean === 'banktransfer') return 'BankTransfer';
+      if (clean === 'wps') return 'Wps';
+      if (clean === 'cheque') return 'Cheque';
+      if (clean === 'cash') return 'Cash';
+      return 'BankTransfer';
+    };
+
     this.api
       .updateEmployee(id, {
         firstName: firstName || detail.firstName,
         middleName: detail.middleName,
         lastName,
         email: contact.email || detail.email,
-        phone: contact.phone,
+        phone: contact.phone || detail.phone,
         departmentId: this.departmentIds.get(job.dept) ?? detail.departmentId,
         designationId: detail.designationId,
         branchId: detail.branchId,
-        reportingManagerId: null,
-        jobTitle: job.title,
+        reportingManagerId: detail.reportingManagerId ?? null,
+        jobTitle: job.title || detail.jobTitle,
         grade: detail.grade,
         employmentType: detail.employmentType,
         status: detail.status,
@@ -760,20 +793,28 @@ export class EmpProfileComponent implements OnInit {
         transportAllowance: detail.transportAllowance,
         mobileAllowance: detail.mobileAllowance,
         otherAllowances: detail.otherAllowances,
-        currency: bank.currency || detail.currency,
-        bankName: bank.bankName,
-        accountName: bank.accountName,
-        accountNumber: bank.accountNo,
-        iban: bank.iban,
-        ifscCode: bank.ifsc,
-        swiftCode: bank.swift,
-        paymentMode: bank.paymentMode,
-        wpsId: bank.wpsId,
-        passportNumber: identity.passportNo,
-        passportExpiry: this.toIso(identity.passportExp),
-        visaNumber: identity.visaNo,
-        visaExpiry: this.toIso(identity.visaExp),
-        emiratesId: identity.emiratesId,
+        currency: bank.currency || detail.currency || 'AED',
+        bankName: bank.bankName || detail.bankName || 'Emirates NBD',
+        accountName: bank.accountName || detail.accountName || personal.fullName.trim() || `${detail.firstName} ${detail.lastName}`.trim(),
+        accountNumber: bank.accountNo || detail.accountNumber,
+        iban: bank.iban || detail.iban,
+        ifscCode: bank.ifsc || detail.ifscCode,
+        swiftCode: bank.swift || detail.swiftCode,
+        paymentMode: normalizePaymentMode(bank.paymentMode || detail.paymentMode),
+        wpsId: bank.wpsId || detail.wpsId,
+        passportNumber: identity.passportNo || detail.passportNumber,
+        passportExpiry: this.toIso(identity.passportExp) ?? (detail.passportExpiry ? this.toIso(detail.passportExpiry) : null),
+        visaNumber: identity.visaNo || detail.visaNumber,
+        visaExpiry: this.toIso(identity.visaExp) ?? (detail.visaExpiry ? this.toIso(detail.visaExpiry) : null),
+        emiratesId: identity.emiratesId || detail.emiratesId,
+        dateOfBirth: this.toIso(personal.dob) ?? (detail.dateOfBirth ? this.toIso(detail.dateOfBirth) : null),
+        gender: normalizeGender(personal.gender) ?? detail.gender,
+        maritalStatus: normalizeMarital(personal.marital) ?? detail.maritalStatus,
+        bloodGroup: personal.blood || detail.bloodGroup || null,
+        nationality: personal.nationality || detail.nationality || null,
+        address: contact.address || detail.address || null,
+        city: contact.city || detail.city || null,
+        country: contact.country || detail.country || null,
       })
       .subscribe({
         next: (updated) => {
@@ -835,7 +876,7 @@ export class EmpProfileComponent implements OnInit {
   });
 
   protected readonly bank = signal({
-    bankName: '',
+    bankName: 'Emirates NBD',
     accountName: '',
     accountNo: '',
     iban: '',
@@ -908,7 +949,16 @@ export class EmpProfileComponent implements OnInit {
   ];
   protected readonly bloodOptions: SelectOption[] = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((b) => ({ v: b, l: b }));
   protected readonly deptOptions: SelectOption[] = ['Engineering', 'Finance', 'HR', 'Sales', 'Marketing', 'Design'].map((d) => ({ v: d, l: d }));
-  protected readonly reportingOptions: SelectOption[] = [];
+  protected reportingOptions: SelectOption[] = [
+    { v: '', l: 'None (Direct Report)' },
+    { v: 'HR Manager', l: 'HR Manager' },
+    { v: 'Manager', l: 'Manager' },
+    { v: 'Company Admin', l: 'Company Admin' },
+    { v: 'Sarah Mitchell', l: 'Sarah Mitchell (HR Manager)' },
+    { v: 'Priya Sharma', l: 'Priya Sharma (HR Executive)' },
+    { v: 'Ravi Kumar', l: 'Ravi Kumar (Manager)' },
+    { v: 'David Vance', l: 'David Vance (Company Admin)' },
+  ];
   protected readonly countryOptions: SelectOption[] = ['UAE', 'Saudi Arabia', 'Qatar', 'United Kingdom', 'United States', 'India'].map((c) => ({ v: c, l: c }));
   protected readonly bankOptions: SelectOption[] = [
     { v: 'Emirates NBD', l: 'Emirates NBD' },
