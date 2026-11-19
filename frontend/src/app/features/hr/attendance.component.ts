@@ -38,10 +38,21 @@ interface DynamicAttendanceRow {
   dayStatusBg: string;
 }
 
+interface TimelineSegment {
+  type: 'work' | 'break' | 'overtime' | 'late' | 'dayoff' | 'absent' | 'scheduled';
+  label: string;
+  timeRange: string;
+  durationLabel: string;
+  leftPercent: number;
+  widthPercent: number;
+  tooltip: string;
+}
+
 interface MusterDay {
   day: number;
   dateStr: string;
   dateFormatted: string;
+  dayLabel: string;
   dayOfWeek: string;
   isWeekend: boolean;
   isToday: boolean;
@@ -56,6 +67,7 @@ interface MusterDay {
   inTimeRaw: string;
   outTime: string;
   outTimeRaw: string;
+  durationStr: string;
   isEarlyOut: boolean;
   isLateIn: boolean;
   totalTimeStr: string;
@@ -69,6 +81,7 @@ interface MusterDay {
   status: string;
   color: string;
   hours: string;
+  timelineSegments: TimelineSegment[];
 }
 
 @Component({
@@ -236,20 +249,20 @@ interface MusterDay {
           </div>
         </div>
 
-        <div class="table-wrap">
-          <table>
+        <div class="table-wrap" style="overflow-x: auto; width: 100%; padding-bottom: 6px;">
+          <table class="daily-punch-table" style="width: 100%; min-width: 1080px; border-collapse: collapse;">
             <thead>
               <tr>
-                <th>Employee</th>
-                <th>Department</th>
-                <th>Date</th>
-                <th>Day Status</th>
-                <th>Check In</th>
-                <th>Check Out</th>
-                <th>Work Hours</th>
-                <th>Status</th>
-                <th>Device/Method</th>
-                <th style="text-align: right;">Action</th>
+                <th style="min-width: 180px;">Employee</th>
+                <th style="min-width: 110px;">Department</th>
+                <th style="min-width: 100px;">Date</th>
+                <th style="min-width: 85px;">Day Status</th>
+                <th style="min-width: 90px;">Check In</th>
+                <th style="min-width: 90px;">Check Out</th>
+                <th style="min-width: 95px;">Work Hours</th>
+                <th style="min-width: 90px;">Status</th>
+                <th style="min-width: 130px;">Device/Method</th>
+                <th style="min-width: 140px; text-align: right; padding-right: 24px;">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -293,8 +306,8 @@ interface MusterDay {
                       {{ row.device || 'Face Terminal' }}
                     </span>
                   </td>
-                  <td style="text-align: right;">
-                    <button class="btn btn-ghost btn-sm" style="color: var(--p); font-size: 12px; font-weight: 700;" (click)="viewEmployeeMuster(row.id)">
+                  <td style="text-align: right; padding-right: 24px; white-space: nowrap;">
+                    <button class="btn-view-muster" (click)="viewEmployeeMuster(row.id)">
                       View Muster ›
                     </button>
                   </td>
@@ -332,287 +345,419 @@ interface MusterDay {
 
     <!-- TAB 2: MONTHLY MUSTER REGISTER (IMAGE 2 DESIGN & LOGIC) -->
     @if (tab() === 'muster') {
-      <div class="muster-container">
-        <!-- 1. Header & Context Control Strip -->
-        <div class="muster-top-bar">
-          <div class="breadcrumb-container">
-            <button class="back-link-btn" (click)="tab.set('daily')" title="Back to Daily Punch Log">
-              ‹ Employee Attendance
-            </button>
-            <span class="breadcrumb-separator">/</span>
-            <span class="employee-title">
-              {{ selectedEmployee()?.fullName || 'Employee' }} - {{ selectedEmployee()?.employeeCode || 'EMP-1001' }}
-            </span>
+      <div class="time-mgmt-layout">
+        <!-- ── LEFT PANE: PRESENT SUMMARY & EMPLOYEE ROSTER ── -->
+        <div class="time-mgmt-sidebar">
+          <div class="sidebar-header-box">
+            <div class="sidebar-main-title">Attendance</div>
+            <div class="date-switcher-pill">
+              <button class="nav-arrow-mini" (click)="prevDay()" title="Previous day">‹</button>
+              <span class="switcher-date-text">{{ filterDateFormatted() }}</span>
+              <button class="nav-arrow-mini" (click)="nextDay()" title="Next day">›</button>
+            </div>
           </div>
 
-          <div class="muster-controls">
-            <!-- Employee Selector Dropdown -->
-            <div class="selector-wrapper">
-              <span class="selector-icon">👤</span>
-              <select class="muster-emp-select" [(ngModel)]="selectedMusterEmpId" (change)="onEmployeeSelectChange()">
-                @for (emp of employees(); track emp.id) {
-                  <option [value]="emp.id">{{ emp.fullName }} ({{ emp.employeeCode }})</option>
-                }
-              </select>
+          <!-- Present Summary Card -->
+          <div class="present-summary-card">
+            <div class="summary-top">
+              <span class="sum-icon">📋</span>
+              <span class="sum-title">Present Summary</span>
             </div>
-
-            <!-- Date / Month Range Picker with Next / Prev buttons -->
-            <div class="date-picker-wrapper">
-              <button class="month-nav-btn" (click)="prevMonth()" title="Previous Month">‹</button>
-              <span class="selector-icon">📅</span>
-              <input type="month" class="muster-month-input" [(ngModel)]="selectedMusterMonth" (change)="generateMuster()" />
-              <button class="month-nav-btn" (click)="nextMonth()" title="Next Month">›</button>
+            <div class="summary-grid-three">
+              <div class="sum-col">
+                <div class="sum-lbl">On time</div>
+                <div class="sum-val">{{ onTimeCount() }}</div>
+                <div class="sum-diff text-success">+{{ onTimeCount() }} vs yesterday</div>
+              </div>
+              <div class="sum-col">
+                <div class="sum-lbl">Late clock-in</div>
+                <div class="sum-val" [class.text-warning]="lateInCount() > 0">{{ lateInCount() }}</div>
+                <div class="sum-diff text-muted">-{{ lateInCount() }} vs yesterday</div>
+              </div>
+              <div class="sum-col">
+                <div class="sum-lbl">Early clock-out</div>
+                <div class="sum-val" [class.text-danger]="earlyOutCount() > 0">{{ earlyOutCount() }}</div>
+                <div class="sum-diff text-muted">0 vs yesterday</div>
+              </div>
             </div>
+          </div>
 
-            <!-- Export Button -->
-            <button class="btn btn-outline btn-sm muster-btn" (click)="exportCsv()" title="Export Muster CSV">
-              <span [appIcon]="'download'"></span>
-            </button>
+          <!-- Search Bar for Sidebar -->
+          <div class="sidebar-search-container">
+            <span class="search-mini-icon">🔍</span>
+            <input 
+              type="text" 
+              class="sidebar-search-field" 
+              placeholder="Search employee..." 
+              [ngModel]="sidebarSearch()" 
+              (ngModelChange)="sidebarSearch.set($event)"
+            />
+          </div>
 
-            <!-- Quick Punch Button -->
-            @if (perms.canCreate('Attendance')) {
-              <button class="btn btn-primary btn-sm muster-add-btn" (click)="openQuickPunchModal()" title="Record Live Punch">
-                +
-              </button>
+          <!-- Employee Roster Header -->
+          <div class="roster-header-row">
+            <span>Employee Name</span>
+            <span>Clock-in &amp; Out</span>
+          </div>
+
+          <!-- Employee List -->
+          <div class="roster-scroll-container">
+            @for (emp of filteredSidebarEmployees(); track emp.id) {
+              <div 
+                class="roster-item-card" 
+                [class.active]="emp.id === selectedMusterEmpId"
+                (click)="selectEmployeeFromSidebar(emp.id)"
+              >
+                <div class="roster-user-left">
+                  <div class="roster-avatar-circle" [style.background]="emp.id === selectedMusterEmpId ? 'var(--p)' : 'var(--p-soft)'" [style.color]="emp.id === selectedMusterEmpId ? '#fff' : 'var(--p)'">
+                    {{ emp.fullName.charAt(0) }}
+                  </div>
+                  <div class="roster-names">
+                    <div class="roster-name-title">{{ emp.fullName }}</div>
+                    <div class="roster-code-sub">{{ emp.employeeCode }}</div>
+                  </div>
+                </div>
+
+                <div class="roster-clock-right">
+                  <span class="roster-time-tag">{{ getEmpTodayCheckIn(emp.id) }}</span>
+                  <span 
+                    class="status-indicator-dot" 
+                    [class.dot-on-time]="isEmpOnTime(emp.id)" 
+                    [class.dot-late]="isEmpLate(emp.id)" 
+                    [class.dot-absent]="!isEmpPresent(emp.id)"
+                  ></span>
+                </div>
+              </div>
             }
           </div>
         </div>
 
-        <!-- 2. The 16-Metric Ribbon (KPI Summary Bar matching Image 2) -->
-        <div class="muster-kpi-card">
-          <div class="kpi-ribbon-scroll">
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">{{ musterKpis().workingHours }}</div>
-              <div class="kpi-lbl">Working Hours</div>
+        <!-- ── RIGHT PANE: EMPLOYEE TIME MANAGEMENT & TIMELINE ── -->
+        <div class="time-mgmt-detail">
+          <!-- Top Navigation Header -->
+          <div class="detail-top-nav">
+            <div class="emp-pager">
+              <button class="pager-btn" (click)="prevEmployee()" title="Previous employee">‹</button>
+              <button class="pager-btn" (click)="nextEmployee()" title="Next employee">›</button>
+              <span class="pager-info">{{ currentEmployeeIndex() + 1 }} out of {{ employees().length }}</span>
             </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">
-                {{ musterKpis().actualWorkingTime }}
-                <span class="info-tip" title="Total hours clocked by employee this month">ℹ</span>
+
+            <button class="detail-close-btn" (click)="tab.set('daily')" title="Close and return to Daily Punch Log">✕</button>
+          </div>
+
+          <!-- Employee Profile Banner -->
+          <div class="emp-profile-banner">
+            <div class="profile-left">
+              <div class="profile-avatar">
+                {{ selectedEmployee()?.fullName?.charAt(0) || 'E' }}
               </div>
-              <div class="kpi-lbl">Actual Working Time</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">{{ musterKpis().trackedHours }}</div>
-              <div class="kpi-lbl">Tracked Hours</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val" [class.val-green]="musterKpis().diffPositive" [class.val-danger]="!musterKpis().diffPositive">
-                {{ musterKpis().timeDifference }}
-                <span class="info-tip" title="Variance between actual and expected shift hours">ℹ</span>
+              <div class="profile-texts">
+                <div class="profile-name-row">
+                  <span class="profile-name">{{ selectedEmployee()?.fullName }}</span>
+                </div>
+                <div class="profile-meta-row">
+                  <span class="meta-label">Role:</span>
+                  <span class="meta-val">{{ selectedEmployee()?.jobTitle || selectedEmployee()?.department || 'Executive' }}</span>
+                  <span class="meta-divider">•</span>
+                  <span class="meta-label">Employee ID:</span>
+                  <span class="emp-id-badge">#{{ selectedEmployee()?.employeeCode }}</span>
+                  <span class="meta-divider">•</span>
+                  <span class="meta-label">Phone:</span>
+                  <span class="phone-badge">{{ selectedEmployee()?.email || '+971 4 999 8888' }}</span>
+                </div>
               </div>
-              <div class="kpi-lbl">Time Difference</div>
             </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val val-green">{{ musterKpis().clockInDays }}</div>
-              <div class="kpi-lbl">Clock In Days</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">{{ musterKpis().payrollPresentDays }}</div>
-              <div class="kpi-lbl">Payroll Present Days</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">{{ musterKpis().odRemoteWork }}</div>
-              <div class="kpi-lbl">OD/Remote work</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val val-danger">{{ musterKpis().absentDays }}</div>
-              <div class="kpi-lbl">Absent</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">{{ musterKpis().shiftNotStart }}</div>
-              <div class="kpi-lbl">Shift Not Start</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">{{ musterKpis().onLeaveDays }}</div>
-              <div class="kpi-lbl">On Leave</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val val-warning">{{ musterKpis().lateIn }}</div>
-              <div class="kpi-lbl">Late IN</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val val-warning">{{ musterKpis().earlyOut }}</div>
-              <div class="kpi-lbl">Early OUT</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">{{ musterKpis().paidLeave }}</div>
-              <div class="kpi-lbl">Paid Leave</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">{{ musterKpis().unpaidLeave }}</div>
-              <div class="kpi-lbl">Unpaid Leave</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">{{ musterKpis().odHourlyRemote }}</div>
-              <div class="kpi-lbl">OD/Hourly Remote work</div>
-            </div>
-            <div class="kpi-ribbon-item">
-              <div class="kpi-val">{{ musterKpis().hourlyPaidLeave }}</div>
-              <div class="kpi-lbl">Hourly Paid Leave</div>
+
+            <div class="profile-actions">
+              <a class="btn btn-outline btn-sm" [routerLink]="'/employees'" style="display: inline-flex; align-items: center; gap: 5px;">
+                View Details
+              </a>
+              @if (perms.canCreate('Attendance')) {
+                <button class="btn btn-primary btn-sm" (click)="openQuickPunchModal()" style="display: inline-flex; align-items: center; gap: 6px;">
+                  + Add Attendance
+                </button>
+              }
             </div>
           </div>
-        </div>
 
-        <!-- 3. The Rich Data Table matching Image 2 -->
-        <div class="muster-table-card">
-          <div class="table-wrap" style="overflow-x: auto;">
-            <table class="muster-data-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Display Name</th>
-                  <th>Day Status</th>
-                  <th>Attendance Status</th>
-                  <th>Attendance Action</th>
-                  <th>Clock IN</th>
-                  <th>Clock OUT</th>
-                  <th>Total Time</th>
-                  <th>Break Hours</th>
-                  <th>Productive Hours</th>
-                  <th>Extra Time</th>
-                  <th>Shift</th>
-                  <th>Location</th>
-                  <th>Job</th>
-                  <th style="text-align: center;">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (day of musterDays(); track day.dateStr) {
-                  <tr [class.row-weekend]="day.isWeekend" [class.row-today]="day.isToday">
-                    <!-- 1. Date -->
-                    <td class="cell-date">
-                      {{ day.dateFormatted }}
-                    </td>
-
-                    <!-- 2. Display Name -->
-                    <td class="cell-name">
-                      <span class="name-text">{{ selectedEmployee()?.fullName || '—' }}</span>
-                    </td>
-
-                    <!-- 3. Day Status -->
-                    <td class="cell-day-status">
-                      <span class="day-status-pill" [style.background]="day.dayStatusBg" [style.color]="day.dayStatusColor">
-                        {{ day.dayStatusBadge }}
-                      </span>
-                    </td>
-
-                    <!-- 4. Attendance Status -->
-                    <td class="cell-att-status">
-                      @if (day.attendanceIcon === '⚠️') {
-                        <span class="status-icon-box warn" title="Ongoing or Incomplete Punch">⚠️</span>
-                      } @else if (day.attendanceIcon === 'P') {
-                        <span class="status-icon-box success" title="Present">P</span>
-                      } @else if (day.attendanceIcon === 'A') {
-                        <span class="status-icon-box danger" title="Absent">A</span>
-                      } @else if (day.attendanceIcon === 'L') {
-                        <span class="status-icon-box warn" title="Late Arrival">L</span>
-                      } @else {
-                        <span class="status-icon-dash">—</span>
-                      }
-                    </td>
-
-                    <!-- 5. Attendance Action -->
-                    <td class="cell-action">
-                      <div class="action-select-box">
-                        <span class="action-bullet" 
-                          [class.bullet-ongoing]="day.actionStatus === 'On Going'" 
-                          [class.bullet-present]="day.actionStatus === 'Present (P)'" 
-                          [class.bullet-weekend]="day.actionStatus === 'Weekend'" 
-                          [class.bullet-absent]="day.actionStatus === 'Absent (A)'"
-                        ></span>
-                        <select class="action-dropdown" [ngModel]="day.actionStatus" (ngModelChange)="onAttendanceActionChange(day, $event)">
-                          <option value="Present (P)">Present (P)</option>
-                          <option value="On Going">On Going</option>
-                          <option value="Weekend">Weekend</option>
-                          <option value="Absent (A)">Absent (A)</option>
-                          <option value="Half Day">Half Day</option>
-                          <option value="On Leave">On Leave</option>
-                        </select>
-                      </div>
-                    </td>
-
-                    <!-- 6. Clock IN -->
-                    <td class="cell-clock-in">
-                      @if (day.inTime !== '—') {
-                        <span class="time-with-icon">
-                          {{ day.inTime }}
-                          <span class="punch-device-badge" title="Web / Biometric Punch">💻</span>
-                        </span>
-                      } @else {
-                        <span class="dash">—</span>
-                      }
-                    </td>
-
-                    <!-- 7. Clock OUT -->
-                    <td class="cell-clock-out">
-                      @if (day.outTime !== '—') {
-                        <span class="time-with-icon" [class.early-out-text]="day.isEarlyOut" [title]="day.isEarlyOut ? 'Early Out (Departed before 05:00 PM)' : 'Normal Out'">
-                          {{ day.outTime }}
-                          <span class="punch-device-badge">💻</span>
-                        </span>
-                      } @else {
-                        <span class="dash">—</span>
-                      }
-                    </td>
-
-                    <!-- 8. Total Time -->
-                    <td class="cell-total-time" [class.time-short]="day.workHoursRaw > 0 && day.workHoursRaw < 8" [class.time-good]="day.workHoursRaw >= 8">
-                      {{ day.totalTimeStr }}
-                    </td>
-
-                    <!-- 9. Break Hours -->
-                    <td class="cell-break-hours">
-                      {{ day.breakHoursStr }}
-                    </td>
-
-                    <!-- 10. Productive Hours -->
-                    <td class="cell-productive">
-                      {{ day.productiveHoursStr }}
-                    </td>
-
-                    <!-- 11. Extra Time -->
-                    <td class="cell-extra-time" [class.extra-positive]="day.extraTimeStr !== '—'">
-                      {{ day.extraTimeStr }}
-                    </td>
-
-                    <!-- 12. Shift -->
-                    <td class="cell-shift">
-                      <span class="shift-badge-link" title="Shift Roster: 09:00 AM - 06:00 PM">{{ day.shiftName }}</span>
-                    </td>
-
-                    <!-- 13. Location -->
-                    <td class="cell-location">
-                      {{ day.locationName }}
-                    </td>
-
-                    <!-- 14. Job -->
-                    <td class="cell-job">
-                      {{ day.jobRole }}
-                    </td>
-
-                    <!-- 15. Actions -->
-                    <td class="cell-actions" style="text-align: center;">
-                      <div class="row-actions-group">
-                        <button class="action-icon-btn" (click)="openDayDetails(day)" title="View Punch Timeline">
-                          👁️
-                        </button>
-                        <button class="action-icon-btn" (click)="openRegularizeForDay(day)" title="Regularize / Edit Punch">
-                          ✏️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                } @empty {
-                  <tr>
-                    <td colspan="15" style="text-align: center; padding: 40px; color: var(--muted);">
-                      No muster records found for this employee and period.
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+          <!-- 6 Stat Summary Cards -->
+          <div class="six-stats-grid">
+            <div class="stat-box">
+              <div class="stat-title">Day off</div>
+              <div class="stat-num">{{ musterSummary().dayOff }}</div>
+              <div class="stat-foot text-success">+2 vs last month</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-title">Late clock-in</div>
+              <div class="stat-num" [class.text-warning]="musterSummary().lateIn > 0">{{ musterSummary().lateIn }}</div>
+              <div class="stat-foot text-success">-1 vs last month</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-title">Late clock-out</div>
+              <div class="stat-num">{{ musterSummary().lateOut }}</div>
+              <div class="stat-foot text-success">+4 vs last month</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-title">No clock-out</div>
+              <div class="stat-num" [class.text-danger]="musterSummary().noClockOut > 0">{{ musterSummary().noClockOut }}</div>
+              <div class="stat-foot text-muted">0 vs last month</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-title">Off time quota</div>
+              <div class="stat-num">{{ musterSummary().offTimeQuota }}</div>
+              <div class="stat-foot text-muted">Available leaves</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-title">Absent</div>
+              <div class="stat-num" [class.text-danger]="musterSummary().absent > 0">{{ musterSummary().absent }}</div>
+              <div class="stat-foot text-muted">0 vs last month</div>
+            </div>
           </div>
+
+          <!-- Month Selector & Controls -->
+          <div class="timeline-toolbar">
+            <div class="month-nav-cluster">
+              <span class="current-month-heading">{{ selectedMonthFormatted() }}</span>
+              <div class="month-arrows">
+                <button class="m-arrow-btn" (click)="prevMonth()" title="Previous month">‹</button>
+                <button class="m-arrow-btn" (click)="nextMonth()" title="Next month">›</button>
+              </div>
+            </div>
+
+            <div class="toolbar-right-cluster">
+              <!-- Search box -->
+              <div class="search-box-pill">
+                <span class="pill-search-icon">🔍</span>
+                <input 
+                  type="text" 
+                  placeholder="Search day..." 
+                  [ngModel]="timelineSearch()" 
+                  (ngModelChange)="timelineSearch.set($event)"
+                />
+              </div>
+
+              <!-- Status select filter -->
+              <select class="status-dropdown-pill" [ngModel]="timelineStatusFilter()" (ngModelChange)="timelineStatusFilter.set($event)">
+                <option value="">All Status</option>
+                <option value="present">Present</option>
+                <option value="late">Late</option>
+                <option value="dayoff">Day Off</option>
+                <option value="overtime">Overtime</option>
+                <option value="absent">Absent</option>
+              </select>
+
+              <!-- View mode toggle (Timeline vs Table) -->
+              <div class="view-mode-toggle">
+                <button 
+                  class="toggle-btn" 
+                  [class.active]="musterViewMode() === 'timeline'" 
+                  (click)="musterViewMode.set('timeline')"
+                  title="Gantt Timeline View"
+                >
+                  ▤ Timeline
+                </button>
+                <button 
+                  class="toggle-btn" 
+                  [class.active]="musterViewMode() === 'table'" 
+                  (click)="musterViewMode.set('table')"
+                  title="Muster Table View"
+                >
+                  ▦ Table
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── VIEW 1: TIMELINE CARDS (IMAGE 2 STYLE) ── -->
+          @if (musterViewMode() === 'timeline') {
+            <div class="timeline-cards-list">
+              @for (day of filteredMusterDays(); track day.dateStr) {
+                <div class="day-gantt-card" [class.is-today-card]="day.isToday">
+                  <div class="gantt-card-header">
+                    <div class="gantt-day-name">
+                      {{ day.dayLabel }}
+                    </div>
+
+                    <div class="gantt-header-right">
+                      @if (day.workHoursRaw > 8) {
+                        @if (isOvertimeApproved(day.dateStr)) {
+                          <span class="ot-badge-approved">✓ Approved</span>
+                        } @else {
+                          <div class="ot-approval-box">
+                            <span class="ot-approval-txt">Overtime approval</span>
+                            <button class="btn-ot-reject" (click)="rejectOvertime(day.dateStr, $event)" title="Reject Overtime">✕</button>
+                            <button class="btn-ot-approve" (click)="approveOvertime(day.dateStr, $event)" title="Approve Overtime">✓ Approve</button>
+                          </div>
+                        }
+                      } @else if (day.status === 'OnLeave') {
+                        <span class="badge-requested-off">Requested day off</span>
+                      } @else if (day.status === 'Weekend') {
+                        <span class="badge-weekend-pill">Weekend</span>
+                      } @else if (day.status === 'Present') {
+                        <span class="badge-present-pill">✓ Present</span>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Timeline Gantt Bar Track -->
+                  <div class="gantt-bar-row">
+                    <!-- Left: Clock-in -->
+                    <div class="gantt-time-col in-col">
+                      <span class="col-lbl">Clock-in</span>
+                      <span class="col-val">{{ day.inTime }}</span>
+                    </div>
+
+                    <!-- Center: Timeline visualization -->
+                    <div class="gantt-track-center">
+                      <!-- Scale hours -->
+                      <div class="gantt-scale-hours">
+                        <span>09:00</span>
+                        <span>11:00</span>
+                        <span>13:00</span>
+                        <span>15:00</span>
+                        <span>17:00</span>
+                        <span>19:00</span>
+                        <span>21:00</span>
+                        <span>23:59</span>
+                      </div>
+
+                      <!-- The visual bar container -->
+                      <div class="gantt-bar-track">
+                        @for (seg of day.timelineSegments; track seg.label + seg.leftPercent) {
+                          <div 
+                            class="gantt-segment" 
+                            [class]="'seg-kind-' + seg.type"
+                            [style.left.%]="seg.leftPercent"
+                            [style.width.%]="seg.widthPercent"
+                          >
+                            <span class="seg-label-txt">{{ seg.label }}</span>
+
+                            <!-- Hover Tooltip -->
+                            <div class="seg-popup-tooltip">
+                              <div class="tip-heading">{{ seg.label }}</div>
+                              <div class="tip-body">{{ seg.timeRange }} ({{ seg.durationLabel }})</div>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    </div>
+
+                    <!-- Right: Clock-out & Duration -->
+                    <div class="gantt-time-col out-col">
+                      <div class="time-block">
+                        <span class="col-lbl">Clock-out</span>
+                        <span class="col-val" [class.early-out-alert]="day.isEarlyOut">{{ day.outTime }}</span>
+                      </div>
+                      <div class="dur-block">
+                        <span class="col-lbl">Duration</span>
+                        <span class="col-val">{{ day.durationStr }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              } @empty {
+                <div style="text-align: center; padding: 40px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--muted);">
+                  No attendance records found matching filters for this period.
+                </div>
+              }
+            </div>
+          }
+
+          <!-- ── VIEW 2: 15-COLUMN MUSTER TABLE (TABLE MODE) ── -->
+          @if (musterViewMode() === 'table') {
+            <div class="muster-table-card">
+              <div class="table-wrap" style="overflow-x: auto;">
+                <table class="muster-data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Display Name</th>
+                      <th>Day Status</th>
+                      <th>Attendance Status</th>
+                      <th>Attendance Action</th>
+                      <th>Clock IN</th>
+                      <th>Clock OUT</th>
+                      <th>Total Time</th>
+                      <th>Break Hours</th>
+                      <th>Productive Hours</th>
+                      <th>Extra Time</th>
+                      <th>Shift</th>
+                      <th>Location</th>
+                      <th>Job</th>
+                      <th style="text-align: center;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (day of filteredMusterDays(); track day.dateStr) {
+                      <tr [class.row-weekend]="day.isWeekend" [class.row-today]="day.isToday">
+                        <td class="cell-date">{{ day.dateFormatted }}</td>
+                        <td class="cell-name"><span class="name-text">{{ selectedEmployee()?.fullName || '—' }}</span></td>
+                        <td>
+                          <span class="day-status-pill" [style.background]="day.dayStatusBg" [style.color]="day.dayStatusColor">
+                            {{ day.dayStatusBadge }}
+                          </span>
+                        </td>
+                        <td>
+                          @if (day.attendanceIcon === '⚠️') {
+                            <span class="status-icon-box warn" title="Ongoing or Incomplete Punch">⚠️</span>
+                          } @else if (day.attendanceIcon === 'P') {
+                            <span class="status-icon-box success" title="Present">P</span>
+                          } @else if (day.attendanceIcon === 'A') {
+                            <span class="status-icon-box danger" title="Absent">A</span>
+                          } @else if (day.attendanceIcon === 'L') {
+                            <span class="status-icon-box warn" title="Late Arrival">L</span>
+                          } @else {
+                            <span class="status-icon-dash">—</span>
+                          }
+                        </td>
+                        <td>
+                          <div class="action-select-box">
+                            <span class="action-bullet" 
+                              [class.bullet-ongoing]="day.actionStatus === 'On Going'" 
+                              [class.bullet-present]="day.actionStatus === 'Present (P)'" 
+                              [class.bullet-weekend]="day.actionStatus === 'Weekend'" 
+                              [class.bullet-absent]="day.actionStatus === 'Absent (A)'"
+                            ></span>
+                            <select class="action-dropdown" [ngModel]="day.actionStatus" (ngModelChange)="onAttendanceActionChange(day, $event)">
+                              <option value="Present (P)">Present (P)</option>
+                              <option value="On Going">On Going</option>
+                              <option value="Weekend">Weekend</option>
+                              <option value="Absent (A)">Absent (A)</option>
+                              <option value="Half Day">Half Day</option>
+                              <option value="On Leave">On Leave</option>
+                            </select>
+                          </div>
+                        </td>
+                        <td class="cell-clock-in">
+                          @if (day.inTime !== '—') {
+                            <span class="time-with-icon">{{ day.inTime }} <span class="punch-device-badge">💻</span></span>
+                          } @else { <span class="dash">—</span> }
+                        </td>
+                        <td class="cell-clock-out">
+                          @if (day.outTime !== '—') {
+                            <span class="time-with-icon" [class.early-out-text]="day.isEarlyOut">{{ day.outTime }} <span class="punch-device-badge">💻</span></span>
+                          } @else { <span class="dash">—</span> }
+                        </td>
+                        <td class="cell-total-time" [class.time-short]="day.workHoursRaw > 0 && day.workHoursRaw < 8" [class.time-good]="day.workHoursRaw >= 8">{{ day.totalTimeStr }}</td>
+                        <td>{{ day.breakHoursStr }}</td>
+                        <td>{{ day.productiveHoursStr }}</td>
+                        <td [class.extra-positive]="day.extraTimeStr !== '—'">{{ day.extraTimeStr }}</td>
+                        <td><span class="shift-badge-link">{{ day.shiftName }}</span></td>
+                        <td>{{ day.locationName }}</td>
+                        <td>{{ day.jobRole }}</td>
+                        <td style="text-align: center;">
+                          <div class="row-actions-group">
+                            <button class="action-icon-btn" (click)="openDayDetails(day)" title="View Punch Timeline">👁️</button>
+                            <button class="action-icon-btn" (click)="openRegularizeForDay(day)" title="Regularize Punch">✏️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
         </div>
       </div>
     }
@@ -836,194 +981,744 @@ interface MusterDay {
         animation: pulseLive 2s infinite;
       }
       @keyframes pulseLive {
-        0% {
-          box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7);
-        }
-        70% {
-          box-shadow: 0 0 0 6px rgba(22, 163, 74, 0);
-        }
-        100% {
-          box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
-        }
+        0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+        70% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
       }
 
-      /* ── Image 2 Muster Layout & Components ── */
-      .muster-container {
+      /* ── Daily Records Action Button (Fix Image 1 Overlap) ── */
+      .btn-view-muster {
+        background: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #bfdbfe;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 5px 12px;
+        border-radius: 6px;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .btn-view-muster:hover {
+        background: #2563eb;
+        color: #ffffff;
+        border-color: #2563eb;
+        transform: translateY(-1px);
+      }
+
+      /* ── Time Management & Muster Split View (Image 2) ── */
+      .time-mgmt-layout {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+      }
+
+      /* ── Left Sidebar (Attendance & Employee Roster) ── */
+      .time-mgmt-sidebar {
+        width: 320px;
+        flex-shrink: 0;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+      }
+      .sidebar-header-box {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .sidebar-main-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .date-switcher-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 3px 8px;
+      }
+      .nav-arrow-mini {
+        background: none;
+        border: none;
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--muted);
+        cursor: pointer;
+        padding: 0 2px;
+        line-height: 1;
+      }
+      .nav-arrow-mini:hover { color: var(--p); }
+      .switcher-date-text {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      /* Present Summary Card */
+      .present-summary-card {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 14px;
+      }
+      .summary-top {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 10px;
+      }
+      .sum-icon { font-size: 13px; }
+      .summary-grid-three {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .sum-col { display: flex; flex-direction: column; }
+      .sum-lbl {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .sum-val {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--text);
+        margin: 2px 0;
+      }
+      .sum-diff {
+        font-size: 9px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      /* Sidebar Search */
+      .sidebar-search-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .search-mini-icon {
+        position: absolute;
+        left: 10px;
+        font-size: 11px;
+        color: var(--muted);
+        pointer-events: none;
+      }
+      .sidebar-search-field {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 12px;
+        padding: 6px 10px 6px 28px;
+        color: var(--text);
+        outline: none;
+      }
+
+      /* Roster List */
+      .roster-header-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 8px;
+        padding: 0 4px;
+      }
+      .roster-scroll-container {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 520px;
+        overflow-y: auto;
+      }
+      .roster-item-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .roster-item-card:hover {
+        background: var(--bg);
+      }
+      .roster-item-card.active {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+      }
+      .roster-user-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .roster-avatar-circle {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        font-size: 12px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .roster-names { display: flex; flex-direction: column; }
+      .roster-name-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .roster-code-sub {
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .roster-clock-right {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .roster-time-tag {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .status-indicator-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+      }
+      .dot-on-time { background: #16a34a; box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2); }
+      .dot-late { background: #ea580c; box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.2); }
+      .dot-absent { background: #94a3b8; }
+
+      /* ── Right Detail Area (Image 2) ── */
+      .time-mgmt-detail {
+        flex: 1;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         gap: 16px;
       }
-      .muster-top-bar {
+
+      /* Top Navigation & Close */
+      .detail-top-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .emp-pager {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .pager-btn {
+        width: 26px;
+        height: 26px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--muted);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .pager-btn:hover { background: var(--bg); color: var(--text); }
+      .pager-info {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        margin-left: 4px;
+      }
+      .detail-close-btn {
+        background: none;
+        border: none;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--muted);
+        cursor: pointer;
+        padding: 4px;
+      }
+      .detail-close-btn:hover { color: var(--text); }
+
+      /* Employee Profile Banner */
+      .emp-profile-banner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 14px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      }
+      .profile-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .profile-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: #dbeafe;
+        color: #1e40af;
+        font-size: 18px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .profile-texts { display: flex; flex-direction: column; gap: 4px; }
+      .profile-name {
+        font-size: 17px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .profile-meta-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 11px;
+      }
+      .meta-label { color: var(--muted); font-weight: 500; }
+      .meta-val { color: var(--text); font-weight: 700; }
+      .meta-divider { color: var(--muted); opacity: 0.6; }
+      .emp-id-badge {
+        background: #f1f5f9;
+        color: #334155;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 4px;
+      }
+      .phone-badge {
+        background: #f0fdf4;
+        color: #15803d;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 4px;
+      }
+      .profile-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* 6 Stat Summary Cards Grid (Image 2) */
+      .six-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 10px;
+      }
+      .stat-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      }
+      .stat-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .stat-num {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--text);
+        margin: 4px 0 2px 0;
+      }
+      .stat-foot {
+        font-size: 10px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      /* Timeline Toolbar */
+      .timeline-toolbar {
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
         gap: 12px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        padding: 12px 18px;
-        border-radius: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
       }
-      .breadcrumb-container {
+      .month-nav-cluster {
         display: flex;
         align-items: center;
         gap: 8px;
       }
-      .back-link-btn {
-        background: none;
-        border: none;
-        font-size: 14px;
-        font-weight: 700;
-        color: var(--muted);
-        cursor: pointer;
-        padding: 0;
-        transition: color 0.15s ease;
-      }
-      .back-link-btn:hover {
-        color: var(--p);
-      }
-      .breadcrumb-separator {
-        color: var(--muted);
-        font-weight: 600;
-      }
-      .employee-title {
-        font-size: 14px;
+      .current-month-heading {
+        font-size: 16px;
         font-weight: 800;
         color: var(--text);
       }
-      .muster-controls {
+      .month-arrows {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .m-arrow-btn {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--muted);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .m-arrow-btn:hover { background: var(--bg); color: var(--text); }
+
+      .toolbar-right-cluster {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         flex-wrap: wrap;
       }
-      .selector-wrapper, .date-picker-wrapper {
+      .search-box-pill {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: var(--bg);
+        background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 8px;
+        border-radius: 20px;
         padding: 4px 10px;
       }
-      .selector-icon {
-        font-size: 13px;
-        opacity: 0.8;
-      }
-      .muster-emp-select, .muster-month-input {
+      .search-box-pill input {
         border: none;
         background: transparent;
         font-size: 12px;
-        font-weight: 600;
         color: var(--text);
-        cursor: pointer;
         outline: none;
+        width: 110px;
       }
-      .month-nav-btn {
-        background: none;
-        border: none;
-        font-size: 16px;
-        font-weight: 800;
-        color: var(--muted);
-        cursor: pointer;
-        padding: 0 4px;
-        line-height: 1;
-        transition: color 0.15s ease;
-      }
-      .month-nav-btn:hover {
-        color: var(--p);
-      }
-      .muster-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 6px 12px;
-      }
-      .muster-add-btn {
-        width: 32px;
-        height: 32px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        font-weight: 700;
-        border-radius: 8px;
-      }
-
-      /* 16-Metric Horizontal Ribbon (Image 2) */
-      .muster-kpi-card {
+      .pill-search-icon { font-size: 11px; opacity: 0.6; }
+      .status-dropdown-pill {
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
-        overflow: hidden;
+        border-radius: 20px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text);
+        outline: none;
+        cursor: pointer;
       }
-      .kpi-ribbon-scroll {
-        display: flex;
-        overflow-x: auto;
-        scrollbar-width: thin;
+      .view-mode-toggle {
+        display: inline-flex;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 2px;
       }
-      .kpi-ribbon-item {
-        flex: 1;
-        min-width: 120px;
-        padding: 12px 14px;
-        border-right: 1px solid var(--border);
+      .toggle-btn {
+        border: none;
+        background: transparent;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        padding: 3px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .toggle-btn.active {
+        background: var(--surface);
+        color: var(--text);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+      }
+
+      /* ── Gantt Day Cards (Image 2) ── */
+      .timeline-cards-list {
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        gap: 10px;
       }
-      .kpi-ribbon-item:last-child {
-        border-right: none;
+      .day-gantt-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 18px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        transition: box-shadow 0.15s ease;
       }
-      .kpi-val {
-        font-size: 13px;
+      .day-gantt-card:hover {
+        box-shadow: 0 3px 10px rgba(0,0,0,0.04);
+      }
+      .is-today-card {
+        border-color: #93c5fd;
+        background: #fbfdff;
+      }
+
+      .gantt-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .gantt-day-name {
+        font-size: 14px;
         font-weight: 800;
         color: var(--text);
+      }
+      .gantt-header-right {
         display: flex;
         align-items: center;
-        gap: 5px;
-        white-space: nowrap;
+        gap: 8px;
       }
-      .kpi-lbl {
+
+      /* Overtime Approval Controls */
+      .ot-approval-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .ot-approval-txt {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .btn-ot-reject {
+        background: none;
+        border: 1px solid #e2e8f0;
+        color: #ef4444;
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+        font-size: 11px;
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .btn-ot-approve {
+        background: #0f172a;
+        color: #ffffff;
+        border: none;
+        border-radius: 6px;
+        padding: 3px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .btn-ot-approve:hover { background: #1e293b; }
+      .ot-badge-approved {
+        background: #dcfce7;
+        color: #15803d;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+      .badge-requested-off {
+        background: #fef08a;
+        color: #854d0e;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+      .badge-weekend-pill {
+        background: #e0f2fe;
+        color: #0369a1;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+      .badge-present-pill {
+        background: #f0fdf4;
+        color: #15803d;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+
+      /* Gantt Track Row */
+      .gantt-bar-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .gantt-time-col {
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+      }
+      .in-col { width: 85px; }
+      .out-col {
+        width: 130px;
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-end;
+        gap: 14px;
+        text-align: right;
+      }
+      .col-lbl {
         font-size: 10px;
         font-weight: 600;
         color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.3px;
-        margin-top: 4px;
-        white-space: nowrap;
       }
-      .val-green {
-        color: #16a34a !important;
+      .col-val {
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--text);
+        margin-top: 2px;
       }
-      .val-danger {
-        color: #dc2626 !important;
+      .early-out-alert { color: #dc2626 !important; }
+
+      /* Center Visual Track */
+      .gantt-track-center {
+        flex: 1;
+        position: relative;
+        min-width: 0;
       }
-      .val-warning {
-        color: #ea580c !important;
+      .gantt-scale-hours {
+        display: flex;
+        justify-content: space-between;
+        font-size: 9px;
+        font-weight: 600;
+        color: #94a3b8;
+        margin-bottom: 5px;
+        padding: 0 2px;
       }
-      .info-tip {
-        font-size: 10px;
-        color: var(--muted);
-        cursor: help;
-        border-radius: 50%;
-        display: inline-flex;
-        width: 13px;
-        height: 13px;
+      .gantt-bar-track {
+        position: relative;
+        height: 24px;
+        background: #f1f5f9;
+        border-radius: 6px;
+        overflow: visible;
+      }
+      .gantt-segment {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        display: flex;
         align-items: center;
         justify-content: center;
-        border: 1px solid var(--border);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: opacity 0.15s ease;
+      }
+      .gantt-segment:hover {
+        opacity: 0.92;
+      }
+      .seg-label-txt {
+        font-size: 10px;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: 0 4px;
       }
 
-      /* Data Table */
+      /* Segment Styles matching Image 2 */
+      .seg-kind-work {
+        background: #2563eb;
+        color: #ffffff;
+      }
+      .seg-kind-break {
+        background: #38bdf8;
+        color: #082f49;
+      }
+      .seg-kind-overtime {
+        background: #f97316;
+        color: #ffffff;
+      }
+      .seg-kind-late {
+        background: #ea580c;
+        color: #ffffff;
+      }
+      .seg-kind-dayoff {
+        background: #eab308;
+        color: #713f12;
+      }
+      .seg-kind-absent {
+        background: #fca5a5;
+        color: #7f1d1d;
+      }
+      .seg-kind-scheduled {
+        background: #e2e8f0;
+        color: #475569;
+        border: 1px dashed #cbd5e1;
+      }
+
+      /* Tooltip Popup on Segment Hover */
+      .seg-popup-tooltip {
+        position: absolute;
+        bottom: 115%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #0f172a;
+        color: #ffffff;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.15s ease;
+        z-index: 30;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      }
+      .seg-popup-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 5px;
+        border-style: solid;
+        border-color: #0f172a transparent transparent transparent;
+      }
+      .gantt-segment:hover .seg-popup-tooltip {
+        opacity: 1;
+        visibility: visible;
+      }
+      .tip-heading { font-weight: 800; font-size: 11px; }
+      .tip-sub { font-size: 10px; opacity: 0.85; margin-top: 2px; }
+
+      /* Table View in Muster Mode */
       .muster-table-card {
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 10px;
+        border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
       }
       .muster-data-table {
         width: 100%;
@@ -1048,24 +1743,12 @@ interface MusterDay {
         vertical-align: middle;
         white-space: nowrap;
       }
-      .muster-data-table tr:hover td {
-        background: rgba(0, 0, 0, 0.015);
-      }
-      .row-weekend td {
-        background: rgba(241, 245, 249, 0.4);
-      }
-      .row-today td {
-        background: rgba(59, 130, 246, 0.04);
-      }
+      .muster-data-table tr:hover td { background: rgba(0, 0, 0, 0.015); }
+      .row-weekend td { background: rgba(241, 245, 249, 0.4); }
+      .row-today td { background: rgba(59, 130, 246, 0.04); }
 
-      .cell-date {
-        font-weight: 700;
-        color: var(--text);
-      }
-      .name-text {
-        color: var(--muted);
-        font-weight: 500;
-      }
+      .cell-date { font-weight: 700; color: var(--text); }
+      .name-text { color: var(--muted); font-weight: 500; }
       .day-status-pill {
         display: inline-block;
         font-size: 11px;
@@ -1085,22 +1768,10 @@ interface MusterDay {
         font-size: 11px;
         font-weight: 800;
       }
-      .status-icon-box.success {
-        background: #dcfce7;
-        color: #16a34a;
-      }
-      .status-icon-box.danger {
-        background: #fee2e2;
-        color: #dc2626;
-      }
-      .status-icon-box.warn {
-        background: #fef3c7;
-        color: #d97706;
-      }
-      .status-icon-dash {
-        color: var(--muted);
-        font-weight: 700;
-      }
+      .status-icon-box.success { background: #dcfce7; color: #16a34a; }
+      .status-icon-box.danger { background: #fee2e2; color: #dc2626; }
+      .status-icon-box.warn { background: #fef3c7; color: #d97706; }
+      .status-icon-dash { color: var(--muted); font-weight: 700; }
 
       .action-select-box {
         display: inline-flex;
@@ -1111,24 +1782,11 @@ interface MusterDay {
         border-radius: 6px;
         padding: 2px 8px;
       }
-      .action-bullet {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-      }
-      .bullet-present {
-        background: #16a34a;
-      }
-      .bullet-ongoing {
-        background: #0284c7;
-        box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
-      }
-      .bullet-weekend {
-        background: #94a3b8;
-      }
-      .bullet-absent {
-        background: #dc2626;
-      }
+      .action-bullet { width: 6px; height: 6px; border-radius: 50%; }
+      .bullet-present { background: #16a34a; }
+      .bullet-ongoing { background: #0284c7; box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2); }
+      .bullet-weekend { background: #94a3b8; }
+      .bullet-absent { background: #dc2626; }
       .action-dropdown {
         border: none;
         background: transparent;
@@ -1139,33 +1797,13 @@ interface MusterDay {
         cursor: pointer;
       }
 
-      .time-with-icon {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        font-weight: 700;
-      }
-      .punch-device-badge {
-        font-size: 10px;
-        opacity: 0.7;
-      }
-      .early-out-text {
-        color: #dc2626 !important;
-        font-weight: 800;
-      }
-      .cell-total-time {
-        font-weight: 700;
-      }
-      .time-short {
-        color: #0284c7;
-      }
-      .time-good {
-        color: var(--text);
-      }
-      .extra-positive {
-        color: #16a34a;
-        font-weight: 700;
-      }
+      .time-with-icon { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; }
+      .punch-device-badge { font-size: 10px; opacity: 0.7; }
+      .early-out-text { color: #dc2626 !important; font-weight: 800; }
+      .cell-total-time { font-weight: 700; }
+      .time-short { color: #0284c7; }
+      .time-good { color: var(--text); }
+      .extra-positive { color: #16a34a; font-weight: 700; }
       .shift-badge-link {
         color: #0284c7;
         font-weight: 700;
@@ -1174,11 +1812,7 @@ interface MusterDay {
         text-decoration: underline;
         text-decoration-style: dotted;
       }
-      .row-actions-group {
-        display: inline-flex;
-        gap: 6px;
-        align-items: center;
-      }
+      .row-actions-group { display: inline-flex; gap: 6px; align-items: center; }
       .action-icon-btn {
         background: none;
         border: none;
@@ -1188,11 +1822,25 @@ interface MusterDay {
         border-radius: 4px;
         transition: background 0.15s ease;
       }
-      .action-icon-btn:hover {
-        background: var(--bg);
+      .action-icon-btn:hover { background: var(--bg); }
+      .dash { color: var(--muted); }
+
+      /* Responsive rules */
+      @media (max-width: 1024px) {
+        .time-mgmt-layout {
+          flex-direction: column;
+        }
+        .time-mgmt-sidebar {
+          width: 100%;
+        }
+        .six-stats-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
       }
-      .dash {
-        color: var(--muted);
+      @media (max-width: 640px) {
+        .six-stats-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
       }
 
       input[type="search"]::-webkit-search-decoration,
@@ -1246,8 +1894,14 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly filterStatus = signal('');
   protected filterDate = new Date().toISOString().slice(0, 10);
 
+  // Time Management split-view & muster signals
   protected selectedMusterEmpId = '';
   protected selectedMusterMonth = new Date().toISOString().slice(0, 7);
+  protected musterViewMode = signal<'timeline' | 'table'>('timeline');
+  protected sidebarSearch = signal('');
+  protected timelineSearch = signal('');
+  protected timelineStatusFilter = signal('');
+  protected approvedOvertimes = signal<Set<string>>(new Set());
 
   protected readonly employees = signal<EmployeeListItem[]>([]);
   protected readonly dailyRows = signal<DynamicAttendanceRow[]>([]);
@@ -1282,7 +1936,6 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   ]);
 
   protected readonly regData = signal<Regularization[]>([]);
-
   protected readonly pendingCount = computed(() => this.regData().filter((r) => r.status === 'Pending').length);
 
   // Selected Employee object computed
@@ -1291,96 +1944,118 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.employees().find((e) => e.id === id) || this.employees()[0] || null;
   });
 
-  // 16-Metric Horizontal Ribbon computed for selected employee and month
-  protected readonly musterKpis = computed(() => {
-    const days = this.musterDays();
-    const todayStr = new Date().toISOString().slice(0, 10);
+  protected readonly currentEmployeeIndex = computed(() => {
+    const empList = this.employees();
+    const id = this.selectedMusterEmpId;
+    const idx = empList.findIndex((e) => e.id === id);
+    return idx >= 0 ? idx : 0;
+  });
 
-    let workingDaysCount = 0;
-    let clockedInDays = 0;
-    let presentDays = 0;
-    let halfDays = 0;
-    let absentDays = 0;
-    let scheduledDays = 0;
-    let onLeaveDays = 0;
+  // Filtered sidebar roster items
+  protected readonly filteredSidebarEmployees = computed(() => {
+    const q = this.sidebarSearch().toLowerCase().trim();
+    const list = this.employees();
+    if (!q) return list;
+    return list.filter(
+      (e) =>
+        e.fullName.toLowerCase().includes(q) ||
+        e.employeeCode.toLowerCase().includes(q) ||
+        e.department.toLowerCase().includes(q)
+    );
+  });
+
+  // Sidebar Present Summary counts
+  protected readonly onTimeCount = computed(() => {
+    return this.dailyRows().filter(
+      (r) => r.status === 'Present' && r.checkIn && r.checkIn !== '—' && !this.isLateCheckIn(r.checkIn)
+    ).length;
+  });
+
+  protected readonly lateInCount = computed(() => {
+    return this.dailyRows().filter(
+      (r) => r.status === 'Late' || (r.checkIn && this.isLateCheckIn(r.checkIn))
+    ).length;
+  });
+
+  protected readonly earlyOutCount = computed(() => {
+    return this.dailyRows().filter(
+      (r) => r.checkOut && r.checkOut !== '—' && this.isEarlyCheckOut(r.checkOut)
+    ).length;
+  });
+
+  protected readonly filterDateFormatted = computed(() => {
+    const d = new Date(this.filterDate + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+  });
+
+  protected readonly selectedMonthFormatted = computed(() => {
+    const parts = this.selectedMusterMonth.split('-');
+    const y = parseInt(parts[0], 10) || new Date().getFullYear();
+    const m = parseInt(parts[1], 10) || new Date().getMonth() + 1;
+    const d = new Date(y, m - 1, 1);
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  });
+
+  // 6 Stats Summary for Selected Employee Month
+  protected readonly musterSummary = computed(() => {
+    const days = this.musterDays();
+    let dayOffCount = 0;
     let lateInCount = 0;
-    let earlyOutCount = 0;
-    let paidLeaveDays = 0;
-    let unpaidLeaveDays = 0;
-    let totalWorkMinutes = 0;
+    let lateOutCount = 0;
+    let noClockOutCount = 0;
+    let absentCount = 0;
 
     for (const d of days) {
-      if (!d.isWeekend && !d.isFuture) {
-        workingDaysCount++;
+      if (d.isWeekend || d.status === 'OnLeave') {
+        dayOffCount++;
       }
-      if (d.inTime && d.inTime !== '—') {
-        clockedInDays++;
-      }
-      if (d.status === 'Present') {
-        presentDays++;
-      } else if (d.status === 'HalfDay') {
-        halfDays++;
-      } else if (d.status === 'Absent') {
-        absentDays++;
-      } else if (d.status === 'OnLeave') {
-        onLeaveDays++;
-        paidLeaveDays++;
-      } else if (d.status === 'Scheduled' || d.isFuture) {
-        scheduledDays++;
-      }
-
       if (d.isLateIn) lateInCount++;
-      if (d.isEarlyOut) earlyOutCount++;
-
-      totalWorkMinutes += Math.round((d.workHoursRaw || 0) * 60);
+      if (d.workHoursRaw > 8 || (d.outTime && d.outTime !== '—' && this.isLateCheckOut(d.outTimeRaw))) {
+        lateOutCount++;
+      }
+      if (d.inTime !== '—' && (d.outTime === '—' || !d.outTime)) {
+        noClockOutCount++;
+      }
+      if (d.status === 'Absent') {
+        absentCount++;
+      }
     }
 
-    // Expected working hours = working days * 8 hours
-    const expectedTotalMinutes = Math.max(workingDaysCount * 8 * 60, 0);
-    const expH = Math.floor(expectedTotalMinutes / 60);
-    const expM = expectedTotalMinutes % 60;
-    const workingHoursStr = `${String(expH).padStart(2, '0')} H : ${String(expM).padStart(2, '0')} M : 00 S`;
-
-    // Actual working hours
-    const actH = Math.floor(totalWorkMinutes / 60);
-    const actM = totalWorkMinutes % 60;
-    const actualWorkingStr = `${String(actH).padStart(2, '0')} H : ${String(actM).padStart(2, '0')} M : 00 S`;
-
-    // Tracked hours
-    const trackedHoursStr = actualWorkingStr;
-
-    // Time difference
-    const diffMinutes = totalWorkMinutes - expectedTotalMinutes;
-    const sign = diffMinutes >= 0 ? '+' : '-';
-    const absDiff = Math.abs(diffMinutes);
-    const diffH = Math.floor(absDiff / 60);
-    const diffM = absDiff % 60;
-    const timeDiffStr = `${sign}${String(diffH).padStart(2, '0')} H : ${String(diffM).padStart(2, '0')} M : 00 S`;
-
-    const payrollPresent = presentDays + halfDays * 0.5 + paidLeaveDays;
-
     return {
-      workingHours: workingHoursStr,
-      actualWorkingTime: actualWorkingStr,
-      trackedHours: trackedHoursStr,
-      timeDifference: timeDiffStr,
-      diffPositive: diffMinutes >= 0,
-      clockInDays: clockedInDays,
-      payrollPresentDays: payrollPresent,
-      odRemoteWork: 0,
-      absentDays: absentDays,
-      shiftNotStart: scheduledDays,
-      onLeaveDays: onLeaveDays,
+      dayOff: dayOffCount,
       lateIn: lateInCount,
-      earlyOut: earlyOutCount,
-      paidLeave: paidLeaveDays,
-      unpaidLeave: unpaidLeaveDays,
-      odHourlyRemote: '00H : 00M',
-      hourlyPaidLeave: '00H : 00M',
+      lateOut: lateOutCount,
+      noClockOut: noClockOutCount,
+      offTimeQuota: 14,
+      absent: absentCount,
     };
   });
 
-  // Reactive computed for instant filter & search matching
+  // Filtered Muster Days for Timeline
+  protected readonly filteredMusterDays = computed(() => {
+    const q = this.timelineSearch().toLowerCase().trim();
+    const st = this.timelineStatusFilter().toLowerCase().trim();
+    const days = this.musterDays();
+
+    return days.filter((d) => {
+      const matchQ =
+        !q ||
+        d.dateFormatted.toLowerCase().includes(q) ||
+        d.dayLabel.toLowerCase().includes(q) ||
+        d.status.toLowerCase().includes(q);
+
+      let matchSt = true;
+      if (st === 'present') matchSt = d.status === 'Present';
+      else if (st === 'late') matchSt = d.status === 'Late' || d.isLateIn;
+      else if (st === 'absent') matchSt = d.status === 'Absent';
+      else if (st === 'dayoff') matchSt = d.isWeekend || d.status === 'OnLeave';
+      else if (st === 'overtime') matchSt = d.workHoursRaw > 8;
+
+      return matchQ && matchSt;
+    });
+  });
+
+  // Reactive computed for instant filter & search matching in Daily Punch Log
   protected readonly filteredDailyRows = computed(() => {
     const q = this.searchKeyword().toLowerCase().trim();
     const st = this.filterStatus().toLowerCase().replace(/\s+/g, '');
@@ -1601,7 +2276,8 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     this.generateMuster();
   }
 
-  protected onEmployeeSelectChange(): void {
+  protected selectEmployeeFromSidebar(id: string): void {
+    this.selectedMusterEmpId = id;
     const emp = this.selectedEmployee();
     if (emp) {
       this.newReg.employeeId = emp.id;
@@ -1609,6 +2285,36 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       this.punchForm.employeeId = emp.id;
     }
     this.generateMuster();
+  }
+
+  protected prevEmployee(): void {
+    const list = this.employees();
+    if (list.length === 0) return;
+    let idx = this.currentEmployeeIndex() - 1;
+    if (idx < 0) idx = list.length - 1;
+    this.selectEmployeeFromSidebar(list[idx].id);
+  }
+
+  protected nextEmployee(): void {
+    const list = this.employees();
+    if (list.length === 0) return;
+    let idx = this.currentEmployeeIndex() + 1;
+    if (idx >= list.length) idx = 0;
+    this.selectEmployeeFromSidebar(list[idx].id);
+  }
+
+  protected prevDay(): void {
+    const d = new Date(this.filterDate + 'T00:00:00');
+    d.setDate(d.getDate() - 1);
+    this.filterDate = d.toISOString().slice(0, 10);
+    this.loadDailyAttendance();
+  }
+
+  protected nextDay(): void {
+    const d = new Date(this.filterDate + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    this.filterDate = d.toISOString().slice(0, 10);
+    this.loadDailyAttendance();
   }
 
   protected prevMonth(): void {
@@ -1623,6 +2329,50 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const d = new Date(y, m, 1);
     this.selectedMusterMonth = d.toISOString().slice(0, 7);
     this.generateMuster();
+  }
+
+  protected getEmpTodayCheckIn(employeeId: string): string {
+    const row = this.dailyRows().find((r) => r.id === employeeId);
+    return row?.checkIn && row.checkIn !== '—' ? row.checkIn : '—';
+  }
+
+  protected isEmpOnTime(employeeId: string): boolean {
+    const row = this.dailyRows().find((r) => r.id === employeeId);
+    return !!(row && row.status === 'Present' && row.checkIn && row.checkIn !== '—' && !this.isLateCheckIn(row.checkIn));
+  }
+
+  protected isEmpLate(employeeId: string): boolean {
+    const row = this.dailyRows().find((r) => r.id === employeeId);
+    return !!(row && (row.status === 'Late' || (row.checkIn && this.isLateCheckIn(row.checkIn))));
+  }
+
+  protected isEmpPresent(employeeId: string): boolean {
+    const row = this.dailyRows().find((r) => r.id === employeeId);
+    return !!(row && (row.status === 'Present' || row.status === 'Late'));
+  }
+
+  protected isOvertimeApproved(dateStr: string): boolean {
+    return this.approvedOvertimes().has(dateStr);
+  }
+
+  protected approveOvertime(dateStr: string, event?: Event): void {
+    event?.stopPropagation();
+    this.approvedOvertimes.update((set) => {
+      const next = new Set(set);
+      next.add(dateStr);
+      return next;
+    });
+    this.toast.show(`Overtime approved for ${dateStr}!`);
+  }
+
+  protected rejectOvertime(dateStr: string, event?: Event): void {
+    event?.stopPropagation();
+    this.approvedOvertimes.update((set) => {
+      const next = new Set(set);
+      next.delete(dateStr);
+      return next;
+    });
+    this.toast.show(`Overtime rejected for ${dateStr}.`, 'warning');
   }
 
   protected generateMuster(): void {
@@ -1640,6 +2390,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           const dateObj = new Date(d.date + 'T00:00:00');
           const dayNum = dateObj.getDate();
           const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+          const dayLabel = d.date === todayStr ? 'Today' : `${dateObj.toLocaleDateString('en-US', { weekday: 'long' })}, ${dayNum}`;
           const dateFormatted = `${dayOfWeek} ${String(dayNum).padStart(2, '0')} ${dateObj.toLocaleDateString('en-US', { month: 'short' })}, ${dateObj.getFullYear()}`;
           const isWeekend = d.status === 'Weekend' || dateObj.getDay() === 0 || dateObj.getDay() === 6;
           const isToday = d.date === todayStr;
@@ -1718,11 +2469,23 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           const breakHoursStr = workHours >= 5 ? '01 H : 00 M' : '—';
           const productiveHoursStr = workHours > 0 ? this.formatDuration(workHours >= 5 ? workHours - 1 : workHours) : '—';
           const extraTimeStr = this.formatExtraTime(workHours);
+          const durationStr = workHours > 0 ? this.formatDurationShort(workHours) : '—';
+
+          // Visual Timeline Segments (Image 2)
+          const timelineSegments = this.computeTimelineSegments(
+            d.status,
+            d.checkIn,
+            d.checkOut,
+            workHours,
+            isWeekend,
+            isFuture
+          );
 
           return {
             day: dayNum,
             dateStr: d.date,
             dateFormatted,
+            dayLabel,
             dayOfWeek,
             isWeekend,
             isToday,
@@ -1737,6 +2500,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
             inTimeRaw: d.checkIn || '',
             outTime: outTime12,
             outTimeRaw: d.checkOut || '',
+            durationStr,
             isEarlyOut,
             isLateIn,
             totalTimeStr,
@@ -1750,6 +2514,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
             status: d.status,
             color: dayStatusColor,
             hours: totalTimeStr,
+            timelineSegments,
           };
         });
         this.musterDays.set(mapped);
@@ -1758,6 +2523,189 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
         this.musterDays.set([]);
       },
     });
+  }
+
+  private computeTimelineSegments(
+    status: string,
+    checkIn: string | null | undefined,
+    checkOut: string | null | undefined,
+    workHours: number,
+    isWeekend: boolean,
+    isFuture: boolean
+  ): TimelineSegment[] {
+    if (status === 'Weekend' || isWeekend) {
+      return [
+        {
+          type: 'dayoff',
+          label: 'Weekend',
+          timeRange: 'All Day',
+          durationLabel: 'Non-working day',
+          leftPercent: 0,
+          widthPercent: 100,
+          tooltip: 'Weekend: Rest day',
+        },
+      ];
+    }
+
+    if (status === 'OnLeave') {
+      return [
+        {
+          type: 'dayoff',
+          label: 'Requested day off',
+          timeRange: 'All Day',
+          durationLabel: 'Approved Leave',
+          leftPercent: 0,
+          widthPercent: 100,
+          tooltip: 'Leave: Requested day off approved',
+        },
+      ];
+    }
+
+    if (status === 'Absent') {
+      return [
+        {
+          type: 'absent',
+          label: 'Absent',
+          timeRange: '09:00 - 18:00',
+          durationLabel: 'No punch recorded',
+          leftPercent: 0,
+          widthPercent: 100,
+          tooltip: 'Absent: No check-in record found',
+        },
+      ];
+    }
+
+    if (status === 'Scheduled' || isFuture) {
+      return [
+        {
+          type: 'scheduled',
+          label: 'Scheduled shift (09:00 - 18:00)',
+          timeRange: '09:00 - 18:00',
+          durationLabel: '8h standard shift',
+          leftPercent: 0,
+          widthPercent: 69.2,
+          tooltip: 'Scheduled: Shift upcoming',
+        },
+      ];
+    }
+
+    // Active Present or Late
+    const segments: TimelineSegment[] = [];
+    let startH = 9.0;
+    if (checkIn) {
+      const parts = checkIn.split(':');
+      if (parts.length >= 2) {
+        startH = parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60;
+      }
+    }
+
+    let endH = startH + (workHours || 8.0);
+    if (checkOut) {
+      const parts = checkOut.split(':');
+      if (parts.length >= 2) {
+        endH = parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60;
+      }
+    }
+
+    // If late check-in
+    if (startH > 9.5) {
+      const lateWidth = Math.min(22, ((startH - 9.0) / 13) * 100);
+      segments.push({
+        type: 'late',
+        label: 'Late',
+        timeRange: `09:00 - ${this.formatHourDecimal(startH)}`,
+        durationLabel: `${Math.round((startH - 9.0) * 60)}m late`,
+        leftPercent: 0,
+        widthPercent: Math.max(5, lateWidth),
+        tooltip: `Late arrival: arrived at ${this.formatHourDecimal(startH)}`,
+      });
+    }
+
+    const effectiveWork = workHours > 0 ? workHours : Math.max(0.5, endH - startH);
+
+    if (effectiveWork >= 5) {
+      const firstHalf = Math.round(effectiveWork * 0.45 * 10) / 10;
+      const breakDur = 1.0;
+      const secondHalf = Math.min(effectiveWork - firstHalf, Math.max(1, 8.0 - firstHalf));
+      const overtime = Math.max(0, effectiveWork - 8.0);
+
+      // 1. Morning work
+      const s1Left = Math.max(0, ((startH - 9.0) / 13) * 100);
+      const s1Width = Math.max(6, (firstHalf / 13) * 100);
+      segments.push({
+        type: 'work',
+        label: 'Working time',
+        timeRange: `${this.formatHourDecimal(startH)} - ${this.formatHourDecimal(startH + firstHalf)}`,
+        durationLabel: `${firstHalf.toFixed(1)}h`,
+        leftPercent: s1Left,
+        widthPercent: s1Width,
+        tooltip: `Working time: ${this.formatHourDecimal(startH)} - ${this.formatHourDecimal(startH + firstHalf)} (${firstHalf}h)`,
+      });
+
+      // 2. Break
+      const s2Left = s1Left + s1Width;
+      const s2Width = Math.max(4, (breakDur / 13) * 100);
+      segments.push({
+        type: 'break',
+        label: 'Break',
+        timeRange: `${this.formatHourDecimal(startH + firstHalf)} - ${this.formatHourDecimal(startH + firstHalf + breakDur)}`,
+        durationLabel: '1h 00m',
+        leftPercent: s2Left,
+        widthPercent: s2Width,
+        tooltip: 'Break: 1h meal break',
+      });
+
+      // 3. Afternoon work
+      const s3Left = s2Left + s2Width;
+      const s3Width = Math.max(6, (secondHalf / 13) * 100);
+      segments.push({
+        type: 'work',
+        label: 'Working time',
+        timeRange: `${this.formatHourDecimal(startH + firstHalf + breakDur)} - ${this.formatHourDecimal(startH + firstHalf + breakDur + secondHalf)}`,
+        durationLabel: `${secondHalf.toFixed(1)}h`,
+        leftPercent: s3Left,
+        widthPercent: s3Width,
+        tooltip: `Working time: ${secondHalf.toFixed(1)}h productive`,
+      });
+
+      // 4. Overtime
+      if (overtime > 0) {
+        const s4Left = s3Left + s3Width;
+        const s4Width = Math.max(5, (overtime / 13) * 100);
+        segments.push({
+          type: 'overtime',
+          label: 'Overtime',
+          timeRange: `${this.formatHourDecimal(startH + firstHalf + breakDur + secondHalf)} - ${this.formatHourDecimal(endH)}`,
+          durationLabel: `${overtime.toFixed(1)}h OT`,
+          leftPercent: s4Left,
+          widthPercent: Math.min(s4Width, 100 - s4Left),
+          tooltip: `Overtime: ${overtime.toFixed(1)} hours extra work`,
+        });
+      }
+    } else {
+      const sLeft = Math.max(0, ((startH - 9.0) / 13) * 100);
+      const sWidth = Math.max(8, (effectiveWork / 13) * 100);
+      segments.push({
+        type: 'work',
+        label: 'Working time',
+        timeRange: `${this.formatHourDecimal(startH)} - ${this.formatHourDecimal(endH)}`,
+        durationLabel: `${effectiveWork.toFixed(1)}h`,
+        leftPercent: sLeft,
+        widthPercent: Math.min(sWidth, 100 - sLeft),
+        tooltip: `Working time: ${effectiveWork.toFixed(1)}h`,
+      });
+    }
+
+    return segments;
+  }
+
+  private formatHourDecimal(decimalHour: number): string {
+    let h = Math.floor(decimalHour);
+    const m = Math.round((decimalHour - h) * 60);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    h = h ? h : 12;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
   }
 
   private formatTime12(timeStr?: string | null): string {
@@ -1784,6 +2732,14 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const h = Math.floor(totalMin / 60);
     const m = totalMin % 60;
     return `${String(h).padStart(2, '0')} H : ${String(m).padStart(2, '0')} M`;
+  }
+
+  private formatDurationShort(hoursDecimal: number): string {
+    if (!hoursDecimal || hoursDecimal <= 0) return '—';
+    const totalMin = Math.round(hoursDecimal * 60);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h} hour`;
   }
 
   private formatExtraTime(hoursDecimal: number): string {
@@ -1815,6 +2771,17 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     return false;
   }
 
+  private isLateCheckOut(timeStr: string): boolean {
+    if (!timeStr) return false;
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      return h > 18 || (h === 18 && m > 30);
+    }
+    return false;
+  }
+
   protected openDayDetails(day: MusterDay): void {
     this.selectedDetailDay.set(day);
     this.showDayDetailModal.set(true);
@@ -1838,7 +2805,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected openQuickPunchModal(): void {
     if (this.employees().length > 0 && !this.punchForm.employeeId) {
-      this.punchForm.employeeId = this.employees()[0].id;
+      this.punchForm.employeeId = this.selectedMusterEmpId || this.employees()[0].id;
     }
     this.showPunchModal.set(true);
   }
@@ -1963,8 +2930,8 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected openRegModal(): void {
     if (this.employees().length > 0 && !this.newReg.employeeId) {
-      this.newReg.employeeId = this.employees()[0].id;
-      this.newReg.employeeName = this.employees()[0].fullName;
+      this.newReg.employeeId = this.selectedMusterEmpId || this.employees()[0].id;
+      this.newReg.employeeName = this.selectedEmployee()?.fullName || this.employees()[0].fullName;
     }
     this.showRegModal.set(true);
   }
