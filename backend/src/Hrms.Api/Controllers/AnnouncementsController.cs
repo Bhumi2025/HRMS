@@ -23,6 +23,7 @@ public sealed class AnnouncementsController : ControllerBase
         Ok(await _announcements.ListAsync(ct));
 
     [HttpPost]
+    [Authorize(Policy = "ManagerOrAbove")]
     [ProducesResponseType(typeof(AnnouncementDto), StatusCodes.Status201Created)]
     public async Task<ActionResult<AnnouncementDto>> Create(
         [FromBody] SaveAnnouncementRequest request,
@@ -33,6 +34,7 @@ public sealed class AnnouncementsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "ManagerOrAbove")]
     [ProducesResponseType(typeof(AnnouncementDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<AnnouncementDto>> Update(
         Guid id,
@@ -41,6 +43,7 @@ public sealed class AnnouncementsController : ControllerBase
         Ok(await _announcements.UpdateAsync(id, request, ct));
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "ManagerOrAbove")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {

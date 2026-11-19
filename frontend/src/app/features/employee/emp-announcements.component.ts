@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
+import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 
 interface Announcement {
@@ -19,50 +20,143 @@ interface Announcement {
   selector: 'app-emp-announcements',
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="flex justify-end items-center" style="margin-bottom: 24px">
-      <div style="display: flex; align-items: center; gap: 12px">
-        <span class="badge badge-danger" style="font-size: 0.82rem; padding: 6px 14px">{{ announcements().length }} Total</span>
-        <button class="btn btn-primary" (click)="openCreateModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600">
-          <span>+</span> Post Announcement
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 12px">
+      <!-- Filter Tabs: All, Unread, Read -->
+      <div style="display: flex; align-items: center; gap: 4px; background: var(--surface); padding: 4px; border-radius: 10px; border: 1px solid var(--border)">
+        <button
+          type="button"
+          (click)="activeFilter.set('all')"
+          [style.background]="activeFilter() === 'all' ? 'var(--p)' : 'transparent'"
+          [style.color]="activeFilter() === 'all' ? '#fff' : 'var(--text)'"
+          style="border: none; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s"
+        >
+          All ({{ announcements().length }})
         </button>
+        <button
+          type="button"
+          (click)="activeFilter.set('unread')"
+          [style.background]="activeFilter() === 'unread' ? 'var(--p)' : 'transparent'"
+          [style.color]="activeFilter() === 'unread' ? '#fff' : 'var(--text)'"
+          style="border: none; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s"
+        >
+          Unread ({{ unreadCount() }})
+        </button>
+        <button
+          type="button"
+          (click)="activeFilter.set('read')"
+          [style.background]="activeFilter() === 'read' ? 'var(--p)' : 'transparent'"
+          [style.color]="activeFilter() === 'read' ? '#fff' : 'var(--text)'"
+          style="border: none; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s"
+        >
+          Read ({{ readCount() }})
+        </button>
+      </div>
+
+      <!-- Header Actions -->
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+        @if (unreadCount() > 0) {
+          <button
+            class="btn btn-outline btn-sm"
+            type="button"
+            (click)="markAllAsRead()"
+            style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600"
+          >
+            ✓ Mark All as Read
+          </button>
+        }
+        @if (canManage()) {
+          <button class="btn btn-primary btn-sm" (click)="openCreateModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600">
+            <span>+</span> Post Announcement
+          </button>
+        }
       </div>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 14px">
-      @for (a of announcements(); track a.id ?? a.title) {
-        <div style="background: var(--surface); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; transition: transform 0.15s ease">
-          <div [style.background]="barColor(a.type)" style="height: 3px"></div>
-          <div style="padding: 16px">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px">
-              <div style="display: flex; align-items: center; gap: 8px">
+      @for (a of filteredAnnouncements(); track a.id ?? a.title) {
+        <div
+          class="news-card"
+          (click)="readNews(a)"
+          style="background: var(--surface); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;"
+          [style.opacity]="isRead(a) ? '0.88' : '1'"
+        >
+          <div [style.background]="barColor(a.type)" [style.height]="isRead(a) ? '2px' : '4px'"></div>
+          <div style="padding: 16px 20px">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
                 <span class="badge" [class]="badgeClass(a.type)">{{ a.tag }}</span>
+                
+                @if (isRead(a)) {
+                  <span
+                    class="badge"
+                    style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background: rgba(16,185,129,0.12); color: #10b981; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
+                  >
+                    ✓ Read
+                  </span>
+                } @else {
+                  <span
+                    class="badge"
+                    style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background: rgba(239,68,68,0.12); color: #ef4444; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"
+                  >
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
+                    Unread
+                  </span>
+                }
+
                 <span class="ann-time" style="font-size: 11px; color: var(--muted); white-space: nowrap">{{ a.time }}</span>
               </div>
-              @if (a.id) {
-                <div style="display: flex; align-items: center; gap: 4px">
+
+              <div style="display: flex; align-items: center; gap: 8px" (click)="$event.stopPropagation()">
+                <!-- Mark as read button / action -->
+                @if (!isRead(a)) {
                   <button
                     type="button"
-                    (click)="openEditModal(a)"
-                    title="Edit announcement"
-                    style="border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: 13px; transition: color 0.15s; display: inline-flex; align-items: center; gap: 4px"
-                    onmouseover="this.style.color='var(--p)'"
-                    onmouseout="this.style.color='var(--muted)'"
+                    class="btn btn-outline btn-xs"
+                    (click)="markAsRead(a, $event)"
+                    title="Mark news as read"
+                    style="font-size: 12px; padding: 4px 12px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
                   >
-                    ✎ Edit
+                    <span>✓</span> Mark as Read
                   </button>
+                } @else {
                   <button
                     type="button"
-                    (click)="deleteItem(a)"
-                    title="Delete announcement"
-                    style="border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: 14px; transition: color 0.15s"
-                    onmouseover="this.style.color='var(--danger, #ef4444)'"
-                    onmouseout="this.style.color='var(--muted)'"
+                    class="btn btn-ghost btn-xs"
+                    (click)="toggleRead(a, $event)"
+                    title="Mark as unread"
+                    style="font-size: 11px; padding: 4px 8px; border-radius: 6px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px;"
                   >
-                    ✕
+                    Mark Unread
                   </button>
-                </div>
-              }
+                }
+
+                @if (canManage() && a.id) {
+                  <div style="display: flex; align-items: center; gap: 4px; margin-left: 4px; border-left: 1px solid var(--border); padding-left: 8px">
+                    <button
+                      type="button"
+                      (click)="openEditModal(a)"
+                      title="Edit announcement"
+                      style="border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: 13px; transition: color 0.15s; display: inline-flex; align-items: center; gap: 4px"
+                      onmouseover="this.style.color='var(--p)'"
+                      onmouseout="this.style.color='var(--muted)'"
+                    >
+                      ✎ Edit
+                    </button>
+                    <button
+                      type="button"
+                      (click)="deleteItem(a)"
+                      title="Delete announcement"
+                      style="border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: 14px; transition: color 0.15s"
+                      onmouseover="this.style.color='var(--danger, #ef4444)'"
+                      onmouseout="this.style.color='var(--muted)'"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                }
+              </div>
             </div>
+
             <div class="ann-title" style="font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 7px; line-height: 1.4">
               {{ a.title }}
             </div>
@@ -71,11 +165,48 @@ interface Announcement {
         </div>
       } @empty {
         <div style="text-align: center; padding: 48px; background: var(--surface); border-radius: 14px; border: 1px dashed var(--border)">
-          <p style="color: var(--muted); margin-bottom: 14px">No active announcements right now.</p>
-          <button class="btn btn-primary btn-sm" (click)="openCreateModal()">+ Post the First Announcement</button>
+          <p style="color: var(--muted); margin-bottom: 14px">
+            @if (activeFilter() === 'unread') {
+              No unread news. You are all caught up! 🎉
+            } @else if (activeFilter() === 'read') {
+              No read news yet.
+            } @else {
+              No active announcements right now.
+            }
+          </p>
+          @if (canManage()) {
+            <button class="btn btn-primary btn-sm" (click)="openCreateModal()">+ Post the First Announcement</button>
+          }
         </div>
       }
     </div>
+
+    <!-- Read News Details Modal (automatically marks as read when opened) -->
+    @if (readingItem(); as item) {
+      <div class="modal-overlay open" (click)="closeReaderModal()">
+        <div class="modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span class="badge" [class]="badgeClass(item.type)">{{ item.tag }}</span>
+              <span class="badge" style="font-size: 11px; padding: 2px 8px; border-radius: 12px; background: rgba(16,185,129,0.12); color: #10b981; font-weight: 600;">✓ Read</span>
+              <span style="font-size: 12px; color: var(--muted)">{{ item.time }}</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" type="button" (click)="closeReaderModal()" style="font-size: 18px; line-height: 1; padding: 4px 8px; border-radius: 6px">✕</button>
+          </div>
+          <div class="modal-body">
+            <h3 style="margin: 0 0 12px 0; font-size: 1.25rem; font-weight: 700; color: var(--text); line-height: 1.4">
+              {{ item.title }}
+            </h3>
+            <div style="font-size: 14.5px; color: var(--text); line-height: 1.7; white-space: pre-wrap; background: var(--bg); padding: 16px; border-radius: 10px; border: 1px solid var(--border)">
+              {{ item.msg }}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary btn-sm" type="button" (click)="closeReaderModal()">Done</button>
+          </div>
+        </div>
+      </div>
+    }
 
     <!-- Create / Edit Announcement Modal -->
     @if (showModal()) {
@@ -243,11 +374,17 @@ interface Announcement {
 })
 export class EmpAnnouncementsComponent implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly session = inject(SessionService);
   private readonly toast = inject(ToastService);
+
+  protected readonly canManage = computed(() => this.session.role() !== 'Employee');
 
   protected readonly announcements = signal<Announcement[]>([]);
   protected readonly showModal = signal(false);
   protected readonly isSubmitting = signal(false);
+  protected readonly readIds = signal<Set<string>>(new Set());
+  protected readonly activeFilter = signal<'all' | 'unread' | 'read'>('all');
+  protected readonly readingItem = signal<Announcement | null>(null);
 
   protected formTitle = '';
   protected formTag = 'HR Update';
@@ -257,8 +394,109 @@ export class EmpAnnouncementsComponent implements OnInit {
 
   protected readonly quickTags = ['HR Update', 'Notice', 'Company Event', 'Holiday', 'IT Notice', 'Policy', 'Urgent'];
 
+  private get storageKey(): string {
+    const user = this.session.user();
+    const id = user?.employeeId || user?.email || user?.name || 'default';
+    return `hrms_news_read_${id}`;
+  }
+
+  protected isRead(a: Announcement): boolean {
+    const key = a.id || a.title;
+    return this.readIds().has(key);
+  }
+
+  protected readonly unreadCount = computed(() => {
+    const read = this.readIds();
+    return this.announcements().filter((a) => !read.has(a.id || a.title)).length;
+  });
+
+  protected readonly readCount = computed(() => {
+    const read = this.readIds();
+    return this.announcements().filter((a) => read.has(a.id || a.title)).length;
+  });
+
+  protected readonly filteredAnnouncements = computed(() => {
+    const filter = this.activeFilter();
+    const items = this.announcements();
+    const read = this.readIds();
+    if (filter === 'unread') {
+      return items.filter((a) => !read.has(a.id || a.title));
+    }
+    if (filter === 'read') {
+      return items.filter((a) => read.has(a.id || a.title));
+    }
+    return items;
+  });
+
   ngOnInit(): void {
+    this.loadReadState();
     this.loadAnnouncements();
+  }
+
+  protected readNews(a: Announcement): void {
+    this.readingItem.set(a);
+    this.markAsRead(a);
+  }
+
+  protected closeReaderModal(): void {
+    this.readingItem.set(null);
+  }
+
+  protected markAsRead(a: Announcement, event?: Event): void {
+    if (event) event.stopPropagation();
+    const key = a.id || a.title;
+    const current = new Set(this.readIds());
+    if (!current.has(key)) {
+      current.add(key);
+      this.readIds.set(current);
+      this.saveReadState();
+      this.toast.show('News marked as read.', 'success');
+    }
+  }
+
+  protected toggleRead(a: Announcement, event?: Event): void {
+    if (event) event.stopPropagation();
+    const key = a.id || a.title;
+    const current = new Set(this.readIds());
+    if (current.has(key)) {
+      current.delete(key);
+      this.toast.show('News marked as unread.', 'info');
+    } else {
+      current.add(key);
+      this.toast.show('News marked as read.', 'success');
+    }
+    this.readIds.set(current);
+    this.saveReadState();
+  }
+
+  protected markAllAsRead(): void {
+    const current = new Set(this.readIds());
+    for (const a of this.announcements()) {
+      current.add(a.id || a.title);
+    }
+    this.readIds.set(current);
+    this.saveReadState();
+    this.toast.show('All news marked as read.', 'success');
+  }
+
+  private saveReadState(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify([...this.readIds()]));
+    } catch {}
+  }
+
+  private loadReadState(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(this.storageKey);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          this.readIds.set(new Set(arr));
+        }
+      }
+    } catch {}
   }
 
   loadAnnouncements(): void {
@@ -287,6 +525,7 @@ export class EmpAnnouncementsComponent implements OnInit {
   }
 
   openCreateModal(): void {
+    if (!this.canManage()) return;
     this.editingId = null;
     this.formTitle = '';
     this.formTag = 'HR Update';
@@ -296,6 +535,7 @@ export class EmpAnnouncementsComponent implements OnInit {
   }
 
   openEditModal(a: Announcement): void {
+    if (!this.canManage()) return;
     this.editingId = a.id ?? null;
     this.formTitle = a.title;
     this.formTag = a.tag;
@@ -310,6 +550,7 @@ export class EmpAnnouncementsComponent implements OnInit {
   }
 
   submitAnnouncement(): void {
+    if (!this.canManage()) return;
     if (!this.formTitle.trim()) {
       this.toast.show('Please enter an announcement title.', 'warning');
       return;
@@ -347,7 +588,7 @@ export class EmpAnnouncementsComponent implements OnInit {
   }
 
   deleteItem(a: Announcement): void {
-    if (!a.id) return;
+    if (!this.canManage() || !a.id) return;
     if (!confirm(`Are you sure you want to delete notice "${a.title}"?`)) return;
 
     this.api.deleteAnnouncement(a.id).subscribe({

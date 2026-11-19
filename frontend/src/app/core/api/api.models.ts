@@ -171,6 +171,8 @@ export interface MonthlyMusterDay {
   checkOut?: string | null;
   workHours: number;
   status: string;
+  breakMinutes?: number;
+  punches?: EmployeePunch[];
 }
 
 export interface Regularization {
@@ -629,6 +631,8 @@ export interface EmployeePunchStatus {
   hasForgottenCheckOut: boolean;
   forgottenCheckOutDate?: string | null;
   regularizationMessage?: string | null;
+  isOnBreak?: boolean;
+  breakSecondsToday?: number;
 }
 
 export interface EnrolledFace {

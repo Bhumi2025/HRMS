@@ -40,7 +40,9 @@ public sealed record MonthlyMusterDayDto(
     string? CheckIn,
     string? CheckOut,
     decimal WorkHours,
-    string Status);
+    string Status,
+    int BreakMinutes = 0,
+    IReadOnlyList<EmployeePunchDto>? Punches = null);
 
 public sealed record EmployeePunchDto(
     Guid Id,
@@ -77,7 +79,9 @@ public sealed record EmployeePunchStatusDto(
     IReadOnlyList<EmployeePunchDto> TodayPunches,
     bool HasForgottenCheckOut,
     DateOnly? ForgottenCheckOutDate,
-    string? RegularizationMessage);
+    string? RegularizationMessage,
+    bool IsOnBreak = false,
+    long BreakSecondsToday = 0);
 
 public sealed record AttendancePersonDto(
     Guid EmployeeId,

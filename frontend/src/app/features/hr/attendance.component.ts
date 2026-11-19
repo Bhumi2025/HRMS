@@ -3,7 +3,7 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, com
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
-import { AttendanceRecord, EmployeeListItem, MonthlyMusterDay, TodayAttendanceOverview } from '../../core/api/api.models';
+import { AttendanceRecord, EmployeeListItem, EmployeePunch, MonthlyMusterDay, TodayAttendanceOverview } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { PermissionService } from '../../core/services/permission.service';
 import { SessionService } from '../../core/services/session.service';
@@ -82,6 +82,8 @@ interface MusterDay {
   color: string;
   hours: string;
   timelineSegments: TimelineSegment[];
+  breakMinutes?: number;
+  punches?: EmployeePunch[];
 }
 
 @Component({
@@ -256,7 +258,7 @@ interface MusterDay {
                 <th style="min-width: 95px;">Work Hours</th>
                 <th style="min-width: 90px;">Status</th>
                 <th style="min-width: 130px;">Device/Method</th>
-                <th style="min-width: 140px; text-align: right; padding-right: 24px;">Action</th>
+                <th style="min-width: 130px; text-align: center; padding-right: 16px;">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -300,7 +302,7 @@ interface MusterDay {
                       {{ row.device || 'Face Terminal' }}
                     </span>
                   </td>
-                  <td style="text-align: right; padding-right: 24px; white-space: nowrap;">
+                  <td style="text-align: center; padding: 8px 16px; white-space: nowrap;">
                     <button class="btn-view-muster" (click)="viewEmployeeMuster(row.id)">
                       View Muster ›
                     </button>
@@ -964,24 +966,34 @@ interface MusterDay {
                 }
               </select>
             </div>
+
+            <!-- Current Employee Live Punch Status Badge -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
+              <span style="color: #64748b; font-weight: 500;">Current State:</span>
+              <span [style.color]="currentEmpPunchState().badgeColor" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                <span [style.background]="currentEmpPunchState().badgeColor" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                {{ currentEmpPunchState().badgeText }}
+              </span>
+            </div>
+
             <div class="form-group">
               <label class="form-label">Punch Type <span style="color: var(--danger)">*</span></label>
               <div style="display: flex; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockIn" name="punchType" />
+                <label [style.opacity]="isPunchTypeAllowed('ClockIn') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockIn') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockIn" name="punchType" [disabled]="!isPunchTypeAllowed('ClockIn')" />
                   Clock In
                 </label>
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockOut" name="punchType" />
-                  Clock Out
-                </label>
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakIn" name="punchType" />
+                <label [style.opacity]="isPunchTypeAllowed('BreakIn') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('BreakIn') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakIn" name="punchType" [disabled]="!isPunchTypeAllowed('BreakIn')" />
                   Break In
                 </label>
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakOut" name="punchType" />
+                <label [style.opacity]="isPunchTypeAllowed('BreakOut') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('BreakOut') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakOut" name="punchType" [disabled]="!isPunchTypeAllowed('BreakOut')" />
                   Break Out
+                </label>
+                <label [style.opacity]="isPunchTypeAllowed('ClockOut') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockOut') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockOut" name="punchType" [disabled]="!isPunchTypeAllowed('ClockOut')" />
+                  Clock Out
                 </label>
               </div>
             </div>
@@ -1032,6 +1044,7 @@ interface MusterDay {
         white-space: nowrap;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 4px;
         cursor: pointer;
         transition: all 0.15s ease;
@@ -1998,6 +2011,21 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly showDayDetailModal = signal(false);
   protected readonly selectedDetailDay = signal<MusterDay | null>(null);
   protected readonly recordingPunch = signal(false);
+  protected readonly currentEmpPunchState = signal<{
+    badgeText: string;
+    badgeColor: string;
+    canClockIn: boolean;
+    canBreakIn: boolean;
+    canBreakOut: boolean;
+    canClockOut: boolean;
+  }>({
+    badgeText: 'Not Clocked In',
+    badgeColor: '#64748b',
+    canClockIn: true,
+    canBreakIn: false,
+    canBreakOut: false,
+    canClockOut: false,
+  });
 
   private pollInterval: any = null;
 
@@ -2562,21 +2590,27 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
             actionStatus = 'Scheduled';
           }
 
-          // Durations
-          const totalTimeStr = workHours > 0 ? this.formatDuration(workHours) : '—';
-          const breakHoursStr = workHours >= 5 ? '01 H : 00 M' : '—';
-          const productiveHoursStr = workHours > 0 ? this.formatDuration(workHours >= 5 ? workHours - 1 : workHours) : '—';
-          const extraTimeStr = this.formatExtraTime(workHours);
-          const durationStr = workHours > 0 ? this.formatDurationShort(workHours) : '—';
+          // Durations (calculated dynamically from real punches & break minutes)
+          const breakMins = d.breakMinutes ?? 0;
+          const breakHoursStr = breakMins > 0 ? this.formatMinutesToHM(breakMins) : (workHours >= 5 ? '01 H : 00 M' : '00 H : 00 M');
+          const effectiveWorkHours = workHours > 0 ? workHours : 0;
+          const productiveHoursStr = effectiveWorkHours > 0 ? this.formatDuration(effectiveWorkHours) : '—';
+          const totalShiftHours = effectiveWorkHours + (breakMins / 60.0);
+          const totalTimeStr = totalShiftHours > 0 ? this.formatDuration(totalShiftHours) : '—';
+          const extraTimeStr = this.formatExtraTime(effectiveWorkHours);
+          const durationStr = effectiveWorkHours > 0 ? this.formatDurationShort(effectiveWorkHours) : '—';
 
-          // Visual Timeline Segments (Image 2)
+          // Visual Timeline Segments (Dynamic Image 2 Breakdown)
           const timelineSegments = this.computeTimelineSegments(
             d.status,
             d.checkIn,
             d.checkOut,
-            workHours,
+            effectiveWorkHours,
             isWeekend,
-            isFuture
+            isFuture,
+            d.breakMinutes,
+            d.punches,
+            isToday
           );
 
           return {
@@ -2613,6 +2647,8 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
             color: dayStatusColor,
             hours: totalTimeStr,
             timelineSegments,
+            breakMinutes: d.breakMinutes,
+            punches: d.punches,
           };
         });
         this.musterDays.set(mapped);
@@ -2629,7 +2665,10 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     checkOut: string | null | undefined,
     workHours: number,
     isWeekend: boolean,
-    isFuture: boolean
+    isFuture: boolean,
+    breakMinutes?: number,
+    punches?: EmployeePunch[],
+    isToday?: boolean
   ): TimelineSegment[] {
     if (status === 'Weekend' || isWeekend) {
       return [
@@ -2687,114 +2726,263 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       ];
     }
 
-    // Active Present or Late
     const segments: TimelineSegment[] = [];
+    const scaleStart = 8.0;
+    const scaleHours = 16.0; // 08:00 to 24:00 (16 hrs)
+
+    const calcLeft = (h: number) => Math.max(0, Math.min(100, ((h - scaleStart) / scaleHours) * 100));
+    const calcWidth = (sH: number, eH: number) => {
+      const left = calcLeft(sH);
+      const span = ((eH - sH) / scaleHours) * 100;
+      return Math.max(4, Math.min(100 - left, span));
+    };
+
+    const parseToDecimalHour = (timeVal: string): number => {
+      if (!timeVal) return 9.0;
+      if (timeVal.includes('T')) {
+        const d = new Date(timeVal);
+        return d.getHours() + d.getMinutes() / 60.0;
+      }
+      const parts = timeVal.split(':');
+      if (parts.length >= 2) {
+        return parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60.0;
+      }
+      return 9.0;
+    };
+
+    // 1. If we have actual raw punches from backend
+    if (punches && punches.length > 0) {
+      const sorted = [...punches].sort((a, b) => new Date(a.punchTime).getTime() - new Date(b.punchTime).getTime());
+      const firstIn = sorted.find((p) => p.punchType === 'ClockIn');
+      const firstInH = firstIn ? parseToDecimalHour(firstIn.punchTime) : parseToDecimalHour(sorted[0].punchTime);
+
+      // Late arrival check (after 09:15)
+      if (firstInH > 9.25) {
+        const lateWidth = Math.max(4, Math.min(22, ((firstInH - 9.0) / scaleHours) * 100));
+        segments.push({
+          type: 'late',
+          label: 'Late',
+          timeRange: `09:00 - ${this.formatHourDecimal(firstInH)}`,
+          durationLabel: `${Math.round((firstInH - 9.0) * 60)}m late`,
+          leftPercent: calcLeft(9.0),
+          widthPercent: lateWidth,
+          tooltip: `Late arrival: arrived at ${this.formatHourDecimal(firstInH)}`,
+        });
+      }
+
+      let currentWorkStart: number | null = null;
+      let currentBreakStart: number | null = null;
+      let accumulatedWorkHours = 0;
+
+      for (const p of sorted) {
+        const pH = parseToDecimalHour(p.punchTime);
+
+        if (p.punchType === 'ClockIn') {
+          currentWorkStart = pH;
+          currentBreakStart = null;
+        } else if (p.punchType === 'BreakIn') {
+          if (currentWorkStart !== null && pH > currentWorkStart) {
+            const dur = pH - currentWorkStart;
+            accumulatedWorkHours += dur;
+            segments.push({
+              type: 'work',
+              label: 'Working Time',
+              timeRange: `${this.formatHourDecimal(currentWorkStart)} - ${this.formatHourDecimal(pH)}`,
+              durationLabel: `${dur.toFixed(1)}h`,
+              leftPercent: calcLeft(currentWorkStart),
+              widthPercent: calcWidth(currentWorkStart, pH),
+              tooltip: `Working time: ${dur.toFixed(1)}h`,
+            });
+            currentWorkStart = null;
+          }
+          currentBreakStart = pH;
+        } else if (p.punchType === 'BreakOut') {
+          if (currentBreakStart !== null && pH > currentBreakStart) {
+            const dur = pH - currentBreakStart;
+            segments.push({
+              type: 'break',
+              label: 'Break',
+              timeRange: `${this.formatHourDecimal(currentBreakStart)} - ${this.formatHourDecimal(pH)}`,
+              durationLabel: `${Math.round(dur * 60)}m break`,
+              leftPercent: calcLeft(currentBreakStart),
+              widthPercent: calcWidth(currentBreakStart, pH),
+              tooltip: `Break interval: ${Math.round(dur * 60)} minutes`,
+            });
+            currentBreakStart = null;
+          }
+          currentWorkStart = pH;
+        } else if (p.punchType === 'ClockOut') {
+          if (currentBreakStart !== null && pH > currentBreakStart) {
+            const bDur = pH - currentBreakStart;
+            segments.push({
+              type: 'break',
+              label: 'Break',
+              timeRange: `${this.formatHourDecimal(currentBreakStart)} - ${this.formatHourDecimal(pH)}`,
+              durationLabel: `${Math.round(bDur * 60)}m break`,
+              leftPercent: calcLeft(currentBreakStart),
+              widthPercent: calcWidth(currentBreakStart, pH),
+              tooltip: `Break interval: ${Math.round(bDur * 60)} minutes`,
+            });
+            currentBreakStart = null;
+          }
+          if (currentWorkStart !== null && pH > currentWorkStart) {
+            const wDur = pH - currentWorkStart;
+            accumulatedWorkHours += wDur;
+            const isOT = accumulatedWorkHours > 8.0;
+            segments.push({
+              type: isOT ? 'overtime' : 'work',
+              label: isOT ? 'Overtime' : 'Working Time',
+              timeRange: `${this.formatHourDecimal(currentWorkStart)} - ${this.formatHourDecimal(pH)}`,
+              durationLabel: `${wDur.toFixed(1)}h`,
+              leftPercent: calcLeft(currentWorkStart),
+              widthPercent: calcWidth(currentWorkStart, pH),
+              tooltip: `${isOT ? 'Overtime' : 'Working time'}: ${wDur.toFixed(1)}h`,
+            });
+            currentWorkStart = null;
+          }
+        }
+      }
+
+      // If ongoing today without clock out
+      if (isToday) {
+        const nowObj = new Date();
+        const nowH = nowObj.getHours() + nowObj.getMinutes() / 60.0;
+
+        if (currentBreakStart !== null) {
+          const endH = Math.max(currentBreakStart + 0.25, nowH);
+          const dur = endH - currentBreakStart;
+          segments.push({
+            type: 'break',
+            label: 'Break (Ongoing)',
+            timeRange: `${this.formatHourDecimal(currentBreakStart)} - Now`,
+            durationLabel: `${Math.round(dur * 60)}m`,
+            leftPercent: calcLeft(currentBreakStart),
+            widthPercent: calcWidth(currentBreakStart, endH),
+            tooltip: `Currently on break (${Math.round(dur * 60)}m)`,
+          });
+        } else if (currentWorkStart !== null) {
+          const endH = Math.max(currentWorkStart + 0.25, nowH);
+          const dur = endH - currentWorkStart;
+          segments.push({
+            type: 'work',
+            label: 'Working Time (Active)',
+            timeRange: `${this.formatHourDecimal(currentWorkStart)} - Now`,
+            durationLabel: `${dur.toFixed(1)}h`,
+            leftPercent: calcLeft(currentWorkStart),
+            widthPercent: calcWidth(currentWorkStart, endH),
+            tooltip: `Currently working (${dur.toFixed(1)}h)`,
+          });
+        }
+      }
+
+      if (segments.length > 0) {
+        return segments;
+      }
+    }
+
+    // 2. Fallback when punches array not present (historical/mock records)
     let startH = 9.0;
     if (checkIn) {
-      const parts = checkIn.split(':');
-      if (parts.length >= 2) {
-        startH = parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60;
-      }
+      startH = parseToDecimalHour(checkIn);
     }
 
     let endH = startH + (workHours || 8.0);
     if (checkOut) {
-      const parts = checkOut.split(':');
-      if (parts.length >= 2) {
-        endH = parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60;
-      }
+      endH = parseToDecimalHour(checkOut);
     }
 
-    // If late check-in
-    if (startH > 9.5) {
-      const lateWidth = Math.min(22, ((startH - 9.0) / 13) * 100);
+    if (startH > 9.25) {
+      const lateWidth = Math.max(4, Math.min(22, ((startH - 9.0) / scaleHours) * 100));
       segments.push({
         type: 'late',
         label: 'Late',
         timeRange: `09:00 - ${this.formatHourDecimal(startH)}`,
         durationLabel: `${Math.round((startH - 9.0) * 60)}m late`,
-        leftPercent: 0,
-        widthPercent: Math.max(5, lateWidth),
+        leftPercent: calcLeft(9.0),
+        widthPercent: lateWidth,
         tooltip: `Late arrival: arrived at ${this.formatHourDecimal(startH)}`,
       });
     }
 
-    const effectiveWork = workHours > 0 ? workHours : Math.max(0.5, endH - startH);
+    const bMins = breakMinutes ?? (workHours >= 5 ? 60 : 0);
+    const bHours = bMins / 60.0;
+    const effectiveWork = workHours > 0 ? workHours : Math.max(0.5, endH - startH - bHours);
 
-    if (effectiveWork >= 5) {
+    if (bHours > 0 && effectiveWork >= 2) {
       const firstHalf = Math.round(effectiveWork * 0.45 * 10) / 10;
-      const breakDur = 1.0;
-      const secondHalf = Math.min(effectiveWork - firstHalf, Math.max(1, 8.0 - firstHalf));
+      const secondHalf = Math.max(0.5, effectiveWork - firstHalf);
       const overtime = Math.max(0, effectiveWork - 8.0);
 
-      // 1. Morning work
-      const s1Left = Math.max(0, ((startH - 9.0) / 13) * 100);
-      const s1Width = Math.max(6, (firstHalf / 13) * 100);
+      // Part 1: Morning work
       segments.push({
         type: 'work',
         label: 'Working time',
         timeRange: `${this.formatHourDecimal(startH)} - ${this.formatHourDecimal(startH + firstHalf)}`,
         durationLabel: `${firstHalf.toFixed(1)}h`,
-        leftPercent: s1Left,
-        widthPercent: s1Width,
-        tooltip: `Working time: ${this.formatHourDecimal(startH)} - ${this.formatHourDecimal(startH + firstHalf)} (${firstHalf}h)`,
+        leftPercent: calcLeft(startH),
+        widthPercent: calcWidth(startH, startH + firstHalf),
+        tooltip: `Working time: ${firstHalf.toFixed(1)}h`,
       });
 
-      // 2. Break
-      const s2Left = s1Left + s1Width;
-      const s2Width = Math.max(4, (breakDur / 13) * 100);
+      // Part 2: Break
+      const bStart = startH + firstHalf;
+      const bEnd = bStart + bHours;
       segments.push({
         type: 'break',
         label: 'Break',
-        timeRange: `${this.formatHourDecimal(startH + firstHalf)} - ${this.formatHourDecimal(startH + firstHalf + breakDur)}`,
-        durationLabel: '1h 00m',
-        leftPercent: s2Left,
-        widthPercent: s2Width,
-        tooltip: 'Break: 1h meal break',
+        timeRange: `${this.formatHourDecimal(bStart)} - ${this.formatHourDecimal(bEnd)}`,
+        durationLabel: `${Math.round(bMins)}m`,
+        leftPercent: calcLeft(bStart),
+        widthPercent: calcWidth(bStart, bEnd),
+        tooltip: `Break: ${Math.round(bMins)} minutes`,
       });
 
-      // 3. Afternoon work
-      const s3Left = s2Left + s2Width;
-      const s3Width = Math.max(6, (secondHalf / 13) * 100);
+      // Part 3: Afternoon work
+      const s3Start = bEnd;
+      const regularAfternoon = Math.max(0.5, Math.min(secondHalf, Math.max(0, 8.0 - firstHalf)));
+      const s3End = s3Start + regularAfternoon;
       segments.push({
         type: 'work',
         label: 'Working time',
-        timeRange: `${this.formatHourDecimal(startH + firstHalf + breakDur)} - ${this.formatHourDecimal(startH + firstHalf + breakDur + secondHalf)}`,
-        durationLabel: `${secondHalf.toFixed(1)}h`,
-        leftPercent: s3Left,
-        widthPercent: s3Width,
-        tooltip: `Working time: ${secondHalf.toFixed(1)}h productive`,
+        timeRange: `${this.formatHourDecimal(s3Start)} - ${this.formatHourDecimal(s3End)}`,
+        durationLabel: `${regularAfternoon.toFixed(1)}h`,
+        leftPercent: calcLeft(s3Start),
+        widthPercent: calcWidth(s3Start, s3End),
+        tooltip: `Working time: ${regularAfternoon.toFixed(1)}h`,
       });
 
-      // 4. Overtime
+      // Part 4: Overtime
       if (overtime > 0) {
-        const s4Left = s3Left + s3Width;
-        const s4Width = Math.max(5, (overtime / 13) * 100);
+        const otEnd = s3End + overtime;
         segments.push({
           type: 'overtime',
           label: 'Overtime',
-          timeRange: `${this.formatHourDecimal(startH + firstHalf + breakDur + secondHalf)} - ${this.formatHourDecimal(endH)}`,
+          timeRange: `${this.formatHourDecimal(s3End)} - ${this.formatHourDecimal(otEnd)}`,
           durationLabel: `${overtime.toFixed(1)}h OT`,
-          leftPercent: s4Left,
-          widthPercent: Math.min(s4Width, 100 - s4Left),
-          tooltip: `Overtime: ${overtime.toFixed(1)} hours extra work`,
+          leftPercent: calcLeft(s3End),
+          widthPercent: calcWidth(s3End, otEnd),
+          tooltip: `Overtime: ${overtime.toFixed(1)}h extra work`,
         });
       }
     } else {
-      const sLeft = Math.max(0, ((startH - 9.0) / 13) * 100);
-      const sWidth = Math.max(8, (effectiveWork / 13) * 100);
       segments.push({
         type: 'work',
         label: 'Working time',
         timeRange: `${this.formatHourDecimal(startH)} - ${this.formatHourDecimal(endH)}`,
         durationLabel: `${effectiveWork.toFixed(1)}h`,
-        leftPercent: sLeft,
-        widthPercent: Math.min(sWidth, 100 - sLeft),
+        leftPercent: calcLeft(startH),
+        widthPercent: calcWidth(startH, endH),
         tooltip: `Working time: ${effectiveWork.toFixed(1)}h`,
       });
     }
 
     return segments;
+  }
+
+  private formatMinutesToHM(totalMinutes: number): string {
+    const h = Math.floor(totalMinutes / 60);
+    const m = Math.round(totalMinutes % 60);
+    return `${String(h).padStart(2, '0')} H : ${String(m).padStart(2, '0')} M`;
   }
 
   private formatHourDecimal(decimalHour: number): string {
@@ -2911,15 +3099,79 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     this.showPunchModal.set(true);
   }
 
+  protected isPunchTypeAllowed(type: string): boolean {
+    const s = this.currentEmpPunchState();
+    if (type === 'ClockIn') return s.canClockIn;
+    if (type === 'BreakIn') return s.canBreakIn;
+    if (type === 'BreakOut') return s.canBreakOut;
+    if (type === 'ClockOut') return s.canClockOut;
+    return true;
+  }
+
   protected updateDefaultPunchTypeForSelected(): void {
     const targetId = this.punchForm.employeeId;
     if (!targetId) return;
-    const match = this.dailyRows().find((r) => r.id === targetId);
-    if (match && match.checkIn && match.checkIn !== '—' && (!match.checkOut || match.checkOut === '—')) {
-      this.punchForm.punchType = 'ClockOut';
-    } else {
-      this.punchForm.punchType = 'ClockIn';
-    }
+
+    this.api.punchStatus(targetId).subscribe({
+      next: (status) => {
+        if (!status) return;
+        if (!status.isCheckedIn) {
+          this.currentEmpPunchState.set({
+            badgeText: 'Not Clocked In',
+            badgeColor: '#64748b',
+            canClockIn: true,
+            canBreakIn: false,
+            canBreakOut: false,
+            canClockOut: false,
+          });
+          this.punchForm.punchType = 'ClockIn';
+        } else if (status.isOnBreak) {
+          this.currentEmpPunchState.set({
+            badgeText: 'On Break',
+            badgeColor: '#f59e0b',
+            canClockIn: false,
+            canBreakIn: false,
+            canBreakOut: true,
+            canClockOut: true,
+          });
+          this.punchForm.punchType = 'BreakOut';
+        } else {
+          this.currentEmpPunchState.set({
+            badgeText: 'Working / Clocked In',
+            badgeColor: '#10b981',
+            canClockIn: false,
+            canBreakIn: true,
+            canBreakOut: false,
+            canClockOut: true,
+          });
+          this.punchForm.punchType = 'BreakIn';
+        }
+      },
+      error: () => {
+        const match = this.dailyRows().find((r) => r.id === targetId);
+        if (match && match.checkIn && match.checkIn !== '—' && (!match.checkOut || match.checkOut === '—')) {
+          this.currentEmpPunchState.set({
+            badgeText: 'Clocked In',
+            badgeColor: '#10b981',
+            canClockIn: false,
+            canBreakIn: true,
+            canBreakOut: false,
+            canClockOut: true,
+          });
+          this.punchForm.punchType = 'BreakIn';
+        } else {
+          this.currentEmpPunchState.set({
+            badgeText: 'Not Clocked In',
+            badgeColor: '#64748b',
+            canClockIn: true,
+            canBreakIn: false,
+            canBreakOut: false,
+            canClockOut: false,
+          });
+          this.punchForm.punchType = 'ClockIn';
+        }
+      },
+    });
   }
 
   protected submitQuickPunch(): void {
