@@ -88,23 +88,25 @@ interface MusterDay {
   selector: 'app-attendance',
   imports: [CommonModule, FormsModule, IconDirective, RouterModule],
   template: `
-    <!-- Top Action Header -->
-    <div class="flex justify-end items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-      <div class="flex gap-2">
-        <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="exportCsv()">
-          <span [appIcon]="'download'"></span> Export CSV
-        </button>
-        @if (perms.canCreate('Attendance')) {
-          <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="openQuickPunchModal()">
-            <span [appIcon]="'clock'"></span> + Record Punch
+    <!-- Top Action Header (only shown in Daily Punch Log & Regularization) -->
+    @if (tab() !== 'muster') {
+      <div class="flex justify-end items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div class="flex gap-2">
+          <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="exportCsv()">
+            <span [appIcon]="'download'"></span> Export CSV
           </button>
-          <a class="btn btn-outline btn-sm" routerLink="/kiosk" target="_blank" style="display: flex; align-items: center; gap: 6px; border-color: #38bdf8; color: #0284c7; font-weight: 700;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
-            Face Kiosk ⛶
-          </a>
-        }
+          @if (perms.canCreate('Attendance')) {
+            <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="openQuickPunchModal()">
+              <span [appIcon]="'clock'"></span> + Record Punch
+            </button>
+            <a class="btn btn-outline btn-sm" routerLink="/kiosk" target="_blank" style="display: flex; align-items: center; gap: 6px; border-color: #38bdf8; color: #0284c7; font-weight: 700;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+              Face Kiosk ⛶
+            </a>
+          }
+        </div>
       </div>
-    </div>
+    }
 
     <!-- Daily KPIs (when on daily or reg tab) -->
     @if (tab() !== 'muster') {
@@ -434,7 +436,18 @@ interface MusterDay {
               <span class="pager-info">{{ currentEmployeeIndex() + 1 }} out of {{ employees().length }}</span>
             </div>
 
-            <button type="button" class="detail-close-btn" (click)="tab.set('daily')" title="Close and return to Daily Punch Log">✕</button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button 
+                type="button" 
+                class="btn btn-outline btn-xs" 
+                (click)="exportCsv()" 
+                style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 11px; font-weight: 600;"
+                title="Export Monthly Muster CSV for {{ selectedEmployee()?.fullName }}"
+              >
+                <span [appIcon]="'download'"></span> Export CSV
+              </button>
+              <button type="button" class="detail-close-btn" (click)="tab.set('daily')" title="Close and return to Daily Punch Log">✕</button>
+            </div>
           </div>
 
           <!-- Employee Profile Banner -->
