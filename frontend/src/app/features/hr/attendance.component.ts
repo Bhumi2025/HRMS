@@ -631,16 +631,16 @@ interface MusterDay {
 
                         <!-- Center: Timeline visualization -->
                         <div class="gantt-track-center">
-                          <!-- Scale hours -->
+                          <!-- Scale hours (mathematically mapped to 09:00 - 24:00) -->
                           <div class="gantt-scale-hours">
-                            <span>09:00</span>
-                            <span>11:00</span>
-                            <span>13:00</span>
-                            <span>15:00</span>
-                            <span>17:00</span>
-                            <span>19:00</span>
-                            <span>21:00</span>
-                            <span>23:59</span>
+                            <span style="position: absolute; left: 0%;">09:00</span>
+                            <span style="position: absolute; left: 13.33%; transform: translateX(-50%);">11:00</span>
+                            <span style="position: absolute; left: 26.67%; transform: translateX(-50%);">13:00</span>
+                            <span style="position: absolute; left: 40.00%; transform: translateX(-50%);">15:00</span>
+                            <span style="position: absolute; left: 53.33%; transform: translateX(-50%);">17:00</span>
+                            <span style="position: absolute; left: 66.67%; transform: translateX(-50%);">19:00</span>
+                            <span style="position: absolute; left: 80.00%; transform: translateX(-50%);">21:00</span>
+                            <span style="position: absolute; right: 0%;">23:59</span>
                           </div>
 
                           <!-- The visual bar container -->
@@ -1677,25 +1677,54 @@ interface MusterDay {
         flex-direction: column;
         flex-shrink: 0;
       }
-      .in-col { width: 85px; }
+      .in-col {
+        width: 85px;
+        min-width: 85px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        white-space: nowrap;
+      }
       .out-col {
-        width: 130px;
+        width: 175px;
+        min-width: 175px;
+        flex-shrink: 0;
         display: flex;
         flex-direction: row;
         justify-content: flex-end;
-        gap: 14px;
+        align-items: center;
+        gap: 16px;
         text-align: right;
       }
+      .time-block, .dur-block {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        white-space: nowrap;
+      }
+      .time-block {
+        min-width: 80px;
+      }
+      .dur-block {
+        min-width: 65px;
+      }
       .col-lbl {
-        font-size: 10px;
+        font-size: 10.5px;
         font-weight: 600;
-        color: var(--muted);
+        color: #64748b;
+        white-space: nowrap;
+        text-transform: capitalize;
+        letter-spacing: 0.02em;
+        line-height: 1.2;
       }
       .col-val {
-        font-size: 12px;
-        font-weight: 800;
-        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+        white-space: nowrap;
         margin-top: 2px;
+        line-height: 1.25;
       }
       .early-out-alert { color: #dc2626 !important; }
 
@@ -1706,13 +1735,13 @@ interface MusterDay {
         min-width: 0;
       }
       .gantt-scale-hours {
-        display: flex;
-        justify-content: space-between;
-        font-size: 9px;
+        position: relative;
+        height: 16px;
+        font-size: 9.5px;
         font-weight: 600;
         color: #94a3b8;
         margin-bottom: 5px;
-        padding: 0 2px;
+        padding: 0;
       }
       .gantt-bar-track {
         position: relative;
@@ -2706,7 +2735,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           timeRange: '09:00 - 18:00',
           durationLabel: 'No punch recorded',
           leftPercent: 0,
-          widthPercent: 100,
+          widthPercent: 60.0,
           tooltip: 'Absent: No check-in record found',
         },
       ];
@@ -2720,24 +2749,32 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           timeRange: '09:00 - 18:00',
           durationLabel: '8h standard shift',
           leftPercent: 0,
-          widthPercent: 69.2,
+          widthPercent: 60.0,
           tooltip: 'Scheduled: Shift upcoming',
         },
       ];
     }
 
     const segments: TimelineSegment[] = [];
-    const scaleStart = 8.0;
-    const scaleHours = 16.0; // 08:00 to 24:00 (16 hrs)
+    const scaleStart = 9.0;
+    const scaleEnd = 24.0;
+    const scaleHours = 15.0; // 09:00 to 24:00 (15 hours scale matching HTML markers)
 
-    const calcLeft = (h: number) => Math.max(0, Math.min(100, ((h - scaleStart) / scaleHours) * 100));
-    const calcWidth = (sH: number, eH: number) => {
-      const left = calcLeft(sH);
-      const span = ((eH - sH) / scaleHours) * 100;
-      return Math.max(4, Math.min(100 - left, span));
+    const calcLeft = (h: number): number => {
+      const clamped = Math.max(scaleStart, Math.min(scaleEnd, h));
+      return Math.max(0, Math.min(96.5, ((clamped - scaleStart) / scaleHours) * 100));
     };
 
-    const parseToDecimalHour = (timeVal: string): number => {
+    const calcWidth = (sH: number, eH: number): number => {
+      const clampedS = Math.max(scaleStart, Math.min(scaleEnd, sH));
+      const clampedE = Math.max(clampedS, Math.min(scaleEnd, eH));
+      const left = ((clampedS - scaleStart) / scaleHours) * 100;
+      const rawWidth = ((clampedE - clampedS) / scaleHours) * 100;
+      const maxAvailable = Math.max(0, 100 - left);
+      return Math.max(3.0, Math.min(maxAvailable, rawWidth));
+    };
+
+    const parseToDecimalHour = (timeVal: string | null | undefined): number => {
       if (!timeVal) return 9.0;
       if (timeVal.includes('T')) {
         const d = new Date(timeVal);
@@ -2753,19 +2790,69 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     // 1. If we have actual raw punches from backend
     if (punches && punches.length > 0) {
       const sorted = [...punches].sort((a, b) => new Date(a.punchTime).getTime() - new Date(b.punchTime).getTime());
-      const firstIn = sorted.find((p) => p.punchType === 'ClockIn');
-      const firstInH = firstIn ? parseToDecimalHour(firstIn.punchTime) : parseToDecimalHour(sorted[0].punchTime);
+      const firstIn = sorted.find((p) => p.punchType === 'ClockIn') || sorted[0];
+      const firstInH = parseToDecimalHour(firstIn.punchTime);
+      const hasClockOut = sorted.some((p) => p.punchType === 'ClockOut');
 
-      // Late arrival check (after 09:15)
-      if (firstInH > 9.25) {
-        const lateWidth = Math.max(4, Math.min(22, ((firstInH - 9.0) / scaleHours) * 100));
+      // Check for single unclosed punch on a past day (Fix Image 2 bug where 19:09 punch exploded)
+      if (!hasClockOut && !isToday && sorted.length === 1 && firstIn.punchType === 'ClockIn') {
+        if (firstInH >= 18.0) {
+          // Missed daytime shift and clocked in during evening without clock-out
+          segments.push({
+            type: 'absent',
+            label: 'Shift Missed (09:00 - 18:00)',
+            timeRange: '09:00 - 18:00',
+            durationLabel: 'Missed',
+            leftPercent: 0,
+            widthPercent: 60.0,
+            tooltip: 'Scheduled shift (09:00 - 18:00) was missed',
+          });
+          const endPunchH = Math.min(23.5, firstInH + 1.5);
+          segments.push({
+            type: 'late',
+            label: 'Missed Out',
+            timeRange: `${this.formatHourDecimal(firstInH)} - No Clock-out`,
+            durationLabel: 'Incomplete',
+            leftPercent: calcLeft(firstInH),
+            widthPercent: calcWidth(firstInH, endPunchH),
+            tooltip: `Clocked in at ${this.formatHourDecimal(firstInH)} without Clock-out. Regularization required.`,
+          });
+          return segments;
+        } else {
+          // Clocked in during normal hours but forgot to clock out
+          if (firstInH > 9.25) {
+            segments.push({
+              type: 'late',
+              label: 'Late',
+              timeRange: `09:00 - ${this.formatHourDecimal(firstInH)}`,
+              durationLabel: `${Math.round((firstInH - 9.0) * 60)}m late`,
+              leftPercent: 0,
+              widthPercent: calcWidth(9.0, firstInH),
+              tooltip: `Late arrival: arrived at ${this.formatHourDecimal(firstInH)}`,
+            });
+          }
+          segments.push({
+            type: 'work',
+            label: 'Working Time (Incomplete)',
+            timeRange: `${this.formatHourDecimal(firstInH)} - 18:00`,
+            durationLabel: 'Incomplete',
+            leftPercent: calcLeft(firstInH),
+            widthPercent: calcWidth(firstInH, 18.0),
+            tooltip: `Working session ended without Clock-out`,
+          });
+          return segments;
+        }
+      }
+
+      // Normal multi-punch lifecycle (or today's live shift)
+      if (firstInH > 9.25 && firstInH < 14.0) {
         segments.push({
           type: 'late',
           label: 'Late',
           timeRange: `09:00 - ${this.formatHourDecimal(firstInH)}`,
           durationLabel: `${Math.round((firstInH - 9.0) * 60)}m late`,
-          leftPercent: calcLeft(9.0),
-          widthPercent: lateWidth,
+          leftPercent: 0,
+          widthPercent: calcWidth(9.0, firstInH),
           tooltip: `Late arrival: arrived at ${this.formatHourDecimal(firstInH)}`,
         });
       }
@@ -2775,7 +2862,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       let accumulatedWorkHours = 0;
 
       for (const p of sorted) {
-        const pH = parseToDecimalHour(p.punchTime);
+        const pH = Math.min(23.95, parseToDecimalHour(p.punchTime));
 
         if (p.punchType === 'ClockIn') {
           currentWorkStart = pH;
@@ -2828,16 +2915,34 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           if (currentWorkStart !== null && pH > currentWorkStart) {
             const wDur = pH - currentWorkStart;
             accumulatedWorkHours += wDur;
-            const isOT = accumulatedWorkHours > 8.0;
-            segments.push({
-              type: isOT ? 'overtime' : 'work',
-              label: isOT ? 'Overtime' : 'Working Time',
-              timeRange: `${this.formatHourDecimal(currentWorkStart)} - ${this.formatHourDecimal(pH)}`,
-              durationLabel: `${wDur.toFixed(1)}h`,
-              leftPercent: calcLeft(currentWorkStart),
-              widthPercent: calcWidth(currentWorkStart, pH),
-              tooltip: `${isOT ? 'Overtime' : 'Working time'}: ${wDur.toFixed(1)}h`,
-            });
+            const regularEnd = (accumulatedWorkHours > 8.0 && currentWorkStart < 18.0) ? 18.0 : pH;
+            const regularDur = regularEnd - currentWorkStart;
+            if (regularDur > 0) {
+              segments.push({
+                type: 'work',
+                label: 'Working Time',
+                timeRange: `${this.formatHourDecimal(currentWorkStart)} - ${this.formatHourDecimal(regularEnd)}`,
+                durationLabel: `${regularDur.toFixed(1)}h`,
+                leftPercent: calcLeft(currentWorkStart),
+                widthPercent: calcWidth(currentWorkStart, regularEnd),
+                tooltip: `Working time: ${regularDur.toFixed(1)}h`,
+              });
+            }
+            if (pH > 18.0 || accumulatedWorkHours > 8.0) {
+              const otStart = Math.max(currentWorkStart, 18.0);
+              const otDur = pH - otStart;
+              if (otDur > 0) {
+                segments.push({
+                  type: 'overtime',
+                  label: 'Overtime',
+                  timeRange: `${this.formatHourDecimal(otStart)} - ${this.formatHourDecimal(pH)}`,
+                  durationLabel: `${otDur.toFixed(1)}h OT`,
+                  leftPercent: calcLeft(otStart),
+                  widthPercent: calcWidth(otStart, pH),
+                  tooltip: `Overtime: ${otDur.toFixed(1)}h extra work`,
+                });
+              }
+            }
             currentWorkStart = null;
           }
         }
@@ -2846,7 +2951,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       // If ongoing today without clock out
       if (isToday) {
         const nowObj = new Date();
-        const nowH = nowObj.getHours() + nowObj.getMinutes() / 60.0;
+        const nowH = Math.min(23.95, nowObj.getHours() + nowObj.getMinutes() / 60.0);
 
         if (currentBreakStart !== null) {
           const endH = Math.max(currentBreakStart + 0.25, nowH);
@@ -2880,99 +2985,102 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // 2. Fallback when punches array not present (historical/mock records)
-    let startH = 9.0;
-    if (checkIn) {
-      startH = parseToDecimalHour(checkIn);
+    // 2. Fallback when punches array not present (historical seed / mock records)
+    let startH = checkIn ? parseToDecimalHour(checkIn) : 9.0;
+    let endH = checkOut ? parseToDecimalHour(checkOut) : 18.0;
+
+    // Irregular evening punch on a past day with no checkout
+    if (startH >= 18.0 && (!checkOut || checkOut === '—' || workHours === 0)) {
+      segments.push({
+        type: 'absent',
+        label: 'Shift Missed (09:00 - 18:00)',
+        timeRange: '09:00 - 18:00',
+        durationLabel: 'Missed',
+        leftPercent: 0,
+        widthPercent: 60.0,
+        tooltip: 'Scheduled shift (09:00 - 18:00) was missed',
+      });
+      const endPunchH = Math.min(23.5, startH + 1.5);
+      segments.push({
+        type: 'late',
+        label: 'Missed Out',
+        timeRange: `${this.formatHourDecimal(startH)} - No Clock-out`,
+        durationLabel: 'Incomplete',
+        leftPercent: calcLeft(startH),
+        widthPercent: calcWidth(startH, endPunchH),
+        tooltip: `Clocked in at ${this.formatHourDecimal(startH)} without Clock-out. Regularization required.`,
+      });
+      return segments;
     }
 
-    let endH = startH + (workHours || 8.0);
-    if (checkOut) {
-      endH = parseToDecimalHour(checkOut);
-    }
-
-    if (startH > 9.25) {
-      const lateWidth = Math.max(4, Math.min(22, ((startH - 9.0) / scaleHours) * 100));
+    // Standard working day
+    const effectiveWork = workHours > 0 ? workHours : 8.0;
+    if (startH > 9.25 && startH <= 13.0) {
       segments.push({
         type: 'late',
         label: 'Late',
         timeRange: `09:00 - ${this.formatHourDecimal(startH)}`,
         durationLabel: `${Math.round((startH - 9.0) * 60)}m late`,
-        leftPercent: calcLeft(9.0),
-        widthPercent: lateWidth,
+        leftPercent: 0,
+        widthPercent: calcWidth(9.0, startH),
         tooltip: `Late arrival: arrived at ${this.formatHourDecimal(startH)}`,
       });
     }
 
-    const bMins = breakMinutes ?? (workHours >= 5 ? 60 : 0);
-    const bHours = bMins / 60.0;
-    const effectiveWork = workHours > 0 ? workHours : Math.max(0.5, endH - startH - bHours);
+    const workStart = Math.max(9.0, startH);
+    const breakStart = 13.0; // standard 1:00 PM lunch break
+    const breakEnd = 14.0;   // 1 hour break (13:00 - 14:00)
+    const regularWorkEnd = 18.0; // 6:00 PM standard shift end
+    const overtimeEnd = Math.min(23.95, endH > 18.0 ? endH : (effectiveWork > 8.0 ? 18.0 + (effectiveWork - 8.0) : 18.0));
 
-    if (bHours > 0 && effectiveWork >= 2) {
-      const firstHalf = Math.round(effectiveWork * 0.45 * 10) / 10;
-      const secondHalf = Math.max(0.5, effectiveWork - firstHalf);
-      const overtime = Math.max(0, effectiveWork - 8.0);
-
-      // Part 1: Morning work
+    // Part 1: Morning Working Time
+    if (breakStart > workStart) {
+      const mDur = breakStart - workStart;
       segments.push({
         type: 'work',
-        label: 'Working time',
-        timeRange: `${this.formatHourDecimal(startH)} - ${this.formatHourDecimal(startH + firstHalf)}`,
-        durationLabel: `${firstHalf.toFixed(1)}h`,
-        leftPercent: calcLeft(startH),
-        widthPercent: calcWidth(startH, startH + firstHalf),
-        tooltip: `Working time: ${firstHalf.toFixed(1)}h`,
+        label: 'Working Time',
+        timeRange: `${this.formatHourDecimal(workStart)} - 13:00`,
+        durationLabel: `${mDur.toFixed(1)}h`,
+        leftPercent: calcLeft(workStart),
+        widthPercent: calcWidth(workStart, breakStart),
+        tooltip: `Working time: ${this.formatHourDecimal(workStart)} - 13:00 (${mDur.toFixed(1)}h)`,
       });
+    }
 
-      // Part 2: Break
-      const bStart = startH + firstHalf;
-      const bEnd = bStart + bHours;
-      segments.push({
-        type: 'break',
-        label: 'Break',
-        timeRange: `${this.formatHourDecimal(bStart)} - ${this.formatHourDecimal(bEnd)}`,
-        durationLabel: `${Math.round(bMins)}m`,
-        leftPercent: calcLeft(bStart),
-        widthPercent: calcWidth(bStart, bEnd),
-        tooltip: `Break: ${Math.round(bMins)} minutes`,
-      });
+    // Part 2: Break (13:00 to 14:00)
+    segments.push({
+      type: 'break',
+      label: 'Break',
+      timeRange: '13:00 - 14:00',
+      durationLabel: '1h 00m',
+      leftPercent: calcLeft(breakStart),
+      widthPercent: calcWidth(breakStart, breakEnd),
+      tooltip: 'Break: 1h meal break (13:00 - 14:00)',
+    });
 
-      // Part 3: Afternoon work
-      const s3Start = bEnd;
-      const regularAfternoon = Math.max(0.5, Math.min(secondHalf, Math.max(0, 8.0 - firstHalf)));
-      const s3End = s3Start + regularAfternoon;
-      segments.push({
-        type: 'work',
-        label: 'Working time',
-        timeRange: `${this.formatHourDecimal(s3Start)} - ${this.formatHourDecimal(s3End)}`,
-        durationLabel: `${regularAfternoon.toFixed(1)}h`,
-        leftPercent: calcLeft(s3Start),
-        widthPercent: calcWidth(s3Start, s3End),
-        tooltip: `Working time: ${regularAfternoon.toFixed(1)}h`,
-      });
+    // Part 3: Afternoon Working Time (14:00 to 18:00)
+    const aDur = regularWorkEnd - breakEnd;
+    segments.push({
+      type: 'work',
+      label: 'Working Time',
+      timeRange: '14:00 - 18:00',
+      durationLabel: `${aDur.toFixed(1)}h`,
+      leftPercent: calcLeft(breakEnd),
+      widthPercent: calcWidth(breakEnd, regularWorkEnd),
+      tooltip: 'Working time: 14:00 - 18:00 (4.0h)',
+    });
 
-      // Part 4: Overtime
-      if (overtime > 0) {
-        const otEnd = s3End + overtime;
-        segments.push({
-          type: 'overtime',
-          label: 'Overtime',
-          timeRange: `${this.formatHourDecimal(s3End)} - ${this.formatHourDecimal(otEnd)}`,
-          durationLabel: `${overtime.toFixed(1)}h OT`,
-          leftPercent: calcLeft(s3End),
-          widthPercent: calcWidth(s3End, otEnd),
-          tooltip: `Overtime: ${overtime.toFixed(1)}h extra work`,
-        });
-      }
-    } else {
+    // Part 4: Overtime (if overtimeEnd > 18.0)
+    if (overtimeEnd > 18.0) {
+      const otDur = overtimeEnd - 18.0;
       segments.push({
-        type: 'work',
-        label: 'Working time',
-        timeRange: `${this.formatHourDecimal(startH)} - ${this.formatHourDecimal(endH)}`,
-        durationLabel: `${effectiveWork.toFixed(1)}h`,
-        leftPercent: calcLeft(startH),
-        widthPercent: calcWidth(startH, endH),
-        tooltip: `Working time: ${effectiveWork.toFixed(1)}h`,
+        type: 'overtime',
+        label: 'Overtime',
+        timeRange: `18:00 - ${this.formatHourDecimal(overtimeEnd)}`,
+        durationLabel: `${otDur.toFixed(1)}h OT`,
+        leftPercent: calcLeft(18.0),
+        widthPercent: calcWidth(18.0, overtimeEnd),
+        tooltip: `Overtime: 18:00 - ${this.formatHourDecimal(overtimeEnd)} (${otDur.toFixed(1)}h extra)`,
       });
     }
 
