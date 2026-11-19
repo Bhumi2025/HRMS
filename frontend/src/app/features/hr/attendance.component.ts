@@ -958,7 +958,7 @@ interface MusterDay {
           <div class="modal-body">
             <div class="form-group">
               <label class="form-label">Employee <span style="color: var(--danger)">*</span></label>
-              <select class="form-control" [(ngModel)]="punchForm.employeeId">
+              <select class="form-control" [(ngModel)]="punchForm.employeeId" (change)="updateDefaultPunchTypeForSelected()">
                 @for (e of employees(); track e.id) {
                   <option [value]="e.id">{{ e.fullName }} ({{ e.department }})</option>
                 }
@@ -966,7 +966,7 @@ interface MusterDay {
             </div>
             <div class="form-group">
               <label class="form-label">Punch Type <span style="color: var(--danger)">*</span></label>
-              <div style="display: flex; gap: 12px; margin-top: 4px;">
+              <div style="display: flex; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
                   <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockIn" name="punchType" />
                   Clock In
@@ -974,6 +974,14 @@ interface MusterDay {
                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
                   <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockOut" name="punchType" />
                   Clock Out
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakIn" name="punchType" />
+                  Break In
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakOut" name="punchType" />
+                  Break Out
                 </label>
               </div>
             </div>
@@ -983,8 +991,14 @@ interface MusterDay {
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-outline" (click)="showPunchModal.set(false)">Cancel</button>
-            <button class="btn btn-primary" (click)="submitQuickPunch()">Record Punch</button>
+            <button class="btn btn-outline" (click)="showPunchModal.set(false)" [disabled]="recordingPunch()">Cancel</button>
+            <button class="btn btn-primary" (click)="submitQuickPunch()" [disabled]="recordingPunch()">
+              @if (recordingPunch()) {
+                Recording...
+              } @else {
+                Record Punch
+              }
+            </button>
           </div>
         </div>
       </div>
@@ -1983,6 +1997,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly showPunchModal = signal(false);
   protected readonly showDayDetailModal = signal(false);
   protected readonly selectedDetailDay = signal<MusterDay | null>(null);
+  protected readonly recordingPunch = signal(false);
 
   private pollInterval: any = null;
 
@@ -2887,10 +2902,24 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected openQuickPunchModal(): void {
-    if (this.employees().length > 0 && !this.punchForm.employeeId) {
-      this.punchForm.employeeId = this.selectedMusterEmpId() || this.employees()[0].id;
+    if (this.tab() === 'muster' && this.selectedMusterEmpId()) {
+      this.punchForm.employeeId = this.selectedMusterEmpId();
+    } else if (this.employees().length > 0 && !this.punchForm.employeeId) {
+      this.punchForm.employeeId = this.employees()[0].id;
     }
+    this.updateDefaultPunchTypeForSelected();
     this.showPunchModal.set(true);
+  }
+
+  protected updateDefaultPunchTypeForSelected(): void {
+    const targetId = this.punchForm.employeeId;
+    if (!targetId) return;
+    const match = this.dailyRows().find((r) => r.id === targetId);
+    if (match && match.checkIn && match.checkIn !== '—' && (!match.checkOut || match.checkOut === '—')) {
+      this.punchForm.punchType = 'ClockOut';
+    } else {
+      this.punchForm.punchType = 'ClockIn';
+    }
   }
 
   protected submitQuickPunch(): void {
@@ -2899,6 +2928,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    this.recordingPunch.set(true);
     this.api
       .recordPunch({
         employeeId: this.punchForm.employeeId,
@@ -2908,16 +2938,19 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       })
       .subscribe({
         next: (p) => {
+          this.recordingPunch.set(false);
           this.showPunchModal.set(false);
           this.punchForm.note = '';
-          this.toast.show(`Recorded ${p.punchType} for ${p.employeeName}!`);
+          this.toast.show(`Recorded ${p.punchType} for ${p.employeeName}!`, 'success');
           this.loadDailyAttendance();
           if (this.tab() === 'muster') {
             this.generateMuster();
           }
         },
         error: (err) => {
-          this.toast.show(err?.error?.message || 'Failed to record punch', 'danger');
+          this.recordingPunch.set(false);
+          const msg = err?.error?.title ?? err?.error?.detail ?? err?.error?.message ?? 'Failed to record punch';
+          this.toast.show(msg, 'danger');
         },
       });
   }

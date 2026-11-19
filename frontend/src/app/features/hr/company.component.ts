@@ -192,7 +192,6 @@ function emptyTenantForm(): CreateCompanyRequest {
                         <option value="Asia/Riyadh">Asia/Riyadh (AST +03:00)</option>
                         <option value="Asia/Kolkata">Asia/Kolkata (IST +05:30)</option>
                         <option value="UTC">UTC (+00:00)</option>
-                        <option value="UTC (+00:00)">UTC (+00:00)</option>
                         <option value="Europe/London">Europe/London (GMT/BST)</option>
                         <option value="America/New_York">America/New_York (EST/EDT)</option>
                         <option value="Asia/Singapore">Asia/Singapore (SGT +08:00)</option>

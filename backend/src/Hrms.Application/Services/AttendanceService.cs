@@ -243,28 +243,99 @@ public sealed class AttendanceService : IAttendanceService
     {
         var settings = await _uow.CompanySettings.FirstOrDefaultAsync(
             _uow.CompanySettings.Query().OrderBy(c => c.CreatedAtUtc), ct);
-        if (settings == null || string.IsNullOrWhiteSpace(settings.TimeZone))
-        {
-            throw new BadRequestException("The company's time zone is not configured. Please set a valid time zone in Company Profile settings before recording punches.");
-        }
-        var maxDuration = settings.MaxPunchDurationHours > 0 ? settings.MaxPunchDurationHours : 16;
-        return (ResolveTimeZone(settings.TimeZone), settings.TimeZone, maxDuration);
+        var timeZoneName = !string.IsNullOrWhiteSpace(settings?.TimeZone) ? settings.TimeZone : "UTC";
+        var maxDuration = (settings?.MaxPunchDurationHours ?? 0) > 0 ? settings!.MaxPunchDurationHours : 16;
+        return (ResolveTimeZone(timeZoneName), timeZoneName, maxDuration);
     }
 
-    private static TimeZoneInfo ResolveTimeZone(string timeZoneId)
+    private static TimeZoneInfo ResolveTimeZone(string? timeZoneId)
     {
-        try
+        if (string.IsNullOrWhiteSpace(timeZoneId))
         {
-            return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return TimeZoneInfo.Utc;
         }
-        catch
+
+        var trimmed = timeZoneId.Trim();
+
+        // 1. Direct TryFindSystemTimeZoneById on raw string
+        if (TimeZoneInfo.TryFindSystemTimeZoneById(trimmed, out var tz))
         {
-            if (TimeZoneInfo.TryFindSystemTimeZoneById(timeZoneId, out var tz))
+            return tz;
+        }
+
+        // 2. If it's UTC or starts with UTC (e.g. "UTC (+00:00)", "UTC")
+        if (trimmed.StartsWith("UTC", StringComparison.OrdinalIgnoreCase))
+        {
+            return TimeZoneInfo.Utc;
+        }
+
+        // 3. Extract base identifier if formatted with display label like "Asia/Dubai (GST +04:00)"
+        var cleanId = trimmed;
+        var parenIdx = cleanId.IndexOf('(');
+        if (parenIdx > 0)
+        {
+            cleanId = cleanId.Substring(0, parenIdx).Trim();
+        }
+
+        if (TimeZoneInfo.TryFindSystemTimeZoneById(cleanId, out tz))
+        {
+            return tz;
+        }
+
+        // 4. Common Windows vs IANA cross-mappings
+        var lower = cleanId.ToLowerInvariant();
+        if (lower.Contains("dubai") || lower.Contains("arabian") || lower.Contains("uae") || lower.Contains("gst"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("Arabian Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Dubai", out tz))
             {
                 return tz;
             }
-            throw new BadRequestException($"The company's configured time zone '{timeZoneId}' is invalid or not recognized by the server. Please update the time zone in Company Profile settings.");
         }
+        else if (lower.Contains("kolkata") || lower.Contains("india") || lower.Contains("calcutta") || lower.Contains("ist"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("India Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Kolkata", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Calcutta", out tz))
+            {
+                return tz;
+            }
+        }
+        else if (lower.Contains("riyadh") || lower.Contains("saudi") || lower.Contains("ast"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("Arab Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Riyadh", out tz))
+            {
+                return tz;
+            }
+        }
+        else if (lower.Contains("london") || lower.Contains("gmt") || lower.Contains("bst"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("GMT Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Europe/London", out tz))
+            {
+                return tz;
+            }
+        }
+        else if (lower.Contains("new_york") || lower.Contains("eastern") || lower.Contains("est"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("Eastern Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("America/New_York", out tz))
+            {
+                return tz;
+            }
+        }
+        else if (lower.Contains("singapore") || lower.Contains("sgt"))
+        {
+            if (TimeZoneInfo.TryFindSystemTimeZoneById("Singapore Standard Time", out tz) ||
+                TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Singapore", out tz))
+            {
+                return tz;
+            }
+        }
+
+        // Fallback gracefully to Utc instead of throwing a blocking error
+        return TimeZoneInfo.Utc;
     }
 
     private static (double MaxAllowedHours, decimal TargetDailyHours, int LateGraceMinutes, TimeOnly ShiftStart, bool IsOvernight) GetShiftParameters(Shift? shift, int maxPunchDurationHours = 16)
