@@ -91,36 +91,37 @@
 
           <div class="widget-body widget-scroll-list">
             @if (leaveBalances().length > 0) {
-              <div class="leave-grid">
-                @for (l of leaveBalances(); track l.t) {
-                  <div class="leave-bal-box">
-                    <div class="leave-num" [style.color]="l.c">{{ l.n }}</div>
-                    <div class="leave-name">{{ l.t }}</div>
-                    <div class="leave-total">{{ l.total ? 'of ' + l.total + ' d' : '--' }}</div>
-                    @if (l.total) {
-                      <div class="progress-bar-bg">
-                        <div class="progress-bar-fill" [style.width.%]="ratio(l)" [style.background]="l.c"></div>
-                      </div>
-                    }
-                  </div>
+            <div class="leave-grid">
+              @for (l of leaveBalances(); track l.t) {
+              <div class="leave-bal-box">
+                <div class="leave-num" [style.color]="l.c">{{ l.n }}</div>
+                <div class="leave-name">{{ l.t }}</div>
+                <div class="leave-total">{{ l.total ? 'of ' + l.total + ' d' : '--' }}</div>
+                @if (l.total) {
+                <div class="progress-bar-bg">
+                  <div class="progress-bar-fill" [style.width.%]="ratio(l)" [style.background]="l.c"></div>
+                </div>
                 }
               </div>
+              }
+            </div>
             }
 
             <div class="recent-leave-title">Recent Leaves</div>
             <div class="recent-leaves-list">
               @for (r of recentLeave(); track r.t + r.d) {
-                <div class="recent-leave-item">
-                  <div class="leave-info">
-                    <div class="leave-type">{{ r.t }}</div>
-                    <div class="leave-date">{{ r.d }}</div>
-                  </div>
-                  <span class="status-badge" [class.badge-success]="r.s === 'Approved'" [class.badge-warning]="r.s !== 'Approved'">{{ r.s }}</span>
+              <div class="recent-leave-item">
+                <div class="leave-info">
+                  <div class="leave-type">{{ r.t }}</div>
+                  <div class="leave-date">{{ r.d }}</div>
                 </div>
+                <span class="status-badge" [class.badge-success]="r.s === 'Approved'"
+                  [class.badge-warning]="r.s !== 'Approved'">{{ r.s }}</span>
+              </div>
               } @empty {
-                <div class="empty-state">
-                  <span>No recent leaves applied.</span>
-                </div>
+              <div class="empty-state">
+                <span>No recent leaves applied.</span>
+              </div>
               }
             </div>
           </div>
@@ -160,7 +161,8 @@
               <h3>Working Hours</h3>
             </div>
             <div class="header-actions">
-              <span class="count-pill purple" style="background: #ede9fe; color: #7c3aed;">{{ workingHours() }} hrs this week</span>
+              <span class="count-pill purple" style="background: #ede9fe; color: #7c3aed;">{{ workingHours() }} hrs this
+                week</span>
             </div>
           </div>
 
@@ -176,7 +178,8 @@
               <span class="widget-indicator blue"></span>
               <h3>Notice Board</h3>
               @if (announcements().length > 0) {
-                <span class="count-pill blue" style="background: #eff6ff; color: #2563eb;">{{ announcements().length }}</span>
+              <span class="count-pill blue" style="background: #eff6ff; color: #2563eb;">{{ announcements().length
+                }}</span>
               }
             </div>
             <div class="header-actions">
@@ -187,19 +190,19 @@
           <div class="widget-body widget-scroll-list">
             <div class="notices-list">
               @for (a of announcements(); track a.title) {
-                <div class="notice-card" [class]="'severity-' + a.type">
-                  <div class="notice-meta">
-                    <span class="tag-pill">{{ a.type | uppercase }}</span>
-                    <span class="date-label">{{ a.time }}</span>
-                  </div>
-                  <h4 class="notice-title">{{ a.title }}</h4>
-                  <p class="notice-msg">{{ a.msg }}</p>
+              <div class="notice-card" [class]="'severity-' + a.type">
+                <div class="notice-meta">
+                  <span class="tag-pill">{{ a.type | uppercase }}</span>
+                  <span class="date-label">{{ a.time }}</span>
                 </div>
+                <h4 class="notice-title">{{ a.title }}</h4>
+                <p class="notice-msg">{{ a.msg }}</p>
+              </div>
               } @empty {
-                <div class="empty-state">
-                  <span class="empty-icon">📢</span>
-                  <span>No announcements published.</span>
-                </div>
+              <div class="empty-state">
+                <span class="empty-icon">📢</span>
+                <span>No announcements published.</span>
+              </div>
               }
             </div>
           </div>
@@ -218,19 +221,20 @@
         </div>
 
         <!-- Shift & Status Badge -->
-        <div class="punch-status-badge" [class.active]="punchService.state() === 'active'" [class.on-break]="punchService.onBreak()">
+        <div class="punch-status-badge" [class.active]="punchService.state() === 'active'"
+          [class.on-break]="punchService.onBreak()">
           <span class="status-dot"></span>
           @if (punchService.state() === 'active') {
-            {{ punchService.onBreak() ? 'Currently On Break' : 'Clocked In · Working' }}
+          {{ punchService.onBreak() ? 'Currently On Break' : 'Clocked In · Working' }}
           } @else {
-            Standard Shift · Clocked Out
+          Standard Shift · Clocked Out
           }
         </div>
 
         <!-- Timers: Production Time & Break Time -->
         <div class="punch-timers">
           <div class="timer-box">
-            <div class="timer-label">Production Time</div>
+            <div class="timer-label">Work Time</div>
             <div class="timer-value">{{ punchService.workTime() }}</div>
           </div>
           <div class="timer-box">
@@ -250,47 +254,51 @@
 
           <div class="history-timeline">
             @if (punchService.punchTimeline().length > 0) {
-              <div class="timeline-stream">
-                @for (item of punchService.punchTimeline(); track item.id) {
-                  @if (item.kind === 'punch') {
-                    <div class="timeline-punch-row" [class.is-in]="item.isPunchIn" [class.is-out]="!item.isPunchIn" [title]="(item.punchType ?? '') + (item.note ? ' - ' + item.note : '')">
-                      <div class="punch-icon-circle" [class.in]="item.isPunchIn" [class.out]="!item.isPunchIn">
-                        @if (item.isPunchIn) {
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                            <polyline points="10 17 15 12 10 7" />
-                            <line x1="15" y1="12" x2="3" y2="12" />
-                          </svg>
-                        } @else {
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                            <polyline points="16 17 21 12 16 7" />
-                            <line x1="21" y1="12" x2="9" y2="12" />
-                          </svg>
-                        }
-                      </div>
-                      <span class="punch-label">{{ item.label }}</span>
-                      <span class="punch-time">{{ item.timeStr }}</span>
-                    </div>
-                  } @else if (item.kind === 'break') {
-                    <div class="timeline-break-row">
-                      <div class="break-line"></div>
-                      <div class="break-pill">
-                        <span class="coffee-icon">☕</span>
-                        <span class="break-text">{{ item.durationStr }}</span>
-                      </div>
-                    </div>
+            <div class="timeline-stream">
+              @for (item of punchService.punchTimeline(); track item.id) {
+              @if (item.kind === 'punch') {
+              <div class="timeline-punch-row" [class.is-in]="item.isPunchIn" [class.is-out]="!item.isPunchIn"
+                [title]="(item.punchType ?? '') + (item.note ? ' - ' + item.note : '')">
+                <div class="punch-icon-circle" [class.in]="item.isPunchIn" [class.out]="!item.isPunchIn">
+                  @if (item.isPunchIn) {
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                    <polyline points="10 17 15 12 10 7" />
+                    <line x1="15" y1="12" x2="3" y2="12" />
+                  </svg>
+                  } @else {
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
                   }
-                }
+                </div>
+                <span class="punch-label">{{ item.label }}</span>
+                <span class="punch-time">{{ item.timeStr }}</span>
               </div>
+              } @else if (item.kind === 'break') {
+              <div class="timeline-break-row">
+                <div class="break-line"></div>
+                <div class="break-pill">
+                  <span class="coffee-icon">☕</span>
+                  <span class="break-text">{{ item.durationStr }}</span>
+                </div>
+              </div>
+              }
+              }
+            </div>
             } @else {
-              <div class="timeline-empty">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="empty-icon">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-                <span>No punch activity recorded today.</span>
-              </div>
+            <div class="timeline-empty">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                class="empty-icon">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>No punch activity recorded today.</span>
+            </div>
             }
           </div>
         </div>
@@ -303,7 +311,7 @@
             <span class="widget-indicator orange"></span>
             <h3>Holiday Calendar</h3>
             @if (holidays().length > 0) {
-              <span class="badge badge-warning">{{ holidays().length }} Scheduled</span>
+            <span class="badge badge-warning">{{ holidays().length }} Scheduled</span>
             }
           </div>
         </div>
@@ -311,21 +319,21 @@
         <div class="widget-body widget-scroll-list">
           <div class="holiday-list">
             @for (h of holidays(); track h.name + h.day) {
-              <div class="holiday-card">
-                <div class="holiday-date-badge">
-                  <span class="month">{{ h.mon }}</span>
-                  <span class="day">{{ h.day }}</span>
-                </div>
-                <div class="holiday-details">
-                  <div class="holiday-name">{{ h.name }}</div>
-                  <div class="holiday-sub"><span class="holiday-pill">{{ h.type }}</span></div>
-                </div>
+            <div class="holiday-card">
+              <div class="holiday-date-badge">
+                <span class="month">{{ h.mon }}</span>
+                <span class="day">{{ h.day }}</span>
               </div>
+              <div class="holiday-details">
+                <div class="holiday-name">{{ h.name }}</div>
+                <div class="holiday-sub"><span class="holiday-pill">{{ h.type }}</span></div>
+              </div>
+            </div>
             } @empty {
-              <div class="empty-state">
-                <span class="empty-icon">🏖️</span>
-                <span>No upcoming holidays scheduled</span>
-              </div>
+            <div class="empty-state">
+              <span class="empty-icon">🏖️</span>
+              <span>No upcoming holidays scheduled</span>
+            </div>
             }
           </div>
         </div>
