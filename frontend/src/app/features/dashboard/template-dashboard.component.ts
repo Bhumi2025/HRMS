@@ -378,12 +378,7 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
         this.myTasks.set(data.myTasks || []);
         this.pendingApprovals.set(data.pendingApprovals || []);
         
-        // Only overwrite attendanceGraph if current month is selected; otherwise keep selected month
-        const now = this.currentTime();
-        const defaultMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        if (this.selectedMonthKey() === defaultMonthKey) {
-          this.attendanceGraph.set(data.attendanceGraph || []);
-        }
+        this.attendanceGraph.set(data.attendanceGraph || []);
         
         this.leaveBalances.set(data.leaveBalances || []);
         this.loading.set(false);
@@ -493,9 +488,7 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   loadAttendanceTrendForMonth(year: number, month: number): void {
     this.api.attendanceTrend(year, month).subscribe({
       next: (points) => {
-        if (points && points.length > 0) {
-          this.attendanceGraph.set(points);
-        }
+        this.attendanceGraph.set(points || []);
       },
       error: () => {},
     });

@@ -1,0 +1,913 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: calc(100vh - 84px);
+  max-height: calc(100vh - 84px);
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.dash-container {
+  flex: 1;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+// ── 4 Top KPI Cards ──
+.kpi-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.kpi-card {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  padding: 6px 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  .kpi-card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+
+    .kpi-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted, #64748b);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .kpi-icon-wrap {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    &.icon-purple {
+      background: #f3e8ff;
+      color: #9333ea;
+    }
+    &.icon-green {
+      background: #dcfce7;
+      color: #16a34a;
+    }
+    &.icon-coral {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+    &.icon-amber {
+      background: #fef3c7;
+      color: #d97706;
+    }
+  }
+
+  .kpi-card-val {
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--text, #111827);
+    margin-bottom: 2px;
+    letter-spacing: -0.02em;
+  }
+
+  .kpi-card-meta {
+    display: flex;
+    align-items: center;
+
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 8px;
+
+      &.positive {
+        background: #ecfdf5;
+        color: #059669;
+      }
+      &.neutral {
+        background: #f1f5f9;
+        color: #475569;
+      }
+      &.alert {
+        background: #fffbeb;
+        color: #d97706;
+      }
+    }
+  }
+}
+
+// ── Main Layout: Center Column + Right Column ──
+.dash-main-area {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 290px;
+  gap: 8px;
+  overflow: hidden;
+
+  @media (max-width: 1100px) {
+    grid-template-columns: 1fr 260px;
+  }
+}
+
+// ── Left / Center Column ──
+.dash-center-col {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.center-row {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  overflow: hidden;
+}
+
+// ── Base Widget Card ──
+.dash-widget {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  padding: 7px 10px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease;
+
+  &:hover {
+    box-shadow: 0 3px 8px -2px rgba(0, 0, 0, 0.05);
+  }
+}
+
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  flex-shrink: 0;
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+
+    h3 {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text, #111827);
+      margin: 0;
+    }
+  }
+
+  .widget-indicator {
+    width: 3.5px;
+    height: 12px;
+    background: var(--p, #2563eb);
+    border-radius: 3px;
+
+    &.green { background: #16a34a; }
+    &.amber { background: #f59e0b; }
+    &.purple { background: #8b5cf6; }
+    &.blue { background: #3b82f6; }
+    &.orange { background: #f97316; }
+    &.red { background: #ef4444; }
+  }
+
+  .count-pill {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 8px;
+  }
+
+  .badge-warning {
+    font-size: 9px;
+    font-weight: 600;
+    background: #fff7ed;
+    color: #ea580c;
+    padding: 1px 5px;
+    border-radius: 8px;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .view-link {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--p, #2563eb);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.widget-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+// ── Widget Internal Scrollbars (Only inside widgets) ──
+.widget-scroll-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+
+  &::-webkit-scrollbar {
+    width: 3.5px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.25);
+    }
+  }
+}
+
+// ── Graph Legend (For Attendance Overview) ──
+.graph-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9.5px;
+  color: var(--muted, #64748b);
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+  }
+
+  .legend-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+
+    &.dot-present { background: #2563eb; }
+    &.dot-late { background: #fcd34d; }
+    &.dot-absent { background: #fca5a5; }
+  }
+}
+
+// ── Leave Balance Widget ──
+.leave-widget {
+  .leave-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+  }
+
+  .leave-bal-box {
+    background: var(--bg, #f9fafb);
+    border: 1px solid var(--border, #f3f4f6);
+    border-radius: 6px;
+    padding: 4px 6px;
+
+    .leave-num {
+      font-size: 1rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+
+    .leave-name {
+      font-size: 9.5px;
+      font-weight: 600;
+      color: var(--text, #111827);
+      margin-top: 1px;
+    }
+
+    .leave-total {
+      font-size: 8.5px;
+      color: var(--muted, #6b7280);
+    }
+
+    .progress-bar-bg {
+      margin-top: 3px;
+      height: 3px;
+      background: #e5e7eb;
+      border-radius: 2px;
+      overflow: hidden;
+
+      .progress-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+      }
+    }
+  }
+
+  .recent-leave-title {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--muted, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 3px;
+    flex-shrink: 0;
+  }
+
+  .recent-leaves-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .recent-leave-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 3px 5px;
+    border-radius: 5px;
+    background: var(--bg, #f9fafb);
+    border: 1px solid var(--border, #f3f4f6);
+
+    .leave-type {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text, #111827);
+    }
+
+    .leave-date {
+      font-size: 8.5px;
+      color: var(--muted, #6b7280);
+    }
+
+    .status-badge {
+      font-size: 8.5px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 6px;
+
+      &.badge-success {
+        background: #ecfdf5;
+        color: #059669;
+      }
+      &.badge-warning {
+        background: #fffbeb;
+        color: #d97706;
+      }
+    }
+  }
+}
+
+// ── Notice Board Widget ──
+.notice-widget {
+  .notices-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .notice-card {
+    border-radius: 6px;
+    padding: 5px 8px;
+    border-left: 3px solid var(--p, #2563eb);
+    background: var(--bg, #f8fafc);
+    flex-shrink: 0;
+
+    &.severity-success {
+      border-left-color: #10b981;
+      background: #f0fdf4;
+    }
+    &.severity-warning {
+      border-left-color: #f59e0b;
+      background: #fffbeb;
+    }
+    &.severity-danger, &.severity-urgent {
+      border-left-color: #ef4444;
+      background: #fef2f2;
+    }
+
+    .notice-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1px;
+
+      .tag-pill {
+        font-size: 8px;
+        font-weight: 700;
+        background: rgba(0, 0, 0, 0.05);
+        padding: 1px 4px;
+        border-radius: 3px;
+        color: var(--text, #374151);
+      }
+
+      .date-label {
+        font-size: 8.5px;
+        color: var(--muted, #6b7280);
+      }
+    }
+
+    .notice-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      margin: 0 0 1px;
+      color: var(--text, #111827);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .notice-msg {
+      font-size: 9.5px;
+      color: var(--muted, #4b5563);
+      margin: 0;
+      line-height: 1.25;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+}
+
+// ── Right Column: Time Tracker & Holiday Calendar ──
+.dash-right-col {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+// ── Time Tracker & Punch Widget ──
+.punch-widget {
+  flex: 1.15;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 7px 9px;
+  background: linear-gradient(180deg, var(--surface, #ffffff) 0%, #f8fafc 100%);
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.punch-header {
+  text-align: center;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+
+  .punch-date {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--muted, #6b7280);
+  }
+
+  .punch-live-clock {
+    font-size: 1.2rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--text, #111827);
+    margin-top: 1px;
+    letter-spacing: -0.02em;
+  }
+}
+
+.punch-status-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  background: #f3f4f6;
+  color: #6b7280;
+  margin-bottom: 5px;
+  flex-shrink: 0;
+
+  .status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #9ca3af;
+  }
+
+  &.active {
+    background: #ecfdf5;
+    color: #059669;
+    .status-dot {
+      background: #10b981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    }
+  }
+
+  &.on-break {
+    background: #fffbeb;
+    color: #d97706;
+    .status-dot {
+      background: #f59e0b;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+    }
+  }
+}
+
+.punch-timers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 5px;
+  flex-shrink: 0;
+
+  .timer-box {
+    text-align: center;
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e5e7eb);
+    padding: 2px 2px;
+    border-radius: 5px;
+
+    .timer-label {
+      font-size: 7.5px;
+      font-weight: 600;
+      color: var(--muted, #6b7280);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .timer-value {
+      font-size: 0.82rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: var(--p, #2563eb);
+      margin-top: 1px;
+
+      &.break { color: #f59e0b; }
+    }
+  }
+}
+
+.punch-buttons {
+  margin-bottom: 5px;
+  flex-shrink: 0;
+
+  .btn-punch {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    padding: 4px 7px;
+    border-radius: 5px;
+    font-size: 10.5px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+
+    &.btn-clockin {
+      background: #10b981;
+      color: #fff;
+      &:hover { background: #059669; }
+    }
+
+    &.btn-clockout {
+      background: #ef4444;
+      color: #fff;
+      &:hover { background: #dc2626; }
+    }
+
+    &.btn-break {
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #d1d5db;
+      &:hover { background: #e5e7eb; }
+      &.active {
+        background: #fef3c7;
+        color: #b45309;
+        border-color: #fcd34d;
+      }
+    }
+  }
+
+  .punch-active-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+}
+
+// ── Attendance Activity Stream ──
+.punch-history {
+  border-top: 1px dashed var(--border, #e5e7eb);
+  padding-top: 4px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  .history-title {
+    font-size: 8.5px;
+    font-weight: 700;
+    color: var(--muted, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .history-timeline {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding-right: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+
+    &::-webkit-scrollbar {
+      width: 3.5px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 3px;
+    }
+  }
+
+  .timeline-stream {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 0 4px 0;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: #e2e8f0;
+      z-index: 0;
+    }
+  }
+
+  .timeline-punch-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 1.5px 0;
+    z-index: 1;
+
+    .punch-icon-circle {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 2;
+
+      &.in {
+        background: #ecfdf5;
+        border: 1.5px solid #10b981;
+        color: #059669;
+      }
+
+      &.out {
+        background: #fef2f2;
+        border: 1.5px solid #ef4444;
+        color: #dc2626;
+      }
+    }
+
+    .punch-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text, #111827);
+    }
+
+    .punch-time {
+      margin-left: auto;
+      font-size: 10px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted, #4b5563);
+    }
+  }
+
+  .timeline-break-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 2px 0;
+    padding: 1px 0;
+
+    .break-line {
+      position: absolute;
+      left: 10px;
+      right: 0;
+      height: 1px;
+      background: #e2e8f0;
+      z-index: 0;
+    }
+
+    .break-pill {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 7px;
+      border-radius: 9999px;
+      background: #fffbeb;
+      border: 1px solid #d97706;
+      color: #b45309;
+      font-size: 8.5px;
+      font-weight: 700;
+
+      .coffee-icon {
+        font-size: 9px;
+      }
+    }
+  }
+
+  .timeline-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 0;
+    color: var(--muted, #9ca3af);
+    font-size: 9.5px;
+    text-align: center;
+
+    .empty-icon {
+      opacity: 0.5;
+    }
+  }
+}
+
+// ── Holiday Calendar Card ──
+.holiday-widget {
+  flex: 0.85;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 7px 9px;
+
+  .holiday-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .holiday-card {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 5px;
+    background: var(--bg, #f9fafb);
+    border: 1px solid var(--border, #f3f4f6);
+    border-radius: 6px;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #fff7ed;
+      border-color: #fdba74;
+      transform: translateY(-1px);
+    }
+
+    .holiday-date-badge {
+      width: 26px;
+      height: 26px;
+      border-radius: 5px;
+      background: #ffedd5;
+      color: #ea580c;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+
+      .month {
+        font-size: 7px;
+        font-weight: 800;
+        text-transform: uppercase;
+        line-height: 1;
+      }
+      .day {
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1;
+      }
+    }
+
+    .holiday-details {
+      flex: 1;
+      min-width: 0;
+
+      .holiday-name {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--text, #111827);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .holiday-sub {
+        font-size: 8.5px;
+        color: var(--muted, #6b7280);
+        margin-top: 1px;
+      }
+
+      .holiday-pill {
+        font-weight: 600;
+        color: #ea580c;
+      }
+    }
+  }
+}
+
+// ── Generic Empty State ──
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--muted, #9ca3af);
+  font-size: 9px;
+  text-align: center;
+  padding: 6px;
+
+  .empty-icon {
+    font-size: 12px;
+  }
+}

@@ -102,9 +102,9 @@ public sealed class CompanyService : ICompanyService
         }
 
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
-        if (ext is not (".png" or ".jpg" or ".jpeg" or ".webp" or ".svg"))
+        if (ext is not (".png" or ".jpg" or ".jpeg"))
         {
-            throw new ValidationException("Invalid file type. Allowed formats are PNG, JPEG, SVG, and WebP.");
+            throw new ValidationException("Invalid file type. Allowed formats are PNG and JPG (up to 2MB).");
         }
 
         using var ms = new MemoryStream();

@@ -8,6 +8,7 @@ import { UiService } from '../../core/services/ui.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { triggerDocumentDownload } from '../../core/utils/document-download.util';
+import { ACCEPT_DOC_TYPES, ACCEPT_IMG_TYPES, validateDocumentFile, validateImageFile } from '../../core/utils/file-validator';
 
 interface DocRow {
   id?: string;
@@ -34,7 +35,7 @@ interface DocRow {
     >
       <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
         <div style="position: relative">
-          <input #avatarInput type="file" accept="image/*" (change)="onAvatarSelected($event)" style="display: none" />
+          <input #avatarInput type="file" [accept]="acceptImgTypes" (change)="onAvatarSelected($event)" style="display: none" />
           <div
             style="width: 72px; height: 72px; border-radius: 50%; background: var(--p); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800; border: 3px solid var(--surface); box-shadow: 0 4px 16px rgba(37,99,235,.2); overflow: hidden"
           >
@@ -350,7 +351,7 @@ interface DocRow {
           </div>
           <div class="form-group">
             <label class="form-label">Upload File</label>
-            <input #empFileInput type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" (change)="onDocFileSelected($event)" style="display: none" />
+            <input #empFileInput type="file" [accept]="acceptDocTypes" (change)="onDocFileSelected($event)" style="display: none" />
             <div
               style="border: 2px dashed var(--border); border-radius: var(--r); padding: 24px; text-align: center; cursor: pointer; transition: var(--t)"
               [style.borderColor]="selectedDocFile() ? 'var(--p)' : 'var(--border)'"
@@ -366,7 +367,7 @@ interface DocRow {
               } @else {
                 <div style="color: var(--p); margin-bottom: 6px"><span [appIcon]="'upload2'"></span></div>
                 <div style="font-size: 0.86rem; font-weight: 600">Drop file or click to browse</div>
-                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG up to 10MB</div>
+                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG up to 2MB</div>
               }
             </div>
           </div>
@@ -524,10 +525,19 @@ export class EmpProfileComponent implements OnInit {
       .toUpperCase();
   }
 
+  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
+  protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
+
   protected onAvatarSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
       const file = input.files[0];
+      const check = validateImageFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid image file.', 'danger');
+        input.value = '';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         const res = e.target?.result as string;
@@ -541,14 +551,28 @@ export class EmpProfileComponent implements OnInit {
   protected onDocFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
-      this.selectedDocFile.set(input.files[0]);
+      const file = input.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        input.value = '';
+        this.selectedDocFile.set(null);
+        return;
+      }
+      this.selectedDocFile.set(file);
     }
   }
 
   protected onDocFileDrop(event: DragEvent): void {
     event.preventDefault();
     if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-      this.selectedDocFile.set(event.dataTransfer.files[0]);
+      const file = event.dataTransfer.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        return;
+      }
+      this.selectedDocFile.set(file);
     }
   }
 

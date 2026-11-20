@@ -16,6 +16,7 @@ import { EmployeeListItem, EnrolledFace, FacePunchResult } from '../../core/api/
 import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
+import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 
 interface RecentKioskPunch {
   name: string;
@@ -375,8 +376,8 @@ interface RecentKioskPunch {
 
               <!-- File upload alternative -->
               <div style="background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; text-align: center; margin-bottom: 16px;">
-                <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">OR UPLOAD PHOTO FILE</label>
-                <input type="file" accept="image/*" (change)="onKioskPhotoFileSelected($event)" style="font-size: 12px; color: #cbd5e1;" />
+                <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">OR UPLOAD PHOTO FILE (JPG, PNG - Max 2MB)</label>
+                <input type="file" [accept]="acceptImgTypes" (change)="onKioskPhotoFileSelected($event)" style="font-size: 12px; color: #cbd5e1;" />
               </div>
 
               <div style="display: flex; gap: 10px;">
@@ -1598,10 +1599,20 @@ export class KioskComponent implements OnInit, OnDestroy {
     this.toast.show('Could not capture snapshot. Please ensure camera is active.', 'warning');
   }
 
+  protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
+
   protected onKioskPhotoFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) return;
     const file = input.files[0];
+
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      this.toast.show(check.error || 'Invalid photo file.', 'danger');
+      input.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       this.enrollSnapshotPreview.set(reader.result as string);

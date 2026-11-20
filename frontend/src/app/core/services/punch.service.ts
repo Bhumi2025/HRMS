@@ -2,6 +2,37 @@ import { Injectable, NgZone, computed, inject, signal } from '@angular/core';
 import { ApiService } from '../api/api.service';
 import { EmployeePunch } from '../api/api.models';
 
+export function safeParseDate(val: any): Date {
+  if (!val) return new Date();
+  if (val instanceof Date) return isNaN(val.getTime()) ? new Date() : val;
+  const str = String(val).trim();
+  if (!str) return new Date();
+
+  // If ISO date/time string without explicit timezone:
+  // Backend stores DateTime in UTC (EF Core returns datetime2 as Unspecified),
+  // so if string has 'T' and no timezone offset or Z, append 'Z' to treat as UTC!
+  if (str.includes('T')) {
+    const timePart = str.split('T')[1] || '';
+    if (!timePart.endsWith('Z') && !timePart.includes('+') && !timePart.includes('-')) {
+      const parsedUtc = new Date(str + 'Z');
+      if (!isNaN(parsedUtc.getTime())) return parsedUtc;
+    }
+  } else if (str.includes(' ')) {
+    // Format "YYYY-MM-DD HH:mm:ss"
+    const formatted = str.replace(' ', 'T');
+    const timePart = formatted.split('T')[1] || '';
+    if (!timePart.endsWith('Z') && !timePart.includes('+') && !timePart.includes('-')) {
+      const parsedUtc = new Date(formatted + 'Z');
+      if (!isNaN(parsedUtc.getTime())) return parsedUtc;
+    }
+  }
+
+  const direct = new Date(str);
+  if (!isNaN(direct.getTime())) return direct;
+
+  return new Date();
+}
+
 export type PunchState = 'idle' | 'active';
 
 export interface PunchTimelineItem {
@@ -49,7 +80,7 @@ export class PunchService {
 
     // Sort ascending: earliest punch of today first to latest punch last
     const sorted = [...punches].sort(
-      (a, b) => new Date(a.punchTime).getTime() - new Date(b.punchTime).getTime()
+      (a, b) => safeParseDate(a.punchTime).getTime() - safeParseDate(b.punchTime).getTime()
     );
 
     const items: PunchTimelineItem[] = [];
@@ -59,21 +90,25 @@ export class PunchService {
       const isPunchIn = p.punchType === 'ClockIn' || p.punchType === 'BreakOut';
       const label: 'Punch In' | 'Punch Out' = isPunchIn ? 'Punch In' : 'Punch Out';
 
-      // Format time as hh:mm am/pm (e.g. 09:38 am)
-      const d = new Date(p.punchTime);
+      // Format time as hh:mm:ss a (e.g. 02:08:26 PM)
+      const d = safeParseDate(p.punchTime);
       let hours = d.getHours();
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      const ampm = hours >= 12 ? 'pm' : 'am';
+      let minutes = d.getMinutes();
+      let seconds = d.getSeconds();
+      if (isNaN(hours)) hours = 0;
+      if (isNaN(minutes)) minutes = 0;
+      if (isNaN(seconds)) seconds = 0;
+      const ampm = hours >= 12 ? 'PM' : 'AM';
       hours = hours % 12;
       hours = hours ? hours : 12;
-      const timeStr = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+      const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} ${ampm}`;
 
       // Check if previous punch was an Out and current is an In -> Break divider!
       if (i > 0) {
         const prev = sorted[i - 1];
         const prevIsOut = prev.punchType === 'ClockOut' || prev.punchType === 'BreakIn';
         if (prevIsOut && isPunchIn) {
-          const prevTime = new Date(prev.punchTime).getTime();
+          const prevTime = safeParseDate(prev.punchTime).getTime();
           const currTime = d.getTime();
           const diffMs = Math.max(0, currTime - prevTime);
           const breakMinutes = Math.round(diffMs / 60000);
@@ -111,7 +146,7 @@ export class PunchService {
     if (this._onBreak()) {
       const lastPunch = sorted[sorted.length - 1];
       if (lastPunch) {
-        const lastTime = new Date(lastPunch.punchTime).getTime();
+        const lastTime = safeParseDate(lastPunch.punchTime).getTime();
         const diffMs = Math.max(0, Date.now() - lastTime);
         const breakMinutes = Math.floor(diffMs / 60000);
         const durationStr = breakMinutes < 60
@@ -126,7 +161,8 @@ export class PunchService {
       }
     }
 
-    return items;
+    // Return reverse chronological: latest activity at top
+    return items.reverse();
   });
 
   readonly todayPunchBreakdown = computed(() => {
@@ -143,7 +179,7 @@ export class PunchService {
       };
     }
 
-    const sorted = [...punches].sort((a, b) => new Date(a.punchTime).getTime() - new Date(b.punchTime).getTime());
+    const sorted = [...punches].sort((a, b) => safeParseDate(a.punchTime).getTime() - safeParseDate(b.punchTime).getTime());
     const inP = sorted.find((p) => p.punchType === 'ClockIn');
     if (!inP) {
       return {
@@ -158,7 +194,7 @@ export class PunchService {
     }
 
     const now = Date.now();
-    const inTime = new Date(inP.punchTime).getTime();
+    const inTime = safeParseDate(inP.punchTime).getTime();
     const bInP = sorted.find((p) => p.punchType === 'BreakIn');
     const bOutP = sorted.find((p) => p.punchType === 'BreakOut');
     const outP = sorted.find((p) => p.punchType === 'ClockOut');
@@ -171,7 +207,7 @@ export class PunchService {
     if (!bInP) {
       // Phase 1: Clocked In, lower green portion active until break punch
       if (outP) {
-        const outTime = new Date(outP.punchTime).getTime();
+        const outTime = safeParseDate(outP.punchTime).getTime();
         beforeBreak = Math.max(0.1, (outTime - inTime) / 3600000);
         phase = 'clocked_out';
       } else {
@@ -180,13 +216,13 @@ export class PunchService {
       }
     } else {
       // Break punch occurred
-      const bInTime = new Date(bInP.punchTime).getTime();
+      const bInTime = safeParseDate(bInP.punchTime).getTime();
       beforeBreak = Math.max(0.1, (bInTime - inTime) / 3600000);
 
       if (!bOutP) {
         // Phase 2: On break, yellow break portion active
         if (outP) {
-          const outTime = new Date(outP.punchTime).getTime();
+          const outTime = safeParseDate(outP.punchTime).getTime();
           breakHrs = Math.max(0.1, (outTime - bInTime) / 3600000);
           phase = 'clocked_out';
         } else {
@@ -195,12 +231,12 @@ export class PunchService {
         }
       } else {
         // Phase 3 & 4: Break ended, converts to green for remaining time
-        const bOutTime = new Date(bOutP.punchTime).getTime();
+        const bOutTime = safeParseDate(bOutP.punchTime).getTime();
         breakHrs = Math.max(0.1, (bOutTime - bInTime) / 3600000);
 
         if (outP) {
           // Phase 4: Final logout punch completed
-          const outTime = new Date(outP.punchTime).getTime();
+          const outTime = safeParseDate(outP.punchTime).getTime();
           afterBreak = Math.max(0.1, (outTime - bOutTime) / 3600000);
           phase = 'clocked_out';
         } else {
@@ -210,6 +246,10 @@ export class PunchService {
         }
       }
     }
+
+    if (isNaN(beforeBreak) || beforeBreak < 0) beforeBreak = 0;
+    if (isNaN(breakHrs) || breakHrs < 0) breakHrs = 0;
+    if (isNaN(afterBreak) || afterBreak < 0) afterBreak = 0;
 
     beforeBreak = Math.round(beforeBreak * 10) / 10;
     breakHrs = Math.round(breakHrs * 10) / 10;
@@ -251,69 +291,75 @@ export class PunchService {
   }
 
   loadTodayPunches(): void {
-    this.api.todayPunches().subscribe({
-      next: (punches) => {
-        this.todayPunches.set(punches || []);
-        if (punches && punches.length > 0) {
-          const sorted = [...punches].sort((a, b) => new Date(a.punchTime).getTime() - new Date(b.punchTime).getTime());
-          const now = Date.now();
+    // 1. First attempt to load authoritative punch status from backend
+    this.api.punchStatus().subscribe({
+      next: (status) => {
+        if (status) {
+          const punches = status.todayPunches || [];
+          this.todayPunches.set(punches);
 
-          let workSec = 0;
-          let breakSec = 0;
-          let workStartMs: number | null = null;
-          let breakStartMs: number | null = null;
+          const isCheckedIn = !!status.isCheckedIn;
+          const isOnBreak = !!status.isOnBreak;
+          this._state.set(isCheckedIn ? 'active' : 'idle');
+          this._onBreak.set(isOnBreak);
 
-          for (const p of sorted) {
-            const t = new Date(p.punchTime).getTime();
-            if (p.punchType === 'ClockIn' || p.punchType === 'BreakOut') {
-              if (breakStartMs !== null) {
-                breakSec += Math.max(0, Math.floor((t - breakStartMs) / 1000));
-                breakStartMs = null;
-              }
-              workStartMs = t;
-            } else if (p.punchType === 'BreakIn') {
-              if (workStartMs !== null) {
-                workSec += Math.max(0, Math.floor((t - workStartMs) / 1000));
-                workStartMs = null;
-              }
-              breakStartMs = t;
-            } else if (p.punchType === 'ClockOut') {
-              if (workStartMs !== null) {
-                workSec += Math.max(0, Math.floor((t - workStartMs) / 1000));
-                workStartMs = null;
-              }
-              if (breakStartMs !== null) {
-                breakSec += Math.max(0, Math.floor((t - breakStartMs) / 1000));
-                breakStartMs = null;
-              }
-            }
+          let workSec = status.workedSecondsToday;
+          let breakSec = status.breakSecondsToday ?? 0;
+
+          if (typeof workSec !== 'number' || isNaN(workSec) || workSec < 0) {
+            workSec = this.calculateWorkedSeconds(punches);
+          }
+          if (typeof breakSec !== 'number' || isNaN(breakSec) || breakSec < 0) {
+            breakSec = this.calculateBreakSeconds(punches);
           }
 
+          this._workSeconds.set(workSec);
+          this._breakSeconds.set(breakSec);
+          this.render();
+
+          if (isCheckedIn) {
+            this.startTimer();
+          } else {
+            this.stopTimer();
+          }
+          return;
+        }
+        this.fallbackTodayPunches();
+      },
+      error: () => {
+        this.fallbackTodayPunches();
+      }
+    });
+  }
+
+  private fallbackTodayPunches(): void {
+    this.api.todayPunches().subscribe({
+      next: (punches) => {
+        const list = punches || [];
+        this.todayPunches.set(list);
+        if (list.length > 0) {
+          const workSec = this.calculateWorkedSeconds(list);
+          const breakSec = this.calculateBreakSeconds(list);
+          this._workSeconds.set(workSec);
+          this._breakSeconds.set(breakSec);
+
+          const sorted = [...list].sort((a, b) => safeParseDate(a.punchTime).getTime() - safeParseDate(b.punchTime).getTime());
           const latest = sorted[sorted.length - 1];
           if (latest) {
             if (latest.punchType === 'ClockIn' || latest.punchType === 'BreakOut') {
-              if (workStartMs !== null) {
-                workSec += Math.max(0, Math.floor((now - workStartMs) / 1000));
-              }
               this._state.set('active');
               this._onBreak.set(false);
               this.startTimer();
             } else if (latest.punchType === 'BreakIn') {
-              if (breakStartMs !== null) {
-                breakSec += Math.max(0, Math.floor((now - breakStartMs) / 1000));
-              }
               this._state.set('active');
               this._onBreak.set(true);
               this.startTimer();
-            } else if (latest.punchType === 'ClockOut') {
+            } else {
               this._state.set('idle');
               this._onBreak.set(false);
               this.stopTimer();
             }
           }
-
-          this._workSeconds.set(workSec);
-          this._breakSeconds.set(breakSec);
           this.render();
         } else {
           this._workSeconds.set(0);
@@ -325,9 +371,73 @@ export class PunchService {
         }
       },
       error: () => {
-        // Offline fallback
+        // Offline
       }
     });
+  }
+
+  private calculateWorkedSeconds(punches: EmployeePunch[]): number {
+    if (!punches || punches.length === 0) return 0;
+    const sorted = [...punches].sort((a, b) => safeParseDate(a.punchTime).getTime() - safeParseDate(b.punchTime).getTime());
+    let workSec = 0;
+    let workStartMs: number | null = null;
+    const now = Date.now();
+
+    for (const p of sorted) {
+      const t = safeParseDate(p.punchTime).getTime();
+      if (p.punchType === 'ClockIn' || p.punchType === 'BreakOut') {
+        workStartMs = t;
+      } else if (p.punchType === 'BreakIn' || p.punchType === 'ClockOut') {
+        if (workStartMs !== null && !isNaN(workStartMs) && t >= workStartMs) {
+          workSec += Math.floor((t - workStartMs) / 1000);
+        }
+        workStartMs = null;
+      }
+    }
+
+    const latest = sorted[sorted.length - 1];
+    if (latest && (latest.punchType === 'ClockIn' || latest.punchType === 'BreakOut')) {
+      if (workStartMs !== null && !isNaN(workStartMs) && now >= workStartMs) {
+        workSec += Math.floor((now - workStartMs) / 1000);
+      }
+    }
+
+    return isNaN(workSec) || workSec < 0 ? 0 : workSec;
+  }
+
+  private calculateBreakSeconds(punches: EmployeePunch[]): number {
+    if (!punches || punches.length === 0) return 0;
+    const sorted = [...punches].sort((a, b) => safeParseDate(a.punchTime).getTime() - safeParseDate(b.punchTime).getTime());
+    let breakSec = 0;
+    let breakStartMs: number | null = null;
+    const now = Date.now();
+
+    for (const p of sorted) {
+      const t = safeParseDate(p.punchTime).getTime();
+      if (p.punchType === 'ClockIn' || p.punchType === 'BreakOut') {
+        if (breakStartMs !== null && !isNaN(breakStartMs) && t >= breakStartMs) {
+          breakSec += Math.floor((t - breakStartMs) / 1000);
+          breakStartMs = null;
+        }
+      } else if (p.punchType === 'BreakIn') {
+        breakStartMs = t;
+      } else if (p.punchType === 'ClockOut') {
+        if (breakStartMs !== null && !isNaN(breakStartMs) && t >= breakStartMs) {
+          breakSec += Math.floor((t - breakStartMs) / 1000);
+        }
+        // Track interval between ClockOut and subsequent ClockIn as break
+        breakStartMs = t;
+      }
+    }
+
+    const latest = sorted[sorted.length - 1];
+    if (latest && latest.punchType === 'BreakIn') {
+      if (breakStartMs !== null && !isNaN(breakStartMs) && now >= breakStartMs) {
+        breakSec += Math.floor((now - breakStartMs) / 1000);
+      }
+    }
+
+    return isNaN(breakSec) || breakSec < 0 ? 0 : breakSec;
   }
 
   readonly showFaceModal = signal(false);
@@ -369,16 +479,7 @@ export class PunchService {
         this.loadTodayPunches();
       },
       error: () => {
-        const fallback: EmployeePunch = {
-          id: 'p-' + Date.now(),
-          employeeId: 'EMP-001',
-          employeeCode: 'EMP-001',
-          employeeName: 'Sarah Jenkins',
-          punchType: 'ClockIn',
-          punchTime: new Date().toISOString(),
-          device: 'Web Dashboard',
-        };
-        this.todayPunches.update((list) => [fallback, ...list]);
+        this.loadTodayPunches();
       }
     });
   }
@@ -395,16 +496,7 @@ export class PunchService {
         this.loadTodayPunches();
       },
       error: () => {
-        const fallback: EmployeePunch = {
-          id: 'p-' + Date.now(),
-          employeeId: 'EMP-001',
-          employeeCode: 'EMP-001',
-          employeeName: 'Sarah Jenkins',
-          punchType: 'ClockOut',
-          punchTime: new Date().toISOString(),
-          device: 'Web Dashboard',
-        };
-        this.todayPunches.update((list) => [fallback, ...list]);
+        this.loadTodayPunches();
       }
     });
   }
@@ -412,6 +504,7 @@ export class PunchService {
   startBreak(): void {
     if (this._state() !== 'active') return;
     this._onBreak.set(true);
+    this.startTimer();
     this.render();
 
     this.api.recordPunch({ punchType: 'BreakIn', device: 'Web Dashboard' }).subscribe({
@@ -420,16 +513,7 @@ export class PunchService {
         this.loadTodayPunches();
       },
       error: () => {
-        const fallback: EmployeePunch = {
-          id: 'p-' + Date.now(),
-          employeeId: 'EMP-001',
-          employeeCode: 'EMP-001',
-          employeeName: 'Sarah Jenkins',
-          punchType: 'BreakIn',
-          punchTime: new Date().toISOString(),
-          device: 'Web Dashboard',
-        };
-        this.todayPunches.update((list) => [fallback, ...list]);
+        this.loadTodayPunches();
       }
     });
   }
@@ -437,6 +521,7 @@ export class PunchService {
   endBreak(): void {
     if (this._state() !== 'active') return;
     this._onBreak.set(false);
+    this.startTimer();
     this.render();
 
     this.api.recordPunch({ punchType: 'BreakOut', device: 'Web Dashboard' }).subscribe({
@@ -445,16 +530,7 @@ export class PunchService {
         this.loadTodayPunches();
       },
       error: () => {
-        const fallback: EmployeePunch = {
-          id: 'p-' + Date.now(),
-          employeeId: 'EMP-001',
-          employeeCode: 'EMP-001',
-          employeeName: 'Sarah Jenkins',
-          punchType: 'BreakOut',
-          punchTime: new Date().toISOString(),
-          device: 'Web Dashboard',
-        };
-        this.todayPunches.update((list) => [fallback, ...list]);
+        this.loadTodayPunches();
       }
     });
   }
@@ -462,9 +538,9 @@ export class PunchService {
   toggleBreak(): void {
     if (this._state() !== 'active') return;
     if (this._onBreak()) {
-      this.requestEndBreak();
+      this.endBreak();
     } else {
-      this.requestStartBreak();
+      this.startBreak();
     }
   }
 
@@ -484,9 +560,12 @@ export class PunchService {
   }
 
   private static format(total: number): string {
+    if (typeof total !== 'number' || isNaN(total) || total < 0) {
+      total = 0;
+    }
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
+    const s = Math.floor(total % 60);
     return [h, m, s].map((x) => String(x).padStart(2, '0')).join(':');
   }
 }

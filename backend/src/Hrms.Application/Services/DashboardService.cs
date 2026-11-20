@@ -95,25 +95,26 @@ public sealed class DashboardService : IDashboardService
         // employee onto every attendance row.
         var monthStart = new DateOnly(today.Year, today.Month, 1);
         var monthEnd = monthStart.AddMonths(1);
+        var weekStart = today.AddDays(-6);
+        var queryStart = monthStart < weekStart ? monthStart : weekStart;
         var monthRecords = await _uow.Attendance.ToListAsync(
             _uow.Attendance.Query()
-                .Where(r => r.EmployeeId == employeeId && r.Date >= monthStart && r.Date < monthEnd)
+                .Where(r => r.EmployeeId == employeeId && r.Date >= queryStart && r.Date < monthEnd)
                 .Select(r => new { r.Date, r.CheckIn, r.WorkHours, r.Status }),
             ct);
 
         var summary = new AttendanceSummaryDto(
-            monthRecords.Count(r => r.Status is AttendanceStatus.Present or AttendanceStatus.Late
-                or AttendanceStatus.Remote or AttendanceStatus.LeftEarly),
-            monthRecords.Count(r => r.Status == AttendanceStatus.Absent),
-            monthRecords.Count(r => r.Status == AttendanceStatus.Late),
-            monthRecords.Count(r => r.Status == AttendanceStatus.OnLeave));
+            monthRecords.Count(r => r.Date >= monthStart && (r.Status is AttendanceStatus.Present or AttendanceStatus.Late
+                or AttendanceStatus.Remote or AttendanceStatus.LeftEarly or AttendanceStatus.HalfDay)),
+            monthRecords.Count(r => r.Date >= monthStart && r.Status == AttendanceStatus.Absent),
+            monthRecords.Count(r => r.Date >= monthStart && r.Status == AttendanceStatus.Late),
+            monthRecords.Count(r => r.Date >= monthStart && r.Status == AttendanceStatus.OnLeave));
 
         var todayRecord = monthRecords.FirstOrDefault(r => r.Date == today);
         var checkInLabel = todayRecord?.CheckIn is { } checkIn
             ? checkIn.ToString("hh:mm tt")
             : "Not checked in";
 
-        var weekStart = today.AddDays(-6);
         var weekRecords = monthRecords.Where(r => r.Date >= weekStart).ToList();
         var workingHours = weekRecords.Sum(r => r.WorkHours);
 
@@ -122,11 +123,14 @@ public sealed class DashboardService : IDashboardService
         {
             var date = today.AddDays(-i);
             var record = monthRecords.FirstOrDefault(r => r.Date == date);
+            var isPresent = record is { Status: AttendanceStatus.Present or AttendanceStatus.Remote or AttendanceStatus.LeftEarly or AttendanceStatus.HalfDay };
+            var isLate = record is { Status: AttendanceStatus.Late };
+            var isAbsent = record is { Status: AttendanceStatus.Absent };
             trend.Add(new AttendanceTrendPointDto(
                 date.DayOfWeek.ToString()[..3],
-                record is { Status: AttendanceStatus.Present or AttendanceStatus.Remote or AttendanceStatus.Late or AttendanceStatus.LeftEarly } ? 1 : 0,
-                record is { Status: AttendanceStatus.Absent } ? 1 : 0,
-                record is { Status: AttendanceStatus.Late } ? 1 : 0));
+                isPresent ? 1 : 0,
+                isAbsent ? 1 : 0,
+                isLate ? 1 : 0));
         }
 
         // Leave balances

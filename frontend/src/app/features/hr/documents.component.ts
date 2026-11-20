@@ -5,6 +5,7 @@ import { ApiService } from '../../core/api/api.service';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
+import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 
 interface DocumentRow {
@@ -204,7 +205,7 @@ interface DocumentRow {
           </div>
           <div class="form-group">
             <label class="form-label">Upload File</label>
-            <input #fileInput type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" (change)="onFileSelected($event)" style="display: none" />
+            <input #fileInput type="file" [accept]="acceptDocTypes" (change)="onFileSelected($event)" style="display: none" />
             <div
               style="border: 2px dashed var(--border); border-radius: var(--r); padding: 24px; text-align: center; cursor: pointer; transition: var(--t)"
               [style.borderColor]="selectedFile() ? 'var(--p)' : 'var(--border)'"
@@ -220,7 +221,7 @@ interface DocumentRow {
               } @else {
                 <div style="color: var(--p); margin-bottom: 8px"><span [appIcon]="'upload2'"></span></div>
                 <div style="font-size: 0.86rem; font-weight: 600">Drop files here or click to browse</div>
-                <div style="font-size: 0.86rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG up to 10MB</div>
+                <div style="font-size: 0.86rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG up to 2MB</div>
               }
             </div>
           </div>
@@ -327,17 +328,33 @@ export class DocumentsComponent implements OnInit {
     );
   });
 
+  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
+
   protected onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
-      this.selectedFile.set(input.files[0]);
+      const file = input.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        input.value = '';
+        this.selectedFile.set(null);
+        return;
+      }
+      this.selectedFile.set(file);
     }
   }
 
   protected onFileDrop(event: DragEvent): void {
     event.preventDefault();
     if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-      this.selectedFile.set(event.dataTransfer.files[0]);
+      const file = event.dataTransfer.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        return;
+      }
+      this.selectedFile.set(file);
     }
   }
 
