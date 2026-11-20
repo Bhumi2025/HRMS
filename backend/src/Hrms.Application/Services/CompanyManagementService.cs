@@ -128,6 +128,7 @@ public sealed class CompanyManagementService : ICompanyManagementService
             ContactName = string.IsNullOrWhiteSpace(request.ContactName) ? null : request.ContactName.Trim(),
             ContactEmail = string.IsNullOrWhiteSpace(request.ContactEmail) ? null : request.ContactEmail.Trim().ToLowerInvariant(),
             TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "UTC" : request.TimeZone.Trim(),
+            LogoUrl = string.IsNullOrWhiteSpace(request.LogoUrl) ? null : request.LogoUrl.Trim(),
             Status = CompanyStatus.Provisioning,
         };
 
@@ -148,6 +149,7 @@ public sealed class CompanyManagementService : ICompanyManagementService
         if (request.ContactName is not null) company.ContactName = string.IsNullOrWhiteSpace(request.ContactName) ? null : request.ContactName.Trim();
         if (request.ContactEmail is not null) company.ContactEmail = string.IsNullOrWhiteSpace(request.ContactEmail) ? null : request.ContactEmail.Trim().ToLowerInvariant();
         if (request.TimeZone is not null) company.TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "UTC" : request.TimeZone.Trim();
+        if (request.LogoUrl is not null) company.LogoUrl = string.IsNullOrWhiteSpace(request.LogoUrl) ? null : request.LogoUrl.Trim();
 
         _master.Companies.Update(company);
         await _master.SaveChangesAsync(ct);
@@ -320,7 +322,8 @@ public sealed class CompanyManagementService : ICompanyManagementService
                 company.AdminEmail,
                 company.AdminFullName,
                 // Unusable random password — the account only becomes usable after activation.
-                _passwordHasher.Hash($"invite:{Guid.NewGuid():N}:{Guid.NewGuid():N}"));
+                _passwordHasher.Hash($"invite:{Guid.NewGuid():N}:{Guid.NewGuid():N}"),
+                LogoUrl: company.LogoUrl);
 
             await _tenantDb.BootstrapAsync(company.DatabaseName!, bootstrap, ct);
             adminCreated = await _tenantDb.FindUserByEmailAsync(company.DatabaseName!, company.AdminEmail, ct) is not null;
@@ -510,7 +513,8 @@ public sealed class CompanyManagementService : ICompanyManagementService
         c.LastProvisioningError,
         invitation?.Status.ToString() ?? (c.IsDefault ? InvitationStatus.Sent.ToString() : InvitationStatus.Pending.ToString()),
         invitation?.SentAtUtc ?? (c.IsDefault ? c.CreatedAtUtc : null),
-        invitation?.LastError);
+        invitation?.LastError,
+        c.LogoUrl);
 
     private static CompanyDetailDto ToDetail(Company c, CompanyInvitation? invitation, IReadOnlyList<ProvisioningLog> logs, IReadOnlyList<CompanyEmployeeSummaryDto>? employees = null) => new(
         c.Id,
@@ -535,5 +539,6 @@ public sealed class CompanyManagementService : ICompanyManagementService
         invitation?.LastError,
         logs.Select(l => new ProvisioningLogDto(l.Step, l.Succeeded, l.Message, l.OccurredAtUtc)).ToList(),
         employees?.Count ?? 0,
-        employees ?? Array.Empty<CompanyEmployeeSummaryDto>());
+        employees ?? Array.Empty<CompanyEmployeeSummaryDto>(),
+        c.LogoUrl);
 }

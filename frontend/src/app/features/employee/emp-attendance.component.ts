@@ -68,6 +68,7 @@ interface CalendarDay {
             <span class="kpi-chip chip-halfday"><span class="dot"></span> Half Day: <strong>{{ musterStats().halfDay }}d</strong></span>
             <span class="kpi-chip chip-absent"><span class="dot"></span> Absent: <strong>{{ musterStats().absent }}d</strong></span>
             <span class="kpi-chip chip-hours"><span class="dot"></span> Hours: <strong>{{ musterStats().totalHours }}h</strong></span>
+            <span class="kpi-chip" style="margin-left: auto; color: var(--muted);"><span style="border-top: 2px dashed #94a3b8; width: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></span> Standard (8h)</span>
           </div>
 
           <!-- Trend Chart Canvas -->
@@ -470,30 +471,44 @@ export class EmpAttendanceComponent implements OnInit, AfterViewInit {
 
     const mode = this.trendViewMode();
     let labels: string[] = [];
-    let presentData: number[] = [];
-    let lateData: number[] = [];
-    let halfDayData: number[] = [];
-    let absentData: number[] = [];
     let hoursData: number[] = [];
+    let barColors: string[] = [];
+    let hoverColors: string[] = [];
+
+    const getColors = (status: string, hours: number) => {
+      switch (status) {
+        case 'Present':
+        case 'Remote':
+        case 'LeftEarly':
+          return { bg: '#10b981', hover: '#059669' };
+        case 'Late':
+          return { bg: '#f59e0b', hover: '#d97706' };
+        case 'HalfDay':
+          return { bg: '#f97316', hover: '#ea580c' };
+        case 'Absent':
+          return { bg: '#ef4444', hover: '#dc2626' };
+        case 'Weekend':
+        case 'Holiday':
+          return { bg: hours > 0 ? '#8b5cf6' : 'rgba(0,0,0,0)', hover: hours > 0 ? '#7c3aed' : 'rgba(0,0,0,0)' };
+        default:
+          return hours > 0 ? { bg: '#3b82f6', hover: '#2563eb' } : { bg: 'rgba(0,0,0,0)', hover: 'rgba(0,0,0,0)' };
+      }
+    };
 
     if (mode === 'month') {
       const musterList = this.muster();
       if (musterList.length > 0) {
         labels = musterList.map((d) => String(Number(d.date.slice(8, 10))));
-        presentData = musterList.map((d) => (d.status === 'Present' || d.status === 'Remote' || d.status === 'LeftEarly' ? 1 : 0));
-        lateData = musterList.map((d) => (d.status === 'Late' ? 1 : 0));
-        halfDayData = musterList.map((d) => (d.status === 'HalfDay' ? 1 : 0));
-        absentData = musterList.map((d) => (d.status === 'Absent' ? 1 : 0));
         hoursData = musterList.map((d) => d.workHours || 0);
+        barColors = musterList.map((d) => getColors(d.status, d.workHours || 0).bg);
+        hoverColors = musterList.map((d) => getColors(d.status, d.workHours || 0).hover);
       }
     } else {
       const weekDays = this.weeklyStripDays();
       labels = weekDays.map((w) => w.dayName);
-      presentData = weekDays.map((w) => (w.status === 'Present' || w.status === 'Remote' || w.status === 'LeftEarly' ? 1 : 0));
-      lateData = weekDays.map((w) => (w.status === 'Late' ? 1 : 0));
-      halfDayData = weekDays.map((w) => (w.status === 'HalfDay' ? 1 : 0));
-      absentData = weekDays.map((w) => (w.status === 'Absent' ? 1 : 0));
       hoursData = weekDays.map((w) => w.workHours || 0);
+      barColors = weekDays.map((w) => getColors(w.status, w.workHours || 0).bg);
+      hoverColors = weekDays.map((w) => getColors(w.status, w.workHours || 0).hover);
     }
 
     this.trendChart?.destroy();
@@ -504,52 +519,27 @@ export class EmpAttendanceComponent implements OnInit, AfterViewInit {
         datasets: [
           {
             type: 'bar',
-            label: 'Present',
-            data: presentData,
-            backgroundColor: '#10b981',
-            borderRadius: 3,
-            stack: 'attendance',
-            order: 2,
-          },
-          {
-            type: 'bar',
-            label: 'Late',
-            data: lateData,
-            backgroundColor: '#f59e0b',
-            borderRadius: 3,
-            stack: 'attendance',
-            order: 2,
-          },
-          {
-            type: 'bar',
-            label: 'Half Day',
-            data: halfDayData,
-            backgroundColor: '#f97316',
-            borderRadius: 3,
-            stack: 'attendance',
-            order: 2,
-          },
-          {
-            type: 'bar',
-            label: 'Absent',
-            data: absentData,
-            backgroundColor: '#ef4444',
-            borderRadius: 3,
-            stack: 'attendance',
+            label: 'Work Hours',
+            data: hoursData,
+            backgroundColor: barColors,
+            hoverBackgroundColor: hoverColors,
+            borderRadius: mode === 'month' ? 4 : 6,
+            borderSkipped: false,
+            minBarLength: 4,
+            barPercentage: mode === 'month' ? 0.7 : 0.45,
+            maxBarThickness: mode === 'month' ? 14 : 36,
             order: 2,
           },
           {
             type: 'line',
-            label: 'Work Hours',
-            data: hoursData,
-            borderColor: '#8b5cf6',
-            backgroundColor: 'rgba(139, 92, 246, 0.12)',
-            borderWidth: 2,
-            pointRadius: mode === 'month' ? (labels.length > 20 ? 2 : 3) : 4,
-            pointHoverRadius: 5,
-            fill: true,
-            tension: 0.35,
-            yAxisID: 'yHours',
+            label: 'Standard Shift (8h)',
+            data: labels.map(() => 8),
+            borderColor: '#94a3b8',
+            borderWidth: 1.5,
+            borderDash: [5, 5],
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            fill: false,
             order: 1,
           },
         ],
@@ -563,21 +553,15 @@ export class EmpAttendanceComponent implements OnInit, AfterViewInit {
         },
         plugins: {
           legend: {
-            position: 'top',
-            labels: {
-              boxWidth: 10,
-              boxHeight: 10,
-              padding: 10,
-              font: { size: 10, weight: '600' },
-              usePointStyle: true,
-            },
+            display: false,
           },
           tooltip: {
             backgroundColor: 'rgba(15, 23, 42, 0.92)',
-            titleFont: { size: 11, weight: 'bold' },
-            bodyFont: { size: 10 },
-            padding: 8,
-            cornerRadius: 6,
+            titleFont: { size: 12, weight: 'bold' },
+            bodyFont: { size: 11 },
+            padding: 10,
+            cornerRadius: 8,
+            filter: (item) => item.datasetIndex === 0,
             callbacks: {
               title: (items) => {
                 if (!items.length) return '';
@@ -589,23 +573,25 @@ export class EmpAttendanceComponent implements OnInit, AfterViewInit {
                 const w = this.weeklyStripDays()[idx];
                 return w ? `${w.dayName} (${w.dateStr})` : items[0].label;
               },
+              label: (item) => {
+                const hours = item.raw as number;
+                return `⏱ Work Hours: ${hours}h`;
+              },
               afterBody: (items) => {
                 if (!items.length) return [];
                 const idx = items[0].dataIndex;
-                const lines = [];
+                const lines: string[] = [];
                 if (mode === 'month') {
                   const m = this.muster()[idx];
                   if (m) {
                     if (m.status) lines.push(`Status: ${m.status}`);
-                    if (m.workHours > 0) lines.push(`Work Hours: ${m.workHours}h`);
-                    if (m.checkIn) lines.push(`In: ${m.checkIn} | Out: ${m.checkOut || '—'}`);
+                    if (m.checkIn) lines.push(`Punch: ${m.checkIn} - ${m.checkOut || '—'}`);
                   }
                 } else {
                   const w = this.weeklyStripDays()[idx];
                   if (w) {
                     if (w.status) lines.push(`Status: ${w.status}`);
-                    if (w.workHours > 0) lines.push(`Work Hours: ${w.workHours}h`);
-                    if (w.inTime) lines.push(`In: ${w.inTime} | Out: ${w.outTime || '—'}`);
+                    if (w.inTime) lines.push(`Punch: ${w.inTime} - ${w.outTime || '—'}`);
                   }
                 }
                 return lines;
@@ -615,27 +601,21 @@ export class EmpAttendanceComponent implements OnInit, AfterViewInit {
         },
         scales: {
           x: {
-            stacked: true,
             grid: { display: false },
             ticks: {
-              font: { size: mode === 'month' ? (labels.length > 20 ? 9 : 10) : 10 },
+              font: { size: mode === 'month' ? (labels.length > 20 ? 9 : 10) : 11, weight: '500' },
+              color: '#64748b',
               maxRotation: 0,
             },
           },
           y: {
-            stacked: true,
             min: 0,
-            max: 1.2,
-            display: false,
-          },
-          yHours: {
-            position: 'right',
-            min: 0,
-            suggestedMax: 9,
-            grid: { color: 'rgba(0, 0, 0, 0.04)' },
+            suggestedMax: 10,
+            grid: { color: 'rgba(0, 0, 0, 0.05)' },
             ticks: {
-              font: { size: 9 },
-              stepSize: 3,
+              font: { size: 10 },
+              color: '#64748b',
+              stepSize: 2,
               callback: (v) => `${v}h`,
             },
           },

@@ -74,7 +74,8 @@ public sealed record TenantBootstrap(
     string AdminEmail,
     string AdminFullName,
     string AdminPasswordHash,
-    string Currency = "USD");
+    string Currency = "USD",
+    string? LogoUrl = null);
 
 /// <summary>Performs the EF Core work required to create and initialize a tenant database.</summary>
 public interface ITenantDatabaseService

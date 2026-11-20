@@ -78,6 +78,7 @@ function emptyTenantForm(): CreateCompanyRequest {
     contactName: '',
     contactEmail: '',
     timeZone: 'UTC',
+    logoUrl: '',
   };
 }
 
@@ -378,19 +379,32 @@ function emptyTenantForm(): CreateCompanyRequest {
                   @for (c of filteredTenantCompanies(); track c.id) {
                     <tr style="border-bottom: 1px solid var(--border);">
                       <td style="padding: 14px 16px;">
-                        <button
-                          type="button"
-                          class="company-name-link"
-                          (click)="viewTenant(c)"
-                          title="View {{ c.name }} details & employees"
-                        >
-                          {{ c.name }}
-                        </button>
-                        <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
-                          <span class="badge" style="background: var(--p-soft); color: var(--p); font-weight: 700;">{{ c.code }}</span>
-                          @if (c.isDefault) {
-                            <span class="badge badge-info">Default</span>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                          @if (c.logoUrl) {
+                            <div style="width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                              <img [src]="c.logoUrl" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain; padding: 2px;" />
+                            </div>
+                          } @else {
+                            <div style="width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--border); background: var(--p-soft); color: var(--p); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;">
+                              {{ (c.name || 'C').substring(0, 2).toUpperCase() }}
+                            </div>
                           }
+                          <div>
+                            <button
+                              type="button"
+                              class="company-name-link"
+                              (click)="viewTenant(c)"
+                              title="View {{ c.name }} details & employees"
+                            >
+                              {{ c.name }}
+                            </button>
+                            <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+                              <span class="badge" style="background: var(--p-soft); color: var(--p); font-weight: 700;">{{ c.code }}</span>
+                              @if (c.isDefault) {
+                                <span class="badge badge-info">Default</span>
+                              }
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td style="padding: 14px 16px; font-size: 13px; font-family: monospace; color: var(--muted);">
@@ -837,6 +851,47 @@ function emptyTenantForm(): CreateCompanyRequest {
               <label class="form-label">Company Name <span style="color: var(--danger)">*</span></label>
               <input class="form-control" type="text" [(ngModel)]="tenantCreateForm.name" placeholder="e.g. Acme Widgets LLC" />
             </div>
+            <!-- Company Logo Upload Section -->
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label class="form-label" style="display: flex; align-items: center; justify-content: space-between;">
+                <span>Company Logo</span>
+                <span style="font-size: 11px; color: var(--muted); font-weight: normal;">Max 2MB (JPG, PNG)</span>
+              </label>
+              <div style="display: flex; align-items: center; gap: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px;">
+                <div style="width: 56px; height: 56px; border-radius: 8px; background: var(--surface); border: 1.5px dashed var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; position: relative;">
+                  @if (tenantCreateForm.logoUrl && !tenantLogoLoadFailed()) {
+                    <img [src]="tenantCreateForm.logoUrl" alt="Company Logo" (error)="tenantLogoLoadFailed.set(true)" style="max-width: 100%; max-height: 100%; object-fit: contain; padding: 4px;" />
+                  } @else {
+                    <div style="text-align: center; color: var(--muted);">
+                      <span [appIcon]="'building'" style="font-size: 20px; display: block; opacity: 0.6;"></span>
+                      <span style="font-size: 9px; line-height: 1;">Logo</span>
+                    </div>
+                  }
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <label class="btn btn-outline btn-sm" style="cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 10px;">
+                      <span [appIcon]="'upload'"></span>
+                      <span>{{ tenantCreateForm.logoUrl ? 'Change Logo' : 'Upload Logo' }}</span>
+                      <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" style="display: none;" (change)="onTenantLogoSelected($event, false)" />
+                    </label>
+                    @if (tenantCreateForm.logoUrl) {
+                      <button type="button" class="btn btn-ghost btn-sm" style="color: var(--danger); font-size: 12px; padding: 4px 8px;" (click)="removeTenantLogo(false)">
+                        <span [appIcon]="'trash'"></span> Remove
+                      </button>
+                    }
+                    @if (uploadingTenantLogo()) {
+                      <span style="font-size: 12px; color: var(--p); display: inline-flex; align-items: center; gap: 4px;">
+                        Uploading to Cloudinary...
+                      </span>
+                    }
+                  </div>
+                  <div style="font-size: 11px; color: var(--muted);">
+                    Uploaded to Cloudinary CDN for all user modules.
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="grid grid-2" style="gap: 12px; margin-bottom: 12px;">
               <div class="form-group">
                 <label class="form-label">Company Code</label>
@@ -898,6 +953,47 @@ function emptyTenantForm(): CreateCompanyRequest {
               <label class="form-label">Company Name <span style="color: var(--danger)">*</span></label>
               <input class="form-control" type="text" [(ngModel)]="tenantEditForm.name" placeholder="e.g. Acme Widgets LLC" />
             </div>
+            <!-- Company Logo Upload Section -->
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label class="form-label" style="display: flex; align-items: center; justify-content: space-between;">
+                <span>Company Logo</span>
+                <span style="font-size: 11px; color: var(--muted); font-weight: normal;">Max 2MB (JPG, PNG)</span>
+              </label>
+              <div style="display: flex; align-items: center; gap: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px;">
+                <div style="width: 56px; height: 56px; border-radius: 8px; background: var(--surface); border: 1.5px dashed var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; position: relative;">
+                  @if (tenantEditForm.logoUrl && !editTenantLogoLoadFailed()) {
+                    <img [src]="tenantEditForm.logoUrl" alt="Company Logo" (error)="editTenantLogoLoadFailed.set(true)" style="max-width: 100%; max-height: 100%; object-fit: contain; padding: 4px;" />
+                  } @else {
+                    <div style="text-align: center; color: var(--muted);">
+                      <span [appIcon]="'building'" style="font-size: 20px; display: block; opacity: 0.6;"></span>
+                      <span style="font-size: 9px; line-height: 1;">Logo</span>
+                    </div>
+                  }
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <label class="btn btn-outline btn-sm" style="cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 10px;">
+                      <span [appIcon]="'upload'"></span>
+                      <span>{{ tenantEditForm.logoUrl ? 'Change Logo' : 'Upload Logo' }}</span>
+                      <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" style="display: none;" (change)="onTenantLogoSelected($event, true)" />
+                    </label>
+                    @if (tenantEditForm.logoUrl) {
+                      <button type="button" class="btn btn-ghost btn-sm" style="color: var(--danger); font-size: 12px; padding: 4px 8px;" (click)="removeTenantLogo(true)">
+                        <span [appIcon]="'trash'"></span> Remove
+                      </button>
+                    }
+                    @if (uploadingTenantLogo()) {
+                      <span style="font-size: 12px; color: var(--p); display: inline-flex; align-items: center; gap: 4px;">
+                        Uploading to Cloudinary...
+                      </span>
+                    }
+                  </div>
+                  <div style="font-size: 11px; color: var(--muted);">
+                    Uploaded to Cloudinary CDN for all user modules.
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="form-group" style="margin-bottom: 12px;">
               <label class="form-label">Administrator Full Name <span style="color: var(--danger)">*</span></label>
               <input class="form-control" type="text" [(ngModel)]="tenantEditForm.adminFullName" placeholder="Full name" />
@@ -938,6 +1034,11 @@ function emptyTenantForm(): CreateCompanyRequest {
           <div class="modal" style="max-width: 860px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <div style="display: flex; align-items: center; gap: 10px;">
+                @if (d.logoUrl) {
+                  <div style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                    <img [src]="d.logoUrl" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain; padding: 2px;" />
+                  </div>
+                }
                 <div style="font-size: 1.15rem; font-weight: 700; color: var(--text);">{{ d.name }}</div>
                 <span class="badge" style="background: var(--p-soft); color: var(--p); font-weight: 700;">{{ d.code }}</span>
                 <span class="badge" [ngClass]="statusBadge(d.status)">{{ d.status }}</span>
@@ -1688,7 +1789,12 @@ export class CompanyComponent implements OnInit, OnDestroy {
     contactName: '',
     contactEmail: '',
     timeZone: '',
+    logoUrl: '',
   };
+
+  protected readonly uploadingTenantLogo = signal(false);
+  protected readonly tenantLogoLoadFailed = signal(false);
+  protected readonly editTenantLogoLoadFailed = signal(false);
 
   // Regular Company Modal signals
   protected readonly showCompanyModal = signal(false);
@@ -1944,8 +2050,55 @@ export class CompanyComponent implements OnInit, OnDestroy {
     });
   }
 
+  protected onTenantLogoSelected(event: Event, isEdit: boolean = false): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      this.toast.show(check.error || 'Invalid logo image (JPG or PNG up to 2MB).', 'danger');
+      input.value = '';
+      return;
+    }
+
+    this.uploadingTenantLogo.set(true);
+    const code = isEdit ? (this.editingTenant()?.code || 'HRNEXUS') : (this.tenantCreateForm.code || 'HRNEXUS');
+    this.api.uploadFile(file, code, 'company-logo').subscribe({
+      next: (res) => {
+        this.uploadingTenantLogo.set(false);
+        const url = res.cloudinaryUrl || res.url;
+        if (isEdit) {
+          this.tenantEditForm.logoUrl = url;
+          this.editTenantLogoLoadFailed.set(false);
+        } else {
+          this.tenantCreateForm.logoUrl = url;
+          this.tenantLogoLoadFailed.set(false);
+        }
+        this.toast.show('Company logo uploaded successfully!', 'success');
+        input.value = '';
+      },
+      error: (err) => {
+        this.uploadingTenantLogo.set(false);
+        input.value = '';
+        this.toast.show(err?.error?.message || err?.message || 'Logo upload failed. Please ensure file is valid JPG or PNG under 2MB.', 'danger');
+      },
+    });
+  }
+
+  protected removeTenantLogo(isEdit: boolean = false): void {
+    if (isEdit) {
+      this.tenantEditForm.logoUrl = '';
+      this.editTenantLogoLoadFailed.set(false);
+    } else {
+      this.tenantCreateForm.logoUrl = '';
+      this.tenantLogoLoadFailed.set(false);
+    }
+  }
+
   protected openCreateTenant(): void {
     this.tenantCreateForm = emptyTenantForm();
+    this.tenantLogoLoadFailed.set(false);
     this.showCreateTenant.set(true);
   }
 
@@ -1963,6 +2116,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
       contactName: this.tenantCreateForm.contactName?.trim() || undefined,
       contactEmail: this.tenantCreateForm.contactEmail?.trim() || undefined,
       timeZone: this.tenantCreateForm.timeZone?.trim() || 'UTC',
+      logoUrl: this.tenantCreateForm.logoUrl?.trim() || undefined,
     };
 
     this.savingTenant.set(true);
@@ -1992,12 +2146,14 @@ export class CompanyComponent implements OnInit, OnDestroy {
 
   protected editTenant(company: CompanyListItem): void {
     this.editingTenant.set(company);
+    this.editTenantLogoLoadFailed.set(false);
     this.tenantEditForm = {
       name: company.name,
       adminFullName: company.adminFullName,
       contactName: '',
       contactEmail: '',
       timeZone: '',
+      logoUrl: company.logoUrl ?? '',
     };
     this.showEditTenant.set(true);
 
@@ -2009,6 +2165,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
           contactName: d.contactName ?? '',
           contactEmail: d.contactEmail ?? '',
           timeZone: d.timeZone ?? '',
+          logoUrl: d.logoUrl ?? company.logoUrl ?? '',
         };
       },
       error: () => { },
@@ -2034,6 +2191,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
       contactName: this.tenantEditForm.contactName?.trim() || undefined,
       contactEmail: this.tenantEditForm.contactEmail?.trim() || undefined,
       timeZone: this.tenantEditForm.timeZone?.trim() || undefined,
+      logoUrl: this.tenantEditForm.logoUrl?.trim() || undefined,
     };
 
     this.savingTenant.set(true);
