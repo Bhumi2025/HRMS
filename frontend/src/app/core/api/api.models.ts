@@ -674,6 +674,8 @@ export interface EmployeePunchStatus {
   regularizationMessage?: string | null;
   isOnBreak?: boolean;
   breakSecondsToday?: number;
+  shiftName?: string | null;
+  shiftTiming?: string | null;
 }
 
 export interface EnrolledFace {
