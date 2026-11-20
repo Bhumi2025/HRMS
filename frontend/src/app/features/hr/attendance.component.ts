@@ -423,9 +423,11 @@ interface MusterDay {
                   <span class="roster-time-tag">{{ getEmpTodayCheckIn(emp.id) }}</span>
                   <span 
                     class="status-indicator-dot" 
-                    [class.dot-on-time]="isEmpOnTime(emp.id)" 
-                    [class.dot-late]="isEmpLate(emp.id)" 
+                    [class.dot-active]="isEmpActive(emp.id)"
+                    [class.dot-on-time]="!isEmpActive(emp.id) && isEmpOnTime(emp.id)" 
+                    [class.dot-late]="!isEmpActive(emp.id) && isEmpLate(emp.id)" 
                     [class.dot-absent]="!isEmpPresent(emp.id)"
+                    [title]="getEmpStatusTooltip(emp.id)"
                   ></span>
                 </div>
               </div>
@@ -652,7 +654,11 @@ interface MusterDay {
                                 [style.left.%]="seg.leftPercent"
                                 [style.width.%]="seg.widthPercent"
                               >
-                                <span class="seg-label-txt">{{ seg.label }}</span>
+                                @if (seg.widthPercent >= 8.0) {
+                                  <span class="seg-label-txt">{{ seg.label }}</span>
+                                } @else if (seg.widthPercent >= 4.0) {
+                                  <span class="seg-label-txt">{{ seg.type === 'late' ? 'Late' : (seg.type === 'work' ? 'Work' : seg.label) }}</span>
+                                }
 
                                 <!-- Hover Tooltip -->
                                 <div class="seg-popup-tooltip">
@@ -1283,10 +1289,12 @@ interface MusterDay {
         color: var(--text);
       }
       .status-indicator-dot {
-        width: 7px;
-        height: 7px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
+        display: inline-block;
       }
+      .dot-active { background: #22c55e; box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25); }
       .dot-on-time { background: #16a34a; box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2); }
       .dot-late { background: #ea580c; box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.2); }
       .dot-absent { background: #94a3b8; }
@@ -2228,7 +2236,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const q = this.timelineSearch().toLowerCase().trim();
     const st = this.timelineStatusFilter().toLowerCase().trim();
     const days = this.musterDays();
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const curMonthStr = todayStr.slice(0, 7);
     const isCurrentMonth = this.selectedMusterMonth() === curMonthStr;
 
@@ -2320,9 +2328,12 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private startLivePolling(): void {
     this.pollInterval = setInterval(() => {
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
       if (this.tab() === 'daily' && this.filterDate() === todayStr) {
         this.loadDailyAttendance(true);
+      }
+      if (this.selectedMusterEmpId() && this.musterDays().length > 0) {
+        this.generateMuster();
       }
     }, 10000);
   }
@@ -2586,6 +2597,24 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     return !!(row && (row.status === 'Present' || row.status === 'Late'));
   }
 
+  protected isEmpActive(employeeId: string): boolean {
+    const row = this.dailyRows().find((r) => r.id === employeeId);
+    if (!row) return false;
+    const hasIn = !!(row.checkIn && row.checkIn !== '—');
+    const hasOut = !!(row.checkOut && row.checkOut !== '—');
+    return hasIn && !hasOut;
+  }
+
+  protected getEmpStatusTooltip(employeeId: string): string {
+    const row = this.dailyRows().find((r) => r.id === employeeId);
+    if (!row || !row.checkIn || row.checkIn === '—') return 'Offline / Not Checked In';
+    if (!row.checkOut || row.checkOut === '—') {
+      const lateStr = this.isLateCheckIn(row.checkIn) ? ' (Late Arrival)' : '';
+      return `Active • Clocked In at ${row.checkIn}${lateStr}`;
+    }
+    return `Clocked Out at ${row.checkOut}`;
+  }
+
   protected isOvertimeApproved(dateStr: string): boolean {
     return this.approvedOvertimes().has(dateStr);
   }
@@ -2618,7 +2647,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const year = parseInt(parts[0], 10) || new Date().getFullYear();
     const month = parseInt(parts[1], 10) || new Date().getMonth() + 1;
     const emp = this.selectedEmployee();
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
     this.api.muster(empId, year, month).subscribe({
       next: (data: MonthlyMusterDay[]) => {
@@ -2858,12 +2887,29 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const parseToDecimalHour = (timeVal: string | null | undefined): number => {
       if (!timeVal) return 9.0;
       if (timeVal.includes('T')) {
-        const d = new Date(timeVal);
-        return d.getHours() + d.getMinutes() / 60.0;
+        let iso = timeVal;
+        if (!iso.endsWith('Z') && !iso.includes('+') && !iso.includes('-')) {
+          iso += 'Z';
+        }
+        const d = new Date(iso);
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Kolkata',
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: false,
+        }).formatToParts(d);
+        const hPart = parts.find((p) => p.type === 'hour')?.value ?? '9';
+        const mPart = parts.find((p) => p.type === 'minute')?.value ?? '0';
+        return parseInt(hPart, 10) + parseInt(mPart, 10) / 60.0;
       }
-      const parts = timeVal.split(':');
-      if (parts.length >= 2) {
-        return parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60.0;
+      const match = timeVal.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+      if (match) {
+        let h = parseInt(match[1], 10);
+        const m = parseInt(match[2], 10);
+        const ampm = match[3] ? match[3].toUpperCase() : null;
+        if (ampm === 'PM' && h < 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        return h + m / 60.0;
       }
       return 9.0;
     };
@@ -3031,8 +3077,15 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // If ongoing today without clock out
       if (isToday) {
-        const nowObj = new Date();
-        const nowH = Math.min(23.95, nowObj.getHours() + nowObj.getMinutes() / 60.0);
+        const nowParts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Kolkata',
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: false,
+        }).formatToParts(new Date());
+        const curH = parseInt(nowParts.find((p) => p.type === 'hour')?.value ?? '10', 10);
+        const curM = parseInt(nowParts.find((p) => p.type === 'minute')?.value ?? '30', 10);
+        const nowH = Math.min(23.95, curH + curM / 60.0);
 
         if (currentBreakStart !== null) {
           const endH = Math.max(currentBreakStart + 0.25, nowH);
@@ -3062,13 +3115,71 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       if (segments.length > 0) {
-        return segments;
+        // Merge contiguous or near-adjacent work segments so multiple test clicks don't shatter the bar
+        const merged: TimelineSegment[] = [];
+        for (const seg of segments) {
+          if (merged.length > 0) {
+            const prev = merged[merged.length - 1];
+            if (prev.type === seg.type && seg.type === 'work') {
+              const prevEndPercent = prev.leftPercent + prev.widthPercent;
+              if (seg.leftPercent <= prevEndPercent + 2.5) {
+                const combinedEnd = Math.min(100, Math.max(prevEndPercent, seg.leftPercent + seg.widthPercent));
+                prev.widthPercent = Math.max(prev.widthPercent, combinedEnd - prev.leftPercent);
+                const prevStartStr = prev.timeRange.split(' - ')[0];
+                const segEndStr = seg.timeRange.split(' - ')[1] || 'Now';
+                prev.timeRange = `${prevStartStr} - ${segEndStr}`;
+                prev.label = 'Working Time';
+                continue;
+              }
+            }
+          }
+          merged.push(seg);
+        }
+        return merged;
       }
     }
 
     // 2. Fallback when punches array not present (historical seed / mock records)
     let startH = checkIn ? parseToDecimalHour(checkIn) : 9.0;
     let endH = checkOut ? parseToDecimalHour(checkOut) : 18.0;
+
+    // Active ongoing shift today in fallback mode
+    if (isToday && (!checkOut || checkOut === '—')) {
+      const nowParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false,
+      }).formatToParts(new Date());
+      const curH = parseInt(nowParts.find((p) => p.type === 'hour')?.value ?? '10', 10);
+      const curM = parseInt(nowParts.find((p) => p.type === 'minute')?.value ?? '30', 10);
+      const nowH = Math.min(23.95, curH + curM / 60.0);
+
+      if (startH > 9.25 && startH <= 13.0) {
+        segments.push({
+          type: 'late',
+          label: 'Late',
+          timeRange: `09:00 - ${this.formatHourDecimal(startH)}`,
+          durationLabel: `${Math.round((startH - 9.0) * 60)}m late`,
+          leftPercent: 0,
+          widthPercent: calcWidth(9.0, startH),
+          tooltip: `Late arrival: arrived at ${this.formatHourDecimal(startH)}`,
+        });
+      }
+
+      const activeEnd = Math.max(startH + 0.25, nowH);
+      const dur = activeEnd - startH;
+      segments.push({
+        type: 'work',
+        label: 'Working Time (Active)',
+        timeRange: `${this.formatHourDecimal(startH)} - Now`,
+        durationLabel: `${dur.toFixed(1)}h`,
+        leftPercent: calcLeft(startH),
+        widthPercent: calcWidth(startH, activeEnd),
+        tooltip: `Currently working (${dur.toFixed(1)}h)`,
+      });
+      return segments;
+    }
 
     // Irregular evening punch on a past day with no checkout
     if (startH >= 18.0 && (!checkOut || checkOut === '—' || workHours === 0)) {

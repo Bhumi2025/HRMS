@@ -211,11 +211,82 @@ public sealed class DashboardService : IDashboardService
     }
 
     public Task<IReadOnlyList<AttendanceTrendPointDto>> GetAttendanceTrendAsync(CancellationToken ct = default) =>
-        GetAttendanceTrendAsync(null, null, ct);
+        GetAttendanceTrendAsync(null, null, null, ct);
 
-    public async Task<IReadOnlyList<AttendanceTrendPointDto>> GetAttendanceTrendAsync(int? year, int? month, CancellationToken ct = default)
+    public Task<IReadOnlyList<AttendanceTrendPointDto>> GetAttendanceTrendAsync(int? year, int? month, CancellationToken ct = default) =>
+        GetAttendanceTrendAsync(year, month, null, ct);
+
+    private async Task<TimeZoneInfo> GetCompanyTimeZoneAsync(CancellationToken ct)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var settings = await _uow.CompanySettings.FirstOrDefaultAsync(
+            _uow.CompanySettings.Query().OrderBy(c => c.CreatedAtUtc), ct);
+        var timeZoneName = !string.IsNullOrWhiteSpace(settings?.TimeZone) ? settings.TimeZone : "Asia/Kolkata";
+        return ResolveTimeZone(timeZoneName);
+    }
+
+    private static TimeZoneInfo ResolveTimeZone(string? timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId))
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+        }
+
+        var trimmed = timeZoneId.Trim();
+        if (TimeZoneInfo.TryFindSystemTimeZoneById(trimmed, out var tz))
+        {
+            return tz;
+        }
+
+        if (trimmed.StartsWith("UTC", StringComparison.OrdinalIgnoreCase))
+        {
+            return TimeZoneInfo.Utc;
+        }
+
+        var cleanId = trimmed;
+        var parenIdx = cleanId.IndexOf('(');
+        if (parenIdx > 0)
+        {
+            cleanId = cleanId[..parenIdx].Trim();
+            if (TimeZoneInfo.TryFindSystemTimeZoneById(cleanId, out var tzParen))
+            {
+                return tzParen;
+            }
+        }
+
+        var lower = cleanId.ToLowerInvariant();
+        if (lower.Contains("kolkata") || lower.Contains("calcutta") || lower.Contains("india") || lower.Contains("ist"))
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+        }
+        if (lower.Contains("dubai") || lower.Contains("gst"))
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Arabian Standard Time");
+        }
+
+        return TimeZoneInfo.Utc;
+    }
+
+    public async Task<IReadOnlyList<HrEmployeeSummaryDto>> GetHrTeamAsync(CancellationToken ct = default)
+    {
+        var employees = await _uow.Employees.ListWithDepartmentAsync(ct);
+        return employees
+            .Where(e => (e.Department != null && e.Department.Name.Contains("Human Resources", StringComparison.OrdinalIgnoreCase))
+                     || (e.JobTitle != null && e.JobTitle.Contains("HR", StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(e => e.EmployeeCode)
+            .Select(e => new HrEmployeeSummaryDto(
+                e.Id,
+                e.EmployeeCode,
+                e.FirstName,
+                e.LastName,
+                e.Email,
+                e.JobTitle ?? e.Designation?.Name ?? "HR Executive"))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<AttendanceTrendPointDto>> GetAttendanceTrendAsync(int? year, int? month, Guid? employeeId, CancellationToken ct = default)
+    {
+        var tz = await GetCompanyTimeZoneAsync(ct);
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
         var targetYear = year.HasValue && year.Value >= 2020 && year.Value <= 2035 ? year.Value : today.Year;
         var targetMonth = month.HasValue && month.Value >= 1 && month.Value <= 12 ? month.Value : today.Month;
 
@@ -226,22 +297,23 @@ public sealed class DashboardService : IDashboardService
 
         var queryFrom = prevMonthStart;
 
-        // Aggregate per day in SQL
-        var daily = await _uow.Attendance.ToListAsync(
-            _uow.Attendance.Query()
-                .Where(r => r.Date >= queryFrom && r.Date <= monthEnd)
-                .GroupBy(r => r.Date)
-                .Select(g => new
-                {
-                    Date = g.Key,
-                    Present = g.Sum(r => r.Status == AttendanceStatus.Present || r.Status == AttendanceStatus.Remote
-                        || r.Status == AttendanceStatus.Late ? 1 : 0),
-                    Absent = g.Sum(r => r.Status == AttendanceStatus.Absent ? 1 : 0),
-                    Late = g.Sum(r => r.Status == AttendanceStatus.Late ? 1 : 0),
-                }),
-            ct);
+        // If employeeId is not supplied, default to the primary HR employee
+        if (!employeeId.HasValue || employeeId.Value == Guid.Empty)
+        {
+            var hrList = await GetHrTeamAsync(ct);
+            if (hrList.Count > 0)
+            {
+                employeeId = hrList[0].Id;
+            }
+        }
 
-        var byDate = daily.ToDictionary(d => d.Date);
+        // Aggregate per day for this specific HR employee (or company-wide if no HR found)
+        var records = await _uow.Attendance.ToListAsync(
+            _uow.Attendance.Query()
+                .Where(r => (employeeId.HasValue ? r.EmployeeId == employeeId.Value : true) && r.Date >= queryFrom && r.Date <= monthEnd),
+            ct);
+        var byDate = records.GroupBy(r => r.Date).ToDictionary(g => g.Key, g => g.First());
+
         var result = new List<AttendanceTrendPointDto>();
         var totalDays = DateTime.DaysInMonth(targetYear, targetMonth);
 
@@ -256,33 +328,26 @@ public sealed class DashboardService : IDashboardService
             maxDay = 0;
         }
 
-        var todayStartUtc = DateTime.UtcNow.Date;
+        var todayStartUtc = TimeZoneInfo.ConvertTimeToUtc(today.ToDateTime(TimeOnly.MinValue), tz);
         var todayEndUtc = todayStartUtc.AddDays(1);
         var punchesToday = await _uow.Punches.ToListAsync(
             _uow.Punches.Query()
-                .Where(p => p.PunchTime >= todayStartUtc && p.PunchTime < todayEndUtc)
+                .Where(p => (employeeId.HasValue ? p.EmployeeId == employeeId.Value : true) && p.PunchTime >= todayStartUtc && p.PunchTime < todayEndUtc)
                 .OrderBy(p => p.PunchTime),
             ct);
 
         for (var day = 1; day <= maxDay; day++)
         {
             var date = new DateOnly(targetYear, targetMonth, day);
-            var prevDate = new DateOnly(prevMonthStart.Year, prevMonthStart.Month, Math.Min(day, prevMonthDays));
-
-            byDate.TryGetValue(date, out var dayStat);
-            byDate.TryGetValue(prevDate, out var prevStat);
-
-            // Realistic baseline for previous month when historical month data is not yet accumulated
             var isWeekend = date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday;
-            var prevPresent = prevStat?.Present ?? (isWeekend ? 0 : 5);
-            var prevAbsent = prevStat?.Absent ?? (isWeekend ? 0 : 1);
-            var prevLate = prevStat?.Late ?? (isWeekend ? 0 : 1);
+
+            byDate.TryGetValue(date, out var rec);
 
             int weekNumber = Math.Min(4, ((day - 1) / 7) + 1);
 
-            var curPresent = dayStat?.Present ?? 0;
-            var curAbsent = dayStat?.Absent ?? 0;
-            var curLate = dayStat?.Late ?? 0;
+            int curPresent = 0;
+            int curAbsent = 0;
+            int curLate = 0;
 
             decimal beforeBreak = 0;
             decimal breakHrs = 0;
@@ -291,89 +356,166 @@ public sealed class DashboardService : IDashboardService
 
             if (date == today)
             {
-                // Dynamic punch tracking for present day
+                // Dynamic punch tracking for present day for this HR employee
                 if (punchesToday.Count > 0)
                 {
-                    var clockIn = punchesToday.FirstOrDefault(p => p.PunchType == PunchType.ClockIn);
-                    if (clockIn != null)
+                    var sorted = punchesToday.OrderBy(p => p.PunchTime).ToList();
+                    var last = sorted.Last();
+                    bool isClockedIn = (last.PunchType == PunchType.ClockIn || last.PunchType == PunchType.BreakOut);
+                    bool isOnBreak = (last.PunchType == PunchType.BreakIn);
+
+                    long totalWorkSec = 0;
+                    long totalBreakSec = 0;
+                    DateTime? wOpen = null;
+                    DateTime? bOpen = null;
+
+                    foreach (var p in sorted)
                     {
-                        var inTime = clockIn.PunchTime;
-                        var breakIn = punchesToday.FirstOrDefault(p => p.PunchType == PunchType.BreakIn);
-                        var breakOut = punchesToday.FirstOrDefault(p => p.PunchType == PunchType.BreakOut);
-                        var clockOut = punchesToday.FirstOrDefault(p => p.PunchType == PunchType.ClockOut);
-                        var nowUtc = DateTime.UtcNow;
-
-                        if (breakIn == null)
+                        if (p.PunchType == PunchType.ClockIn)
                         {
-                            if (clockOut == null)
+                            wOpen = p.PunchTime;
+                            bOpen = null;
+                        }
+                        else if (p.PunchType == PunchType.BreakIn)
+                        {
+                            if (wOpen.HasValue)
                             {
-                                beforeBreak = Math.Round((decimal)(nowUtc - inTime).TotalHours, 1);
-                                breakHrs = 0;
-                                afterBreak = 0;
+                                var diff = p.PunchTime - wOpen.Value;
+                                if (diff.TotalSeconds > 0) totalWorkSec += (long)diff.TotalSeconds;
+                                wOpen = null;
                             }
-                            else
+                            bOpen = p.PunchTime;
+                        }
+                        else if (p.PunchType == PunchType.BreakOut)
+                        {
+                            if (bOpen.HasValue)
                             {
-                                beforeBreak = Math.Round((decimal)(clockOut.PunchTime - inTime).TotalHours, 1);
-                                breakHrs = 0;
-                                afterBreak = 0;
+                                var diff = p.PunchTime - bOpen.Value;
+                                if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
+                                bOpen = null;
+                            }
+                            wOpen = p.PunchTime;
+                        }
+                        else if (p.PunchType == PunchType.ClockOut)
+                        {
+                            if (wOpen.HasValue)
+                            {
+                                var diff = p.PunchTime - wOpen.Value;
+                                if (diff.TotalSeconds > 0) totalWorkSec += (long)diff.TotalSeconds;
+                                wOpen = null;
+                            }
+                            if (bOpen.HasValue)
+                            {
+                                var diff = p.PunchTime - bOpen.Value;
+                                if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
+                                bOpen = null;
                             }
                         }
-                        else
-                        {
-                            beforeBreak = Math.Round((decimal)(breakIn.PunchTime - inTime).TotalHours, 1);
-                            if (breakOut == null)
-                            {
-                                breakHrs = Math.Round((decimal)(nowUtc - breakIn.PunchTime).TotalHours, 1);
-                                afterBreak = 0;
-                            }
-                            else
-                            {
-                                breakHrs = Math.Round((decimal)(breakOut.PunchTime - breakIn.PunchTime).TotalHours, 1);
-                                if (clockOut == null)
-                                {
-                                    afterBreak = Math.Round((decimal)(nowUtc - breakOut.PunchTime).TotalHours, 1);
-                                }
-                                else
-                                {
-                                    afterBreak = Math.Round((decimal)(clockOut.PunchTime - breakOut.PunchTime).TotalHours, 1);
-                                }
-                            }
-                        }
+                    }
 
-                        beforeBreak = Math.Max(0.1m, beforeBreak);
-                        if (breakHrs > 0) breakHrs = Math.Max(0.1m, breakHrs);
-                        if (afterBreak > 0) afterBreak = Math.Max(0.1m, afterBreak);
+                    var nowUtc = DateTime.UtcNow;
+                    if (isClockedIn && wOpen.HasValue)
+                    {
+                        var diff = nowUtc - wOpen.Value;
+                        if (diff.TotalSeconds > 0) totalWorkSec += (long)diff.TotalSeconds;
+                    }
+                    else if (isOnBreak && bOpen.HasValue)
+                    {
+                        var diff = nowUtc - bOpen.Value;
+                        if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
+                    }
+
+                    var wH = Math.Round((decimal)totalWorkSec / 3600m, 1);
+                    var bH = Math.Round((decimal)totalBreakSec / 3600m, 1);
+
+                    if (bH > 0)
+                    {
+                        beforeBreak = Math.Min(4.0m, Math.Max(0.5m, wH * 0.5m));
+                        breakHrs = Math.Max(0.5m, bH);
+                        afterBreak = Math.Max(0m, wH - beforeBreak);
+                    }
+                    else
+                    {
+                        beforeBreak = Math.Max(0.5m, wH);
+                        breakHrs = 0;
+                        afterBreak = 0;
+                    }
+
+                    if (isClockedIn || isOnBreak)
+                    {
+                        missing = 0m;
+                    }
+                    else
+                    {
                         decimal tot = beforeBreak + breakHrs + afterBreak;
                         missing = Math.Max(0m, 8.5m - tot);
                     }
-                    else if (curPresent > 0)
+
+                    curPresent = 1;
+                    var firstIn = sorted.FirstOrDefault(p => p.PunchType == PunchType.ClockIn);
+                    if (firstIn != null)
                     {
-                        beforeBreak = 3.5m;
-                        breakHrs = 1.0m;
-                        afterBreak = 3.5m;
-                        missing = 0.5m;
+                        var firstInLocal = TimeZoneInfo.ConvertTimeFromUtc(firstIn.PunchTime, tz);
+                        if (firstInLocal.TimeOfDay > new TimeSpan(9, 30, 0))
+                        {
+                            curLate = 1;
+                        }
                     }
                 }
-                else if (curPresent > 0)
+                else if (rec != null && (rec.Status == AttendanceStatus.Present || rec.Status == AttendanceStatus.Late))
                 {
-                    beforeBreak = 3.5m;
-                    breakHrs = 1.0m;
-                    afterBreak = 3.5m;
-                    missing = 0.5m;
+                    curPresent = 1;
+                    curLate = rec.Status == AttendanceStatus.Late ? 1 : 0;
+                    beforeBreak = 1.0m;
+                    breakHrs = 0m;
+                    afterBreak = 0m;
+                    missing = 0m;
                 }
             }
             else if (date < today && !isWeekend)
             {
-                if (curPresent > 0)
+                if (rec != null)
                 {
-                    beforeBreak = curLate > 0 ? 3.5m : 4.0m;
-                    breakHrs = 1.0m;
-                    afterBreak = curPresent >= 4 ? 3.5m : 3.0m;
-                    missing = Math.Max(0m, 8.5m - (beforeBreak + breakHrs + afterBreak));
+                    if (rec.Status == AttendanceStatus.Holiday)
+                    {
+                        beforeBreak = 0m;
+                        breakHrs = 0m;
+                        afterBreak = 0m;
+                        missing = 0m;
+                    }
+                    else if (rec.Status == AttendanceStatus.Present || rec.Status == AttendanceStatus.Late)
+                    {
+                        curPresent = 1;
+                        curLate = rec.Status == AttendanceStatus.Late ? 1 : 0;
+                        decimal wH = rec.WorkHours > 0 ? rec.WorkHours : 8.0m;
+                        decimal bH = rec.BreakMinutes > 0 ? Math.Round((decimal)rec.BreakMinutes / 60m, 1) : 1.0m;
+
+                        beforeBreak = Math.Min(4.0m, Math.Round(wH * 0.5m, 1));
+                        breakHrs = bH;
+                        afterBreak = Math.Max(0m, wH - beforeBreak);
+                        missing = Math.Max(0m, 8.5m - (beforeBreak + breakHrs + afterBreak));
+                    }
+                    else if (rec.Status == AttendanceStatus.HalfDay)
+                    {
+                        curPresent = 1;
+                        beforeBreak = 4.0m;
+                        breakHrs = 0.5m;
+                        afterBreak = 0m;
+                        missing = 4.0m;
+                    }
+                    else if (rec.Status == AttendanceStatus.Absent)
+                    {
+                        curAbsent = 1;
+                        missing = 1.0m;
+                    }
+                    else if (rec.Status == AttendanceStatus.OnLeave)
+                    {
+                        missing = 0m;
+                    }
                 }
-                else if (curAbsent > 0 || (date < today && curPresent == 0))
+                else
                 {
-                    // Absent or missing day (like Day 4 in reference)
+                    curAbsent = 1;
                     missing = 1.0m;
                 }
             }
@@ -385,9 +527,9 @@ public sealed class DashboardService : IDashboardService
                 curLate,
                 date.ToString("yyyy-MM-dd"),
                 weekNumber,
-                prevPresent,
-                prevAbsent,
-                prevLate,
+                curPresent,
+                curAbsent,
+                curLate,
                 beforeBreak,
                 breakHrs,
                 afterBreak,
@@ -534,7 +676,10 @@ public sealed class DashboardService : IDashboardService
 
     public async Task<DashboardTemplateDataDto> GetTemplateDataAsync(Guid? employeeId, CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var tz = await GetCompanyTimeZoneAsync(ct);
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+        var todayStartUtc = TimeZoneInfo.ConvertTimeToUtc(today.ToDateTime(TimeOnly.MinValue), tz);
+        var todayEndUtc = todayStartUtc.AddDays(1);
 
         // Resolve target employee if provided, or pick first
         Guid targetEmpId;
@@ -554,7 +699,7 @@ public sealed class DashboardService : IDashboardService
         var todayRecords = await _uow.Attendance.ToListAsync(
             _uow.Attendance.Query()
                 .Where(a => a.Date == today)
-                .Select(a => new { a.EmployeeId, a.CheckIn, a.Status }),
+                .Select(a => new { a.EmployeeId, a.CheckIn, a.Status, a.WorkHours }),
             ct);
         var recordByEmp = todayRecords.ToDictionary(r => r.EmployeeId);
 
@@ -562,6 +707,13 @@ public sealed class DashboardService : IDashboardService
             _uow.LeaveRequests.Query().Where(l => l.Status == LeaveStatus.Approved && l.FromDate <= today && l.ToDate >= today),
             ct);
         var leaveByEmp = todayLeaves.ToDictionary(l => l.EmployeeId);
+
+        var allPunchesToday = await _uow.Punches.ToListAsync(
+            _uow.Punches.Query()
+                .Where(p => p.PunchTime >= todayStartUtc && p.PunchTime < todayEndUtc)
+                .OrderBy(p => p.PunchTime),
+            ct);
+        var punchesByEmp = allPunchesToday.GroupBy(p => p.EmployeeId).ToDictionary(g => g.Key, g => g.ToList());
 
         var presentList = new List<AttendancePersonDto>();
         var absentList = new List<AttendancePersonDto>();
@@ -574,18 +726,52 @@ public sealed class DashboardService : IDashboardService
             var dept = emp.Department?.Name ?? "General";
             var desig = emp.Designation?.Name ?? emp.JobTitle;
 
-            if (leaveByEmp.TryGetValue(emp.Id, out var leave))
+            recordByEmp.TryGetValue(emp.Id, out var rec);
+            punchesByEmp.TryGetValue(emp.Id, out var empPunches);
+
+            var hasCheckIn = (rec != null && rec.CheckIn.HasValue) || (empPunches != null && empPunches.Any(p => p.PunchType == PunchType.ClockIn));
+
+            if (hasCheckIn)
             {
-                onLeaveList.Add(new AttendancePersonDto(emp.Id, name, emp.EmployeeCode, dept, desig, null, leave.Reason));
-            }
-            else if (recordByEmp.TryGetValue(emp.Id, out var rec) && rec.CheckIn is not null)
-            {
-                var person = new AttendancePersonDto(emp.Id, name, emp.EmployeeCode, dept, desig, rec.CheckIn.Value.ToString("hh:mm tt"), null);
+                string? timeStr = null;
+                if (rec?.CheckIn.HasValue == true)
+                {
+                    timeStr = rec.CheckIn.Value.ToString("hh:mm tt");
+                }
+                else if (empPunches != null)
+                {
+                    var firstIn = empPunches.FirstOrDefault(p => p.PunchType == PunchType.ClockIn);
+                    if (firstIn != null)
+                    {
+                        var localIn = TimeZoneInfo.ConvertTimeFromUtc(firstIn.PunchTime, tz);
+                        timeStr = localIn.ToString("hh:mm tt");
+                    }
+                }
+
+                var person = new AttendancePersonDto(emp.Id, name, emp.EmployeeCode, dept, desig, timeStr ?? "10:00 AM", null);
                 presentList.Add(person);
-                if (rec.Status == AttendanceStatus.Late)
+
+                var isLate = (rec != null && rec.Status == AttendanceStatus.Late);
+                if (!isLate && empPunches != null)
+                {
+                    var firstIn = empPunches.FirstOrDefault(p => p.PunchType == PunchType.ClockIn);
+                    if (firstIn != null)
+                    {
+                        var localIn = TimeZoneInfo.ConvertTimeFromUtc(firstIn.PunchTime, tz);
+                        if (localIn.TimeOfDay > new TimeSpan(9, 15, 0))
+                        {
+                            isLate = true;
+                        }
+                    }
+                }
+                if (isLate)
                 {
                     lateList.Add(person);
                 }
+            }
+            else if (leaveByEmp.TryGetValue(emp.Id, out var leave))
+            {
+                onLeaveList.Add(new AttendancePersonDto(emp.Id, name, emp.EmployeeCode, dept, desig, null, leave.Reason));
             }
             else
             {
@@ -659,15 +845,20 @@ public sealed class DashboardService : IDashboardService
         // 6. Pending Approvals
         var pendingApprovals = await GetPendingApprovalsAsync(6, ct);
 
-        // 7. Attendance Graph
-        var attendanceGraph = await GetAttendanceTrendAsync(ct);
+        // 7. Attendance Graph for HR Team
+        var hrTeam = await GetHrTeamAsync(ct);
+        Guid? selectedHrId = null;
+        if (hrTeam.Count > 0)
+        {
+            var matched = hrTeam.FirstOrDefault(h => h.Id == targetEmpId);
+            selectedHrId = matched != null ? matched.Id : hrTeam[0].Id;
+        }
+        var attendanceGraph = await GetAttendanceTrendAsync(today.Year, today.Month, selectedHrId, ct);
 
         // 8. Today's punches
-        var startUtc = DateTime.UtcNow.Date;
-        var endUtc = startUtc.AddDays(1);
         var todayPunches = await _uow.Punches.ToListAsync(
             _uow.Punches.Query()
-                .Where(p => targetEmpId != Guid.Empty && p.EmployeeId == targetEmpId && p.PunchTime >= startUtc && p.PunchTime < endUtc)
+                .Where(p => targetEmpId != Guid.Empty && p.EmployeeId == targetEmpId && p.PunchTime >= todayStartUtc && p.PunchTime < todayEndUtc)
                 .OrderByDescending(p => p.PunchTime),
             ct);
         var punchDtos = todayPunches.Select(p => new EmployeePunchDto(
@@ -695,6 +886,7 @@ public sealed class DashboardService : IDashboardService
             pendingApprovals,
             attendanceGraph,
             punchDtos,
-            leaveBalances);
+            leaveBalances,
+            hrTeam);
     }
 }

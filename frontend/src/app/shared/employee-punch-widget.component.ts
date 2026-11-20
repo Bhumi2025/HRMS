@@ -21,7 +21,7 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
                 </svg>
-                {{ companyTz() || 'Asia/Dubai' }}
+                {{ companyTz() || 'Asia/Kolkata' }}
               </span>
             </div>
             <p class="widget-subtitle">Record daily attendance punches with server-synchronized timestamps</p>
@@ -571,7 +571,7 @@ export class EmployeePunchWidgetComponent implements OnInit, OnDestroy {
   });
 
   protected readonly isCheckedIn = computed(() => this.status()?.isCheckedIn ?? false);
-  protected readonly companyTz = computed(() => this.status()?.companyTimeZone ?? 'Asia/Dubai');
+  protected readonly companyTz = computed(() => this.status()?.companyTimeZone ?? 'Asia/Kolkata');
   protected readonly todayPunches = computed(() => this.status()?.todayPunches ?? []);
 
   protected readonly regularizeRoute = computed(() => {
@@ -674,8 +674,17 @@ export class EmployeePunchWidgetComponent implements OnInit, OnDestroy {
   formatTime(isoString: string): string {
     if (!isoString) return '—';
     try {
-      const d = new Date(isoString);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      let iso = isoString;
+      if (iso.includes('T') && !iso.endsWith('Z') && !iso.includes('+') && !iso.includes('-')) {
+        iso += 'Z';
+      }
+      const d = new Date(iso);
+      return d.toLocaleTimeString('en-US', {
+        timeZone: this.companyTz() || 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
     } catch {
       return isoString;
     }

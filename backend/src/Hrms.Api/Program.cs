@@ -16,6 +16,10 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Ensure listening on all interfaces (0.0.0.0) so LAN devices can access directly
+var configuredUrls = builder.Configuration["Urls"] ?? "http://0.0.0.0:5096";
+builder.WebHost.UseUrls(configuredUrls);
+
 // ── Controllers / JSON ──
 builder.Services.AddControllers(options =>
     {
@@ -27,6 +31,7 @@ builder.Services.AddControllers(options =>
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.Converters.Add(new Hrms.Api.Serialization.FlexibleEnumConverterFactory());
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
     });
 
 builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
@@ -123,16 +128,28 @@ builder.Services.AddAuthorization(options =>
 // ── Response Compression ──
 builder.Services.AddResponseCompression();
 
-// ── CORS (Angular dev server) ──
+// ── CORS (Angular dev server & local network) ──
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                      ?? new[] { "http://localhost:4200" };
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("Angular", policy => policy
-        .WithOrigins(allowedOrigins)
-        .AllowAnyHeader()
-        .AllowAnyMethod());
+    options.AddPolicy("Angular", policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+    });
 });
 
 // ── Background Workers ──
@@ -206,5 +223,19 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "HRMS
     .WithTags("System");
 
 app.Run();
+
+public class UtcDateTimeJsonConverter : JsonConverter<DateTime>
+{
+    public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return DateTime.SpecifyKind(reader.GetDateTime(), DateTimeKind.Utc);
+    }
+
+    public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+    {
+        var utc = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        writer.WriteStringValue(utc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+    }
+}
 
 public partial class Program { }

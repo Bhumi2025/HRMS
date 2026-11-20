@@ -82,7 +82,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   protected readonly faceMatchScore = signal<number | null>(null);
   protected readonly isFaceEnrolled = signal(false);
   /** Minimum similarity (0-100) required to accept a face match. */
-  protected readonly faceThreshold = 80;
+  protected readonly faceThreshold = 70;
   /** Descriptor length produced by face-api ResNet-34 (128-dimensional embedding). */
   private readonly faceDescriptorLength = 128;
   private pendingLoginResponse: LoginResponse | null = null;
@@ -349,14 +349,14 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (localSaved && localSaved.faceDescriptor) {
       try {
         const parsed = JSON.parse(localSaved.faceDescriptor);
-        if (Array.isArray(parsed) && parsed.length === this.faceDescriptorLength) {
+        if (Array.isArray(parsed) && parsed.length === this.faceDescriptorLength && !this.faceService.isDummyDescriptor(parsed)) {
           this.enrolledFaceForUser = localSaved;
           this.referenceFaceFeatures = parsed;
           this.isFaceEnrolled.set(true);
           this.openFaceModal();
           return;
         }
-        // Older/incompatible template — discard it so the user re-registers.
+        // Older/incompatible/dummy template — discard it so the user re-registers cleanly.
         localStorage.removeItem('hrms_face_' + empId);
         localStorage.removeItem('hrms_face_' + empName.toLowerCase());
       } catch {}
@@ -373,13 +373,15 @@ export class LoginComponent implements OnInit, OnDestroy {
         if (match && match.faceDescriptor) {
           try {
             const parsed = JSON.parse(match.faceDescriptor);
-            if (Array.isArray(parsed) && parsed.length === this.faceDescriptorLength) {
+            if (Array.isArray(parsed) && parsed.length === this.faceDescriptorLength && !this.faceService.isDummyDescriptor(parsed)) {
               this.enrolledFaceForUser = match;
               this.referenceFaceFeatures = parsed;
               this.isFaceEnrolled.set(true);
               this.enrolledEmployeeCode.set(match.employeeCode);
               this.openFaceModal();
               return;
+            } else {
+              console.warn('Detected placeholder/dummy face descriptor for employee. Enabling clean AI face enrollment.');
             }
           } catch {}
         }
