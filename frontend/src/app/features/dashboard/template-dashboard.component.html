@@ -131,7 +131,7 @@
                       title="Select HR Employee"
                     >
                       @for (hr of hrEmployees(); track hr.id) {
-                        <option [value]="hr.id">{{ hr.firstName }} {{ hr.lastName }} ({{ hr.employeeCode }})</option>
+                        <option [value]="hr.id">{{ hr.firstName }} {{ hr.lastName }}</option>
                       }
                     </select>
                     <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -141,7 +141,7 @@
                 } @else if (hrEmployees().length === 1) {
                   <div class="hr-badge-single" title="HR Attendance Overview">
                     <span class="hr-dot"></span>
-                    <span>{{ hrEmployees()[0].firstName }} {{ hrEmployees()[0].lastName }} ({{ hrEmployees()[0].employeeCode }})</span>
+                    <span>{{ hrEmployees()[0].firstName }} {{ hrEmployees()[0].lastName }}</span>
                   </div>
                 }
                 <div class="month-selector-badge">
@@ -162,15 +162,19 @@
               </div>
             </div>
 
-            <!-- Legend & Action (Redirects to Monthly Muster Register) -->
+            <!-- Action (Redirects to Monthly Muster Register) -->
             <div class="header-actions">
-              <div class="graph-legend">
-                <span class="legend-item"><span class="legend-dot dot-before-break"></span> Before Break</span>
-                <span class="legend-item"><span class="legend-dot dot-break"></span> Break</span>
-                <span class="legend-item"><span class="legend-dot dot-after-break"></span> After Break</span>
-                <span class="legend-item"><span class="legend-dot dot-missing"></span> Missing</span>
-              </div>
               <a [routerLink]="['/attendance']" [queryParams]="{ tab: 'muster', month: selectedMonthKey() }" class="view-link" title="Open Monthly Muster Register">Detailed Log ›</a>
+            </div>
+          </div>
+
+          <!-- Dedicated Legend Row (Clean, spaced, zero collision) -->
+          <div class="chart-legend-bar">
+            <div class="graph-legend">
+              <span class="legend-item"><span class="legend-dot dot-before-break"></span> Before Break</span>
+              <span class="legend-item"><span class="legend-dot dot-break"></span> Break</span>
+              <span class="legend-item"><span class="legend-dot dot-after-break"></span> After Break</span>
+              <span class="legend-item"><span class="legend-dot dot-missing"></span> Missing</span>
             </div>
           </div>
 
