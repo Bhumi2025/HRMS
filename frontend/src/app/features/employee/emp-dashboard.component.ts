@@ -121,22 +121,6 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   clockIn(): void {
-    this.punchService.clockIn();
-    setTimeout(() => {
-      this.loadData();
-      this.punchService.loadTodayPunches();
-    }, 800);
-  }
-
-  clockOut(): void {
-    this.punchService.clockOut();
-    setTimeout(() => {
-      this.loadData();
-      this.punchService.loadTodayPunches();
-    }, 800);
-  }
-
-  faceClockIn(): void {
     this.punchService.requestClockIn();
     setTimeout(() => {
       this.loadData();
@@ -144,7 +128,7 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }, 1200);
   }
 
-  faceClockOut(): void {
+  clockOut(): void {
     this.punchService.requestClockOut();
     setTimeout(() => {
       this.loadData();
