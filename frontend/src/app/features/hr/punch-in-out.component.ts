@@ -284,12 +284,19 @@ import { ToastService } from '../../core/services/toast.service';
             </div>
 
             <!-- Verification Status Banner -->
-            <div class="verification-summary-banner mt-3" [class.banner-pass]="faceStatus() === 'verified' || punchResult()?.success" [class.banner-fail]="faceStatus() === 'mismatched'">
-              @if (punchResult(); as result) {
+            <div class="verification-summary-banner mt-3" [class.banner-pass]="faceStatus() === 'verified' || punchResult()?.success || (cooldownRemaining() > 0)" [class.banner-fail]="faceStatus() === 'mismatched'">
+              @if (cooldownRemaining() > 0 && cooldownEmployeeName()) {
+                <div class="banner-title" style="color: #047857;">✅ Attendance Recorded: {{ cooldownEmployeeName() }}</div>
+                <div class="banner-desc">Shift status synchronized successfully. Please step away for next employee (Cooldown: <strong>{{ cooldownRemaining() }}s</strong>).</div>
+              } @else if (punchResult(); as result) {
                 @if (result.success) {
-                  <div class="banner-title">🎉 {{ result.message }}</div>
+                  <div class="banner-title">{{ result.punchType === 'ClockIn' ? '🎉 ' + result.message : '🚪 ' + result.message }}</div>
                   <div class="banner-desc">
-                    Recorded at {{ result.punchTime | date:'hh:mm:ss a' }}. Live timer active on employee dashboard and attendance marked in HR panel.
+                    @if (result.punchType === 'ClockIn') {
+                      Recorded at {{ result.punchTime | date:'hh:mm:ss a' }}. Live timer started on employee dashboard and attendance marked in HR panel.
+                    } @else {
+                      Recorded at {{ result.punchTime | date:'hh:mm:ss a' }}. Shift ended, timer stopped on employee dashboard and attendance finalized in HR panel.
+                    }
                   </div>
                 } @else {
                   <div class="banner-title">⚠️ Punch Transaction Failed</div>
@@ -372,10 +379,14 @@ import { ToastService } from '../../core/services/toast.service';
                 </div>
                 @if (result.success) {
                   <div class="sync-confirmation">
-                    ⏱️ <strong>Active live timer</strong> is running on {{ result.employeeName }}'s dashboard. Status reflected in HR Attendance Panel.
+                    @if (result.punchType === 'ClockIn') {
+                      ⏱️ <strong>Active live timer</strong> started on {{ result.employeeName }}'s dashboard. Status reflected in HR Attendance Panel.
+                    } @else {
+                      🚪 <strong>Shift ended & Clocked Out</strong>. Final work hours updated on {{ result.employeeName }}'s dashboard and HR Attendance Panel.
+                    }
                   </div>
                   <div class="terminal-reset-row">
-                    <span class="reset-text">Ready for next employee in <strong>{{ resetCountdown() ?? 4 }}s</strong>…</span>
+                    <span class="reset-text">Ready for next employee in <strong>{{ resetCountdown() ?? 3 }}s</strong>…</span>
                     <button type="button" class="btn-reset-next" (click)="resetForNextEmployee()">Scan Next Employee Now →</button>
                   </div>
                 }
@@ -1150,6 +1161,13 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
   private consecutiveVerifiedFrames = 0;
   private punchCooldown = false;
 
+  // Per-employee post-punch cooldown (prevents rapid re-triggering while employee is in camera view)
+  private lastPunchedEmployeeId: string | null = null;
+  private lastPunchedTime: number = 0;
+  private readonly COOLDOWN_MS = 25000; // 25 seconds cooldown for same employee
+  protected readonly cooldownRemaining = signal<number>(0);
+  protected readonly cooldownEmployeeName = signal<string | null>(null);
+
   // Status signals
   protected readonly isClockedIn = signal<boolean>(false);
   protected readonly lastPunchInfo = signal<string | null>(null);
@@ -1386,6 +1404,19 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.scanInterval) clearInterval(this.scanInterval);
 
     this.scanInterval = setInterval(async () => {
+      // 1. Maintain employee cooldown countdown
+      if (this.lastPunchedEmployeeId) {
+        const elapsed = Date.now() - this.lastPunchedTime;
+        if (elapsed < this.COOLDOWN_MS) {
+          const remSec = Math.ceil((this.COOLDOWN_MS - elapsed) / 1000);
+          this.cooldownRemaining.set(remSec);
+        } else {
+          this.lastPunchedEmployeeId = null;
+          this.cooldownRemaining.set(0);
+          this.cooldownEmployeeName.set(null);
+        }
+      }
+
       const video = this.faceVideoRef?.nativeElement;
       const canvas = this.faceCanvasRef?.nativeElement;
       if (!video || !canvas || video.paused || video.ended || this.isCameraLoading()) return;
@@ -1405,13 +1436,17 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
           this.identifyFace(scan.descriptor);
         }
 
-        // Auto-Punch when verified and eligible
+        // Auto-Punch when verified and eligible (ensuring same employee is not in cooldown)
+        const isCooldownActive =
+          this.lastPunchedEmployeeId === emp?.id && Date.now() - this.lastPunchedTime < this.COOLDOWN_MS;
+
         if (
           this.autoPunchEnabled() &&
           this.canExecutePunch() &&
           !this.isSubmitting() &&
           !this.punchCooldown &&
-          !this.punchResult()
+          !this.punchResult() &&
+          !isCooldownActive
         ) {
           this.consecutiveVerifiedFrames++;
           if (this.consecutiveVerifiedFrames >= 2) {
@@ -1462,6 +1497,18 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
         (e) => e.id === bestMatch!.employeeId || e.employeeCode.toLowerCase() === bestMatch!.employeeCode.toLowerCase()
       );
       if (matchingEmp) {
+        // If this same employee just punched within the cooldown period, do not re-select or re-trigger
+        if (this.lastPunchedEmployeeId === matchingEmp.id) {
+          const elapsed = Date.now() - this.lastPunchedTime;
+          if (elapsed < this.COOLDOWN_MS) {
+            const rem = Math.ceil((this.COOLDOWN_MS - elapsed) / 1000);
+            this.cooldownRemaining.set(rem);
+            this.faceMatchScore.set(bestScore);
+            this.recognizedName.set(matchingEmp.fullName);
+            return;
+          }
+        }
+
         this.selectEmployee(matchingEmp);
         this.faceMatchScore.set(bestScore);
         this.faceStatus.set('verified');
@@ -1571,6 +1618,12 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
         this.punchResult.set(res);
         this.isClockedIn.set(res.punchType === 'ClockIn');
 
+        // Record cooldown for this employee to prevent auto-retrigger ping-pong
+        this.lastPunchedEmployeeId = emp.id;
+        this.lastPunchedTime = Date.now();
+        this.cooldownEmployeeName.set(emp.fullName);
+        this.cooldownRemaining.set(25);
+
         const actionText = res.punchType === 'ClockIn' ? 'Successfully Punched In' : 'Successfully Punched Out';
         this.toast.show(`${actionText}: ${emp.fullName}!`, 'success');
 
@@ -1580,7 +1633,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
 
         this.consecutiveVerifiedFrames = 0;
         // Automatically refresh highlighted employee card after confirmation
-        this.startAutoReset(2);
+        this.startAutoReset(3);
       },
       error: (err) => {
         this.isSubmitting.set(false);
