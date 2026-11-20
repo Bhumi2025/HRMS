@@ -124,13 +124,19 @@ public sealed class AttendanceService : IAttendanceService
                     var sortedPunches = dayPunches!.OrderBy(p => p.PunchTime).ToList();
                     var firstInPunch = sortedPunches.FirstOrDefault(p => p.PunchType == "ClockIn");
                     var lastOutPunch = sortedPunches.LastOrDefault(p => p.PunchType == "ClockOut");
+                    var lastPunch = sortedPunches.Last();
+                    var isCurrentlyCheckedIn = (lastPunch.PunchType == "ClockIn" || lastPunch.PunchType == "BreakIn" || lastPunch.PunchType == "BreakOut");
 
                     if (firstInPunch != null && inTime == null)
                     {
                         var localIn = TimeZoneInfo.ConvertTimeFromUtc(firstInPunch.PunchTime, tz);
                         inTime = TimeOnly.FromDateTime(localIn);
                     }
-                    if (lastOutPunch != null && outTime == null)
+                    if (isCurrentlyCheckedIn)
+                    {
+                        outTime = null;
+                    }
+                    else if (lastOutPunch != null && outTime == null)
                     {
                         var localOut = TimeZoneInfo.ConvertTimeFromUtc(lastOutPunch.PunchTime, tz);
                         outTime = TimeOnly.FromDateTime(localOut);
@@ -200,7 +206,12 @@ public sealed class AttendanceService : IAttendanceService
                     var calcHours = Math.Round((decimal)totalWorkSec / 3600m, 2);
                     var calcBreak = (int)Math.Round((double)totalBreakSec / 60.0);
 
-                    if (record != null && record.WorkHours > 0)
+                    if (date == today && isCurrentlyCheckedIn)
+                    {
+                        workHours = calcHours;
+                        breakMins = calcBreak;
+                    }
+                    else if (record != null && record.WorkHours > 0)
                     {
                         workHours = record.WorkHours;
                         breakMins = record.BreakMinutes;
@@ -980,9 +991,12 @@ public sealed class AttendanceService : IAttendanceService
         if (openPunch != null)
         {
             var openDuration = nowUtc - openPunch.PunchTime;
-            if (openDuration.TotalHours > maxAllowedHours)
+            var localPunchDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(openPunch.PunchTime, tz));
+            if (openDuration.TotalHours > maxAllowedHours || localPunchDate < localToday)
             {
-                // Shift expired past shift end + grace period (or max shift length)
+                // Shift expired past shift end + grace period or from a previous day
+                openPunch.IsOpen = false;
+                _uow.Punches.Update(openPunch);
                 hasForgottenCheckOut = true;
                 var priorLocal = TimeZoneInfo.ConvertTimeFromUtc(openPunch.PunchTime, tz);
                 forgottenCheckOutDate = DateOnly.FromDateTime(priorLocal);
@@ -1071,12 +1085,13 @@ public sealed class AttendanceService : IAttendanceService
         var lastPunch = punchesQuery.LastOrDefault();
         bool isOnBreak = lastPunch != null && lastPunch.PunchType == PunchType.BreakIn;
 
+        long liveOngoingSeconds = 0;
         if (isCheckedIn)
         {
             if (activeCalcOpen.HasValue)
             {
                 var ongoing = nowUtc - activeCalcOpen.Value;
-                if (ongoing.TotalSeconds > 0) closedSeconds += (long)ongoing.TotalSeconds;
+                if (ongoing.TotalSeconds > 0) liveOngoingSeconds = (long)ongoing.TotalSeconds;
             }
             if (activeBreakOpen.HasValue)
             {
@@ -1085,7 +1100,7 @@ public sealed class AttendanceService : IAttendanceService
             }
         }
 
-        var workedHours = Math.Round((decimal)closedSeconds / 3600m, 2);
+        var workedHours = Math.Round((decimal)(closedSeconds + liveOngoingSeconds) / 3600m, 2);
         var empName = employee == null ? "—" : $"{employee.FirstName} {employee.LastName}".Trim();
         var empCode = employee?.EmployeeCode ?? "—";
 
@@ -1464,6 +1479,14 @@ public sealed class AttendanceService : IAttendanceService
                 punchType = (todayCount % 2 == 0) ? PunchType.ClockIn : PunchType.ClockOut;
             }
 
+            // Close any previous open punches for this employee when recording punch
+            var previousOpenPunches = knownPunches.Where(p => p.IsOpen).ToList();
+            foreach (var op in previousOpenPunches)
+            {
+                op.IsOpen = false;
+                _uow.Punches.Update(op);
+            }
+
             var deviceName = entry.Item.DeviceName ?? (!string.IsNullOrWhiteSpace(request.DeviceSerial) ? request.DeviceSerial : "Face Terminal");
             var punch = new EmployeePunch
             {
@@ -1471,13 +1494,16 @@ public sealed class AttendanceService : IAttendanceService
                 PunchTime = itemUtc,
                 PunchType = punchType,
                 Note = entry.Item.Note ?? $"Face scan ({request.DeviceSerial})",
-                Device = deviceName
+                Device = deviceName,
+                IsOpen = (punchType != PunchType.ClockOut)
             };
             await _uow.Punches.AddAsync(punch, ct);
 
-            // Synchronise with AttendanceRecord
-            var dateOnly = DateOnly.FromDateTime(itemUtc);
-            var timeOnly = TimeOnly.FromDateTime(itemUtc.ToLocalTime());
+            // Synchronise with AttendanceRecord using company timezone
+            var (compTz, _, _) = await GetCompanyTimeZoneAsync(ct);
+            var localItem = TimeZoneInfo.ConvertTimeFromUtc(itemUtc, compTz);
+            var dateOnly = DateOnly.FromDateTime(localItem);
+            var timeOnly = TimeOnly.FromDateTime(localItem);
             var key = (employee.Id, dateOnly);
 
             if (!recordByKey.TryGetValue(key, out var todayRecord))

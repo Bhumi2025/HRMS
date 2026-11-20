@@ -2228,7 +2228,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const q = this.timelineSearch().toLowerCase().trim();
     const st = this.timelineStatusFilter().toLowerCase().trim();
     const days = this.musterDays();
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const curMonthStr = todayStr.slice(0, 7);
     const isCurrentMonth = this.selectedMusterMonth() === curMonthStr;
 
@@ -2320,9 +2320,12 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private startLivePolling(): void {
     this.pollInterval = setInterval(() => {
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
       if (this.tab() === 'daily' && this.filterDate() === todayStr) {
         this.loadDailyAttendance(true);
+      }
+      if (this.selectedMusterEmpId() && this.musterDays().length > 0) {
+        this.generateMuster();
       }
     }, 10000);
   }
@@ -2618,7 +2621,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const year = parseInt(parts[0], 10) || new Date().getFullYear();
     const month = parseInt(parts[1], 10) || new Date().getMonth() + 1;
     const emp = this.selectedEmployee();
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
     this.api.muster(empId, year, month).subscribe({
       next: (data: MonthlyMusterDay[]) => {
@@ -2858,12 +2861,29 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const parseToDecimalHour = (timeVal: string | null | undefined): number => {
       if (!timeVal) return 9.0;
       if (timeVal.includes('T')) {
-        const d = new Date(timeVal);
-        return d.getHours() + d.getMinutes() / 60.0;
+        let iso = timeVal;
+        if (!iso.endsWith('Z') && !iso.includes('+') && !iso.includes('-')) {
+          iso += 'Z';
+        }
+        const d = new Date(iso);
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Kolkata',
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: false,
+        }).formatToParts(d);
+        const hPart = parts.find((p) => p.type === 'hour')?.value ?? '9';
+        const mPart = parts.find((p) => p.type === 'minute')?.value ?? '0';
+        return parseInt(hPart, 10) + parseInt(mPart, 10) / 60.0;
       }
-      const parts = timeVal.split(':');
-      if (parts.length >= 2) {
-        return parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60.0;
+      const match = timeVal.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+      if (match) {
+        let h = parseInt(match[1], 10);
+        const m = parseInt(match[2], 10);
+        const ampm = match[3] ? match[3].toUpperCase() : null;
+        if (ampm === 'PM' && h < 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        return h + m / 60.0;
       }
       return 9.0;
     };
@@ -3031,8 +3051,15 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // If ongoing today without clock out
       if (isToday) {
-        const nowObj = new Date();
-        const nowH = Math.min(23.95, nowObj.getHours() + nowObj.getMinutes() / 60.0);
+        const nowParts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Kolkata',
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: false,
+        }).formatToParts(new Date());
+        const curH = parseInt(nowParts.find((p) => p.type === 'hour')?.value ?? '10', 10);
+        const curM = parseInt(nowParts.find((p) => p.type === 'minute')?.value ?? '30', 10);
+        const nowH = Math.min(23.95, curH + curM / 60.0);
 
         if (currentBreakStart !== null) {
           const endH = Math.max(currentBreakStart + 0.25, nowH);
@@ -3069,6 +3096,44 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     // 2. Fallback when punches array not present (historical seed / mock records)
     let startH = checkIn ? parseToDecimalHour(checkIn) : 9.0;
     let endH = checkOut ? parseToDecimalHour(checkOut) : 18.0;
+
+    // Active ongoing shift today in fallback mode
+    if (isToday && (!checkOut || checkOut === '—')) {
+      const nowParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false,
+      }).formatToParts(new Date());
+      const curH = parseInt(nowParts.find((p) => p.type === 'hour')?.value ?? '10', 10);
+      const curM = parseInt(nowParts.find((p) => p.type === 'minute')?.value ?? '30', 10);
+      const nowH = Math.min(23.95, curH + curM / 60.0);
+
+      if (startH > 9.25 && startH <= 13.0) {
+        segments.push({
+          type: 'late',
+          label: 'Late',
+          timeRange: `09:00 - ${this.formatHourDecimal(startH)}`,
+          durationLabel: `${Math.round((startH - 9.0) * 60)}m late`,
+          leftPercent: 0,
+          widthPercent: calcWidth(9.0, startH),
+          tooltip: `Late arrival: arrived at ${this.formatHourDecimal(startH)}`,
+        });
+      }
+
+      const activeEnd = Math.max(startH + 0.25, nowH);
+      const dur = activeEnd - startH;
+      segments.push({
+        type: 'work',
+        label: 'Working Time (Active)',
+        timeRange: `${this.formatHourDecimal(startH)} - Now`,
+        durationLabel: `${dur.toFixed(1)}h`,
+        leftPercent: calcLeft(startH),
+        widthPercent: calcWidth(startH, activeEnd),
+        tooltip: `Currently working (${dur.toFixed(1)}h)`,
+      });
+      return segments;
+    }
 
     // Irregular evening punch on a past day with no checkout
     if (startH >= 18.0 && (!checkOut || checkOut === '—' || workHours === 0)) {
