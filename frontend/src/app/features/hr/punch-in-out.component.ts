@@ -1173,6 +1173,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
   // Operation flags
   protected readonly isEnrolling = signal<boolean>(false);
   protected readonly isSubmitting = signal<boolean>(false);
+  protected readonly isLoadingStatus = signal<boolean>(false);
   protected readonly punchResult = signal<CentralizedPunchResult | null>(null);
 
   private videoStream: MediaStream | null = null;
@@ -1200,6 +1201,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
       this.selectedEmployee() !== null &&
       this.isWithinGeofence() &&
       this.faceStatus() === 'verified' &&
+      !this.isLoadingStatus() &&
       !this.isSubmitting()
     );
   });
@@ -1274,8 +1276,10 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
     this.empEnrolledPhoto.set(enrolled?.avatarUrl || null);
 
     // Check attendance status
+    this.isLoadingStatus.set(true);
     this.api.punchStatus(emp.id).subscribe({
       next: (status) => {
+        this.isLoadingStatus.set(false);
         this.isClockedIn.set(status.isCheckedIn);
         if (status.todayPunches && status.todayPunches.length > 0) {
           const last = status.todayPunches[status.todayPunches.length - 1];
@@ -1286,6 +1290,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       },
       error: () => {
+        this.isLoadingStatus.set(false);
         this.isClockedIn.set(false);
         this.lastPunchInfo.set(null);
       },
@@ -1548,9 +1553,10 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
     const lat = this.currentLat() ?? this.OFFICE_LAT;
     const lon = this.currentLon() ?? this.OFFICE_LON;
 
+    const targetType = type || (this.isClockedIn() ? 'ClockOut' : 'ClockIn');
     const payload: CentralizedPunchRequest = {
       employeeId: emp.id,
-      punchType: type,
+      punchType: targetType,
       latitude: lat,
       longitude: lon,
       faceDescriptor: this.currentDescriptor || undefined,
@@ -1563,17 +1569,18 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (res) => {
         this.isSubmitting.set(false);
         this.punchResult.set(res);
-        this.isClockedIn.set(type === 'ClockIn');
+        this.isClockedIn.set(res.punchType === 'ClockIn');
 
-        const actionText = type === 'ClockIn' ? 'Successfully Punched In' : 'Successfully Punched Out';
+        const actionText = res.punchType === 'ClockIn' ? 'Successfully Punched In' : 'Successfully Punched Out';
         this.toast.show(`${actionText}: ${emp.fullName}!`, 'success');
 
         // Update last activity text
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        this.lastPunchInfo.set(`${type} at ${time}`);
+        this.lastPunchInfo.set(`${res.punchType} at ${time}`);
 
-        // Start Auto-Reset timer for next employee in line
-        this.startAutoReset(4);
+        this.consecutiveVerifiedFrames = 0;
+        // Automatically refresh highlighted employee card after confirmation
+        this.startAutoReset(2);
       },
       error: (err) => {
         this.isSubmitting.set(false);
@@ -1586,7 +1593,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
           employeeId: emp.id,
           employeeName: emp.fullName,
           employeeCode: emp.employeeCode,
-          punchType: type,
+          punchType: targetType,
           punchTime: new Date().toISOString(),
           latitude: lat,
           longitude: lon,
@@ -1601,7 +1608,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  protected startAutoReset(seconds: number): void {
+  protected startAutoReset(seconds: number = 2): void {
     if (this.autoResetTimer) clearInterval(this.autoResetTimer);
     this.resetCountdown.set(seconds);
 
@@ -1622,6 +1629,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.resetCountdown.set(null);
     this.selectedEmployee.set(null);
+    this.searchQuery.set('');
     this.punchResult.set(null);
     this.faceStatus.set('idle');
     this.faceMatchScore.set(null);
@@ -1633,6 +1641,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
     this.currentSnapshot = null;
     this.consecutiveVerifiedFrames = 0;
     this.punchCooldown = false;
+    this.isLoadingStatus.set(false);
   }
 
   private stopCamera(): void {
