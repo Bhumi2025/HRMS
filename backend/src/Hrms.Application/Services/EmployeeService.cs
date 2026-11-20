@@ -58,9 +58,9 @@ public sealed class EmployeeService : IEmployeeService
         if (!string.IsNullOrWhiteSpace(request.Phone))
         {
             var cleanPhone = System.Text.RegularExpressions.Regex.Replace(request.Phone.Trim(), @"[\s\-]", "");
-            if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(?:\+91|91|0)?[6-9]\d{9}$"))
+            if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(?:\+?\d{7,15})$"))
             {
-                throw new ValidationException("Phone number must be a valid 10-digit Indian mobile number (e.g. +91 98765 43210 or 9876543210).");
+                throw new ValidationException("Please provide a valid contact number.");
             }
         }
 
@@ -88,6 +88,7 @@ public sealed class EmployeeService : IEmployeeService
         var employee = new Employee
         {
             EmployeeCode = $"EMP-{nextNum}",
+            Salutation = string.IsNullOrWhiteSpace(request.Salutation) ? null : request.Salutation.Trim(),
             FirstName = request.FirstName.Trim(),
             MiddleName = string.IsNullOrWhiteSpace(request.MiddleName) ? null : request.MiddleName.Trim(),
             LastName = request.LastName.Trim(),
@@ -117,6 +118,8 @@ public sealed class EmployeeService : IEmployeeService
             City = string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim(),
             State = string.IsNullOrWhiteSpace(request.State) ? null : request.State.Trim(),
             Country = string.IsNullOrWhiteSpace(request.Country) ? null : request.Country.Trim(),
+            EmergencyContactName = string.IsNullOrWhiteSpace(request.EmergencyContactName) ? null : request.EmergencyContactName.Trim(),
+            EmergencyContactPhone = string.IsNullOrWhiteSpace(request.EmergencyContactPhone) ? null : request.EmergencyContactPhone.Trim(),
             BankName = string.IsNullOrWhiteSpace(request.BankName) ? null : request.BankName.Trim(),
             AccountName = string.IsNullOrWhiteSpace(request.AccountName) ? null : request.AccountName.Trim(),
             AccountNumber = string.IsNullOrWhiteSpace(request.AccountNumber) ? null : request.AccountNumber.Trim(),
@@ -189,9 +192,9 @@ public sealed class EmployeeService : IEmployeeService
             if (!string.IsNullOrWhiteSpace(request.Phone))
             {
                 var cleanPhone = System.Text.RegularExpressions.Regex.Replace(request.Phone.Trim(), @"[\s\-]", "");
-                if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(?:\+91|91|0)?[6-9]\d{9}$"))
+                if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(?:\+?\d{7,15})$"))
                 {
-                    throw new ValidationException("Phone number must be a valid 10-digit Indian mobile number (e.g. +91 98765 43210 or 9876543210).");
+                    throw new ValidationException("Please provide a valid contact number.");
                 }
             }
 
@@ -203,6 +206,7 @@ public sealed class EmployeeService : IEmployeeService
             _ = await _uow.Departments.GetByIdAsync(request.DepartmentId, ct)
                 ?? throw NotFoundException.For("Department", request.DepartmentId);
 
+            employee.Salutation = string.IsNullOrWhiteSpace(request.Salutation) ? null : request.Salutation.Trim();
             employee.FirstName = request.FirstName.Trim();
             employee.MiddleName = request.MiddleName?.Trim();
             employee.LastName = request.LastName.Trim();
@@ -247,6 +251,8 @@ public sealed class EmployeeService : IEmployeeService
         if (request.City != null) employee.City = string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim();
         if (request.State != null) employee.State = string.IsNullOrWhiteSpace(request.State) ? null : request.State.Trim();
         if (request.Country != null) employee.Country = string.IsNullOrWhiteSpace(request.Country) ? null : request.Country.Trim();
+        if (request.EmergencyContactName != null) employee.EmergencyContactName = string.IsNullOrWhiteSpace(request.EmergencyContactName) ? null : request.EmergencyContactName.Trim();
+        if (request.EmergencyContactPhone != null) employee.EmergencyContactPhone = string.IsNullOrWhiteSpace(request.EmergencyContactPhone) ? null : request.EmergencyContactPhone.Trim();
 
         if (!string.IsNullOrWhiteSpace(request.RoleCode))
         {
@@ -437,6 +443,7 @@ public sealed class EmployeeService : IEmployeeService
     private static EmployeeDetailDto ToDetailDto(Employee e, string? roleCode = null, string? roleName = null) => new(
         e.Id,
         e.EmployeeCode,
+        e.Salutation,
         e.FirstName,
         e.MiddleName,
         e.LastName,
@@ -488,7 +495,9 @@ public sealed class EmployeeService : IEmployeeService
         roleCode,
         roleName,
         e.IsFaceEnrolled,
-        e.FacePhotoUrl);
+        e.FacePhotoUrl,
+        e.EmergencyContactName,
+        e.EmergencyContactPhone);
 
     private static decimal Gross(Employee e) =>
         e.BasicSalary + e.HousingAllowance + e.TransportAllowance + e.MobileAllowance + e.OtherAllowances;
