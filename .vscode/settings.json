@@ -1,4 +1,6 @@
 {
   "git.autofetch": true,
-  "git.autofetchPeriod": 180
+  "git.autofetchPeriod": 180,
+  "scss.lint.vendorPrefix": "ignore",
+  "css.lint.vendorPrefix": "ignore"
 }
