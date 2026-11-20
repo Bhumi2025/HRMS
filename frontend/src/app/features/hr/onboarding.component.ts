@@ -979,60 +979,216 @@ interface AccountItem {
         .ob-card-body {
           padding: 10px;
         }
-        .face-modal-backdrop {
-          position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center;
-          background: rgba(8, 12, 24, 0.85); backdrop-filter: blur(12px); padding: 16px;
-        }
-        .face-modal-card {
-          width: 100%; max-width: 480px; background: #0f172a; border: 1px solid rgba(59, 130, 246, 0.3);
-          border-radius: 18px; box-shadow: 0 25px 60px -15px rgba(0,0,0,0.8); overflow: hidden; color: #f8fafc;
-        }
-        .face-modal-header {
-          padding: 16px 20px 12px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);
-        }
-        .face-header-icon {
-          width: 40px; height: 40px; border-radius: 10px; background: rgba(37,99,235,0.2);
-          display: flex; align-items: center; justify-content: center; color: #60a5fa;
-        }
-        .face-header-info { flex: 1; }
-        .face-header-title { font-size: 15px; font-weight: 700; color: #fff; margin: 0; }
-        .face-header-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-        .face-close-btn {
-          width: 30px; height: 30px; border-radius: 6px; background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; cursor: pointer;
-        }
-        .face-viewport-wrap { padding: 14px 18px; background: #0b1120; }
-        .face-viewport {
-          position: relative; width: 100%; height: 260px; border-radius: 12px; overflow: hidden; background: #020617;
-        }
-        .face-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
-        .face-canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); pointer-events: none; z-index: 2; }
-        .face-camera-loading {
-          position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center;
-          background: rgba(2,6,23,0.92); gap: 8px; font-size: 12px; color: #e2e8f0;
-        }
-        .face-spinner { width: 32px; height: 32px; border: 3px solid rgba(59,130,246,0.2); border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
-        .face-spinner-sm { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
-        .face-hud-reticle {
-          position: absolute; top: 12%; left: 20%; right: 20%; bottom: 18%; border: 1.5px dashed rgba(59,130,246,0.5);
-          border-radius: 20px; pointer-events: none; z-index: 3;
-        }
-        .reticle-corner { position: absolute; width: 12px; height: 12px; border: 2.5px solid #60a5fa; }
-        .reticle-corner.tl { top: -2px; left: -2px; border-right: none; border-bottom: none; border-top-left-radius: 6px; }
-        .reticle-corner.tr { top: -2px; right: -2px; border-left: none; border-bottom: none; border-top-right-radius: 6px; }
-        .reticle-corner.bl { bottom: -2px; left: -2px; border-right: none; border-top: none; border-bottom-left-radius: 6px; }
-        .reticle-corner.br { bottom: -2px; right: -2px; border-left: none; border-top: none; border-bottom-right-radius: 6px; }
-        .reticle-laser {
-          position: absolute; left: 0; right: 0; height: 2px; background: #38bdf8; box-shadow: 0 0 10px #38bdf8; opacity: 0;
-        }
-        .reticle-laser.active { opacity: 1; animation: laserSweep 1.5s ease-in-out infinite alternate; }
-        .face-status-banner {
-          margin: 10px 18px; padding: 8px 12px; border-radius: 8px; background: rgba(30,41,59,0.7);
-          border: 1px solid rgba(255,255,255,0.08); font-size: 12px; color: #cbd5e1;
-        }
-        .face-modal-footer {
-          padding: 12px 18px 16px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 10px;
-        }
+      }
+
+      /* Modal Popup Dialog Styles */
+      .face-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(8, 12, 24, 0.85);
+        backdrop-filter: blur(12px);
+        padding: 16px;
+        animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .face-modal-card {
+        width: 100%;
+        max-width: 490px;
+        background: #0f172a;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 18px;
+        box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.05);
+        overflow: hidden;
+        color: #f8fafc;
+        animation: modalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .face-modal-header {
+        padding: 16px 20px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .face-header-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: rgba(37, 99, 235, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #60a5fa;
+      }
+      .face-header-info {
+        flex: 1;
+      }
+      .face-header-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #fff;
+        margin: 0;
+      }
+      .face-header-sub {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 2px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .emp-badge {
+        padding: 2px 7px;
+        background: rgba(59, 130, 246, 0.2);
+        color: #93c5fd;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+      }
+      .face-close-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #94a3b8;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+      }
+      .face-close-btn:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+      }
+      .face-viewport-wrap {
+        padding: 14px 18px;
+        background: #0b1120;
+      }
+      .face-viewport {
+        position: relative;
+        width: 100%;
+        height: 270px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #020617;
+      }
+      .face-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+        display: block;
+      }
+      .face-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        transform: scaleX(-1);
+        pointer-events: none;
+        z-index: 2;
+      }
+      .face-camera-loading {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(2, 6, 23, 0.92);
+        gap: 8px;
+        font-size: 12px;
+        color: #e2e8f0;
+      }
+      .face-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid rgba(59, 130, 246, 0.2);
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      .face-spinner-sm {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      .face-hud-reticle {
+        position: absolute;
+        top: 12%;
+        left: 20%;
+        right: 20%;
+        bottom: 18%;
+        border: 1.5px dashed rgba(59, 130, 246, 0.5);
+        border-radius: 20px;
+        pointer-events: none;
+        z-index: 3;
+        transition: all 0.25s ease;
+      }
+      .face-hud-reticle.matched {
+        border-color: #10b981;
+        border-style: solid;
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+      }
+      .reticle-corner {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border: 2.5px solid #60a5fa;
+      }
+      .face-hud-reticle.matched .reticle-corner {
+        border-color: #10b981;
+      }
+      .reticle-corner.tl { top: -2px; left: -2px; border-right: none; border-bottom: none; border-top-left-radius: 6px; }
+      .reticle-corner.tr { top: -2px; right: -2px; border-left: none; border-bottom: none; border-top-right-radius: 6px; }
+      .reticle-corner.bl { bottom: -2px; left: -2px; border-right: none; border-top: none; border-bottom-left-radius: 6px; }
+      .reticle-corner.br { bottom: -2px; right: -2px; border-left: none; border-top: none; border-bottom-right-radius: 6px; }
+      .reticle-laser {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #38bdf8;
+        box-shadow: 0 0 10px #38bdf8;
+        opacity: 0;
+      }
+      .reticle-laser.active {
+        opacity: 1;
+        animation: laserSweep 1.5s ease-in-out infinite alternate;
+      }
+      .face-status-banner {
+        margin: 10px 18px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: rgba(30, 41, 59, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 12px;
+        color: #cbd5e1;
+        text-align: center;
+      }
+      .face-modal-footer {
+        padding: 14px 18px 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        gap: 10px;
+      }
+      @keyframes modalFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes modalPopIn {
+        from { opacity: 0; transform: scale(0.95) translateY(12px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
       }
     `,
   ],
