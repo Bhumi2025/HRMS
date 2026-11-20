@@ -519,13 +519,41 @@ export class EmpProfileComponent implements OnInit {
         input.value = '';
         return;
       }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const res = e.target?.result as string;
-        this.avatarUrl.set(res);
-        this.toast.show('Profile photo updated!', 'success');
-      };
-      reader.readAsDataURL(file);
+
+      // First upload file to persistent server storage
+      this.api.uploadFile(file).subscribe({
+        next: (res) => {
+          const photoUrl = res.url || res.cloudinaryUrl || '';
+          if (photoUrl) {
+            this.avatarUrl.set(photoUrl);
+            this.api.updateMyPhoto(photoUrl).subscribe({
+              next: () => {
+                this.toast.show('Profile photo saved successfully!', 'success');
+              },
+              error: () => {
+                this.toast.show('Photo uploaded, but could not update profile.', 'danger');
+              },
+            });
+          }
+        },
+        error: () => {
+          // Fallback to Base64 data URL
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            this.avatarUrl.set(dataUrl);
+            this.api.updateMyPhoto(dataUrl).subscribe({
+              next: () => {
+                this.toast.show('Profile photo saved successfully!', 'success');
+              },
+              error: () => {
+                this.toast.show('Could not save profile photo to server.', 'danger');
+              },
+            });
+          };
+          reader.readAsDataURL(file);
+        },
+      });
     }
   }
 
@@ -657,6 +685,9 @@ export class EmpProfileComponent implements OnInit {
       next: (employee) => {
         this.detail.set(employee);
         this.apiId.set(employee.id);
+        if (employee.facePhotoUrl) {
+          this.avatarUrl.set(employee.facePhotoUrl);
+        }
 
         this.personal.set({
           salutation: employee.salutation || (employee.gender === 'Male' ? 'Mr' : 'Miss'),
