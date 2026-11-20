@@ -92,55 +92,55 @@ interface DocRow {
             <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px">
               <div class="form-group">
                 <label class="form-label">Salutation</label>
-                <app-select [options]="salutationOptions" [value]="personal().salutation" (valueChange)="patchPersonal('salutation', $event)" width="100%" />
+                <app-select [options]="salutationOptions" [value]="personal().salutation" [disabled]="true" width="100%" />
               </div>
               <div class="form-group">
                 <label class="form-label">First Name</label>
-                <input class="form-control" [value]="personal().firstName" (input)="patchPersonal('firstName', $any($event.target).value)" placeholder="First Name" />
+                <input class="form-control" [value]="personal().firstName" disabled placeholder="First Name" />
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
               <div class="form-group">
                 <label class="form-label">Middle Name</label>
-                <input class="form-control" [value]="personal().middleName" (input)="patchPersonal('middleName', $any($event.target).value)" placeholder="Middle Name" />
+                <input class="form-control" [value]="personal().middleName" disabled placeholder="Middle Name" />
               </div>
               <div class="form-group">
                 <label class="form-label">Last Name</label>
-                <input class="form-control" [value]="personal().lastName" (input)="patchPersonal('lastName', $any($event.target).value)" placeholder="Last Name" />
+                <input class="form-control" [value]="personal().lastName" disabled placeholder="Last Name" />
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
               <div class="form-group">
                 <label class="form-label">Personal Email</label>
-                <input class="form-control" type="email" [value]="personal().email" (input)="patchPersonal('email', $any($event.target).value)" placeholder="Personal Email" />
+                <input class="form-control" type="email" [value]="personal().email" disabled placeholder="Personal Email" />
               </div>
               <div class="form-group">
                 <label class="form-label">Contact Number</label>
-                <input class="form-control" type="tel" [value]="personal().phone" (input)="patchPersonal('phone', $any($event.target).value)" placeholder="Contact Number" />
+                <input class="form-control" type="tel" [value]="personal().phone" disabled placeholder="Contact Number" />
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
               <div class="form-group">
                 <label class="form-label">Date of Birth</label>
-                <input class="form-control" type="date" [value]="personal().dob" (input)="patchPersonal('dob', $any($event.target).value)" />
+                <input class="form-control" type="date" [value]="personal().dob" disabled />
               </div>
               <div class="form-group">
                 <label class="form-label">Gender</label>
-                <app-key-select groupCode="GENDER" [value]="personal().gender" (valueChange)="patchPersonal('gender', $event)" width="100%" />
+                <app-key-select groupCode="GENDER" [value]="personal().gender" [disabled]="true" width="100%" />
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
               <div class="form-group">
                 <label class="form-label">Marital Status</label>
-                <app-key-select groupCode="MARITAL_STATUS" [value]="personal().marital" (valueChange)="patchPersonal('marital', $event)" width="100%" />
+                <app-key-select groupCode="MARITAL_STATUS" [value]="personal().marital" [disabled]="true" width="100%" />
               </div>
               <div class="form-group">
                 <label class="form-label">Blood Group</label>
-                <app-key-select groupCode="BLOOD_GROUP" [value]="personal().blood" (valueChange)="patchPersonal('blood', $event)" width="100%" />
+                <app-key-select groupCode="BLOOD_GROUP" [value]="personal().blood" [disabled]="true" width="100%" />
               </div>
             </div>
           </div>
@@ -150,27 +150,22 @@ interface DocRow {
           <div class="card-body" style="overflow: visible">
             <div class="form-group">
               <label class="form-label">Employee ID</label>
-              <input class="form-control" [value]="detail()?.employeeCode || ''" readonly style="background: var(--bg); color: var(--muted)" />
+              <input class="form-control" [value]="detail()?.employeeCode || ''" disabled style="background: var(--bg); color: var(--muted)" />
             </div>
             <div class="form-group">
               <label class="form-label">Job Title</label>
-              <input class="form-control" [value]="job().title" (input)="patchJob('title', $any($event.target).value)" />
+              <input class="form-control" [value]="job().title" disabled />
             </div>
             <div class="form-group">
               <label class="form-label">Department</label>
-              <app-select [options]="deptOptions" [value]="job().dept" (valueChange)="patchJob('dept', $event)" width="100%" />
+              <app-select [options]="deptOptions" [value]="job().dept" [disabled]="true" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">Join Date</label>
-              <input class="form-control" type="date" [value]="job().joinDate" (input)="patchJob('joinDate', $any($event.target).value)" />
+              <input class="form-control" type="date" [value]="job().joinDate" disabled />
             </div>
           </div>
         </div>
-      </div>
-
-      <div class="form-footer" style="margin-top: 16px;">
-        <button class="btn btn-outline btn-sm" (click)="load()">Cancel</button>
-        <button class="btn btn-primary btn-sm" (click)="save('Profile details saved!')"><span [appIcon]="'check'"></span> Save</button>
       </div>
     }
 
@@ -221,43 +216,39 @@ interface DocRow {
           <div class="card-body" style="overflow: visible">
             <div class="form-group">
               <label class="form-label">Bank Name</label>
-              <app-select [options]="bankOptions" [value]="bank().bankName" (valueChange)="patchBank('bankName', $event)" width="100%" />
+              <app-select [options]="bankOptions" [value]="bank().bankName" [disabled]="true" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">Bank Account Name</label>
-              <input class="form-control" [value]="bank().accountName" (input)="patchBank('accountName', $any($event.target).value)" />
+              <input class="form-control" [value]="bank().accountName" disabled />
             </div>
             <div class="form-group">
               <label class="form-label">Account No</label>
-              <input class="form-control" [value]="bank().accountNo" (input)="patchBank('accountNo', $any($event.target).value)" />
+              <input class="form-control" [value]="bank().accountNo" disabled />
             </div>
             <div class="form-group">
               <label class="form-label">IBAN</label>
-              <input class="form-control" [value]="bank().iban" (input)="patchBank('iban', $any($event.target).value)" />
+              <input class="form-control" [value]="bank().iban" disabled />
             </div>
             <div class="form-group">
               <label class="form-label">IFSC Code</label>
-              <input class="form-control" [value]="bank().ifsc" (input)="patchBank('ifsc', $any($event.target).value)" />
+              <input class="form-control" [value]="bank().ifsc" disabled />
             </div>
             <div class="form-group">
               <label class="form-label">Swift Code</label>
-              <input class="form-control" [value]="bank().swift" (input)="patchBank('swift', $any($event.target).value)" />
+              <input class="form-control" [value]="bank().swift" disabled />
             </div>
             <div class="form-group">
               <label class="form-label">Currency</label>
-              <app-select [options]="currencyOptions" [value]="bank().currency" (valueChange)="patchBank('currency', $event)" width="100%" />
+              <app-select [options]="currencyOptions" [value]="bank().currency" [disabled]="true" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">Payment Mode</label>
-              <app-key-select groupCode="PAYMENT_MODE" [value]="bank().paymentMode" (valueChange)="patchBank('paymentMode', $event)" width="100%" />
+              <app-key-select groupCode="PAYMENT_MODE" [value]="bank().paymentMode" [disabled]="true" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">WPS ID</label>
-              <input class="form-control" [value]="bank().wpsId" (input)="patchBank('wpsId', $any($event.target).value)" />
-            </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Bank details saved!')"><span [appIcon]="'check'"></span> Save</button>
+              <input class="form-control" [value]="bank().wpsId" disabled />
             </div>
           </div>
         </div>

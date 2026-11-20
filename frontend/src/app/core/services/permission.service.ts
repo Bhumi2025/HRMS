@@ -16,6 +16,7 @@ export const SYSTEM_MODULES: { id: string; name: string }[] = [
   { id: 'm1', name: 'Dashboard' },
   { id: 'm2', name: 'Company' },
   { id: 'm3', name: 'Employees' },
+  { id: 'm15', name: 'Punch In/Out' },
   { id: 'm4', name: 'Profile' },
   { id: 'm5', name: 'Shift' },
   { id: 'm6', name: 'Attendance' },
@@ -151,13 +152,17 @@ export class PermissionService {
     if (s === 'my account' || s === 'emp profile') return 'profile';
     if (s === 'loans' || s === 'reimbursements') return 'payroll';
     if (s === 'roles & permissions' || s === 'role') return 'settings';
+    if (s === 'punch in/out' || s === 'punch' || s === 'punch-in-out') return 'punch in/out';
     return s;
   }
 
   hasModuleAccess(moduleName: string): boolean {
     const role = this.session.activeRole();
-    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
     const key = this.normKey(moduleName);
+    if (role === 'Employee' && (key === 'punch in/out' || (moduleName || '').toLowerCase().includes('punch'))) {
+      return false;
+    }
+    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canView : false;
   }

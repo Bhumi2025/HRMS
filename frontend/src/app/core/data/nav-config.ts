@@ -12,6 +12,7 @@ const hrModules = (approvalBadge?: string): NavSection => ({
   items: [
     { icon: 'company', label: 'Company', path: '/company' },
     { icon: 'employees', label: 'Employees', path: '/employees' },
+    { icon: 'camera', label: 'Punch In/Out', path: '/punch-in-out' },
     { icon: 'user', label: 'Profile', path: '/employee-profile' },
     { icon: 'clock', label: 'Shift', path: '/shift' },
     { icon: 'attendance', label: 'Attendance', path: '/attendance' },

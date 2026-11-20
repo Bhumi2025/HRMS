@@ -62,6 +62,8 @@ import {
   EnrollFaceRequest,
   FacePunchRequest,
   FacePunchResult,
+  CentralizedPunchRequest,
+  CentralizedPunchResult,
   NoticeBoardItem,
   CelebrationItem,
   DashboardTemplateData,
@@ -739,6 +741,10 @@ export class ApiService {
 
   facePunch(payload: FacePunchRequest, token?: string): Observable<FacePunchResult> {
     return this.http.post<FacePunchResult>(this.url('/attendance/face-punch'), payload, this.withToken(token));
+  }
+
+  centralizedPunch(payload: CentralizedPunchRequest): Observable<CentralizedPunchResult> {
+    return this.http.post<CentralizedPunchResult>(this.url('/attendance/centralized-punch'), payload);
   }
 
   enrollFace(employeeId: string, payload: EnrollFaceRequest, token?: string): Observable<{ message: string }> {

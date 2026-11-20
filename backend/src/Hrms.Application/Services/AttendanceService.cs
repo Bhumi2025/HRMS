@@ -6,6 +6,7 @@ using Hrms.Application.Common;
 using Hrms.Application.DTOs;
 using Hrms.Domain.Entities;
 using Hrms.Domain.Enums;
+using System.Text.Json;
 
 namespace Hrms.Application.Services;
 
@@ -1111,7 +1112,7 @@ public sealed class AttendanceService : IAttendanceService
                     if (diff.TotalSeconds > 0) breakSeconds += (long)diff.TotalSeconds;
                     activeBreakOpen = null;
                 }
-                activeBreakOpen = p.PunchTime;
+                lastClockOutUtc = p.PunchTime;
             }
         }
 
@@ -1991,5 +1992,298 @@ public sealed class AttendanceService : IAttendanceService
             r.OutTime.ToString("HH:mm"),
             r.Status.ToString(),
             Formatting.Relative(r.SubmittedAtUtc));
+    }
+
+    public async Task<CentralizedPunchResultDto> ProcessCentralizedPunchAsync(
+        CentralizedPunchRequest request,
+        CancellationToken ct = default)
+    {
+        // 1. Geofencing Validation (Company registered location: 21.2385574033792, 72.89013466219234, 20m radius)
+        const double OfficeLatitude = 21.2385574033792;
+        const double OfficeLongitude = 72.89013466219234;
+        const double AllowedRadiusMeters = 20.0;
+
+        var distance = CalculateHaversineDistance(request.Latitude, request.Longitude, OfficeLatitude, OfficeLongitude);
+        if (distance > AllowedRadiusMeters)
+        {
+            throw new ValidationException(
+                "You are outside the permitted company location. Please move within 20 meters of the registered office to mark your attendance.");
+        }
+
+        // 2. Employee Validation
+        var employee = await _uow.Employees.GetWithDetailsAsync(request.EmployeeId, ct)
+                       ?? await _uow.Employees.GetByIdAsync(request.EmployeeId, ct)
+                       ?? throw NotFoundException.For("Employee", request.EmployeeId);
+
+        if (employee.Status != EmploymentStatus.Active)
+        {
+            throw new ValidationException($"Employee {employee.FullName} is not active ({employee.Status}) and is not eligible for attendance recording.");
+        }
+
+        // 3. Face Biometric Verification
+        if (string.IsNullOrWhiteSpace(employee.FaceDescriptor))
+        {
+            throw new ValidationException($"Employee {employee.FullName} has not registered face biometrics. Please enroll employee face first.");
+        }
+
+        double matchScore = request.MatchScore ?? 0.0;
+        bool faceVerified = false;
+
+        if (request.FaceDescriptor != null && request.FaceDescriptor.Length > 0)
+        {
+            try
+            {
+                var storedDescriptor = JsonSerializer.Deserialize<float[]>(employee.FaceDescriptor);
+                if (storedDescriptor != null && storedDescriptor.Length == request.FaceDescriptor.Length)
+                {
+                    double sumSq = 0.0;
+                    for (int i = 0; i < storedDescriptor.Length; i++)
+                    {
+                        var diff = storedDescriptor[i] - request.FaceDescriptor[i];
+                        sumSq += diff * diff;
+                    }
+                    var euclideanDist = Math.Sqrt(sumSq);
+
+                    if (euclideanDist <= 0.35)
+                        matchScore = Math.Round(100.0 - (euclideanDist / 0.35) * 8.0);
+                    else if (euclideanDist <= 0.58)
+                        matchScore = Math.Round(92.0 - ((euclideanDist - 0.35) / 0.23) * 22.0);
+                    else
+                        matchScore = Math.Max(0.0, Math.Round(70.0 - ((euclideanDist - 0.58) / 0.22) * 50.0));
+
+                    faceVerified = euclideanDist <= 0.58 || matchScore >= 70.0;
+                }
+            }
+            catch
+            {
+                faceVerified = request.MatchScore >= 70.0;
+            }
+        }
+        else if (request.MatchScore.HasValue)
+        {
+            faceVerified = request.MatchScore.Value >= 70.0;
+        }
+
+        if (!faceVerified)
+        {
+            throw new ValidationException("Face verification failed. The captured face does not match the registered employee.");
+        }
+
+        // 4. State Validation & Duplicate Prevention
+        if (!Enum.TryParse<PunchType>(request.PunchType, true, out var punchType) ||
+            (punchType != PunchType.ClockIn && punchType != PunchType.ClockOut))
+        {
+            throw new ValidationException("Centralized attendance only supports Punch-In and Punch-Out.");
+        }
+
+        var (tz, tzName, maxPunchDurationHours) = await GetCompanyTimeZoneAsync(ct);
+        var nowUtc = DateTime.UtcNow;
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
+        var localToday = DateOnly.FromDateTime(localNow);
+
+        var (maxAllowedHours, targetDailyHours, lateGraceMinutes, shiftStart, isOvernight) = GetShiftParameters(employee.Shift, maxPunchDurationHours);
+        var shiftDayStartUtc = TimeZoneInfo.ConvertTimeToUtc(localToday.ToDateTime(TimeOnly.MinValue), tz);
+        var shiftDayEndUtc = shiftDayStartUtc.AddHours(maxAllowedHours + 4);
+
+        var todayPunches = await _uow.Punches.ToListAsync(
+            _uow.Punches.Query()
+                .Where(p => p.EmployeeId == employee.Id && p.PunchTime >= shiftDayStartUtc && p.PunchTime <= shiftDayEndUtc)
+                .OrderBy(p => p.PunchTime),
+            ct);
+
+        var lastPunch = todayPunches.LastOrDefault();
+        if (punchType == PunchType.ClockIn)
+        {
+            if (lastPunch != null && lastPunch.PunchType == PunchType.ClockIn)
+            {
+                var localPunchTime = TimeZoneInfo.ConvertTimeFromUtc(lastPunch.PunchTime, tz);
+                throw new ConflictException($"Employee {employee.FullName} is already clocked in today at {localPunchTime:hh:mm tt}.");
+            }
+        }
+        else if (punchType == PunchType.ClockOut)
+        {
+            if (lastPunch == null || lastPunch.PunchType == PunchType.ClockOut)
+            {
+                throw new ConflictException($"Employee {employee.FullName} is not currently clocked in. Cannot record Punch-Out without an active Punch-In.");
+            }
+        }
+
+        // 5. Close open punches and create new punch
+        var openPunches = await _uow.Punches.ToListAsync(
+            _uow.Punches.Query().Where(p => p.EmployeeId == employee.Id && p.IsOpen),
+            ct);
+        foreach (var open in openPunches)
+        {
+            open.IsOpen = false;
+            _uow.Punches.Update(open);
+        }
+
+        var note = $"Centralized HR Punch (Face Verified: {matchScore}% | GPS: {request.Latitude:F6}, {request.Longitude:F6} Dist: {distance:F1}m)";
+        var punch = new EmployeePunch
+        {
+            EmployeeId = employee.Id,
+            PunchTime = nowUtc,
+            PunchType = punchType,
+            Device = "HR Centralized Terminal",
+            Note = note,
+            IsOpen = (punchType == PunchType.ClockIn),
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
+            DistanceMeters = Math.Round(distance, 1),
+            VerificationStatus = "Face & Geofence Verified"
+        };
+        await _uow.Punches.AddAsync(punch, ct);
+
+        // 6. Integrate with Daily Attendance Record
+        var allPunches = todayPunches.Concat(new[] { punch }).OrderBy(p => p.PunchTime).ToList();
+        TimeOnly? firstCheckIn = null;
+        TimeOnly? lastCheckOut = null;
+        long totalClosedSeconds = 0;
+        long totalBreakSeconds = 0;
+        DateTime? workIntervalOpen = null;
+        DateTime? breakIntervalOpen = null;
+
+        foreach (var p in allPunches)
+        {
+            var pLocal = TimeZoneInfo.ConvertTimeFromUtc(p.PunchTime, tz);
+            var pTimeOnly = TimeOnly.FromDateTime(pLocal);
+
+            if (p.PunchType == PunchType.ClockIn)
+            {
+                firstCheckIn ??= pTimeOnly;
+                if (breakIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - breakIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+                    breakIntervalOpen = null;
+                }
+                workIntervalOpen = p.PunchTime;
+            }
+            else if (p.PunchType == PunchType.BreakIn)
+            {
+                if (workIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - workIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalClosedSeconds += (long)diff.TotalSeconds;
+                    workIntervalOpen = null;
+                }
+                breakIntervalOpen = p.PunchTime;
+            }
+            else if (p.PunchType == PunchType.BreakOut)
+            {
+                if (breakIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - breakIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+                    breakIntervalOpen = null;
+                }
+                workIntervalOpen = p.PunchTime;
+            }
+            else if (p.PunchType == PunchType.ClockOut)
+            {
+                lastCheckOut = pTimeOnly;
+                if (workIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - workIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalClosedSeconds += (long)diff.TotalSeconds;
+                    workIntervalOpen = null;
+                }
+                if (breakIntervalOpen.HasValue)
+                {
+                    var diff = p.PunchTime - breakIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+                    breakIntervalOpen = null;
+                }
+            }
+        }
+
+        if (punchType != PunchType.ClockOut && workIntervalOpen.HasValue)
+        {
+            var diff = nowUtc - workIntervalOpen.Value;
+            if (diff.TotalSeconds > 0) totalClosedSeconds += (long)diff.TotalSeconds;
+        }
+
+        var workedHours = Math.Round((decimal)totalClosedSeconds / 3600m, 2);
+        var breakMinutes = (int)Math.Round((double)totalBreakSeconds / 60.0);
+
+        string? lateEarlyNote = null;
+        if (firstCheckIn.HasValue && firstCheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes))
+        {
+            var lateMins = (int)(firstCheckIn.Value.ToTimeSpan() - shiftStart.ToTimeSpan()).TotalMinutes;
+            lateEarlyNote = $"[Late: {lateMins}m]";
+        }
+        if (punchType == PunchType.ClockOut && lastCheckOut.HasValue && employee.Shift != null && !isOvernight)
+        {
+            if (lastCheckOut.Value < employee.Shift.EndTime)
+            {
+                var earlyMins = (int)(employee.Shift.EndTime.ToTimeSpan() - lastCheckOut.Value.ToTimeSpan()).TotalMinutes;
+                if (earlyMins >= 5)
+                    lateEarlyNote = string.IsNullOrEmpty(lateEarlyNote) ? $"[Early Departure: {earlyMins}m]" : $"{lateEarlyNote} [Early Departure: {earlyMins}m]";
+            }
+        }
+
+        var attendanceRecord = await _uow.Attendance.GetForEmployeeDateAsync(employee.Id, localToday, ct);
+        if (attendanceRecord is null)
+        {
+            attendanceRecord = new AttendanceRecord
+            {
+                EmployeeId = employee.Id,
+                Date = localToday,
+                CheckIn = firstCheckIn,
+                CheckOut = (punchType == PunchType.ClockOut) ? lastCheckOut : null,
+                BreakMinutes = breakMinutes,
+                WorkHours = workedHours,
+                Status = (firstCheckIn.HasValue && firstCheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes)) ? AttendanceStatus.Late : AttendanceStatus.Present,
+                Notes = lateEarlyNote
+            };
+            await _uow.Attendance.AddAsync(attendanceRecord, ct);
+        }
+        else
+        {
+            attendanceRecord.CheckIn = firstCheckIn ?? attendanceRecord.CheckIn;
+            attendanceRecord.CheckOut = (punchType == PunchType.ClockOut) ? lastCheckOut : null;
+            attendanceRecord.WorkHours = workedHours;
+            attendanceRecord.BreakMinutes = breakMinutes;
+            if (!string.IsNullOrWhiteSpace(lateEarlyNote))
+            {
+                attendanceRecord.Notes = string.IsNullOrWhiteSpace(attendanceRecord.Notes) ? lateEarlyNote : $"{attendanceRecord.Notes} | {lateEarlyNote}";
+            }
+            if (punchType == PunchType.ClockIn)
+            {
+                attendanceRecord.Status = (firstCheckIn.HasValue && firstCheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes)) ? AttendanceStatus.Late : AttendanceStatus.Present;
+            }
+            _uow.Attendance.Update(attendanceRecord);
+        }
+
+        await _uow.SaveChangesAsync(ct);
+
+        return new CentralizedPunchResultDto(
+            Success: true,
+            Message: punchType == PunchType.ClockIn ? $"Successfully Punched In: {employee.FullName}" : $"Successfully Punched Out: {employee.FullName}",
+            EmployeeId: employee.Id,
+            EmployeeName: employee.FullName,
+            EmployeeCode: employee.EmployeeCode,
+            PunchType: punchType.ToString(),
+            PunchTime: nowUtc,
+            Latitude: request.Latitude,
+            Longitude: request.Longitude,
+            DistanceMeters: Math.Round(distance, 1),
+            WithinGeofence: true,
+            MatchScore: matchScore,
+            FaceVerified: true,
+            Status: punchType == PunchType.ClockIn ? "ClockedIn" : "ClockedOut"
+        );
+    }
+
+    private static double CalculateHaversineDistance(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371000.0; // Earth radius in meters
+        var dLat = (lat2 - lat1) * Math.PI / 180.0;
+        var dLon = (lon2 - lon1) * Math.PI / 180.0;
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        var c = 2.0 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1.0 - a));
+        return R * c;
     }
 }

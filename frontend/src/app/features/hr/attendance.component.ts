@@ -159,7 +159,7 @@ interface MusterDay {
 
     <!-- TAB 1: DAILY PUNCH LOG WIDGET -->
     @if (tab() === 'daily') {
-      <div class="card daily-punch-widget" style="height: calc(100vh - 275px); display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0;">
+      <div class="card daily-punch-widget" style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0;">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; flex-shrink: 0;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="card-title">Daily Punch Records</div>
@@ -1061,6 +1061,15 @@ interface MusterDay {
     }
 
     <style>
+      /* ── Prevent whole-page scroll: attendance fills viewport, table scrolls internally ── */
+      :host {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+
       /* ── Employee Live Tracking Summary Card in Quick Punch Modal ── */
       .emp-tracking-card {
         background: #f8fafc;

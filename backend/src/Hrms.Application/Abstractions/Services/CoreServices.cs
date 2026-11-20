@@ -114,6 +114,7 @@ public interface IAttendanceService
     Task<bool> EnrollFaceAsync(Guid employeeId, EnrollFaceRequest request, CancellationToken ct = default);
 
     Task<bool> RemoveFaceAsync(Guid employeeId, CancellationToken ct = default);
+    Task<CentralizedPunchResultDto> ProcessCentralizedPunchAsync(CentralizedPunchRequest request, CancellationToken ct = default);
     Task<DailyAttendanceCloseoutResult> CloseoutDailyAttendanceAsync(DateOnly? targetDate = null, CancellationToken ct = default);
 }
 

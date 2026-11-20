@@ -35,6 +35,7 @@ const MASTER_NAV_CATALOGUE: MasterNavItem[] = [
   // HR Modules
   { label: 'Company', section: 'HR Modules', icon: 'company', path: '/company', empPath: '/company' },
   { label: 'Employees', section: 'HR Modules', icon: 'employees', path: '/employees', empPath: '/employees' },
+  { label: 'Punch In/Out', section: 'HR Modules', icon: 'camera', path: '/punch-in-out' },
   { label: 'Profile', section: 'HR Modules', icon: 'user', path: '/employee-profile', empPath: '/me/profile' },
   { label: 'Shift', section: 'HR Modules', icon: 'clock', path: '/shift', empPath: '/shift' },
   { label: 'Attendance', section: 'HR Modules', icon: 'attendance', path: '/attendance', empPath: '/me/attendance' },
@@ -302,6 +303,26 @@ export class ShellComponent implements OnInit, OnDestroy {
                 if (!isExcludedFromSidebar(child.route, child.title)) {
                   items.push(parseBackendItem(child, true));
                 }
+              }
+            }
+          }
+          if (sec === 'HR Modules' && !isEmp && (this.role() === 'HR Manager' || isCompanyAdmin)) {
+            const punchIdx = items.findIndex((i) => i.path === '/punch-in-out' || i.label === 'Punch In/Out');
+            const punchItem = { icon: 'camera' as IconName, label: 'Punch In/Out', path: '/punch-in-out' };
+            if (punchIdx >= 0) {
+              const [item] = items.splice(punchIdx, 1);
+              const empIdx = items.findIndex((i) => i.path === '/employees' || i.label === 'Employees');
+              if (empIdx >= 0) {
+                items.splice(empIdx + 1, 0, item);
+              } else {
+                items.splice(punchIdx, 0, item);
+              }
+            } else {
+              const empIdx = items.findIndex((i) => i.path === '/employees' || i.label === 'Employees');
+              if (empIdx >= 0) {
+                items.splice(empIdx + 1, 0, punchItem);
+              } else {
+                items.push(punchItem);
               }
             }
           }
@@ -588,9 +609,8 @@ export class ShellComponent implements OnInit, OnDestroy {
     if (switcher && !switcher.contains(target)) {
       this.tenantOpen.set(false);
     }
-    const panels: { key: 'notif' | 'punch' | 'avatar'; panel: string; button: string }[] = [
+    const panels: { key: 'notif' | 'avatar'; panel: string; button: string }[] = [
       { key: 'notif', panel: 'notifPanel', button: 'notifBtn' },
-      { key: 'punch', panel: 'punchPanel', button: 'punchBtn' },
       { key: 'avatar', panel: 'avatarMenu', button: 'avatarBtn' },
     ];
     for (const p of panels) {

@@ -454,7 +454,6 @@
   <div class="dash-right-col">
     <!-- 1. Time Tracker & Attendance Punch Card -->
     <div class="dash-widget punch-widget">
-      Punch Header
       <div class="punch-header">
         <div class="punch-date">{{ currentTime() | date:'EEEE, MMM d, y' }}</div>
         <div class="punch-live-clock">{{ currentTime() | date:'hh:mm:ss a' }}</div>
@@ -481,37 +480,6 @@
           <div class="timer-label">Break Time</div>
           <div class="timer-value break">{{ punchService.breakTime() }}</div>
         </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="punch-buttons">
-        @if (!perms.canCreate('Attendance')) {
-        <div class="punch-readonly-note">
-          Read-only attendance permission
-        </div>
-        } @else if (punchService.state() === 'idle') {
-        <button class="btn-punch btn-clockin" (click)="clockIn()">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
-          Clock In
-        </button>
-        } @else {
-        <div class="punch-active-row">
-          <button class="btn-punch btn-break" [class.active]="punchService.onBreak()" (click)="toggleBreak()">
-            {{ punchService.onBreak() ? 'End Break' : 'Break' }}
-          </button>
-          <button class="btn-punch btn-clockout" (click)="clockOut()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="15" y1="9" x2="9" y2="15" />
-              <line x1="9" y1="9" x2="15" y2="15" />
-            </svg>
-            Clock Out
-          </button>
-        </div>
-        }
       </div>
 
       <!-- Attendance Activity Timeline -->
