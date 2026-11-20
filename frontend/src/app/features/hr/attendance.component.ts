@@ -984,20 +984,12 @@ interface MusterDay {
 
             <div class="form-group">
               <label class="form-label">Punch Type <span style="color: var(--danger)">*</span></label>
-              <div style="display: flex; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
-                <label [style.opacity]="isPunchTypeAllowed('ClockIn') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockIn') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+              <div style="display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap;">
+                <label [style.opacity]="isPunchTypeAllowed('ClockIn') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockIn') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px;">
                   <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockIn" name="punchType" [disabled]="!isPunchTypeAllowed('ClockIn')" />
                   Clock In
                 </label>
-                <label [style.opacity]="isPunchTypeAllowed('BreakIn') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('BreakIn') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakIn" name="punchType" [disabled]="!isPunchTypeAllowed('BreakIn')" />
-                  Break In
-                </label>
-                <label [style.opacity]="isPunchTypeAllowed('BreakOut') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('BreakOut') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakOut" name="punchType" [disabled]="!isPunchTypeAllowed('BreakOut')" />
-                  Break Out
-                </label>
-                <label [style.opacity]="isPunchTypeAllowed('ClockOut') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockOut') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                <label [style.opacity]="isPunchTypeAllowed('ClockOut') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockOut') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px;">
                   <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockOut" name="punchType" [disabled]="!isPunchTypeAllowed('ClockOut')" />
                   Clock Out
                 </label>
@@ -2087,15 +2079,11 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     badgeText: string;
     badgeColor: string;
     canClockIn: boolean;
-    canBreakIn: boolean;
-    canBreakOut: boolean;
     canClockOut: boolean;
   }>({
     badgeText: 'Not Clocked In',
     badgeColor: '#64748b',
     canClockIn: true,
-    canBreakIn: false,
-    canBreakOut: false,
     canClockOut: false,
   });
 
@@ -2986,12 +2974,29 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
       let currentWorkStart: number | null = null;
       let currentBreakStart: number | null = null;
+      let lastClockOutH: number | null = null;
       let accumulatedWorkHours = 0;
 
       for (const p of sorted) {
         const pH = Math.min(23.95, parseToDecimalHour(p.punchTime));
 
         if (p.punchType === 'ClockIn') {
+          // If there was a previous ClockOut, the interval between ClockOut and this ClockIn is a Break/Out interval!
+          if (lastClockOutH !== null && pH > lastClockOutH) {
+            const bDur = pH - lastClockOutH;
+            if (bDur > 0.01) {
+              segments.push({
+                type: 'break',
+                label: 'Break',
+                timeRange: `${this.formatHourDecimal(lastClockOutH)} - ${this.formatHourDecimal(pH)}`,
+                durationLabel: `${Math.round(bDur * 60)}m break`,
+                leftPercent: calcLeft(lastClockOutH),
+                widthPercent: calcWidth(lastClockOutH, pH),
+                tooltip: `Break: ${this.formatHourDecimal(lastClockOutH)} - ${this.formatHourDecimal(pH)} [${Math.round(bDur * 60)}m Break]`,
+              });
+            }
+            lastClockOutH = null;
+          }
           currentWorkStart = pH;
           currentBreakStart = null;
         } else if (p.punchType === 'BreakIn') {
@@ -3020,7 +3025,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
               durationLabel: `${Math.round(dur * 60)}m break`,
               leftPercent: calcLeft(currentBreakStart),
               widthPercent: calcWidth(currentBreakStart, pH),
-              tooltip: `Break interval: ${Math.round(dur * 60)} minutes`,
+              tooltip: `Break: ${this.formatHourDecimal(currentBreakStart)} - ${this.formatHourDecimal(pH)} [${Math.round(dur * 60)}m Break]`,
             });
             currentBreakStart = null;
           }
@@ -3035,7 +3040,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
               durationLabel: `${Math.round(bDur * 60)}m break`,
               leftPercent: calcLeft(currentBreakStart),
               widthPercent: calcWidth(currentBreakStart, pH),
-              tooltip: `Break interval: ${Math.round(bDur * 60)} minutes`,
+              tooltip: `Break: ${this.formatHourDecimal(currentBreakStart)} - ${this.formatHourDecimal(pH)} [${Math.round(bDur * 60)}m Break]`,
             });
             currentBreakStart = null;
           }
@@ -3052,7 +3057,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
                 durationLabel: `${regularDur.toFixed(1)}h`,
                 leftPercent: calcLeft(currentWorkStart),
                 widthPercent: calcWidth(currentWorkStart, regularEnd),
-                tooltip: `Working time: ${regularDur.toFixed(1)}h`,
+                tooltip: `Working time: ${this.formatHourDecimal(currentWorkStart)} - ${this.formatHourDecimal(regularEnd)} (${regularDur.toFixed(1)}h)`,
               });
             }
             if (pH > 18.0 || accumulatedWorkHours > 8.0) {
@@ -3066,12 +3071,13 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
                   durationLabel: `${otDur.toFixed(1)}h OT`,
                   leftPercent: calcLeft(otStart),
                   widthPercent: calcWidth(otStart, pH),
-                  tooltip: `Overtime: ${otDur.toFixed(1)}h extra work`,
+                  tooltip: `Overtime: ${this.formatHourDecimal(otStart)} - ${this.formatHourDecimal(pH)} (${otDur.toFixed(1)}h extra work)`,
                 });
               }
             }
             currentWorkStart = null;
           }
+          lastClockOutH = pH;
         }
       }
 
@@ -3115,14 +3121,14 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       if (segments.length > 0) {
-        // Merge contiguous or near-adjacent work segments so multiple test clicks don't shatter the bar
+        // Merge only truly adjacent identical segments (within 0.1% ~ 1 min) so deliberate breaks/intervals are preserved!
         const merged: TimelineSegment[] = [];
         for (const seg of segments) {
           if (merged.length > 0) {
             const prev = merged[merged.length - 1];
             if (prev.type === seg.type && seg.type === 'work') {
               const prevEndPercent = prev.leftPercent + prev.widthPercent;
-              if (seg.leftPercent <= prevEndPercent + 2.5) {
+              if (seg.leftPercent <= prevEndPercent + 0.1) {
                 const combinedEnd = Math.min(100, Math.max(prevEndPercent, seg.leftPercent + seg.widthPercent));
                 prev.widthPercent = Math.max(prev.widthPercent, combinedEnd - prev.leftPercent);
                 const prevStartStr = prev.timeRange.split(' - ')[0];
@@ -3402,8 +3408,6 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected isPunchTypeAllowed(type: string): boolean {
     const s = this.currentEmpPunchState();
     if (type === 'ClockIn') return s.canClockIn;
-    if (type === 'BreakIn') return s.canBreakIn;
-    if (type === 'BreakOut') return s.canBreakOut;
     if (type === 'ClockOut') return s.canClockOut;
     return true;
   }
@@ -3420,31 +3424,17 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
             badgeText: 'Not Clocked In',
             badgeColor: '#64748b',
             canClockIn: true,
-            canBreakIn: false,
-            canBreakOut: false,
             canClockOut: false,
           });
           this.punchForm.punchType = 'ClockIn';
-        } else if (status.isOnBreak) {
-          this.currentEmpPunchState.set({
-            badgeText: 'On Break',
-            badgeColor: '#f59e0b',
-            canClockIn: false,
-            canBreakIn: false,
-            canBreakOut: true,
-            canClockOut: true,
-          });
-          this.punchForm.punchType = 'BreakOut';
         } else {
           this.currentEmpPunchState.set({
-            badgeText: 'Working / Clocked In',
-            badgeColor: '#10b981',
+            badgeText: status.isOnBreak ? 'On Break' : 'Clocked In / Working',
+            badgeColor: status.isOnBreak ? '#f59e0b' : '#10b981',
             canClockIn: false,
-            canBreakIn: true,
-            canBreakOut: false,
             canClockOut: true,
           });
-          this.punchForm.punchType = 'BreakIn';
+          this.punchForm.punchType = 'ClockOut';
         }
       },
       error: () => {
@@ -3454,18 +3444,14 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
             badgeText: 'Clocked In',
             badgeColor: '#10b981',
             canClockIn: false,
-            canBreakIn: true,
-            canBreakOut: false,
             canClockOut: true,
           });
-          this.punchForm.punchType = 'BreakIn';
+          this.punchForm.punchType = 'ClockOut';
         } else {
           this.currentEmpPunchState.set({
             badgeText: 'Not Clocked In',
             badgeColor: '#64748b',
             canClockIn: true,
-            canBreakIn: false,
-            canBreakOut: false,
             canClockOut: false,
           });
           this.punchForm.punchType = 'ClockIn';
@@ -3495,9 +3481,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           this.punchForm.note = '';
           this.toast.show(`Recorded ${p.punchType} for ${p.employeeName}!`, 'success');
           this.loadDailyAttendance();
-          if (this.tab() === 'muster') {
-            this.generateMuster();
-          }
+          this.generateMuster();
         },
         error: (err) => {
           this.recordingPunch.set(false);
