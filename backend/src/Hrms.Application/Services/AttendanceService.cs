@@ -693,42 +693,48 @@ public sealed class AttendanceService : IAttendanceService
 
         var lastPunch = todayPunches.LastOrDefault();
 
-        // Validate state transitions cleanly
-        if (lastPunch == null || lastPunch.PunchType == PunchType.ClockOut)
+        bool isHrConsole = string.Equals(request.Device, "HR Console", StringComparison.OrdinalIgnoreCase)
+                           || (request.Note != null && request.Note.Contains("HR Console", StringComparison.OrdinalIgnoreCase));
+
+        // Validate state transitions cleanly (skip strict lockout when HR is manually managing punches)
+        if (!isHrConsole)
         {
-            if (punchType == PunchType.BreakIn)
+            if (lastPunch == null || lastPunch.PunchType == PunchType.ClockOut)
             {
-                throw new ValidationException("Cannot start a break without checking in first.");
+                if (punchType == PunchType.BreakIn)
+                {
+                    throw new ValidationException("Cannot start a break without checking in first.");
+                }
+                if (punchType == PunchType.BreakOut)
+                {
+                    throw new ValidationException("Cannot end a break without checking in first.");
+                }
+                if (punchType == PunchType.ClockOut)
+                {
+                    throw new ValidationException("Cannot check out without an active check-in.");
+                }
             }
-            if (punchType == PunchType.BreakOut)
+            else if (lastPunch.PunchType == PunchType.ClockIn || lastPunch.PunchType == PunchType.BreakOut)
             {
-                throw new ValidationException("Cannot end a break without checking in first.");
+                if (punchType == PunchType.ClockIn)
+                {
+                    throw new ConflictException("You are already checked in. Please check out or start a break.");
+                }
+                if (punchType == PunchType.BreakOut)
+                {
+                    throw new ValidationException("You are not currently on a break. You can start a break with Break In.");
+                }
             }
-            if (punchType == PunchType.ClockOut)
+            else if (lastPunch.PunchType == PunchType.BreakIn)
             {
-                throw new ValidationException("Cannot check out without an active check-in.");
-            }
-        }
-        else if (lastPunch.PunchType == PunchType.ClockIn || lastPunch.PunchType == PunchType.BreakOut)
-        {
-            if (punchType == PunchType.ClockIn)
-            {
-                throw new ConflictException("You are already checked in. Please check out or start a break.");
-            }
-            if (punchType == PunchType.BreakOut)
-            {
-                throw new ValidationException("You are not currently on a break. You can start a break with Break In.");
-            }
-        }
-        else if (lastPunch.PunchType == PunchType.BreakIn)
-        {
-            if (punchType == PunchType.ClockIn)
-            {
-                throw new ConflictException("You are currently on break. Please end break (Break Out) before checking in.");
-            }
-            if (punchType == PunchType.BreakIn)
-            {
-                throw new ConflictException("You are already on a break. Record Break Out when your break ends.");
+                if (punchType == PunchType.ClockIn)
+                {
+                    throw new ConflictException("You are currently on break. Please end break (Break Out) before checking in.");
+                }
+                if (punchType == PunchType.BreakIn)
+                {
+                    throw new ConflictException("You are already on a break. Record Break Out when your break ends.");
+                }
             }
         }
 
