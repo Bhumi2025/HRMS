@@ -16,6 +16,10 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Ensure listening on all interfaces (0.0.0.0) so LAN devices can access directly
+var configuredUrls = builder.Configuration["Urls"] ?? "http://0.0.0.0:5096";
+builder.WebHost.UseUrls(configuredUrls);
+
 // ── Controllers / JSON ──
 builder.Services.AddControllers(options =>
     {
@@ -123,16 +127,28 @@ builder.Services.AddAuthorization(options =>
 // ── Response Compression ──
 builder.Services.AddResponseCompression();
 
-// ── CORS (Angular dev server) ──
+// ── CORS (Angular dev server & local network) ──
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                      ?? new[] { "http://localhost:4200" };
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("Angular", policy => policy
-        .WithOrigins(allowedOrigins)
-        .AllowAnyHeader()
-        .AllowAnyMethod());
+    options.AddPolicy("Angular", policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+    });
 });
 
 // ── Background Workers ──
