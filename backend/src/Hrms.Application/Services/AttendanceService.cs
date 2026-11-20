@@ -641,8 +641,32 @@ public sealed class AttendanceService : IAttendanceService
 
     private async Task<Guid> ResolveSelfOrExplicitEmployeeIdAsync(Guid? explicitId, CancellationToken ct)
     {
-        if (explicitId is { } id && id != Guid.Empty) return id;
+        bool isHrOrAdmin = _currentUser.IsInRole("HrManager") || _currentUser.IsInRole("Admin") || _currentUser.IsInRole("SuperAdmin");
+        if (isHrOrAdmin && explicitId is { } id && id != Guid.Empty) return id;
+
         if (_currentUser.EmployeeId is { } own && own != Guid.Empty) return own;
+
+        if (_currentUser.UserId is { } uid && uid != Guid.Empty)
+        {
+            var user = await _uow.Users.GetByIdAsync(uid, ct);
+            if (user?.EmployeeId is { } uEmpId && uEmpId != Guid.Empty)
+            {
+                return uEmpId;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(_currentUser.Email))
+        {
+            var empByEmail = await _uow.Employees.FirstOrDefaultAsync(
+                _uow.Employees.Query().Where(e => e.Email.ToLower() == _currentUser.Email.ToLower()),
+                ct);
+            if (empByEmail != null)
+            {
+                return empByEmail.Id;
+            }
+        }
+
+        if (explicitId is { } anyId && anyId != Guid.Empty) return anyId;
 
         throw new ValidationException("User is not linked to an employee record.");
     }

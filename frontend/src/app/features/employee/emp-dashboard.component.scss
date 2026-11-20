@@ -601,36 +601,55 @@
 }
 
 .punch-buttons {
-  margin-bottom: 5px;
+  margin: 8px 0 10px;
   flex-shrink: 0;
+
+  .punch-btn-group {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+  }
 
   .btn-punch {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 6px;
     width: 100%;
-    padding: 4px 7px;
-    border-radius: 5px;
-    font-size: 10.5px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    font-size: 11.5px;
     font-weight: 700;
     cursor: pointer;
     border: none;
     transition: all 0.15s ease;
 
     &.btn-clockin {
+      flex: 2;
       background: #10b981;
       color: #fff;
-      &:hover { background: #059669; }
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+      &:hover { background: #059669; transform: translateY(-1px); }
     }
 
     &.btn-clockout {
+      flex: 2;
       background: #ef4444;
       color: #fff;
-      &:hover { background: #dc2626; }
+      box-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
+      &:hover { background: #dc2626; transform: translateY(-1px); }
+    }
+
+    &.btn-face {
+      flex: 1;
+      background: #3b82f6;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+      &:hover { background: #2563eb; transform: translateY(-1px); }
     }
 
     &.btn-break {
+      flex: 1;
       background: #f3f4f6;
       color: #374151;
       border: 1px solid #d1d5db;
@@ -644,9 +663,9 @@
   }
 
   .punch-active-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
+    display: flex;
+    gap: 6px;
+    width: 100%;
   }
 }
 

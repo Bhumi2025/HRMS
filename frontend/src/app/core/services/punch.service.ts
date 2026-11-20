@@ -1,6 +1,7 @@
 import { Injectable, NgZone, computed, inject, signal } from '@angular/core';
 import { ApiService } from '../api/api.service';
 import { EmployeePunch } from '../api/api.models';
+import { ToastService } from './toast.service';
 
 export function safeParseDate(val: any): Date {
   if (!val) return new Date();
@@ -57,6 +58,7 @@ export interface PunchTimelineItem {
 export class PunchService {
   private readonly api = inject(ApiService);
   private readonly zone = inject(NgZone);
+  private readonly toast = inject(ToastService);
 
   private readonly _state = signal<PunchState>('idle');
   private readonly _onBreak = signal(false);
@@ -477,8 +479,11 @@ export class PunchService {
       next: (p) => {
         this.todayPunches.update((list) => [p, ...list.filter(x => x.id !== p.id)]);
         this.loadTodayPunches();
+        this.toast.show('Successfully Punched In! Shift timer started.', 'success');
       },
-      error: () => {
+      error: (err) => {
+        const msg = err?.error?.message || err?.message || 'Failed to record punch in.';
+        this.toast.show(msg, 'danger');
         this.loadTodayPunches();
       }
     });
@@ -494,8 +499,11 @@ export class PunchService {
       next: (p) => {
         this.todayPunches.update((list) => [p, ...list.filter(x => x.id !== p.id)]);
         this.loadTodayPunches();
+        this.toast.show('Successfully Punched Out! Shift ended.', 'success');
       },
-      error: () => {
+      error: (err) => {
+        const msg = err?.error?.message || err?.message || 'Failed to record punch out.';
+        this.toast.show(msg, 'danger');
         this.loadTodayPunches();
       }
     });
@@ -511,8 +519,11 @@ export class PunchService {
       next: (p) => {
         this.todayPunches.update((list) => [p, ...list.filter(x => x.id !== p.id)]);
         this.loadTodayPunches();
+        this.toast.show('Break Started. Shift timer paused.', 'warning');
       },
-      error: () => {
+      error: (err) => {
+        const msg = err?.error?.message || err?.message || 'Failed to start break.';
+        this.toast.show(msg, 'danger');
         this.loadTodayPunches();
       }
     });
@@ -528,8 +539,11 @@ export class PunchService {
       next: (p) => {
         this.todayPunches.update((list) => [p, ...list.filter(x => x.id !== p.id)]);
         this.loadTodayPunches();
+        this.toast.show('Break Ended. Shift resumed!', 'success');
       },
-      error: () => {
+      error: (err) => {
+        const msg = err?.error?.message || err?.message || 'Failed to end break.';
+        this.toast.show(msg, 'danger');
         this.loadTodayPunches();
       }
     });

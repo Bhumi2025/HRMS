@@ -243,6 +243,49 @@
           </div>
         </div>
 
+        <!-- Action Buttons -->
+        <div class="punch-buttons">
+          @if (punchService.state() !== 'active') {
+            <div class="punch-btn-group">
+              <button class="btn-punch btn-clockin" (click)="clockIn()" title="Record Clock In">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                Punch In (Clock In)
+              </button>
+              <button class="btn-punch btn-face" (click)="faceClockIn()" title="Biometric Face Clock In">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                Face ID
+              </button>
+            </div>
+          } @else {
+            <div class="punch-active-row">
+              <button class="btn-punch btn-break" [class.active]="punchService.onBreak()" (click)="toggleBreak()">
+                {{ punchService.onBreak() ? 'End Break' : 'Break' }}
+              </button>
+              <button class="btn-punch btn-clockout" (click)="clockOut()" title="Record Clock Out">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+                Punch Out (Clock Out)
+              </button>
+              <button class="btn-punch btn-face" (click)="faceClockOut()" title="Biometric Face Clock Out">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                Face ID
+              </button>
+            </div>
+          }
+        </div>
+
         <!-- Attendance Activity Timeline -->
         <div class="punch-history">
           <div class="history-title">

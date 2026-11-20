@@ -423,9 +423,29 @@ public sealed class EmployeeService : IEmployeeService
             return id;
         }
 
-        if (_currentUser.EmployeeId is { } own)
+        if (_currentUser.EmployeeId is { } own && own != Guid.Empty)
         {
             return own;
+        }
+
+        if (_currentUser.UserId is { } uid && uid != Guid.Empty)
+        {
+            var user = await _uow.Users.GetByIdAsync(uid, ct);
+            if (user?.EmployeeId is { } uEmpId && uEmpId != Guid.Empty)
+            {
+                return uEmpId;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(_currentUser.Email))
+        {
+            var empByEmail = await _uow.Employees.FirstOrDefaultAsync(
+                _uow.Employees.Query().Where(e => e.Email.ToLower() == _currentUser.Email.ToLower()),
+                ct);
+            if (empByEmail != null)
+            {
+                return empByEmail.Id;
+            }
         }
 
         var first = await _uow.Employees.FirstOrDefaultAsync(
