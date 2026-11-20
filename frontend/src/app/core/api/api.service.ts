@@ -132,6 +132,10 @@ export class ApiService {
     return this.http.put<ApiUser>(this.url('/auth/profile'), { fullName });
   }
 
+  updateMyPhoto(photoUrl: string): Observable<void> {
+    return this.http.put<void>(this.url('/employees/me/photo'), { photoUrl });
+  }
+
   changePassword(currentPassword: string, newPassword: string): Observable<void> {
     return this.http.post<void>(this.url('/auth/change-password'), { currentPassword, newPassword });
   }
