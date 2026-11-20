@@ -22,14 +22,6 @@ import { ToastService } from '../../core/services/toast.service';
             <p class="panel-desc">Manage tenant lifecycle, provisioning status, and administrator invitations</p>
           </div>
           <div class="panel-controls">
-            <!-- Header Tenant Switcher Filter Indicator -->
-            @if (selectedTenantCode()) {
-              <div class="active-tenant-chip">
-                <span>Tenant: <strong>{{ selectedTenantName() }}</strong></span>
-                <button type="button" class="chip-clear-btn" (click)="clearTenantFilter()" title="Show All Organizations">✕ Show All</button>
-              </div>
-            }
-
             <!-- Filter pills -->
             <div class="filter-pills">
               <button
@@ -1372,16 +1364,7 @@ export class SuperAdminDashboardComponent implements OnInit, OnDestroy, AfterVie
   protected readonly filteredCompanies = computed(() => {
     let list = this.companies();
 
-    // 1. Filter by header tenant switcher if a specific tenant is active
-    const tCode = this.selectedTenantCode();
-    if (tCode) {
-      const match = list.filter((c) => (c.code || '').toUpperCase() === tCode);
-      if (match.length > 0) {
-        list = match;
-      }
-    }
-
-    // 2. Filter by status pill
+    // 1. Filter by status pill
     const filter = this.statusFilter();
     if (filter === 'Active') {
       list = list.filter((c) => (c.status || '').toLowerCase() === 'active');
@@ -1403,6 +1386,10 @@ export class SuperAdminDashboardComponent implements OnInit, OnDestroy, AfterVie
   });
 
   ngOnInit(): void {
+    sessionStorage.removeItem('current_tenant');
+    if (this.session.user()?.companyCode) {
+      this.session.updateUser({ companyCode: undefined, companyName: undefined, companyId: undefined });
+    }
     this.searchQuery.set('');
     this.refreshAll();
 
