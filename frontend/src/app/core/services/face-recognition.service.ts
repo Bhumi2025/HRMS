@@ -125,19 +125,24 @@ export class FaceRecognitionService {
   }
 
   /**
+   * Identifies whether a 128D descriptor is a synthetic dummy array
+   * (e.g. from older placeholder Math.random() generation) instead of a real neural vector.
+   */
+  isDummyDescriptor(descriptor: unknown): boolean {
+    if (!Array.isArray(descriptor) || descriptor.length !== 128) return true;
+    const allPositive = descriptor.every((v) => typeof v === 'number' && v > 0);
+    const inDummyRange = descriptor.every((v) => typeof v === 'number' && v >= 0.08 && v <= 0.35);
+    return allPositive && inDummyRange;
+  }
+
+  /**
    * Compares two 128-dimensional face descriptors using true Euclidean distance.
-   * Standard threshold for face-api.js is distance < 0.55.
-   * Converted to 0-100% accuracy:
-   *   distance = 0.20 -> 90%
-   *   distance = 0.35 -> 82%
-   *   distance = 0.40 -> 80% (threshold)
-   *   distance = 0.60 -> 50%
-   *   distance = 0.80+ -> 0%
+   * Standard threshold for face-api.js ResNet-34 is distance <= 0.58 for same person.
    */
   compareFaces(
     liveDescriptor: number[] | Float32Array,
     enrolledDescriptor: number[] | Float32Array,
-    requiredThreshold = 80
+    requiredThreshold = 70
   ): FaceMatchEvaluation {
     const arr1 = liveDescriptor instanceof Float32Array ? liveDescriptor : new Float32Array(liveDescriptor);
     const arr2 = enrolledDescriptor instanceof Float32Array ? enrolledDescriptor : new Float32Array(enrolledDescriptor);
@@ -145,18 +150,17 @@ export class FaceRecognitionService {
     const distance = faceapi.euclideanDistance(arr1, arr2);
 
     // In ResNet-34 face embeddings (L2-normalized 128D space):
-    // - Distance 0.00: Identical image (100%)
-    // - Distance 0.15 - 0.35: Same person under natural camera variations (85% - 94%)
-    // - Distance 0.45: Standard biometric threshold boundary for same person (80%)
-    // - Distance 0.55+: Mismatch / different person (drops steeply < 60%)
-    // - Distance 0.70+: Stranger / completely different face (< 25%)
+    // - Distance 0.00 - 0.35: Excellent/identical match (92% - 100%)
+    // - Distance 0.35 - 0.58: Same person under natural camera/lighting variations (70% - 92%)
+    // - Distance 0.58 - 0.65: Borderline / weak match (50% - 70%)
+    // - Distance > 0.65: Different person / impostor (< 50%)
     let normalizedScore: number;
-    if (distance <= 0.45) {
-      // Maps [0.00, 0.45] -> [100%, 80%]
-      normalizedScore = Math.round(100 - (distance / 0.45) * 20);
+    if (distance <= 0.35) {
+      normalizedScore = Math.round(100 - (distance / 0.35) * 8);
+    } else if (distance <= 0.58) {
+      normalizedScore = Math.round(92 - ((distance - 0.35) / 0.23) * 22);
     } else {
-      // Maps (0.45, 0.80] -> (80%, 0%]
-      normalizedScore = Math.max(0, Math.round(80 - ((distance - 0.45) / 0.35) * 80));
+      normalizedScore = Math.max(0, Math.round(70 - ((distance - 0.58) / 0.27) * 70));
     }
 
     const matched = normalizedScore >= requiredThreshold;
