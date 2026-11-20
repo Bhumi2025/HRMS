@@ -310,17 +310,20 @@
 .main-content {
   margin-left: var(--sidebar-w);
   flex: 1;
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  overflow-x: clip;
+  overflow: hidden;
 }
 .page-content {
   flex: 1;
   padding: 16px;
   min-width: 0;
-  overflow-x: clip;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .page-title {
   display: none !important;
