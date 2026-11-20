@@ -2,16 +2,10 @@
   <div class="sidebar-overlay" [class.open]="sidebarOpen()" (click)="closeSidebar()"></div>
 
   <aside class="sidebar" [class.open]="sidebarOpen()" id="sidebar">
-    <div class="sidebar-logo" style="display: flex; align-items: center; gap: 10px;">
-      <img [src]="companyLogo() || 'assets/images/shape-logo.png'" alt="HRMS Logo"
+    <div class="sidebar-logo" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+      <img src="assets/images/shape-logo.png" alt="HRMS Logo"
         style="max-width: 36px; max-height: 36px; object-fit: contain;" class="small-logo" />
-      @if (companyLogo()) {
-      <span class="big-logo"
-        style="font-weight: 700; font-size: 15px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;">{{
-        currentCompanyName() }}</span>
-      } @else {
-      <img src="assets/images/ghost-logo.png" alt="HRMS Logo" style="max-width: 100px" class="big-logo" />
-      }
+      <img src="assets/images/ghost-logo.png" alt="HRMS Logo" style="max-width: 100px;" class="big-logo" />
     </div>
 
     <nav class="sidebar-nav" id="sidebarNav">
