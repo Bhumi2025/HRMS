@@ -277,14 +277,16 @@
                     </text>
                     <text x="77.5" y="43" text-anchor="middle" fill="#38bdf8" font-size="8.5" font-weight="600">
                       @if (hov.isToday) {
-                        @if (punchService.todayPunchBreakdown().phase === 'before_break') {
+                        @if (punchService.todayPunchBreakdown().phase === 'before_break' || (hov.beforeBreak > 0 && hov.afterBreak === 0 && hov.breakHrs === 0)) {
                           Status: Active (Before Break)
-                        } @else if (punchService.todayPunchBreakdown().phase === 'on_break') {
+                        } @else if (punchService.todayPunchBreakdown().phase === 'on_break' || (hov.breakHrs > 0 && hov.afterBreak === 0)) {
                           Status: On Break ☕
-                        } @else if (punchService.todayPunchBreakdown().phase === 'after_break') {
+                        } @else if (punchService.todayPunchBreakdown().phase === 'after_break' || hov.afterBreak > 0) {
                           Status: Active (After Break)
                         } @else if (punchService.todayPunchBreakdown().phase === 'clocked_out') {
                           Status: Completed (Logged Out)
+                        } @else if (hov.present > 0) {
+                          Status: Active (On Duty)
                         } @else {
                           Status: Awaiting Clock-In
                         }
