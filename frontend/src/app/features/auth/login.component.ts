@@ -270,14 +270,8 @@ export class LoginComponent implements OnInit, OnDestroy {
 
     this.api.login(this.email.trim(), this.password?.trim(), this.companyCode).subscribe({
       next: (response) => {
-        // If user is Employee role (or email indicates employee) → check face verification
-        const role = response.user.role as Role;
-        if (role === 'Employee' || response.user.employeeId) {
-          this.checkFaceEnrollment(response);
-        } else {
-          // Non-employee roles skip face check
-          this.completeLogin(response);
-        }
+        // Complete login directly for all roles including Employee (face authentication is removed at login)
+        this.completeLogin(response);
       },
       error: (error) => {
         // Network or proxy error (API not running or 502) → keep the demo usable offline if allowed.
@@ -288,26 +282,6 @@ export class LoginComponent implements OnInit, OnDestroy {
           if (em.includes('admin')) role = 'Super Admin';
           else if (em.includes('hr')) role = 'HR Manager';
           else if (em.includes('employee') || em.includes('sarah') || em.includes('james')) role = 'Employee';
-
-          if (role === 'Employee') {
-            // Trigger face verification even in demo/offline mode so user can test on laptop!
-            const fakeResponse: LoginResponse = {
-              accessToken: 'offline-demo-token',
-              expiresAtUtc: new Date(Date.now() + 86400000).toISOString(),
-              user: {
-                id: 'demo-sarah-id',
-                fullName: 'Sarah Jenkins',
-                email: this.email,
-                initials: 'SJ',
-                role: 'Employee',
-                roleCode: 'EMP-001',
-                employeeId: 'demo-sarah-emp-id',
-                companyName: 'HR Nexus',
-              },
-            };
-            this.checkFaceEnrollment(fakeResponse);
-            return;
-          }
 
           this.navigateForRole(role, this.session.login(role));
           return;

@@ -59,6 +59,12 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Empl
     ALTER TABLE Employees ADD FaceEnrolledAtUtc DATETIME2 NULL;
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Employees' AND COLUMN_NAME = 'FacePhotoUrl')
     ALTER TABLE Employees ADD FacePhotoUrl NVARCHAR(MAX) NULL;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Employees' AND COLUMN_NAME = 'Salutation')
+    ALTER TABLE Employees ADD Salutation NVARCHAR(20) NULL;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Employees' AND COLUMN_NAME = 'EmergencyContactName')
+    ALTER TABLE Employees ADD EmergencyContactName NVARCHAR(200) NULL;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Employees' AND COLUMN_NAME = 'EmergencyContactPhone')
+    ALTER TABLE Employees ADD EmergencyContactPhone NVARCHAR(50) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'KeyGroups' AND COLUMN_NAME = 'IsGeneric')
     ALTER TABLE KeyGroups ADD IsGeneric BIT NOT NULL CONSTRAINT DF_KeyGroups_IsGeneric DEFAULT 0;
@@ -91,9 +97,17 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'CompanySettings' AND COLUMN_NAME = 'WorkingDaysPerWeek')
     ALTER TABLE CompanySettings ADD WorkingDaysPerWeek DECIMAL(3,1) NOT NULL CONSTRAINT DF_CompanySettings_WorkingDaysPerWeek DEFAULT 5.0;
 
--- 7. Ensure EmployeePunches.IsOpen
+-- 7. Ensure EmployeePunches columns
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'EmployeePunches' AND COLUMN_NAME = 'IsOpen')
     ALTER TABLE EmployeePunches ADD IsOpen BIT NOT NULL CONSTRAINT DF_EmployeePunches_IsOpen DEFAULT 0;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'EmployeePunches' AND COLUMN_NAME = 'Latitude')
+    ALTER TABLE EmployeePunches ADD Latitude FLOAT NULL;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'EmployeePunches' AND COLUMN_NAME = 'Longitude')
+    ALTER TABLE EmployeePunches ADD Longitude FLOAT NULL;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'EmployeePunches' AND COLUMN_NAME = 'DistanceMeters')
+    ALTER TABLE EmployeePunches ADD DistanceMeters FLOAT NULL;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'EmployeePunches' AND COLUMN_NAME = 'VerificationStatus')
+    ALTER TABLE EmployeePunches ADD VerificationStatus NVARCHAR(50) NULL;
 
 -- 8. Ensure Shifts.LateGraceMinutes
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Shifts' AND COLUMN_NAME = 'LateGraceMinutes')
@@ -198,7 +212,16 @@ END
             {
                 CompanyName = bootstrap.CompanyName,
                 PayrollCurrency = bootstrap.Currency,
+                LogoUrl = bootstrap.LogoUrl,
             });
+        }
+        else if (!string.IsNullOrWhiteSpace(bootstrap.LogoUrl))
+        {
+            var existingSettings = await db.CompanySettings.FirstOrDefaultAsync(ct);
+            if (existingSettings != null)
+            {
+                existingSettings.LogoUrl = bootstrap.LogoUrl;
+            }
         }
 
         // Seed standard navigation items matching sidebar

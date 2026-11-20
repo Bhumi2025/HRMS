@@ -2,16 +2,10 @@
   <div class="sidebar-overlay" [class.open]="sidebarOpen()" (click)="closeSidebar()"></div>
 
   <aside class="sidebar" [class.open]="sidebarOpen()" id="sidebar">
-    <div class="sidebar-logo" style="display: flex; align-items: center; gap: 10px;">
-      <img [src]="companyLogo() || 'assets/images/shape-logo.png'" alt="HRMS Logo"
+    <div class="sidebar-logo" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+      <img src="assets/images/shape-logo.png" alt="HRMS Logo"
         style="max-width: 36px; max-height: 36px; object-fit: contain;" class="small-logo" />
-      @if (companyLogo()) {
-      <span class="big-logo"
-        style="font-weight: 700; font-size: 15px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;">{{
-        currentCompanyName() }}</span>
-      } @else {
-      <img src="assets/images/ghost-logo.png" alt="HRMS Logo" style="max-width: 100px" class="big-logo" />
-      }
+      <img src="assets/images/ghost-logo.png" alt="HRMS Logo" style="max-width: 100px;" class="big-logo" />
     </div>
 
     <nav class="sidebar-nav" id="sidebarNav">
@@ -39,55 +33,17 @@
       <div class="header-left">
         <button class="sidebar-toggle" id="sidebarToggle" (click)="toggleSidebar()" [appIcon]="'menu'"></button>
 
-        <!-- Company Tenant Badge / Switcher -->
+        <!-- Company Tenant Badge (tenant roles only, not for Super Admin) -->
+        @if (role() !== 'Super Admin') {
         <div class="tenant-switcher-wrap" style="position: relative; margin-left: 8px;">
-          <button class="tenant-btn" type="button" (click)="toggleTenantMenu($event)"
-            [style.cursor]="role() === 'Super Admin' ? 'pointer' : 'default'"
+          <div class="tenant-btn"
             style="display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; color: var(--text); font-weight: 700; font-size: 13px;">
             <img [src]="companyLogo() || selectedTenant()?.logo || 'assets/images/shape-logo.png'" alt="Logo"
               style="width: 20px; height: 20px; object-fit: contain; border-radius: 4px;" />
             <span>{{ currentCompanyName() }}</span>
-            @if (role() === 'Super Admin') {
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-              [style.transform]="tenantOpen() ? 'rotate(180deg)' : ''" style="transition: transform .2s">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-            }
-          </button>
-
-          @if (tenantOpen() && role() === 'Super Admin') {
-          <div class="tenant-menu"
-            style="position: absolute; top: calc(100% + 6px); left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.15); min-width: 240px; padding: 6px; z-index: 1000;"
-            (click)="$event.stopPropagation()">
-            <div
-              style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); padding: 6px 10px;">
-              Select Company / Tenant</div>
-            @for (t of tenants(); track t.id) {
-            <div (click)="selectTenant(t)"
-              style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background .15s;"
-              [style.background]="t.id === selectedTenant()?.id ? 'var(--p-soft)' : 'transparent'"
-              [style.color]="t.id === selectedTenant()?.id ? 'var(--p)' : 'var(--text)'">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <img [src]="t.logo" alt="" style="width: 18px; height: 18px; object-fit: contain;" />
-                <div>
-                  <div style="font-weight: 600;">{{ t.name }}</div>
-                  <div style="font-size: 11px; color: var(--muted);">{{ t.location }}</div>
-                </div>
-              </div>
-              @if (t.id === selectedTenant()?.id) {
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--p)" stroke-width="3">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              }
-            </div>
-            }
-            @if (tenants().length === 0) {
-            <div style="padding: 10px; font-size: 12px; color: var(--muted); text-align: center;">No organizations found
-            </div>
-            }
           </div>
-          }
         </div>
+        }
 
         <!-- Header Greeting (Moved from Dashboard) -->
         <div class="header-greeting"
