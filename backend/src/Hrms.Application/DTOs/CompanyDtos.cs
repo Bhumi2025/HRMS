@@ -20,7 +20,8 @@ public sealed record CompanyListItemDto(
     string? ProvisioningError,
     string InvitationStatus,
     DateTime? InvitationSentAtUtc,
-    string? InvitationError);
+    string? InvitationError,
+    string? LogoUrl = null);
 
 public sealed record CompanyEmployeeSummaryDto(
     Guid Id,
@@ -56,7 +57,8 @@ public sealed record CompanyDetailDto(
     string? InvitationError,
     IReadOnlyList<ProvisioningLogDto> ProvisioningLogs,
     int EmployeeCount = 0,
-    IReadOnlyList<CompanyEmployeeSummaryDto>? Employees = null);
+    IReadOnlyList<CompanyEmployeeSummaryDto>? Employees = null,
+    string? LogoUrl = null);
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false)]
 public sealed class OptionalEmailAddressAttribute : ValidationAttribute
@@ -90,14 +92,16 @@ public sealed record CreateCompanyRequest(
     [Required, EmailAddress, MaxLength(160)] string AdminEmail,
     [MaxLength(160)] string? ContactName,
     [OptionalEmailAddress, MaxLength(160)] string? ContactEmail,
-    [MaxLength(64)] string? TimeZone);
+    [MaxLength(64)] string? TimeZone,
+    [MaxLength(500)] string? LogoUrl = null);
 
 public sealed record UpdateCompanyRequest(
     [MaxLength(200)] string? Name,
     [MaxLength(160)] string? AdminFullName,
     [MaxLength(160)] string? ContactName,
     [OptionalEmailAddress, MaxLength(160)] string? ContactEmail,
-    [MaxLength(64)] string? TimeZone);
+    [MaxLength(64)] string? TimeZone,
+    [MaxLength(500)] string? LogoUrl = null);
 
 /// <summary>Result of a create/retry provisioning attempt.</summary>
 public sealed record CompanyProvisioningResultDto(

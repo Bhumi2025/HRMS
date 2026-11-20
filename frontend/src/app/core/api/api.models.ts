@@ -993,6 +993,7 @@ export interface CreateCompanyRequest {
   contactName?: string | null;
   contactEmail?: string | null;
   timeZone?: string | null;
+  logoUrl?: string | null;
 }
 
 export interface UpdateCompanyRequest {
@@ -1001,6 +1002,7 @@ export interface UpdateCompanyRequest {
   contactName?: string | null;
   contactEmail?: string | null;
   timeZone?: string | null;
+  logoUrl?: string | null;
 }
 
 export interface CompanyProvisioningResult {

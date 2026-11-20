@@ -198,7 +198,16 @@ END
             {
                 CompanyName = bootstrap.CompanyName,
                 PayrollCurrency = bootstrap.Currency,
+                LogoUrl = bootstrap.LogoUrl,
             });
+        }
+        else if (!string.IsNullOrWhiteSpace(bootstrap.LogoUrl))
+        {
+            var existingSettings = await db.CompanySettings.FirstOrDefaultAsync(ct);
+            if (existingSettings != null)
+            {
+                existingSettings.LogoUrl = bootstrap.LogoUrl;
+            }
         }
 
         // Seed standard navigation items matching sidebar
