@@ -1370,7 +1370,9 @@ export class EmployeeProfileComponent implements OnInit {
     this.contact.set({
       phone: employee.phone ?? '',
       email: employee.email,
-      emergency: '',
+      emergency: employee.emergencyContactPhone
+        ? (employee.emergencyContactName ? `${employee.emergencyContactName} (${employee.emergencyContactPhone})` : employee.emergencyContactPhone)
+        : (employee.emergencyContactName ?? ''),
       address: employee.address ?? '',
       city: employee.city ?? '',
       country: employee.country ?? '',
@@ -1498,6 +1500,8 @@ export class EmployeeProfileComponent implements OnInit {
       address: contact.address || null,
       city: contact.city || null,
       country: contact.country || null,
+      emergencyContactName: contact.emergency?.includes('(') ? contact.emergency.split('(')[0].trim() : (contact.emergency?.trim() || null),
+      emergencyContactPhone: contact.emergency?.includes('(') ? contact.emergency.split('(')[1]?.replace(')', '').trim() : null,
     };
 
     this.api.updateEmployee(id, body).subscribe({
