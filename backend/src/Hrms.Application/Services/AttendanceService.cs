@@ -1146,6 +1146,11 @@ public sealed class AttendanceService : IAttendanceService
                 p.Device))
             .ToList();
 
+        var shiftName = employee?.Shift?.Name ?? "General Shift";
+        var shiftTiming = employee?.Shift != null
+            ? $"{DateTime.Today.Add(employee.Shift.StartTime.ToTimeSpan()):hh:mm tt} – {DateTime.Today.Add(employee.Shift.EndTime.ToTimeSpan()):hh:mm tt}"
+            : "09:00 AM – 06:00 PM";
+
         return new EmployeePunchStatusDto(
             IsCheckedIn: isCheckedIn,
             LastPunchTimeUtc: punchesQuery.LastOrDefault()?.PunchTime ?? openPunch?.PunchTime,
@@ -1160,7 +1165,9 @@ public sealed class AttendanceService : IAttendanceService
             ForgottenCheckOutDate: forgottenCheckOutDate,
             RegularizationMessage: regularizationMsg,
             IsOnBreak: isOnBreak,
-            BreakSecondsToday: breakSeconds);
+            BreakSecondsToday: breakSeconds,
+            ShiftName: shiftName,
+            ShiftTiming: shiftTiming);
     }
 
     public async Task<IReadOnlyList<EmployeePunchDto>> GetTodayPunchesAsync(Guid? employeeId, CancellationToken ct = default)

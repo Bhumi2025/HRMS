@@ -31,6 +31,7 @@ interface DynamicAttendanceRow {
   checkIn: string;
   checkOut: string;
   workHours: number;
+  breakMinutes?: number;
   status: string;
   device?: string;
   dayStatusBadge: 'FD' | 'HD' | 'WK' | 'AB' | 'LV' | 'HL' | 'OD' | '—';
@@ -958,14 +959,17 @@ interface MusterDay {
     <!-- Modal: Quick Live Punch -->
     @if (showPunchModal()) {
       <div class="modal-overlay open" (click)="showPunchModal.set(false)">
-        <div class="modal" style="max-width: 450px;" (click)="$event.stopPropagation()">
+        <div class="modal" style="max-width: 520px; width: 100%;" (click)="$event.stopPropagation()">
           <div class="modal-header">
-            <div style="font-size: 1.1rem; font-weight: 700;">Record Live Punch</div>
+            <div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: var(--text, #0f172a);">Record Live Punch</div>
+              <div style="font-size: 12px; color: var(--muted, #64748b); margin-top: 2px;">Track employee attendance status and manually log a punch</div>
+            </div>
             <button class="btn btn-ghost btn-sm" (click)="showPunchModal.set(false)"><span [appIcon]="'x'"></span></button>
           </div>
-          <div class="modal-body">
-            <div class="form-group">
-              <label class="form-label">Employee <span style="color: var(--danger)">*</span></label>
+          <div class="modal-body" style="padding: 18px 24px;">
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label class="form-label" style="font-size: 13px; font-weight: 600;">Employee <span style="color: var(--danger)">*</span></label>
               <select class="form-control" [(ngModel)]="punchForm.employeeId" (change)="updateDefaultPunchTypeForSelected()">
                 @for (e of employees(); track e.id) {
                   <option [value]="e.id">{{ e.fullName }} ({{ e.department }})</option>
@@ -973,17 +977,50 @@ interface MusterDay {
               </select>
             </div>
 
-            <!-- Current Employee Live Punch Status Badge -->
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
-              <span style="color: #64748b; font-weight: 500;">Current State:</span>
-              <span [style.color]="currentEmpPunchState().badgeColor" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-                <span [style.background]="currentEmpPunchState().badgeColor" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
-                {{ currentEmpPunchState().badgeText }}
-              </span>
+            <!-- Employee Live Tracking Summary Card -->
+            <div class="emp-tracking-card">
+              <!-- Top Row: Status badge & Shift Info -->
+              <div class="tracking-top-row">
+                <div class="tracking-status-chip" [style.color]="currentEmpTracking().badgeColor" [style.borderColor]="currentEmpTracking().badgeColor + '40'" [style.background]="currentEmpTracking().badgeColor + '12'">
+                  <span class="tracking-pulse-dot" [style.background]="currentEmpTracking().badgeColor"></span>
+                  {{ currentEmpTracking().badgeText }}
+                </div>
+                <div class="tracking-shift-pill" title="Shift Schedule">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>{{ currentEmpTracking().shiftName }} ({{ currentEmpTracking().shiftTiming }})</span>
+                </div>
+              </div>
+
+              <!-- 3-Column Metrics Grid -->
+              <div class="tracking-metrics-grid">
+                <div class="tracking-metric-item">
+                  <span class="t-label">First In</span>
+                  <span class="t-value">{{ currentEmpTracking().firstCheckIn }}</span>
+                </div>
+                <div class="tracking-metric-item">
+                  <span class="t-label">Total Worked</span>
+                  <span class="t-value highlight">{{ currentEmpTracking().workedHours }}</span>
+                </div>
+                <div class="tracking-metric-item">
+                  <span class="t-label">Break Time</span>
+                  <span class="t-value">{{ currentEmpTracking().breakTime }}</span>
+                </div>
+              </div>
+
+              <!-- Bottom Row: Last Punch & Punches Today -->
+              <div class="tracking-bottom-row">
+                <div class="t-last-punch">
+                  <span class="t-sublabel">Last Punch:</span>
+                  <span class="t-last-val">{{ currentEmpTracking().lastPunch }}</span>
+                </div>
+                <div class="t-punch-count">
+                  {{ currentEmpTracking().punchesCount }} {{ currentEmpTracking().punchesCount === 1 ? 'punch' : 'punches' }} today
+                </div>
+              </div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Punch Type <span style="color: var(--danger)">*</span></label>
+            <div class="form-group" style="margin-top: 16px; margin-bottom: 14px;">
+              <label class="form-label" style="font-size: 13px; font-weight: 600;">Punch Type <span style="color: var(--danger)">*</span></label>
               <div style="display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap;">
                 <label [style.opacity]="isPunchTypeAllowed('ClockIn') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockIn') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px;">
                   <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockIn" name="punchType" [disabled]="!isPunchTypeAllowed('ClockIn')" />
@@ -996,11 +1033,11 @@ interface MusterDay {
               </div>
             </div>
             <div class="form-group">
-              <label class="form-label">Note / Reason</label>
+              <label class="form-label" style="font-size: 13px; font-weight: 600;">Note / Reason</label>
               <input class="form-control" type="text" [(ngModel)]="punchForm.note" placeholder="Optional punch note..." />
             </div>
           </div>
-          <div class="modal-footer">
+          <div class="modal-footer" style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
             <button class="btn btn-outline" (click)="showPunchModal.set(false)" [disabled]="recordingPunch()">Cancel</button>
             <button class="btn btn-primary" (click)="submitQuickPunch()" [disabled]="recordingPunch()">
               @if (recordingPunch()) {
@@ -1015,6 +1052,115 @@ interface MusterDay {
     }
 
     <style>
+      /* ── Employee Live Tracking Summary Card in Quick Punch Modal ── */
+      .emp-tracking-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .tracking-top-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .tracking-status-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid currentColor;
+      }
+      .tracking-pulse-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .tracking-shift-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: #64748b;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-weight: 500;
+      }
+      .tracking-metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        background: #ffffff;
+        border: 1px solid #edf2f7;
+        border-radius: 10px;
+        padding: 10px 14px;
+      }
+      .tracking-metric-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .tracking-metric-item .t-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #64748b;
+        letter-spacing: 0.04em;
+      }
+      .tracking-metric-item .t-value {
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .tracking-metric-item .t-value.highlight {
+        color: #2563eb;
+      }
+      .tracking-bottom-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #64748b;
+        border-top: 1px dashed #e2e8f0;
+        padding-top: 8px;
+      }
+      .t-last-punch {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .t-sublabel {
+        font-weight: 500;
+      }
+      .t-last-val {
+        font-weight: 600;
+        color: #334155;
+      }
+      .t-punch-count {
+        background: #edf2f7;
+        color: #475569;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 10px;
+        white-space: nowrap;
+      }
+
       .pulse-indicator {
         width: 8px;
         height: 8px;
@@ -2075,17 +2221,34 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly showDayDetailModal = signal(false);
   protected readonly selectedDetailDay = signal<MusterDay | null>(null);
   protected readonly recordingPunch = signal(false);
-  protected readonly currentEmpPunchState = signal<{
+  protected readonly currentEmpTracking = signal<{
     badgeText: string;
     badgeColor: string;
+    shiftName: string;
+    shiftTiming: string;
+    firstCheckIn: string;
+    workedHours: string;
+    breakTime: string;
+    lastPunch: string;
+    punchesCount: number;
     canClockIn: boolean;
     canClockOut: boolean;
+    loading: boolean;
   }>({
     badgeText: 'Not Clocked In',
     badgeColor: '#64748b',
+    shiftName: 'General Shift',
+    shiftTiming: '09:00 AM – 06:00 PM',
+    firstCheckIn: '—',
+    workedHours: '00h 00m',
+    breakTime: '00m',
+    lastPunch: '—',
+    punchesCount: 0,
     canClockIn: true,
     canClockOut: false,
+    loading: false,
   });
+  protected readonly currentEmpPunchState = this.currentEmpTracking;
 
   private pollInterval: any = null;
 
@@ -3416,46 +3579,108 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const targetId = this.punchForm.employeeId;
     if (!targetId) return;
 
+    this.currentEmpTracking.update((prev) => ({ ...prev, loading: true }));
+
     this.api.punchStatus(targetId).subscribe({
       next: (status) => {
         if (!status) return;
+
+        // Worked time
+        const totalSec = status.workedSecondsToday || 0;
+        const wH = Math.floor(totalSec / 3600);
+        const wM = Math.floor((totalSec % 3600) / 60);
+        const workedStr = totalSec > 0
+          ? `${wH}h ${String(wM).padStart(2, '0')}m`
+          : (status.workedHoursToday > 0 ? `${status.workedHoursToday}h` : '00h 00m');
+
+        // Break time
+        const bSec = status.breakSecondsToday || 0;
+        const bM = Math.round(bSec / 60);
+        const breakStr = bM > 0 ? `${bM}m` : '00m';
+
+        // Last punch
+        const punches = status.todayPunches || [];
+        const last = punches.length > 0 ? punches[0] : null;
+        let lastPunchStr = '—';
+        if (last) {
+          const pTime = this.formatTime12(last.punchTime);
+          const pType = last.punchType === 'ClockIn' ? 'Clock In' : last.punchType === 'ClockOut' ? 'Clock Out' : last.punchType === 'BreakIn' ? 'Break In' : 'Break Out';
+          const pDevice = last.device ? ` · ${last.device}` : '';
+          lastPunchStr = `${pTime} (${pType}${pDevice})`;
+        }
+
+        const shiftN = status.shiftName || 'General Shift';
+        const shiftT = status.shiftTiming || '09:00 AM – 06:00 PM';
+        const firstIn = status.firstCheckInTime || '—';
+
         if (!status.isCheckedIn) {
-          this.currentEmpPunchState.set({
+          this.currentEmpTracking.set({
             badgeText: 'Not Clocked In',
             badgeColor: '#64748b',
+            shiftName: shiftN,
+            shiftTiming: shiftT,
+            firstCheckIn: firstIn,
+            workedHours: workedStr,
+            breakTime: breakStr,
+            lastPunch: lastPunchStr,
+            punchesCount: punches.length,
             canClockIn: true,
             canClockOut: false,
+            loading: false,
           });
           this.punchForm.punchType = 'ClockIn';
-        } else {
-          this.currentEmpPunchState.set({
-            badgeText: status.isOnBreak ? 'On Break' : 'Clocked In / Working',
-            badgeColor: status.isOnBreak ? '#f59e0b' : '#10b981',
+        } else if (status.isOnBreak) {
+          this.currentEmpTracking.set({
+            badgeText: 'On Break',
+            badgeColor: '#f59e0b',
+            shiftName: shiftN,
+            shiftTiming: shiftT,
+            firstCheckIn: firstIn,
+            workedHours: workedStr,
+            breakTime: breakStr,
+            lastPunch: lastPunchStr,
+            punchesCount: punches.length,
             canClockIn: false,
             canClockOut: true,
+            loading: false,
+          });
+          this.punchForm.punchType = 'ClockOut';
+        } else {
+          this.currentEmpTracking.set({
+            badgeText: 'Clocked In / Working',
+            badgeColor: '#10b981',
+            shiftName: shiftN,
+            shiftTiming: shiftT,
+            firstCheckIn: firstIn,
+            workedHours: workedStr,
+            breakTime: breakStr,
+            lastPunch: lastPunchStr,
+            punchesCount: punches.length,
+            canClockIn: false,
+            canClockOut: true,
+            loading: false,
           });
           this.punchForm.punchType = 'ClockOut';
         }
       },
       error: () => {
         const match = this.dailyRows().find((r) => r.id === targetId);
-        if (match && match.checkIn && match.checkIn !== '—' && (!match.checkOut || match.checkOut === '—')) {
-          this.currentEmpPunchState.set({
-            badgeText: 'Clocked In',
-            badgeColor: '#10b981',
-            canClockIn: false,
-            canClockOut: true,
-          });
-          this.punchForm.punchType = 'ClockOut';
-        } else {
-          this.currentEmpPunchState.set({
-            badgeText: 'Not Clocked In',
-            badgeColor: '#64748b',
-            canClockIn: true,
-            canClockOut: false,
-          });
-          this.punchForm.punchType = 'ClockIn';
-        }
+        const isWorking = match && match.checkIn && match.checkIn !== '—' && (!match.checkOut || match.checkOut === '—');
+        this.currentEmpTracking.set({
+          badgeText: isWorking ? 'Clocked In' : 'Not Clocked In',
+          badgeColor: isWorking ? '#10b981' : '#64748b',
+          shiftName: 'General Shift',
+          shiftTiming: '09:00 AM – 06:00 PM',
+          firstCheckIn: match?.checkIn && match.checkIn !== '—' ? match.checkIn : '—',
+          workedHours: match?.workHours ? `${match.workHours}h` : '00h 00m',
+          breakTime: match?.breakMinutes ? `${match.breakMinutes}m` : '00m',
+          lastPunch: match?.checkIn && match.checkIn !== '—' ? `${match.checkIn} (Clock In)` : '—',
+          punchesCount: isWorking ? 1 : 0,
+          canClockIn: !isWorking,
+          canClockOut: !!isWorking,
+          loading: false,
+        });
+        this.punchForm.punchType = isWorking ? 'ClockOut' : 'ClockIn';
       },
     });
   }
