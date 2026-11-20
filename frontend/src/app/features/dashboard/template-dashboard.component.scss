@@ -410,21 +410,23 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    flex-wrap: nowrap;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-bottom: 6px;
   }
 
   .header-left {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-shrink: 0;
+    flex-wrap: wrap;
   }
 
   .header-title-box {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
 
     h3.widget-title-nowrap {
       margin: 0;
@@ -434,11 +436,34 @@
       white-space: nowrap;
     }
 
+    .hr-badge-single {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(37, 99, 235, 0.08);
+      color: #2563eb;
+      border: 1px solid rgba(37, 99, 235, 0.2);
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+
+      .hr-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #22c55e;
+      }
+    }
+
+    .hr-selector-badge,
     .month-selector-badge {
       position: relative;
       display: inline-flex;
       align-items: center;
 
+      .hr-dropdown,
       .month-dropdown {
         appearance: none;
         -webkit-appearance: none;
@@ -476,40 +501,47 @@
     flex-shrink: 0;
   }
 
-  .graph-legend {
+  .chart-legend-bar {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 11px;
-    color: var(--muted, #64748b);
+    justify-content: flex-end;
+    padding: 0 16px 6px;
 
-    .legend-item {
+    .graph-legend {
       display: flex;
       align-items: center;
-      gap: 5px;
-      white-space: nowrap;
+      gap: 12px;
       font-size: 11px;
-      font-weight: 500;
-    }
+      color: var(--muted, #64748b);
 
-    .legend-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+        font-size: 11px;
+        font-weight: 500;
+      }
 
-      &.dot-before-break {
-        background: #22c55e;
-      }
-      &.dot-break {
-        background: #f59e0b;
-      }
-      &.dot-after-break {
-        background: #16a34a;
-      }
-      &.dot-missing {
-        background: #f87171;
+      .legend-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+
+        &.dot-before-break {
+          background: #22c55e;
+        }
+        &.dot-break {
+          background: #f59e0b;
+        }
+        &.dot-after-break {
+          background: #16a34a;
+        }
+        &.dot-missing {
+          background: #f87171;
+        }
       }
     }
   }

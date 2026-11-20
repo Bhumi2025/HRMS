@@ -8,6 +8,8 @@ public class Employee : BaseEntity
     /// <summary>Human readable code shown in the UI, e.g. EMP-1001.</summary>
     public string EmployeeCode { get; set; } = string.Empty;
 
+    public string? Salutation { get; set; }
+
     public string FirstName { get; set; } = string.Empty;
 
     public string? MiddleName { get; set; }
@@ -17,6 +19,10 @@ public class Employee : BaseEntity
     public string Email { get; set; } = string.Empty;
 
     public string? Phone { get; set; }
+
+    public string? EmergencyContactName { get; set; }
+
+    public string? EmergencyContactPhone { get; set; }
 
     public DateOnly? DateOfBirth { get; set; }
 

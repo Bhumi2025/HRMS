@@ -122,6 +122,10 @@ public interface IDashboardService
 
     Task<IReadOnlyList<AttendanceTrendPointDto>> GetAttendanceTrendAsync(int? year, int? month, CancellationToken ct = default);
 
+    Task<IReadOnlyList<AttendanceTrendPointDto>> GetAttendanceTrendAsync(int? year, int? month, Guid? employeeId, CancellationToken ct = default);
+
+    Task<IReadOnlyList<HrEmployeeSummaryDto>> GetHrTeamAsync(CancellationToken ct = default);
+
     Task<IReadOnlyList<ActivityDto>> GetRecentActivityAsync(int take, CancellationToken ct = default);
 
     Task<IReadOnlyList<ExpoAlertDto>> GetDocumentAlertsAsync(int take, CancellationToken ct = default);

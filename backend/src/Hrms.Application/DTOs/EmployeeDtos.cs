@@ -21,6 +21,7 @@ public sealed record EmployeeListItemDto(
 public sealed record EmployeeDetailDto(
     Guid Id,
     string EmployeeCode,
+    string? Salutation,
     string FirstName,
     string? MiddleName,
     string LastName,
@@ -72,14 +73,17 @@ public sealed record EmployeeDetailDto(
     string? RoleCode = null,
     string? RoleName = null,
     bool IsFaceEnrolled = false,
-    string? FacePhotoUrl = null);
+    string? FacePhotoUrl = null,
+    string? EmergencyContactName = null,
+    string? EmergencyContactPhone = null);
 
 public sealed record CreateEmployeeRequest(
+    string? Salutation,
     [Required, MaxLength(50)] string FirstName,
     [MaxLength(50)] string? MiddleName,
     [Required, MaxLength(50)] string LastName,
     [Required, EmailAddress] string Email,
-    [RegularExpression(@"^(?:(?:\+|0{0,2})91[\s\-]?)?0?[6-9](?:[\s\-]?\d){9}$", ErrorMessage = "Phone number must be a valid 10-digit Indian mobile number (e.g. +91 98765 43210 or 9876543210).")] string? Phone,
+    [RegularExpression(@"^(?:(?:\+|0{0,2})\d{1,4}[\s\-]?)?[\d\s\-]{7,15}$", ErrorMessage = "Please provide a valid contact number.")] string? Phone,
     Guid DepartmentId,
     Guid? DesignationId,
     Guid? BranchId,
@@ -110,14 +114,17 @@ public sealed record CreateEmployeeRequest(
     string? IfscCode = null,
     PaymentMode? PaymentMode = null,
     string? Password = null,
-    string? RoleCode = null);
+    string? RoleCode = null,
+    string? EmergencyContactName = null,
+    string? EmergencyContactPhone = null);
 
 public sealed record UpdateEmployeeRequest(
+    string? Salutation,
     [Required] string FirstName,
     string? MiddleName,
     [Required] string LastName,
     [Required, EmailAddress] string Email,
-    [RegularExpression(@"^(?:(?:\+|0{0,2})91[\s\-]?)?0?[6-9](?:[\s\-]?\d){9}$", ErrorMessage = "Phone number must be a valid 10-digit Indian mobile number (e.g. +91 98765 43210 or 9876543210).")] string? Phone,
+    [RegularExpression(@"^(?:(?:\+|0{0,2})\d{1,4}[\s\-]?)?[\d\s\-]{7,15}$", ErrorMessage = "Please provide a valid contact number.")] string? Phone,
     Guid DepartmentId,
     Guid? DesignationId,
     Guid? BranchId,
@@ -159,4 +166,6 @@ public sealed record UpdateEmployeeRequest(
     string? Address = null,
     string? City = null,
     string? State = null,
-    string? Country = null);
+    string? Country = null,
+    string? EmergencyContactName = null,
+    string? EmergencyContactPhone = null);

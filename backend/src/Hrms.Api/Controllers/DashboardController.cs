@@ -45,8 +45,14 @@ public sealed class DashboardController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<AttendanceTrendPointDto>>> AttendanceTrend(
         [FromQuery] int? year,
         [FromQuery] int? month,
+        [FromQuery] Guid? employeeId,
         CancellationToken ct) =>
-        Ok(await _dashboard.GetAttendanceTrendAsync(year, month, ct));
+        Ok(await _dashboard.GetAttendanceTrendAsync(year, month, employeeId, ct));
+
+    [HttpGet("hr-team")]
+    [ProducesResponseType(typeof(IReadOnlyList<HrEmployeeSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<HrEmployeeSummaryDto>>> HrTeam(CancellationToken ct) =>
+        Ok(await _dashboard.GetHrTeamAsync(ct));
 
     [HttpGet("activity")]
     [ProducesResponseType(typeof(IReadOnlyList<ActivityDto>), StatusCodes.Status200OK)]

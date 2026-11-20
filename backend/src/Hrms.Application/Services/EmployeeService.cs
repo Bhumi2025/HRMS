@@ -58,9 +58,9 @@ public sealed class EmployeeService : IEmployeeService
         if (!string.IsNullOrWhiteSpace(request.Phone))
         {
             var cleanPhone = System.Text.RegularExpressions.Regex.Replace(request.Phone.Trim(), @"[\s\-]", "");
-            if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(?:\+91|91|0)?[6-9]\d{9}$"))
+            if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(?:\+?\d{7,15})$"))
             {
-                throw new ValidationException("Phone number must be a valid 10-digit Indian mobile number (e.g. +91 98765 43210 or 9876543210).");
+                throw new ValidationException("Please provide a valid contact number.");
             }
         }
 
@@ -88,6 +88,7 @@ public sealed class EmployeeService : IEmployeeService
         var employee = new Employee
         {
             EmployeeCode = $"EMP-{nextNum}",
+            Salutation = string.IsNullOrWhiteSpace(request.Salutation) ? null : request.Salutation.Trim(),
             FirstName = request.FirstName.Trim(),
             MiddleName = string.IsNullOrWhiteSpace(request.MiddleName) ? null : request.MiddleName.Trim(),
             LastName = request.LastName.Trim(),
@@ -117,6 +118,8 @@ public sealed class EmployeeService : IEmployeeService
             City = string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim(),
             State = string.IsNullOrWhiteSpace(request.State) ? null : request.State.Trim(),
             Country = string.IsNullOrWhiteSpace(request.Country) ? null : request.Country.Trim(),
+            EmergencyContactName = string.IsNullOrWhiteSpace(request.EmergencyContactName) ? null : request.EmergencyContactName.Trim(),
+            EmergencyContactPhone = string.IsNullOrWhiteSpace(request.EmergencyContactPhone) ? null : request.EmergencyContactPhone.Trim(),
             BankName = string.IsNullOrWhiteSpace(request.BankName) ? null : request.BankName.Trim(),
             AccountName = string.IsNullOrWhiteSpace(request.AccountName) ? null : request.AccountName.Trim(),
             AccountNumber = string.IsNullOrWhiteSpace(request.AccountNumber) ? null : request.AccountNumber.Trim(),
@@ -167,76 +170,77 @@ public sealed class EmployeeService : IEmployeeService
                     IsActive = true,
                 };
                 await _uow.Users.AddAsync(user, ct);
+                }
+
+                await _uow.SaveChangesAsync(ct);
             }
 
-            await _uow.SaveChangesAsync(ct);
+            return await GetAsync(employee.Id, ct);
         }
 
-        return await GetAsync(employee.Id, ct);
-    }
-
-    public async Task<EmployeeDetailDto> UpdateAsync(Guid id, UpdateEmployeeRequest request, CancellationToken ct = default)
-    {
-        var employee = await _uow.Employees.GetWithDetailsAsync(id, ct)
-                       ?? throw NotFoundException.For("Employee", id);
-
-        var email = request.Email.Trim().ToLowerInvariant();
-        if (!System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+        public async Task<EmployeeDetailDto> UpdateAsync(Guid id, UpdateEmployeeRequest request, CancellationToken ct = default)
         {
-            throw new ValidationException("Please provide a valid email address.");
-        }
+            var employee = await _uow.Employees.GetWithDetailsAsync(id, ct)
+                        ?? throw NotFoundException.For("Employee", id);
 
-        if (!string.IsNullOrWhiteSpace(request.Phone))
-        {
-            var cleanPhone = System.Text.RegularExpressions.Regex.Replace(request.Phone.Trim(), @"[\s\-]", "");
-            if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(?:\+91|91|0)?[6-9]\d{9}$"))
+            var email = request.Email.Trim().ToLowerInvariant();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
             {
-                throw new ValidationException("Phone number must be a valid 10-digit Indian mobile number (e.g. +91 98765 43210 or 9876543210).");
+                throw new ValidationException("Please provide a valid email address.");
             }
-        }
 
-        if (await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.Email == email && e.Id != id), ct))
-        {
-            throw new ConflictException($"An employee with email '{email}' already exists.");
-        }
+            if (!string.IsNullOrWhiteSpace(request.Phone))
+            {
+                var cleanPhone = System.Text.RegularExpressions.Regex.Replace(request.Phone.Trim(), @"[\s\-]", "");
+                if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(?:\+?\d{7,15})$"))
+                {
+                    throw new ValidationException("Please provide a valid contact number.");
+                }
+            }
 
-        _ = await _uow.Departments.GetByIdAsync(request.DepartmentId, ct)
-            ?? throw NotFoundException.For("Department", request.DepartmentId);
+            if (await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.Email == email && e.Id != id), ct))
+            {
+                throw new ConflictException($"An employee with email '{email}' already exists.");
+            }
 
-        employee.FirstName = request.FirstName.Trim();
-        employee.MiddleName = request.MiddleName?.Trim();
-        employee.LastName = request.LastName.Trim();
-        employee.Email = email;
-        employee.Phone = request.Phone;
-        employee.DepartmentId = request.DepartmentId;
-        employee.DesignationId = request.DesignationId;
-        employee.BranchId = request.BranchId;
-        employee.ReportingManagerId = request.ReportingManagerId;
-        employee.JobTitle = request.JobTitle.Trim();
-        employee.Grade = request.Grade;
-        employee.EmploymentType = request.EmploymentType;
-        employee.Status = request.Status;
-        employee.JoinDate = request.JoinDate;
-        employee.NoticePeriodDays = request.NoticePeriodDays;
-        employee.BasicSalary = request.BasicSalary;
-        employee.HousingAllowance = request.HousingAllowance;
-        employee.TransportAllowance = request.TransportAllowance;
-        employee.MobileAllowance = request.MobileAllowance;
-        employee.OtherAllowances = request.OtherAllowances;
-        employee.Currency = request.Currency;
-        employee.BankName = !string.IsNullOrWhiteSpace(request.BankName) ? request.BankName.Trim() : (employee.BankName ?? "Emirates NBD");
-        employee.AccountName = !string.IsNullOrWhiteSpace(request.AccountName) ? request.AccountName.Trim() : (employee.AccountName ?? $"{employee.FirstName} {employee.LastName}".Trim());
-        employee.AccountNumber = !string.IsNullOrWhiteSpace(request.AccountNumber) ? request.AccountNumber.Trim() : employee.AccountNumber;
-        employee.Iban = !string.IsNullOrWhiteSpace(request.Iban) ? request.Iban.Trim() : employee.Iban;
-        employee.IfscCode = !string.IsNullOrWhiteSpace(request.IfscCode) ? request.IfscCode.Trim() : employee.IfscCode;
-        employee.SwiftCode = !string.IsNullOrWhiteSpace(request.SwiftCode) ? request.SwiftCode.Trim() : employee.SwiftCode;
-        employee.PaymentMode = request.PaymentMode;
-        employee.WpsId = request.WpsId;
-        employee.PassportNumber = request.PassportNumber;
-        employee.PassportExpiry = request.PassportExpiry;
-        employee.VisaNumber = request.VisaNumber;
-        employee.VisaExpiry = request.VisaExpiry;
-        employee.EmiratesId = request.EmiratesId;
+            _ = await _uow.Departments.GetByIdAsync(request.DepartmentId, ct)
+                ?? throw NotFoundException.For("Department", request.DepartmentId);
+
+            employee.Salutation = string.IsNullOrWhiteSpace(request.Salutation) ? null : request.Salutation.Trim();
+            employee.FirstName = request.FirstName.Trim();
+            employee.MiddleName = request.MiddleName?.Trim();
+            employee.LastName = request.LastName.Trim();
+            employee.Email = email;
+            employee.Phone = request.Phone;
+            employee.DepartmentId = request.DepartmentId;
+            employee.DesignationId = request.DesignationId;
+            employee.BranchId = request.BranchId;
+            employee.ReportingManagerId = request.ReportingManagerId;
+            employee.JobTitle = request.JobTitle.Trim();
+            employee.Grade = request.Grade;
+            employee.EmploymentType = request.EmploymentType;
+            employee.Status = request.Status;
+            employee.JoinDate = request.JoinDate;
+            employee.NoticePeriodDays = request.NoticePeriodDays;
+            employee.BasicSalary = request.BasicSalary;
+            employee.HousingAllowance = request.HousingAllowance;
+            employee.TransportAllowance = request.TransportAllowance;
+            employee.MobileAllowance = request.MobileAllowance;
+            employee.OtherAllowances = request.OtherAllowances;
+            employee.Currency = request.Currency;
+            employee.BankName = !string.IsNullOrWhiteSpace(request.BankName) ? request.BankName.Trim() : (employee.BankName ?? "Emirates NBD");
+            employee.AccountName = !string.IsNullOrWhiteSpace(request.AccountName) ? request.AccountName.Trim() : (employee.AccountName ?? $"{employee.FirstName} {employee.LastName}".Trim());
+            employee.AccountNumber = !string.IsNullOrWhiteSpace(request.AccountNumber) ? request.AccountNumber.Trim() : employee.AccountNumber;
+            employee.Iban = !string.IsNullOrWhiteSpace(request.Iban) ? request.Iban.Trim() : employee.Iban;
+            employee.IfscCode = !string.IsNullOrWhiteSpace(request.IfscCode) ? request.IfscCode.Trim() : employee.IfscCode;
+            employee.SwiftCode = !string.IsNullOrWhiteSpace(request.SwiftCode) ? request.SwiftCode.Trim() : employee.SwiftCode;
+            employee.PaymentMode = request.PaymentMode;
+            employee.WpsId = request.WpsId;
+            employee.PassportNumber = request.PassportNumber;
+            employee.PassportExpiry = request.PassportExpiry;
+            employee.VisaNumber = request.VisaNumber;
+            employee.VisaExpiry = request.VisaExpiry;
+            employee.EmiratesId = request.EmiratesId;
 
         if (request.DateOfBirth.HasValue) employee.DateOfBirth = request.DateOfBirth.Value;
         if (request.Gender.HasValue) employee.Gender = request.Gender.Value;
@@ -247,6 +251,8 @@ public sealed class EmployeeService : IEmployeeService
         if (request.City != null) employee.City = string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim();
         if (request.State != null) employee.State = string.IsNullOrWhiteSpace(request.State) ? null : request.State.Trim();
         if (request.Country != null) employee.Country = string.IsNullOrWhiteSpace(request.Country) ? null : request.Country.Trim();
+        if (request.EmergencyContactName != null) employee.EmergencyContactName = string.IsNullOrWhiteSpace(request.EmergencyContactName) ? null : request.EmergencyContactName.Trim();
+        if (request.EmergencyContactPhone != null) employee.EmergencyContactPhone = string.IsNullOrWhiteSpace(request.EmergencyContactPhone) ? null : request.EmergencyContactPhone.Trim();
 
         if (!string.IsNullOrWhiteSpace(request.RoleCode))
         {
@@ -350,6 +356,41 @@ public sealed class EmployeeService : IEmployeeService
             _uow.Users.Remove(u);
         }
 
+        var payslips = await _uow.Payslips.ToListAsync(
+            _uow.Payslips.Query().Where(p => p.EmployeeId == id), ct);
+        foreach (var p in payslips)
+        {
+            _uow.Payslips.Remove(p);
+        }
+
+        var punches = await _uow.Punches.ToListAsync(
+            _uow.Punches.Query().Where(p => p.EmployeeId == id), ct);
+        foreach (var p in punches)
+        {
+            _uow.Punches.Remove(p);
+        }
+
+        var attendance = await _uow.Attendance.ToListAsync(
+            _uow.Attendance.Query().Where(a => a.EmployeeId == id), ct);
+        foreach (var a in attendance)
+        {
+            _uow.Attendance.Remove(a);
+        }
+
+        var leaves = await _uow.LeaveRequests.ToListAsync(
+            _uow.LeaveRequests.Query().Where(l => l.EmployeeId == id), ct);
+        foreach (var l in leaves)
+        {
+            _uow.LeaveRequests.Remove(l);
+        }
+
+        var tasks = await _uow.Tasks.ToListAsync(
+            _uow.Tasks.Query().Where(t => t.EmployeeId == id), ct);
+        foreach (var t in tasks)
+        {
+            _uow.Tasks.Remove(t);
+        }
+
         _uow.Employees.Remove(employee);
         await _uow.SaveChangesAsync(ct);
     }
@@ -402,6 +443,7 @@ public sealed class EmployeeService : IEmployeeService
     private static EmployeeDetailDto ToDetailDto(Employee e, string? roleCode = null, string? roleName = null) => new(
         e.Id,
         e.EmployeeCode,
+        e.Salutation,
         e.FirstName,
         e.MiddleName,
         e.LastName,
@@ -453,7 +495,9 @@ public sealed class EmployeeService : IEmployeeService
         roleCode,
         roleName,
         e.IsFaceEnrolled,
-        e.FacePhotoUrl);
+        e.FacePhotoUrl,
+        e.EmergencyContactName,
+        e.EmergencyContactPhone);
 
     private static decimal Gross(Employee e) =>
         e.BasicSalary + e.HousingAllowance + e.TransportAllowance + e.MobileAllowance + e.OtherAllowances;

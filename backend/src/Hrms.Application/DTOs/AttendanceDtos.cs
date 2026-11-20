@@ -81,7 +81,9 @@ public sealed record EmployeePunchStatusDto(
     DateOnly? ForgottenCheckOutDate,
     string? RegularizationMessage,
     bool IsOnBreak = false,
-    long BreakSecondsToday = 0);
+    long BreakSecondsToday = 0,
+    string? ShiftName = null,
+    string? ShiftTiming = null);
 
 public sealed record AttendancePersonDto(
     Guid EmployeeId,
