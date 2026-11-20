@@ -59,15 +59,9 @@ interface DocRow {
         <div>
           <div style="font-size: 1.2rem; font-weight: 700; color: var(--text); margin-bottom: 2px">{{ displayName() }}</div>
           <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px">{{ job().title }}{{ job().dept ? ' · ' + job().dept : '' }}{{ detail()?.employeeCode ? ' · ' + detail()?.employeeCode : '' }}</div>
-          <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center">
+          <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-start">
             <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 20px; background: var(--success-soft); color: var(--success); border: 1px solid rgba(34,197,94,.3)">
               <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block"></span>Active
-            </span>
-            <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 20px; background: var(--p-soft); color: var(--p); border: 1px solid var(--p-mid)">
-              <span [appIcon]="'pin'"></span> Dubai, UAE
-            </span>
-            <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 20px; background: var(--p-soft); color: var(--p); border: 1px solid var(--p-mid)">
-              <span [appIcon]="'calendar2'"></span> Joined Mar 2022
             </span>
           </div>
         </div>
