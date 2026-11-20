@@ -157,15 +157,18 @@ interface MusterDay {
       </div>
     }
 
-    <!-- TAB 1: DAILY PUNCH LOG -->
+    <!-- TAB 1: DAILY PUNCH LOG WIDGET -->
     @if (tab() === 'daily') {
-      <div class="card" style="min-height: calc(100vh - 290px); display: flex; flex-direction: column;">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <div class="card daily-punch-widget" style="height: calc(100vh - 275px); display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; flex-shrink: 0;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="card-title">Daily Punch Records</div>
             <span class="badge badge-success" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;">
               <span class="pulse-indicator"></span>
               Live Records
+            </span>
+            <span style="font-size: 12px; color: var(--muted); font-weight: 600; margin-left: 6px;">
+              ({{ filteredDailyRows().length }} {{ filteredDailyRows().length === 1 ? 'record' : 'records' }})
             </span>
           </div>
 
@@ -246,9 +249,9 @@ interface MusterDay {
           </div>
         </div>
 
-        <div class="table-wrap" style="flex: 1; overflow-x: auto; width: 100%; padding-bottom: 0;">
+        <div class="table-wrap custom-scroll" style="flex: 1; overflow-y: auto; overflow-x: auto; width: 100%; min-height: 0;">
           <table class="daily-punch-table" style="width: 100%; min-width: 1080px; border-collapse: collapse;">
-            <thead style="position: sticky; top: 0; z-index: 3; background: var(--surface, #fff);">
+            <thead style="position: sticky; top: 0; z-index: 5; background: var(--surface, #fff); box-shadow: 0 1px 2px rgba(0,0,0,0.06);">
               <tr>
                 <th style="min-width: 180px;">Employee</th>
                 <th style="min-width: 110px;">Department</th>
@@ -263,7 +266,7 @@ interface MusterDay {
               </tr>
             </thead>
             <tbody>
-              @for (row of paginatedDailyRows(); track row.id) {
+              @for (row of filteredDailyRows(); track row.id) {
                 <tr>
                   <td>
                     <div class="table-avatar" style="cursor: pointer;" (click)="viewEmployeeMuster(row.id)">
@@ -336,72 +339,6 @@ interface MusterDay {
               }
             </tbody>
           </table>
-        </div>
-
-        <!-- Dynamic Pagination Row with Rows Per Page & < > navigation -->
-        <div
-          class="pagination-row"
-          style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 12px; background: var(--surface, #fff); margin-top: auto;"
-        >
-          <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted);">
-            <span>Rows per page:</span>
-            <select 
-              class="form-control" 
-              [value]="dailyPageSize()" 
-              (change)="onDailyPageSizeChange(+$any($event.target).value)" 
-              style="width: 75px; padding: 4px 8px; font-size: 12px;"
-            >
-              <option [value]="10">10</option>
-              <option [value]="25">25</option>
-              <option [value]="50">50</option>
-              <option [value]="100">100</option>
-            </select>
-            <span>
-              Showing {{ filteredDailyRows().length === 0 ? 0 : dailyStartIndex() + 1 }} - {{ dailyEndIndex() }} of {{ filteredDailyRows().length }}
-            </span>
-          </div>
-
-          <div style="display: flex; gap: 4px; align-items: center;">
-            <!-- Previous Button (<) -->
-            <button
-              type="button"
-              class="pg-btn"
-              [disabled]="dailyCurrentPage() <= 1"
-              (click)="goToDailyPage(dailyCurrentPage() - 1)"
-              data-tooltip="Previous"
-              aria-label="Previous page"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-
-            <!-- Dynamic Page Numbers -->
-            @for (p of dailyPageNumbers(); track p) {
-              <button
-                type="button"
-                class="pg-btn"
-                [class.active]="p === dailyCurrentPage()"
-                (click)="goToDailyPage(p)"
-              >
-                {{ p }}
-              </button>
-            }
-
-            <!-- Next Button (>) -->
-            <button
-              type="button"
-              class="pg-btn"
-              [disabled]="dailyCurrentPage() >= dailyTotalPages() || dailyTotalPages() <= 1"
-              (click)="goToDailyPage(dailyCurrentPage() + 1)"
-              data-tooltip="Next"
-              aria-label="Next page"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          </div>
         </div>
       </div>
     }
@@ -1319,6 +1256,26 @@ interface MusterDay {
         color: #ffffff;
         border-color: #2563eb;
         transform: translateY(-1px);
+      }
+
+      /* ── Daily Records Widget & Scrollbar (Fill Viewport without Outer Page Scroll) ── */
+      .daily-punch-widget {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+      .custom-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .custom-scroll::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+      }
+      .custom-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .custom-scroll::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
       }
 
       /* ── Time Management & Muster Split View (Image 2) ── */
@@ -2555,68 +2512,8 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   });
 
-  // Daily Punch Records Pagination
-  protected readonly dailyPageSize = signal(10);
-  protected readonly dailyCurrentPage = signal(1);
-
-  protected readonly dailyTotalPages = computed(() => {
-    const total = this.filteredDailyRows().length;
-    return total > 0 ? Math.ceil(total / this.dailyPageSize()) : 1;
-  });
-
-  protected readonly paginatedDailyRows = computed(() => {
-    const list = this.filteredDailyRows();
-    const page = this.dailyCurrentPage();
-    const size = this.dailyPageSize();
-    const start = (page - 1) * size;
-    return list.slice(start, start + size);
-  });
-
-  protected readonly dailyPageNumbers = computed<number[]>(() => {
-    const total = this.dailyTotalPages();
-    const current = this.dailyCurrentPage();
-    if (total <= 1) return [1];
-
-    const pages: number[] = [];
-    const maxButtons = 5;
-    let start = Math.max(1, current - Math.floor(maxButtons / 2));
-    let end = start + maxButtons - 1;
-
-    if (end > total) {
-      end = total;
-      start = Math.max(1, end - maxButtons + 1);
-    }
-
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
-    }
-    return pages;
-  });
-
-  protected dailyStartIndex(): number {
-    return (this.dailyCurrentPage() - 1) * Number(this.dailyPageSize());
-  }
-
-  protected dailyEndIndex(): number {
-    const count = this.filteredDailyRows().length;
-    if (count === 0) return 0;
-    const end = this.dailyStartIndex() + Number(this.dailyPageSize());
-    return end > count ? count : end;
-  }
-
-  protected onDailyPageSizeChange(newSize: number): void {
-    this.dailyPageSize.set(Number(newSize));
-    this.dailyCurrentPage.set(1);
-  }
-
-  protected goToDailyPage(page: number): void {
-    const clamped = Math.max(1, Math.min(page, this.dailyTotalPages()));
-    this.dailyCurrentPage.set(clamped);
-  }
-
   protected onFilterStatusChange(st: string): void {
     this.filterStatus.set(st || '');
-    this.dailyCurrentPage.set(1);
   }
 
   ngOnInit(): void {
@@ -2683,17 +2580,14 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected onSearchInput(val: string): void {
     this.searchKeyword.set(val || '');
-    this.dailyCurrentPage.set(1);
   }
 
   protected onSearchChange(val: string): void {
     this.searchKeyword.set(val || '');
-    this.dailyCurrentPage.set(1);
   }
 
   protected clearSearch(): void {
     this.searchKeyword.set('');
-    this.dailyCurrentPage.set(1);
     if (this.searchInputRef?.nativeElement) {
       this.searchInputRef.nativeElement.value = '';
     }
@@ -2702,7 +2596,6 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected clearFilters(): void {
     this.searchKeyword.set('');
     this.filterStatus.set('');
-    this.dailyCurrentPage.set(1);
     if (this.searchInputRef?.nativeElement) {
       this.searchInputRef.nativeElement.value = '';
     }
@@ -2822,7 +2715,6 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     if (newDate) {
       this.filterDate.set(newDate);
     }
-    this.dailyCurrentPage.set(1);
     this.loadDailyAttendance();
   }
 
