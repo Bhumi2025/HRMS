@@ -1020,21 +1020,27 @@ interface MusterDay {
             </div>
 
             <div class="form-group" style="margin-top: 16px; margin-bottom: 14px;">
-              <label class="form-label" style="font-size: 13px; font-weight: 600;">Punch Type <span style="color: var(--danger)">*</span></label>
-              <div style="display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap;">
-                <label [style.opacity]="isPunchTypeAllowed('ClockIn') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockIn') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockIn" name="punchType" [disabled]="!isPunchTypeAllowed('ClockIn')" />
-                  Clock In
+              <label class="form-label" style="font-size: 13px; font-weight: 600; margin-bottom: 8px; display: block;">Punch Type <span style="color: var(--danger)">*</span></label>
+              <div class="punch-type-selector">
+                <label class="punch-type-option" [class.selected]="punchForm.punchType === 'ClockIn'">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockIn" name="punchType" />
+                  <span class="punch-type-icon in">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                  </span>
+                  <span class="punch-type-text">Clock In</span>
                 </label>
-                <label [style.opacity]="isPunchTypeAllowed('ClockOut') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockOut') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockOut" name="punchType" [disabled]="!isPunchTypeAllowed('ClockOut')" />
-                  Clock Out
+                <label class="punch-type-option" [class.selected]="punchForm.punchType === 'ClockOut'">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockOut" name="punchType" />
+                  <span class="punch-type-icon out">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                  </span>
+                  <span class="punch-type-text">Clock Out</span>
                 </label>
               </div>
             </div>
-            <div class="form-group">
-              <label class="form-label" style="font-size: 13px; font-weight: 600;">Note / Reason</label>
-              <input class="form-control" type="text" [(ngModel)]="punchForm.note" placeholder="Optional punch note..." />
+            <div class="form-group" style="margin-bottom: 4px;">
+              <label class="form-label" style="font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;">Note / Reason</label>
+              <input class="form-control" type="text" [(ngModel)]="punchForm.note" placeholder="Optional punch note or reason..." style="border-radius: 8px; border: 1px solid #cbd5e1; padding: 9px 12px; font-size: 13.5px;" />
             </div>
           </div>
           <div class="modal-footer" style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
@@ -1159,6 +1165,55 @@ interface MusterDay {
         padding: 2px 8px;
         border-radius: 10px;
         white-space: nowrap;
+      }
+
+      /* ── Quick Punch Modal Punch Type Selector ── */
+      .punch-type-selector {
+        display: flex;
+        gap: 12px;
+      }
+      .punch-type-option {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 1.5px solid #e2e8f0;
+        background: #ffffff;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13.5px;
+        color: #475569;
+        transition: all 0.15s ease-in-out;
+        user-select: none;
+      }
+      .punch-type-option:hover {
+        border-color: #cbd5e1;
+        background: #f8fafc;
+      }
+      .punch-type-option.selected {
+        border-color: #2563eb;
+        background: #eff6ff;
+        color: #1d4ed8;
+        box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12);
+      }
+      .punch-type-option input[type="radio"] {
+        accent-color: #2563eb;
+        cursor: pointer;
+        margin: 0;
+      }
+      .punch-type-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .punch-type-icon.in {
+        color: #10b981;
+      }
+      .punch-type-icon.out {
+        color: #ef4444;
       }
 
       .pulse-indicator {
@@ -2245,7 +2300,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     lastPunch: '—',
     punchesCount: 0,
     canClockIn: true,
-    canClockOut: false,
+    canClockOut: true,
     loading: false,
   });
   protected readonly currentEmpPunchState = this.currentEmpTracking;
@@ -3569,9 +3624,6 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected isPunchTypeAllowed(type: string): boolean {
-    const s = this.currentEmpPunchState();
-    if (type === 'ClockIn') return s.canClockIn;
-    if (type === 'ClockOut') return s.canClockOut;
     return true;
   }
 
@@ -3625,7 +3677,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
             lastPunch: lastPunchStr,
             punchesCount: punches.length,
             canClockIn: true,
-            canClockOut: false,
+            canClockOut: true,
             loading: false,
           });
           this.punchForm.punchType = 'ClockIn';
@@ -3640,7 +3692,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
             breakTime: breakStr,
             lastPunch: lastPunchStr,
             punchesCount: punches.length,
-            canClockIn: false,
+            canClockIn: true,
             canClockOut: true,
             loading: false,
           });
@@ -3656,7 +3708,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
             breakTime: breakStr,
             lastPunch: lastPunchStr,
             punchesCount: punches.length,
-            canClockIn: false,
+            canClockIn: true,
             canClockOut: true,
             loading: false,
           });
@@ -3676,8 +3728,8 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           breakTime: match?.breakMinutes ? `${match.breakMinutes}m` : '00m',
           lastPunch: match?.checkIn && match.checkIn !== '—' ? `${match.checkIn} (Clock In)` : '—',
           punchesCount: isWorking ? 1 : 0,
-          canClockIn: !isWorking,
-          canClockOut: !!isWorking,
+          canClockIn: true,
+          canClockOut: true,
           loading: false,
         });
         this.punchForm.punchType = isWorking ? 'ClockOut' : 'ClockIn';
