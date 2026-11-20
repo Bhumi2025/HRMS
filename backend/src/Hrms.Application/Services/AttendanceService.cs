@@ -1111,7 +1111,7 @@ public sealed class AttendanceService : IAttendanceService
                     if (diff.TotalSeconds > 0) breakSeconds += (long)diff.TotalSeconds;
                     activeBreakOpen = null;
                 }
-                activeBreakOpen = p.PunchTime;
+                lastClockOutUtc = p.PunchTime;
             }
         }
 

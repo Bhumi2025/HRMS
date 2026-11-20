@@ -588,9 +588,8 @@ export class ShellComponent implements OnInit, OnDestroy {
     if (switcher && !switcher.contains(target)) {
       this.tenantOpen.set(false);
     }
-    const panels: { key: 'notif' | 'punch' | 'avatar'; panel: string; button: string }[] = [
+    const panels: { key: 'notif' | 'avatar'; panel: string; button: string }[] = [
       { key: 'notif', panel: 'notifPanel', button: 'notifBtn' },
-      { key: 'punch', panel: 'punchPanel', button: 'punchBtn' },
       { key: 'avatar', panel: 'avatarMenu', button: 'avatarBtn' },
     ];
     for (const p of panels) {
