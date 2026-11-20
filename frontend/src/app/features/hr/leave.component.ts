@@ -10,6 +10,7 @@ import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { NotificationStateService } from '../../core/services/notification-state.service';
+import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 
 interface LeaveRequest {
@@ -347,7 +348,8 @@ interface LeaveType {
           </div>
           <div class="form-group">
             <label class="form-label">Attach Document (optional)</label>
-            <input class="form-control" type="file" />
+            <input class="form-control" type="file" [accept]="acceptDocTypes" (change)="onAttachmentSelected($event)" />
+            <div style="font-size: 11px; color: var(--muted); margin-top: 3px;">Allowed: PDF, JPG, PNG (Max 2MB)</div>
           </div>
         </div>
         <div class="modal-footer">
@@ -634,6 +636,21 @@ export class LeaveComponent implements OnInit, AfterViewInit {
       .split(' ')
       .map((n) => n[0])
       .join('');
+  }
+
+  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
+
+  protected onAttachmentSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        input.value = '';
+        return;
+      }
+    }
   }
 
   protected leaveClass(s: LeaveRequest['s']): string {

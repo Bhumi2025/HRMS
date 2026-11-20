@@ -97,6 +97,61 @@ export class NotificationStateService {
           };
         });
 
+        if (isEmp) {
+          const user = this.session.user();
+          const myName = (user?.name || '').trim().toLowerCase();
+          const myFirstName = myName.split(' ')[0] || '';
+
+          const filtered = mapped.filter((item) => {
+            const t = (item.title || '').toLowerCase();
+            const m = (item.message || '').toLowerCase();
+
+            // 1. Announcements (Policy, Notice, Announcement, Holiday, HR Update)
+            if (
+              item.category === 'Policy' ||
+              t.includes('announcement') ||
+              t.includes('notice') ||
+              t.includes('policy') ||
+              t.includes('holiday') ||
+              t.includes('closure') ||
+              (item.time || '').toLowerCase().includes('hr update')
+            ) {
+              return true;
+            }
+
+            // 2. Leave Approval Updates for this employee only
+            if (item.category === 'Approval' || t.includes('leave') || t.includes('approval')) {
+              // If it names this employee
+              if (myFirstName && (m.includes(myFirstName) || t.includes(myFirstName))) {
+                return true;
+              }
+              // If it's a generic status update for the logged-in user (e.g. "Leave Approved", "Leave Rejected")
+              if (t.includes('approved') || t.includes('rejected')) {
+                // If it doesn't mention someone else's name requesting leave
+                return !m.includes('requested') || (myFirstName && m.includes(myFirstName));
+              }
+              return false;
+            }
+
+            // 3. Attendance Reminders of that employee only
+            if (item.category === 'Attendance') {
+              const isReminder =
+                t.includes('reminder') ||
+                m.includes('reminder') ||
+                t.includes('clock in') ||
+                t.includes('punch reminder');
+              const isGenericAbsent = m.includes('recorded absent') || m.includes('window closed');
+              return isReminder && !isGenericAbsent;
+            }
+
+            // Filter out all other unrelated items for employees (birthdays of others, system alerts, approvals of others)
+            return false;
+          });
+
+          this.notifications.set(filtered);
+          return;
+        }
+
         this.notifications.set(mapped);
       },
       error: () => {

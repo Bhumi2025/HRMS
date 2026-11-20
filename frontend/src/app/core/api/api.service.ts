@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, shareReplay } from 'rxjs';
+import { Observable, shareReplay, throwError } from 'rxjs';
+import { validateDocumentFile, validateImageFile } from '../utils/file-validator';
 import { environment } from '../../../environments/environment';
 import {
   Announcement,
@@ -365,6 +366,11 @@ export class ApiService {
   }
 
   uploadFile(file: File, companyCode?: string, userId?: string): Observable<{ fileName: string; storedName: string; url: string; cloudinaryUrl?: string; localPath?: string; size: string }> {
+    const check = validateDocumentFile(file);
+    if (!check.valid) {
+      return throwError(() => ({ error: { message: check.error, title: check.error }, message: check.error }));
+    }
+
     const formData = new FormData();
     formData.append('file', file, file.name);
     const params: Record<string, string> = {};
@@ -464,6 +470,11 @@ export class ApiService {
   }
 
   uploadCompanyLogo(file: File): Observable<CompanyLogoResponse> {
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      return throwError(() => ({ error: { message: check.error, title: check.error }, message: check.error }));
+    }
+
     const formData = new FormData();
     formData.append('file', file, file.name);
     return this.http.post<CompanyLogoResponse>(this.url('/organization/company/logo'), formData);

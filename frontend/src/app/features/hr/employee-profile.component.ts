@@ -10,6 +10,7 @@ import { UiService } from '../../core/services/ui.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { triggerDocumentDownload } from '../../core/utils/document-download.util';
+import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
 
 interface ProfileData {
@@ -684,7 +685,7 @@ interface DocRow {
           </div>
           <div class="form-group">
             <label class="form-label">Upload File</label>
-            <input #docFileInput type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" (change)="onDocFileSelected($event)" style="display: none" />
+            <input #docFileInput type="file" [accept]="acceptDocTypes" (change)="onDocFileSelected($event)" style="display: none" />
             <div
               style="border: 2px dashed var(--border); border-radius: var(--r); padding: 24px; text-align: center; cursor: pointer; transition: var(--t)"
               [style.borderColor]="selectedDocFile() ? 'var(--p)' : 'var(--border)'"
@@ -700,7 +701,7 @@ interface DocRow {
               } @else {
                 <div style="color: var(--p); margin-bottom: 6px"><span [appIcon]="'upload2'"></span></div>
                 <div style="font-size: 0.86rem; font-weight: 600">Drop file or click to browse</div>
-                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG up to 10MB</div>
+                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG up to 2MB</div>
               }
             </div>
           </div>
@@ -1542,17 +1543,33 @@ export class EmployeeProfileComponent implements OnInit {
   protected readonly uploadExpiryDate = signal('');
   protected readonly uploadingDoc = signal(false);
 
+  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
+
   protected onDocFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
-      this.selectedDocFile.set(input.files[0]);
+      const file = input.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        input.value = '';
+        this.selectedDocFile.set(null);
+        return;
+      }
+      this.selectedDocFile.set(file);
     }
   }
 
   protected onDocFileDrop(event: DragEvent): void {
     event.preventDefault();
     if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-      this.selectedDocFile.set(event.dataTransfer.files[0]);
+      const file = event.dataTransfer.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        return;
+      }
+      this.selectedDocFile.set(file);
     }
   }
 

@@ -385,24 +385,7 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
         this.myTasks.set(data.myTasks || []);
         this.pendingApprovals.set(data.pendingApprovals || []);
         
-        // Populate HR team and select default HR employee
-        if (data.hrTeam && data.hrTeam.length > 0) {
-          this.hrEmployees.set(data.hrTeam);
-          if (!this.selectedHrEmployeeId()) {
-            const currentEmpId = this.session.user()?.employeeId;
-            const matched = (currentEmpId ? data.hrTeam.find((h) => h.id === currentEmpId) : null) || data.hrTeam[0];
-            this.selectedHrEmployeeId.set(matched.id);
-            this.selectedHrEmployeeName.set(`${matched.firstName} ${matched.lastName}`);
-            this.selectedHrEmployeeCode.set(matched.employeeCode);
-          }
-        }
-
-        // Only overwrite attendanceGraph if current month is selected; otherwise keep selected month
-        const now = this.currentTime();
-        const defaultMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        if (this.selectedMonthKey() === defaultMonthKey) {
-          this.attendanceGraph.set(data.attendanceGraph || []);
-        }
+        this.attendanceGraph.set(data.attendanceGraph || []);
         
         this.leaveBalances.set(data.leaveBalances || []);
         this.loading.set(false);
@@ -529,9 +512,7 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     const empId = employeeId || this.selectedHrEmployeeId() || undefined;
     this.api.attendanceTrend(year, month, empId).subscribe({
       next: (points) => {
-        if (points && points.length > 0) {
-          this.attendanceGraph.set(points);
-        }
+        this.attendanceGraph.set(points || []);
       },
       error: () => {},
     });

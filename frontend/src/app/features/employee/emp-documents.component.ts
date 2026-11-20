@@ -6,6 +6,7 @@ import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { triggerDocumentDownload } from '../../core/utils/document-download.util';
+import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 
 interface DocRow {
@@ -139,7 +140,7 @@ interface CompanyDoc {
 
           <div class="form-group">
             <label class="form-label">Document File</label>
-            <input #empDocFileInput type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" (change)="onFileSelected($event)" style="display: none" />
+            <input #empDocFileInput type="file" [accept]="acceptDocTypes" (change)="onFileSelected($event)" style="display: none" />
             <div
               style="border: 2px dashed var(--border); border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; transition: 0.2s"
               [style.borderColor]="selectedFile() ? 'var(--p)' : 'var(--border)'"
@@ -155,7 +156,7 @@ interface CompanyDoc {
               } @else {
                 <div style="color: var(--p); font-size: 26px; margin-bottom: 6px"><span [appIcon]="'upload2'"></span></div>
                 <div style="font-size: 0.88rem; font-weight: 600">Drop file here or click to browse</div>
-                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG, DOC up to 10MB</div>
+                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG up to 2MB</div>
               }
             </div>
           </div>
@@ -192,7 +193,7 @@ interface CompanyDoc {
               }
             </div>
 
-            @if (r.fileUrl && (r.fileUrl.startsWith('data:image') || r.fileUrl.endsWith('.jpg') || r.fileUrl.endsWith('.png') || r.fileUrl.endsWith('.jpeg'))) {
+            @if (r.fileUrl && (r.fileUrl.startsWith('data:image') || r.fileUrl.includes('.jpg') || r.fileUrl.includes('.jpeg') || r.fileUrl.includes('.png') || r.fileUrl.includes('.webp') || r.fileUrl.includes('/image/'))) {
               <div style="text-align: center; background: #0f172a; border-radius: 8px; padding: 12px; margin-bottom: 12px; max-height: 240px; overflow: hidden;">
                 <img [src]="r.fileUrl" alt="Document Preview" style="max-height: 220px; max-width: 100%; object-fit: contain; border-radius: 6px;" />
               </div>
@@ -299,17 +300,33 @@ export class EmpDocumentsComponent implements OnInit {
     this.ui.close('empDocUploadModal');
   }
 
+  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
+
   protected onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
-      this.selectedFile.set(input.files[0]);
+      const file = input.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        input.value = '';
+        this.selectedFile.set(null);
+        return;
+      }
+      this.selectedFile.set(file);
     }
   }
 
   protected onFileDrop(event: DragEvent): void {
     event.preventDefault();
     if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-      this.selectedFile.set(event.dataTransfer.files[0]);
+      const file = event.dataTransfer.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        return;
+      }
+      this.selectedFile.set(file);
     }
   }
 
@@ -442,12 +459,12 @@ export class EmpDocumentsComponent implements OnInit {
     return [
       ['Document', r.doc],
       ['Type', r.type],
-      ['Document No.', r.num],
-      ['Issued By', r.issuedBy],
+
+
       ['Issue Date', r.iss],
       ['Expiry', r.exp],
       ['Status', r.s],
-      ['Notes', r.notes],
+
     ];
   }
 

@@ -47,6 +47,18 @@ public sealed class OrganizationController : ControllerBase
             return BadRequest(new ProblemDetails { Status = 400, Title = "No file was uploaded." });
         }
 
+        const long maxSizeBytes = 2 * 1024 * 1024;
+        if (file.Length > maxSizeBytes)
+        {
+            return BadRequest(new ProblemDetails { Status = 400, Title = "File size exceeds the 2MB limit." });
+        }
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext is not (".png" or ".jpg" or ".jpeg"))
+        {
+            return BadRequest(new ProblemDetails { Status = 400, Title = "Invalid file type. Allowed formats are PNG and JPG only (up to 2MB)." });
+        }
+
         using var stream = file.OpenReadStream();
         var url = await _company.UploadLogoAsync(stream, file.FileName, file.ContentType, file.Length, ct);
         return Ok(new CompanyLogoResponse(url));
