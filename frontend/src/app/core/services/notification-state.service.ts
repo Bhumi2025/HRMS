@@ -10,6 +10,7 @@ export interface DetailedNotification {
   time: string;
   category: 'Approval' | 'Attendance' | 'Policy' | 'Birthday' | 'Document' | 'Payroll' | 'System';
   unread: boolean;
+  userId?: string | null;
   actionUrl?: string;
   actionLabel?: string;
 }
@@ -63,7 +64,14 @@ export class NotificationStateService {
           if (full.includes('birthday') || full.includes('celebrat')) {
             category = 'Birthday';
             actionLabel = 'Send Wishes';
-          } else if (full.includes('attendance') || full.includes('absent') || full.includes('punch')) {
+          } else if (
+            full.includes('attendance') ||
+            full.includes('absent') ||
+            full.includes('punch') ||
+            full.includes('clock') ||
+            full.includes('note') ||
+            full.includes('late')
+          ) {
             category = 'Attendance';
             actionUrl = isEmp ? '/me/attendance' : '/attendance';
             actionLabel = 'View Attendance';
@@ -92,6 +100,7 @@ export class NotificationStateService {
             time: n.timeLabel,
             category,
             unread: !n.isRead,
+            userId: n.userId,
             actionUrl,
             actionLabel,
           };
@@ -99,10 +108,16 @@ export class NotificationStateService {
 
         if (isEmp) {
           const user = this.session.user();
+          const myId = user?.id;
           const myName = (user?.name || '').trim().toLowerCase();
           const myFirstName = myName.split(' ')[0] || '';
 
           const filtered = mapped.filter((item) => {
+            // 0. If explicitly targeted to this employee, ALWAYS show it!
+            if (item.userId && myId && item.userId === myId) {
+              return true;
+            }
+
             const t = (item.title || '').toLowerCase();
             const m = (item.message || '').toLowerCase();
 
@@ -133,15 +148,34 @@ export class NotificationStateService {
               return false;
             }
 
-            // 3. Attendance Reminders of that employee only
-            if (item.category === 'Attendance') {
-              const isReminder =
+            // 3. Attendance Reminders & Notes of that employee only
+            if (
+              item.category === 'Attendance' ||
+              t.includes('attendance') ||
+              t.includes('clock in') ||
+              t.includes('clock out') ||
+              t.includes('punch') ||
+              t.includes('note')
+            ) {
+              if (item.userId && myId && item.userId === myId) {
+                return true;
+              }
+              if (myFirstName && (m.includes(myFirstName) || t.includes(myFirstName))) {
+                return true;
+              }
+              const isReminderOrNote =
                 t.includes('reminder') ||
                 m.includes('reminder') ||
                 t.includes('clock in') ||
-                t.includes('punch reminder');
+                t.includes('clock out') ||
+                t.includes('punch reminder') ||
+                t.includes('hr note') ||
+                t.includes('note') ||
+                m.includes('note') ||
+                t.includes('late') ||
+                m.includes('late');
               const isGenericAbsent = m.includes('recorded absent') || m.includes('window closed');
-              return isReminder && !isGenericAbsent;
+              return isReminderOrNote && !isGenericAbsent;
             }
 
             // Filter out all other unrelated items for employees (birthdays of others, system alerts, approvals of others)

@@ -59,15 +59,9 @@ interface DocRow {
         <div>
           <div style="font-size: 1.2rem; font-weight: 700; color: var(--text); margin-bottom: 2px">{{ displayName() }}</div>
           <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px">{{ job().title }}{{ job().dept ? ' · ' + job().dept : '' }}{{ detail()?.employeeCode ? ' · ' + detail()?.employeeCode : '' }}</div>
-          <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center">
+          <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-start">
             <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 20px; background: var(--success-soft); color: var(--success); border: 1px solid rgba(34,197,94,.3)">
               <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block"></span>Active
-            </span>
-            <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 20px; background: var(--p-soft); color: var(--p); border: 1px solid var(--p-mid)">
-              <span [appIcon]="'pin'"></span> Dubai, UAE
-            </span>
-            <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 20px; background: var(--p-soft); color: var(--p); border: 1px solid var(--p-mid)">
-              <span [appIcon]="'calendar2'"></span> Joined Mar 2022
             </span>
           </div>
         </div>
@@ -301,7 +295,6 @@ interface DocRow {
                     <div style="display: flex; gap: 4px">
                       <button class="btn btn-ghost btn-sm" data-tooltip="View" (click)="viewDoc(r)"><span [appIcon]="'eye'"></span></button>
                       <button class="btn btn-ghost btn-sm" data-tooltip="Download" (click)="downloadDocument(r)"><span [appIcon]="'download'"></span></button>
-                      <button class="btn btn-ghost btn-sm" data-tooltip="Save" (click)="saveDocRow(r)"><span [appIcon]="'check'"></span></button>
                     </div>
                   </td>
                 </tr>
@@ -525,13 +518,41 @@ export class EmpProfileComponent implements OnInit {
         input.value = '';
         return;
       }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const res = e.target?.result as string;
-        this.avatarUrl.set(res);
-        this.toast.show('Profile photo updated!', 'success');
-      };
-      reader.readAsDataURL(file);
+
+      // First upload file to persistent server storage
+      this.api.uploadFile(file).subscribe({
+        next: (res) => {
+          const photoUrl = res.url || res.cloudinaryUrl || '';
+          if (photoUrl) {
+            this.avatarUrl.set(photoUrl);
+            this.api.updateMyPhoto(photoUrl).subscribe({
+              next: () => {
+                this.toast.show('Profile photo saved successfully!', 'success');
+              },
+              error: () => {
+                this.toast.show('Photo uploaded, but could not update profile.', 'danger');
+              },
+            });
+          }
+        },
+        error: () => {
+          // Fallback to Base64 data URL
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            this.avatarUrl.set(dataUrl);
+            this.api.updateMyPhoto(dataUrl).subscribe({
+              next: () => {
+                this.toast.show('Profile photo saved successfully!', 'success');
+              },
+              error: () => {
+                this.toast.show('Could not save profile photo to server.', 'danger');
+              },
+            });
+          };
+          reader.readAsDataURL(file);
+        },
+      });
     }
   }
 
@@ -663,6 +684,9 @@ export class EmpProfileComponent implements OnInit {
       next: (employee) => {
         this.detail.set(employee);
         this.apiId.set(employee.id);
+        if (employee.facePhotoUrl) {
+          this.avatarUrl.set(employee.facePhotoUrl);
+        }
 
         this.personal.set({
           salutation: employee.salutation || (employee.gender === 'Male' ? 'Mr' : 'Miss'),

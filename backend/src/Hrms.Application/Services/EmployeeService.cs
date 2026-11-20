@@ -406,6 +406,16 @@ public sealed class EmployeeService : IEmployeeService
         return rows;
     }
 
+    public async Task UpdatePhotoAsync(Guid id, string photoUrl, CancellationToken ct = default)
+    {
+        var employee = await _uow.Employees.GetByIdAsync(id, ct)
+            ?? throw NotFoundException.For("Employee", id);
+
+        employee.FacePhotoUrl = photoUrl;
+        _uow.Employees.Update(employee);
+        await _uow.SaveChangesAsync(ct);
+    }
+
     public async Task<Guid> ResolveEmployeeIdAsync(Guid? explicitEmployeeId, CancellationToken ct = default)
     {
         if (explicitEmployeeId is { } id && id != Guid.Empty)

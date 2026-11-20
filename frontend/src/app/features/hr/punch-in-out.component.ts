@@ -202,9 +202,20 @@ import { ToastService } from '../../core/services/toast.service';
         <!-- RIGHT COLUMN: Live Camera & Face Recognition Verification -->
         <div class="right-col">
           <div class="card p-4">
-            <div class="card-section-title">
-              <span class="step-num">3</span>
-              <span>Live Face Recognition Verification</span>
+            <div class="card-section-title d-flex justify-content-between align-items-center">
+              <div class="d-flex align-items-center gap-2">
+                <span class="step-num">3</span>
+                <span>Live Face Recognition Verification</span>
+              </div>
+              <button
+                type="button"
+                class="btn-toggle-autopunch"
+                [class.enabled]="autoPunchEnabled()"
+                (click)="autoPunchEnabled.set(!autoPunchEnabled())"
+                title="Automatically punches in/out when employee face is verified"
+              >
+                <span>⚡ Auto-Punch:</span> <strong>{{ autoPunchEnabled() ? 'ON' : 'OFF' }}</strong>
+              </button>
             </div>
 
             <!-- Live Camera Viewport -->
@@ -235,13 +246,19 @@ import { ToastService } from '../../core/services/toast.service';
               </div>
 
               <!-- Live Status Pill Overlay -->
-              <div class="floating-face-status" [class.success]="faceStatus() === 'verified'" [class.error]="faceStatus() === 'mismatched'">
-                @if (faceStatus() === 'verified') {
-                  ✅ Face Verified ({{ faceMatchScore() }}% Match)
+              <div class="floating-face-status" [class.success]="faceStatus() === 'verified' || punchResult()?.success" [class.error]="faceStatus() === 'mismatched'">
+                @if (punchResult(); as result) {
+                  @if (result.success) {
+                    ✅ {{ result.message }}
+                  } @else {
+                    ⚠️ Punch Failed
+                  }
+                } @else if (faceStatus() === 'verified') {
+                  ✅ {{ selectedEmployee()?.fullName }} ({{ faceMatchScore() }}% Match)
                 } @else if (faceStatus() === 'mismatched') {
                   ❌ Face Verification Failed ({{ faceMatchScore() }}% &lt; 70%)
                 } @else if (hasFaceDetected()) {
-                  🔍 Center Face for Verification…
+                  🔍 Scanning Face Biometrics…
                 } @else {
                   👤 Position Face inside Frame
                 }
@@ -267,16 +284,26 @@ import { ToastService } from '../../core/services/toast.service';
             </div>
 
             <!-- Verification Status Banner -->
-            <div class="verification-summary-banner mt-3" [class.banner-pass]="faceStatus() === 'verified'" [class.banner-fail]="faceStatus() === 'mismatched'">
-              @if (faceStatus() === 'verified') {
-                <div class="banner-title">✅ Face Verified</div>
-                <div class="banner-desc">Biometrics confirmed for {{ selectedEmployee()?.fullName }}. Eligible to record attendance.</div>
+            <div class="verification-summary-banner mt-3" [class.banner-pass]="faceStatus() === 'verified' || punchResult()?.success" [class.banner-fail]="faceStatus() === 'mismatched'">
+              @if (punchResult(); as result) {
+                @if (result.success) {
+                  <div class="banner-title">🎉 {{ result.message }}</div>
+                  <div class="banner-desc">
+                    Recorded at {{ result.punchTime | date:'hh:mm:ss a' }}. Live timer active on employee dashboard and attendance marked in HR panel.
+                  </div>
+                } @else {
+                  <div class="banner-title">⚠️ Punch Transaction Failed</div>
+                  <div class="banner-desc">{{ result.message }}</div>
+                }
+              } @else if (faceStatus() === 'verified') {
+                <div class="banner-title">✅ Face Verified: {{ selectedEmployee()?.fullName }}</div>
+                <div class="banner-desc">Biometrics confirmed ({{ faceMatchScore() }}% Match). Ready to record attendance.</div>
               } @else if (faceStatus() === 'mismatched') {
                 <div class="banner-title">❌ Face Verification Failed</div>
                 <div class="banner-desc">Captured live face does not match registered biometrics for this employee. Transaction blocked.</div>
               } @else {
                 <div class="banner-title">⏳ Awaiting Face Match</div>
-                <div class="banner-desc">Ensure the employee is facing the camera clearly with proper lighting.</div>
+                <div class="banner-desc">Ensure the employee is facing the camera clearly with proper lighting. Terminal auto-identifies enrolled employees.</div>
               }
             </div>
 
@@ -338,11 +365,20 @@ import { ToastService } from '../../core/services/toast.service';
             <!-- Result Feedback Toast / Alert -->
             @if (punchResult(); as result) {
               <div class="result-alert-box mt-3" [class.alert-success]="result.success" [class.alert-danger]="!result.success">
-                <div class="alert-title">{{ result.success ? '🎉 Attendance Recorded Successfully' : '⚠️ Attendance Failed' }}</div>
+                <div class="alert-title">{{ result.success ? (result.punchType === 'ClockIn' ? '🎉 Successfully Punched In' : '🚪 Successfully Punched Out') : '⚠️ Attendance Failed' }}</div>
                 <div class="alert-msg">{{ result.message }}</div>
                 <div class="alert-meta">
                   Employee: <strong>{{ result.employeeName }} ({{ result.employeeCode }})</strong> · Action: <strong>{{ result.punchType }}</strong> · Time: <strong>{{ result.punchTime | date:'hh:mm:ss a' }}</strong> · Distance: <strong>{{ result.distanceMeters }}m</strong>
                 </div>
+                @if (result.success) {
+                  <div class="sync-confirmation">
+                    ⏱️ <strong>Active live timer</strong> is running on {{ result.employeeName }}'s dashboard. Status reflected in HR Attendance Panel.
+                  </div>
+                  <div class="terminal-reset-row">
+                    <span class="reset-text">Ready for next employee in <strong>{{ resetCountdown() ?? 4 }}s</strong>…</span>
+                    <button type="button" class="btn-reset-next" (click)="resetForNextEmployee()">Scan Next Employee Now →</button>
+                  </div>
+                }
               </div>
             }
           </div>
@@ -1019,6 +1055,63 @@ import { ToastService } from '../../core/services/toast.service';
         opacity: 0.85;
       }
 
+      .btn-toggle-autopunch {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 20px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-toggle-autopunch.enabled {
+        background: #ecfdf5;
+        border-color: #6ee7b7;
+        color: #047857;
+      }
+      .sync-confirmation {
+        margin-top: 8px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px dashed #10b981;
+        font-size: 12px;
+        color: #065f46;
+        font-weight: 500;
+      }
+      .terminal-reset-row {
+        margin-top: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+      }
+      .reset-text {
+        font-size: 11px;
+        color: #4b5563;
+      }
+      .btn-reset-next {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 5px 12px;
+        background: #0284c7;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .btn-reset-next:hover {
+        background: #0369a1;
+      }
+
       .custom-scroll::-webkit-scrollbar {
         width: 6px;
       }
@@ -1049,6 +1142,14 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly searchQuery = signal<string>('');
   protected readonly selectedEmployee = signal<EmployeeListItem | null>(null);
 
+  // Auto-punch & Auto-reset signals
+  protected readonly autoPunchEnabled = signal<boolean>(true);
+  protected readonly resetCountdown = signal<number | null>(null);
+  protected readonly recognizedName = signal<string | null>(null);
+  private autoResetTimer: ReturnType<typeof setInterval> | null = null;
+  private consecutiveVerifiedFrames = 0;
+  private punchCooldown = false;
+
   // Status signals
   protected readonly isClockedIn = signal<boolean>(false);
   protected readonly lastPunchInfo = signal<string | null>(null);
@@ -1072,6 +1173,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
   // Operation flags
   protected readonly isEnrolling = signal<boolean>(false);
   protected readonly isSubmitting = signal<boolean>(false);
+  protected readonly isLoadingStatus = signal<boolean>(false);
   protected readonly punchResult = signal<CentralizedPunchResult | null>(null);
 
   private videoStream: MediaStream | null = null;
@@ -1099,6 +1201,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
       this.selectedEmployee() !== null &&
       this.isWithinGeofence() &&
       this.faceStatus() === 'verified' &&
+      !this.isLoadingStatus() &&
       !this.isSubmitting()
     );
   });
@@ -1124,6 +1227,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.clockInterval) clearInterval(this.clockInterval);
     if (this.scanInterval) clearInterval(this.scanInterval);
+    if (this.autoResetTimer) clearInterval(this.autoResetTimer);
     this.stopCamera();
   }
 
@@ -1153,6 +1257,13 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected selectEmployee(emp: EmployeeListItem): void {
+    if (this.autoResetTimer) {
+      clearInterval(this.autoResetTimer);
+      this.autoResetTimer = null;
+    }
+    this.resetCountdown.set(null);
+    this.punchCooldown = false;
+    this.consecutiveVerifiedFrames = 0;
     this.selectedEmployee.set(emp);
     this.searchQuery.set('');
     this.punchResult.set(null);
@@ -1165,8 +1276,10 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
     this.empEnrolledPhoto.set(enrolled?.avatarUrl || null);
 
     // Check attendance status
+    this.isLoadingStatus.set(true);
     this.api.punchStatus(emp.id).subscribe({
       next: (status) => {
+        this.isLoadingStatus.set(false);
         this.isClockedIn.set(status.isCheckedIn);
         if (status.todayPunches && status.todayPunches.length > 0) {
           const last = status.todayPunches[status.todayPunches.length - 1];
@@ -1177,6 +1290,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       },
       error: () => {
+        this.isLoadingStatus.set(false);
         this.isClockedIn.set(false);
         this.lastPunchInfo.set(null);
       },
@@ -1283,22 +1397,81 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
         this.currentDescriptor = scan.descriptor;
         this.currentSnapshot = scan.snapshot || null;
 
-        // Verify if employee is selected
+        // Verify if employee is selected or auto-identify from enrolled faces
         const emp = this.selectedEmployee();
         if (emp) {
           this.verifySelectedFace(scan.descriptor);
         } else {
-          this.faceStatus.set('scanning');
-          this.faceMatchScore.set(null);
+          this.identifyFace(scan.descriptor);
+        }
+
+        // Auto-Punch when verified and eligible
+        if (
+          this.autoPunchEnabled() &&
+          this.canExecutePunch() &&
+          !this.isSubmitting() &&
+          !this.punchCooldown &&
+          !this.punchResult()
+        ) {
+          this.consecutiveVerifiedFrames++;
+          if (this.consecutiveVerifiedFrames >= 2) {
+            this.punchCooldown = true;
+            this.submitCentralizedPunch(this.isClockedIn() ? 'ClockOut' : 'ClockIn');
+          }
+        } else if (this.faceStatus() !== 'verified') {
+          this.consecutiveVerifiedFrames = 0;
         }
       } else {
         this.currentDescriptor = null;
-        if (this.faceStatus() !== 'idle') {
+        this.consecutiveVerifiedFrames = 0;
+        if (!this.selectedEmployee() && this.faceStatus() !== 'idle') {
           this.faceStatus.set('idle');
           this.faceMatchScore.set(null);
         }
       }
     }, 700);
+  }
+
+  private identifyFace(liveDescriptor: number[]): void {
+    const enrolledList = this.enrolledFaces();
+    if (!enrolledList || enrolledList.length === 0) {
+      this.faceStatus.set('scanning');
+      this.faceMatchScore.set(null);
+      return;
+    }
+
+    let bestMatch: EnrolledFace | null = null;
+    let bestScore = 0;
+    let bestDist = 999;
+
+    for (const enrolled of enrolledList) {
+      if (!enrolled.faceDescriptor) continue;
+      try {
+        const refArr = JSON.parse(enrolled.faceDescriptor) as number[];
+        const evalResult = this.faceService.compareFaces(liveDescriptor, refArr, 70);
+        if (evalResult.matchScore > bestScore) {
+          bestScore = evalResult.matchScore;
+          bestDist = evalResult.distance;
+          bestMatch = enrolled;
+        }
+      } catch {}
+    }
+
+    if (bestMatch && bestScore >= 70 && bestDist <= 0.58) {
+      const matchingEmp = this.employees().find(
+        (e) => e.id === bestMatch!.employeeId || e.employeeCode.toLowerCase() === bestMatch!.employeeCode.toLowerCase()
+      );
+      if (matchingEmp) {
+        this.selectEmployee(matchingEmp);
+        this.faceMatchScore.set(bestScore);
+        this.faceStatus.set('verified');
+        this.recognizedName.set(matchingEmp.fullName);
+        this.toast.show(`Face Recognized: ${matchingEmp.fullName} (${bestScore}% Match)`, 'info');
+      }
+    } else {
+      this.faceStatus.set('scanning');
+      this.faceMatchScore.set(null);
+    }
   }
 
   private verifySelectedFace(liveDescriptor: number[]): void {
@@ -1380,9 +1553,10 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
     const lat = this.currentLat() ?? this.OFFICE_LAT;
     const lon = this.currentLon() ?? this.OFFICE_LON;
 
+    const targetType = type || (this.isClockedIn() ? 'ClockOut' : 'ClockIn');
     const payload: CentralizedPunchRequest = {
       employeeId: emp.id,
-      punchType: type,
+      punchType: targetType,
       latitude: lat,
       longitude: lon,
       faceDescriptor: this.currentDescriptor || undefined,
@@ -1395,17 +1569,23 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (res) => {
         this.isSubmitting.set(false);
         this.punchResult.set(res);
-        this.isClockedIn.set(type === 'ClockIn');
+        this.isClockedIn.set(res.punchType === 'ClockIn');
 
-        const actionText = type === 'ClockIn' ? 'Successfully Punched In' : 'Successfully Punched Out';
+        const actionText = res.punchType === 'ClockIn' ? 'Successfully Punched In' : 'Successfully Punched Out';
         this.toast.show(`${actionText}: ${emp.fullName}!`, 'success');
 
         // Update last activity text
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        this.lastPunchInfo.set(`${type} at ${time}`);
+        this.lastPunchInfo.set(`${res.punchType} at ${time}`);
+
+        this.consecutiveVerifiedFrames = 0;
+        // Automatically refresh highlighted employee card after confirmation
+        this.startAutoReset(2);
       },
       error: (err) => {
         this.isSubmitting.set(false);
+        this.punchCooldown = false;
+        this.consecutiveVerifiedFrames = 0;
         const msg = err.error?.message || err.message || 'Attendance transaction failed.';
         this.punchResult.set({
           success: false,
@@ -1413,7 +1593,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
           employeeId: emp.id,
           employeeName: emp.fullName,
           employeeCode: emp.employeeCode,
-          punchType: type,
+          punchType: targetType,
           punchTime: new Date().toISOString(),
           latitude: lat,
           longitude: lon,
@@ -1426,6 +1606,42 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
         this.toast.show(msg, 'danger');
       },
     });
+  }
+
+  protected startAutoReset(seconds: number = 2): void {
+    if (this.autoResetTimer) clearInterval(this.autoResetTimer);
+    this.resetCountdown.set(seconds);
+
+    this.autoResetTimer = setInterval(() => {
+      const cur = this.resetCountdown();
+      if (cur !== null && cur > 1) {
+        this.resetCountdown.set(cur - 1);
+      } else {
+        this.resetForNextEmployee();
+      }
+    }, 1000);
+  }
+
+  protected resetForNextEmployee(): void {
+    if (this.autoResetTimer) {
+      clearInterval(this.autoResetTimer);
+      this.autoResetTimer = null;
+    }
+    this.resetCountdown.set(null);
+    this.selectedEmployee.set(null);
+    this.searchQuery.set('');
+    this.punchResult.set(null);
+    this.faceStatus.set('idle');
+    this.faceMatchScore.set(null);
+    this.isFaceEnrolled.set(false);
+    this.empEnrolledPhoto.set(null);
+    this.lastPunchInfo.set(null);
+    this.recognizedName.set(null);
+    this.currentDescriptor = null;
+    this.currentSnapshot = null;
+    this.consecutiveVerifiedFrames = 0;
+    this.punchCooldown = false;
+    this.isLoadingStatus.set(false);
   }
 
   private stopCamera(): void {

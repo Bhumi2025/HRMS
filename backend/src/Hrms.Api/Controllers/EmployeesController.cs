@@ -83,6 +83,49 @@ public sealed class EmployeesController : ControllerBase
         return Ok(await _employees.UpdateAsync(id, request, ct));
     }
 
+    public sealed record UpdatePhotoRequest(string PhotoUrl);
+
+    [HttpPut("me/photo")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateMyPhoto(
+        [FromBody] UpdatePhotoRequest request,
+        CancellationToken ct)
+    {
+        var id = await _employees.ResolveEmployeeIdAsync(null, ct);
+        await _employees.UpdatePhotoAsync(id, request.PhotoUrl, ct);
+        return Ok(new { message = "Photo updated successfully." });
+    }
+
+    [HttpPut("{id:guid}/photo")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdatePhoto(
+        Guid id,
+        [FromBody] UpdatePhotoRequest request,
+        CancellationToken ct)
+    {
+        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
+        var isHrAdmin = role.Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
+                        role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) ||
+                        role.Equals("Company Admin", StringComparison.OrdinalIgnoreCase) ||
+                        role.Equals("CompanyAdmin", StringComparison.OrdinalIgnoreCase) ||
+                        role.Equals("HR Manager", StringComparison.OrdinalIgnoreCase) ||
+                        role.Equals("HrManager", StringComparison.OrdinalIgnoreCase);
+
+        if (!isHrAdmin)
+        {
+            var empClaim = User.FindFirst("employeeId")?.Value;
+            if (string.IsNullOrWhiteSpace(empClaim) || !Guid.TryParse(empClaim, out var userEmpId) || userEmpId != id)
+            {
+                return Forbid();
+            }
+        }
+
+        await _employees.UpdatePhotoAsync(id, request.PhotoUrl, ct);
+        return Ok(new { message = "Photo updated successfully." });
+    }
+
     [HttpPut("{id:guid}")]
     [Authorize]
     [ProducesResponseType(typeof(EmployeeDetailDto), StatusCodes.Status200OK)]

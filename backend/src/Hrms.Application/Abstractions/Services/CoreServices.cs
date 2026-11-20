@@ -29,6 +29,8 @@ public interface IEmployeeService
 
     Task<IReadOnlyList<DepartmentHeadcountDto>> DepartmentHeadcountAsync(CancellationToken ct = default);
 
+    Task UpdatePhotoAsync(Guid id, string photoUrl, CancellationToken ct = default);
+
     /// <summary>Resolves the employee record linked to the current user (or the first employee).</summary>
     Task<Guid> ResolveEmployeeIdAsync(Guid? explicitEmployeeId, CancellationToken ct = default);
 }

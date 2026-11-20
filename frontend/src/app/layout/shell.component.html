@@ -51,7 +51,6 @@
           <span
             style="font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.25; white-space: nowrap;">{{
             greeting() }}, {{ userDisplayName() }}! 👋</span>
-         
         </div>
       </div>
       <div class="header-right" style="display: flex; align-items: center; gap: 8px;">
@@ -66,13 +65,8 @@
           </svg>
           <span>{{ todayFormatted() }}</span>
         </div>
-        <div
-          class="header-btn"
-          data-tooltip="Fullscreen"
-          style="cursor: pointer"
-          (click)="toggleFullscreen()"
-          [appIcon]="'expand'"
-        ></div>
+        <div class="header-btn" data-tooltip="Fullscreen" style="cursor: pointer" (click)="toggleFullscreen()"
+          [appIcon]="'expand'"></div>
         <!-- <div
           class="header-btn"
           [attr.data-tooltip]="theme.isDark() ? 'Light Mode' : 'Dark Mode'"

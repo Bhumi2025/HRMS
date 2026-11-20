@@ -325,6 +325,7 @@ export interface NotificationItem {
   message: string;
   timeLabel: string;
   isRead: boolean;
+  userId?: string | null;
 }
 
 export interface DashboardStats {

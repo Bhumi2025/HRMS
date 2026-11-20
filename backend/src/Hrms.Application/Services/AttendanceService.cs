@@ -957,11 +957,25 @@ public sealed class AttendanceService : IAttendanceService
             _uow.Attendance.Update(attendanceRecord);
         }
 
+        var targetUser = await _uow.Users.FirstOrDefaultAsync(
+            _uow.Users.Query().Where(u => u.EmployeeId == employee.Id || (employee.Email != null && u.Email == employee.Email)), ct);
+
+        var hasCustomNote = !string.IsNullOrWhiteSpace(request.Note)
+            && !request.Note.Equals("Manual Punch (HR Console)", StringComparison.OrdinalIgnoreCase)
+            && !request.Note.Equals("Web Browser", StringComparison.OrdinalIgnoreCase)
+            && !request.Note.Equals("Web Dashboard", StringComparison.OrdinalIgnoreCase);
+
+        var punchLabel = punchType == PunchType.ClockIn ? "Clock In" : (punchType == PunchType.ClockOut ? "Clock Out" : "Break");
+        var notifTitle = hasCustomNote ? $"HR Note: {punchLabel}" : $"{punchLabel} Activity";
+        var notifMessage = hasCustomNote ? request.Note!.Trim() : $"{employee.FirstName} {employee.LastName} ({employee.EmployeeCode}) recorded {punchType} at {localNow:hh:mm tt}.";
+        if (notifMessage.Length > 490) notifMessage = notifMessage.Substring(0, 490);
+
         await _uow.Notifications.AddAsync(new Notification
         {
-            IconKey = "clock",
-            Title = punchType == PunchType.ClockIn ? "Clock In Activity" : (punchType == PunchType.ClockOut ? "Clock Out Activity" : "Break Activity"),
-            Message = $"{employee.FirstName} {employee.LastName} ({employee.EmployeeCode}) recorded {punchType} at {localNow:hh:mm tt}.",
+            UserId = targetUser?.Id,
+            IconKey = hasCustomNote ? "bell" : "clock",
+            Title = notifTitle,
+            Message = notifMessage,
             TimeLabel = "Just now",
             IsRead = false,
             CreatedAtUtc = DateTime.UtcNow,
@@ -2069,13 +2083,7 @@ public sealed class AttendanceService : IAttendanceService
             throw new ValidationException("Face verification failed. The captured face does not match the registered employee.");
         }
 
-        // 4. State Validation & Duplicate Prevention
-        if (!Enum.TryParse<PunchType>(request.PunchType, true, out var punchType) ||
-            (punchType != PunchType.ClockIn && punchType != PunchType.ClockOut))
-        {
-            throw new ValidationException("Centralized attendance only supports Punch-In and Punch-Out.");
-        }
-
+        // 4. State Validation & Automatic Punch-In / Punch-Out Toggle
         var (tz, tzName, maxPunchDurationHours) = await GetCompanyTimeZoneAsync(ct);
         var nowUtc = DateTime.UtcNow;
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
@@ -2091,27 +2099,41 @@ public sealed class AttendanceService : IAttendanceService
                 .OrderBy(p => p.PunchTime),
             ct);
 
-        var lastPunch = todayPunches.LastOrDefault();
-        if (punchType == PunchType.ClockIn)
-        {
-            if (lastPunch != null && lastPunch.PunchType == PunchType.ClockIn)
-            {
-                var localPunchTime = TimeZoneInfo.ConvertTimeFromUtc(lastPunch.PunchTime, tz);
-                throw new ConflictException($"Employee {employee.FullName} is already clocked in today at {localPunchTime:hh:mm tt}.");
-            }
-        }
-        else if (punchType == PunchType.ClockOut)
-        {
-            if (lastPunch == null || lastPunch.PunchType == PunchType.ClockOut)
-            {
-                throw new ConflictException($"Employee {employee.FullName} is not currently clocked in. Cannot record Punch-Out without an active Punch-In.");
-            }
-        }
-
-        // 5. Close open punches and create new punch
         var openPunches = await _uow.Punches.ToListAsync(
             _uow.Punches.Query().Where(p => p.EmployeeId == employee.Id && p.IsOpen),
             ct);
+
+        var lastPunch = todayPunches.LastOrDefault();
+        var isCurrentlyClockedIn = openPunches.Any() || (lastPunch != null && lastPunch.PunchType == PunchType.ClockIn);
+
+        PunchType punchType;
+        if (string.Equals(request.PunchType, "Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            punchType = isCurrentlyClockedIn ? PunchType.ClockOut : PunchType.ClockIn;
+        }
+        else if (Enum.TryParse<PunchType>(request.PunchType, true, out var parsedType))
+        {
+            // 2nd scan automatic toggle: if employee is already clocked in, switch to ClockOut!
+            if (parsedType == PunchType.ClockIn && isCurrentlyClockedIn)
+            {
+                punchType = PunchType.ClockOut;
+            }
+            // 1st scan automatic toggle: if employee is not clocked in, switch to ClockIn!
+            else if (parsedType == PunchType.ClockOut && !isCurrentlyClockedIn)
+            {
+                punchType = PunchType.ClockIn;
+            }
+            else
+            {
+                punchType = parsedType;
+            }
+        }
+        else
+        {
+            punchType = isCurrentlyClockedIn ? PunchType.ClockOut : PunchType.ClockIn;
+        }
+
+        // 5. Close open punches and create new punch
         foreach (var open in openPunches)
         {
             open.IsOpen = false;
@@ -2252,7 +2274,40 @@ public sealed class AttendanceService : IAttendanceService
             {
                 attendanceRecord.Status = (firstCheckIn.HasValue && firstCheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes)) ? AttendanceStatus.Late : AttendanceStatus.Present;
             }
+            else if (punchType == PunchType.ClockOut)
+            {
+                if (attendanceRecord.WorkHours >= targetDailyHours * 0.9m || attendanceRecord.WorkHours >= 7.5m)
+                {
+                    attendanceRecord.Status = (attendanceRecord.CheckIn.HasValue && attendanceRecord.CheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes))
+                        ? AttendanceStatus.Late
+                        : AttendanceStatus.Present;
+                }
+                else if (attendanceRecord.WorkHours >= targetDailyHours * 0.5m || attendanceRecord.WorkHours >= 4.0m)
+                {
+                    attendanceRecord.Status = AttendanceStatus.HalfDay;
+                }
+                else if (attendanceRecord.WorkHours > 0)
+                {
+                    attendanceRecord.Status = AttendanceStatus.HalfDay;
+                }
+            }
             _uow.Attendance.Update(attendanceRecord);
+        }
+
+        var targetUser = await _uow.Users.FirstOrDefaultAsync(
+            _uow.Users.Query().Where(u => u.EmployeeId == employee.Id || (employee.Email != null && u.Email == employee.Email)), ct);
+        if (targetUser != null)
+        {
+            await _uow.Notifications.AddAsync(new Notification
+            {
+                UserId = targetUser.Id,
+                IconKey = "clock",
+                Title = punchType == PunchType.ClockIn ? "Clock In Activity" : "Clock Out Activity",
+                Message = punchType == PunchType.ClockIn ? $"Successfully punched in at {localNow:hh:mm tt} via Centralized Face Kiosk." : $"Successfully punched out at {localNow:hh:mm tt} via Centralized Face Kiosk.",
+                TimeLabel = "Just now",
+                IsRead = false,
+                CreatedAtUtc = DateTime.UtcNow,
+            }, ct);
         }
 
         await _uow.SaveChangesAsync(ct);

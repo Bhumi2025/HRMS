@@ -123,40 +123,34 @@
               <div class="header-title-box">
                 <h3 class="widget-title-nowrap">Attendance Overview</h3>
                 @if (hrEmployees().length > 1) {
-                  <div class="hr-selector-badge">
-                    <select
-                      class="hr-dropdown"
-                      [value]="selectedHrEmployeeId()"
-                      (change)="onHrEmployeeChange($event)"
-                      title="Select HR Employee"
-                    >
-                      @for (hr of hrEmployees(); track hr.id) {
-                        <option [value]="hr.id">{{ hr.firstName }} {{ hr.lastName }}</option>
-                      }
-                    </select>
-                    <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <path d="M6 9l6 6 6-6"/>
-                    </svg>
-                  </div>
-                } @else if (hrEmployees().length === 1) {
-                  <div class="hr-badge-single" title="HR Attendance Overview">
-                    <span class="hr-dot"></span>
-                    <span>{{ hrEmployees()[0].firstName }} {{ hrEmployees()[0].lastName }}</span>
-                  </div>
-                }
-                <div class="month-selector-badge">
-                  <select
-                    class="month-dropdown"
-                    [value]="selectedMonthKey()"
-                    (change)="onMonthChange($event)"
-                    title="Select Month & Year"
-                  >
-                    @for (m of availableMonths(); track m.key) {
-                      <option [value]="m.key" [selected]="m.key === selectedMonthKey()">{{ m.label }}</option>
+                <div class="hr-selector-badge">
+                  <select class="hr-dropdown" [value]="selectedHrEmployeeId()" (change)="onHrEmployeeChange($event)"
+                    title="Select HR Employee">
+                    @for (hr of hrEmployees(); track hr.id) {
+                    <option [value]="hr.id">{{ hr.firstName }} {{ hr.lastName }}</option>
                     }
                   </select>
-                  <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M6 9l6 6 6-6"/>
+                  <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5">
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </div>
+                } @else if (hrEmployees().length === 1) {
+                <div class="hr-badge-single" title="HR Attendance Overview">
+                  <span class="hr-dot"></span>
+                  <span>{{ hrEmployees()[0].firstName }} {{ hrEmployees()[0].lastName }}</span>
+                </div>
+                }
+                <div class="month-selector-badge">
+                  <select class="month-dropdown" [value]="selectedMonthKey()" (change)="onMonthChange($event)"
+                    title="Select Month & Year">
+                    @for (m of availableMonths(); track m.key) {
+                    <option [value]="m.key" [selected]="m.key === selectedMonthKey()">{{ m.label }}</option>
+                    }
+                  </select>
+                  <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5">
+                    <path d="M6 9l6 6 6-6" />
                   </svg>
                 </div>
               </div>
@@ -164,7 +158,8 @@
 
             <!-- Action (Redirects to Monthly Muster Register) -->
             <div class="header-actions">
-              <a [routerLink]="['/attendance']" [queryParams]="{ tab: 'muster', month: selectedMonthKey() }" class="view-link" title="Open Monthly Muster Register">Detailed Log ›</a>
+              <a [routerLink]="['/attendance']" [queryParams]="{ tab: 'muster', month: selectedMonthKey() }"
+                class="view-link" title="Open Monthly Muster Register">Detailed Log ›</a>
             </div>
           </div>
 
@@ -184,150 +179,97 @@
               <svg class="timelog-bar-chart-svg" viewBox="0 0 760 185" preserveAspectRatio="none">
                 <!-- Subtle Horizontal Grid Lines & Y-Axis Scale Values -->
                 @for (val of chartYScaleSteps(); track val) {
-                  <line
-                    x1="36"
-                    [attr.y1]="getYCoord(val)"
-                    x2="745"
-                    [attr.y2]="getYCoord(val)"
-                    stroke="#f1f5f9"
-                    stroke-width="1.2"
-                  />
-                  <text
-                    x="28"
-                    [attr.y]="getYCoord(val) + 3.5"
-                    text-anchor="end"
-                    class="y-axis-scale-text"
-                  >
-                    {{ val }}
-                  </text>
+                <line x1="36" [attr.y1]="getYCoord(val)" x2="745" [attr.y2]="getYCoord(val)" stroke="#f1f5f9"
+                  stroke-width="1.2" />
+                <text x="28" [attr.y]="getYCoord(val) + 3.5" text-anchor="end" class="y-axis-scale-text">
+                  {{ val }}
+                </text>
                 }
 
                 <!-- Vertical Column Bars for Each Day of the Month -->
                 @for (b of timelogBars(); track b.idx) {
-                  <g class="bar-day-group" [class.is-today]="b.isToday" [class.is-hovered]="hoveredBar()?.idx === b.idx">
-                    <!-- Invisible Full-Height Hover Trigger Zone -->
-                    <rect
-                      [attr.x]="b.barX - 2"
-                      y="15"
-                      [attr.width]="b.barWidth + 4"
-                      height="145"
-                      fill="transparent"
-                      class="bar-hover-zone"
-                      (mouseenter)="onBarEnter(b)"
-                      (mouseleave)="onBarLeave()"
-                    />
+                <g class="bar-day-group" [class.is-today]="b.isToday" [class.is-hovered]="hoveredBar()?.idx === b.idx">
+                  <!-- Invisible Full-Height Hover Trigger Zone -->
+                  <rect [attr.x]="b.barX - 2" y="15" [attr.width]="b.barWidth + 4" height="145" fill="transparent"
+                    class="bar-hover-zone" (mouseenter)="onBarEnter(b)" (mouseleave)="onBarLeave()" />
 
-                    <!-- Stacked Segments -->
-                    <!-- 1. Before Break (Bottom Segment) -->
-                    @if (b.hBefore > 0) {
-                      <rect
-                        [attr.x]="b.barX"
-                        [attr.y]="b.yBefore"
-                        [attr.width]="b.barWidth"
-                        [attr.height]="b.hBefore"
-                        rx="2"
-                        fill="#22c55e"
-                        class="bar-segment seg-before"
-                      />
-                    }
+                  <!-- Stacked Segments -->
+                  <!-- 1. Before Break (Bottom Segment) -->
+                  @if (b.hBefore > 0) {
+                  <rect [attr.x]="b.barX" [attr.y]="b.yBefore" [attr.width]="b.barWidth" [attr.height]="b.hBefore"
+                    rx="2" fill="#22c55e" class="bar-segment seg-before" />
+                  }
 
-                    <!-- 2. Break -->
-                    @if (b.hBreak > 0) {
-                      <rect
-                        [attr.x]="b.barX"
-                        [attr.y]="b.yBreak"
-                        [attr.width]="b.barWidth"
-                        [attr.height]="b.hBreak"
-                        rx="2"
-                        fill="#f59e0b"
-                        class="bar-segment seg-break"
-                      />
-                    }
+                  <!-- 2. Break -->
+                  @if (b.hBreak > 0) {
+                  <rect [attr.x]="b.barX" [attr.y]="b.yBreak" [attr.width]="b.barWidth" [attr.height]="b.hBreak" rx="2"
+                    fill="#f59e0b" class="bar-segment seg-break" />
+                  }
 
-                    <!-- 3. After Break -->
-                    @if (b.hAfter > 0) {
-                      <rect
-                        [attr.x]="b.barX"
-                        [attr.y]="b.yAfter"
-                        [attr.width]="b.barWidth"
-                        [attr.height]="b.hAfter"
-                        rx="2"
-                        fill="#16a34a"
-                        class="bar-segment seg-after"
-                      />
-                    }
+                  <!-- 3. After Break -->
+                  @if (b.hAfter > 0) {
+                  <rect [attr.x]="b.barX" [attr.y]="b.yAfter" [attr.width]="b.barWidth" [attr.height]="b.hAfter" rx="2"
+                    fill="#16a34a" class="bar-segment seg-after" />
+                  }
 
-                    <!-- 4. Missing (Solid rounded coral bar on missing/absent day) -->
-                    @if (b.hMissing > 0) {
-                      <rect
-                        [attr.x]="b.barX"
-                        [attr.y]="b.yMissing"
-                        [attr.width]="b.barWidth"
-                        [attr.height]="b.hMissing"
-                        rx="3"
-                        fill="#f87171"
-                        class="bar-segment seg-missing"
-                      />
-                    }
+                  <!-- 4. Missing (Solid rounded coral bar on missing/absent day) -->
+                  @if (b.hMissing > 0) {
+                  <rect [attr.x]="b.barX" [attr.y]="b.yMissing" [attr.width]="b.barWidth" [attr.height]="b.hMissing"
+                    rx="3" fill="#f87171" class="bar-segment seg-missing" />
+                  }
 
-                    <!-- X-Axis Day Number Centered Below Column -->
-                    <text
-                      [attr.x]="b.cx"
-                      y="168"
-                      text-anchor="middle"
-                      class="x-axis-day-num"
-                      [class.day-today]="b.isToday"
-                      [class.day-hovered]="hoveredBar()?.idx === b.idx"
-                    >
-                      {{ b.dayNumber }}
-                    </text>
-                  </g>
+                  <!-- X-Axis Day Number Centered Below Column -->
+                  <text [attr.x]="b.cx" y="168" text-anchor="middle" class="x-axis-day-num"
+                    [class.day-today]="b.isToday" [class.day-hovered]="hoveredBar()?.idx === b.idx">
+                    {{ b.dayNumber }}
+                  </text>
+                </g>
                 }
 
                 <!-- Interactive Floating Tooltip -->
                 @if (hoveredBar(); as hov) {
-                  <g
-                    class="bar-tooltip-group"
-                    [attr.transform]="'translate(' + (hov.cx > 570 ? hov.cx - 180 : (hov.cx < 95 ? hov.cx + 5 : hov.cx - 90)) + ', ' + (hov.topY > 75 ? hov.topY - 67 : hov.topY + 12) + ')'"
-                  >
-                    <rect width="180" height="64" rx="7" fill="#0f172a" opacity="0.96" />
-                    <text x="90" y="14" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="700">
-                      {{ selectedHrEmployeeName() }} ({{ selectedHrEmployeeCode() }})
-                    </text>
-                    <text x="90" y="27" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="600">
-                      {{ hov.formattedDate }}
-                    </text>
-                    <text x="90" y="41" text-anchor="middle" fill="#94a3b8" font-size="8.5" font-weight="500">
-                      @if (hov.totalHours > 0) {
-                        Work: {{ (hov.beforeBreak + hov.afterBreak) | number:'1.1-1' }}h | Break: {{ hov.breakHrs > 0 ? (hov.breakHrs | number:'1.1-1') + 'h' : '0h' }}
-                      } @else {
-                        No Activity Recorded
-                      }
-                    </text>
-                    <text x="90" y="55" text-anchor="middle" fill="#4ade80" font-size="8.5" font-weight="600">
-                      @if (hov.isToday) {
-                        @if (punchService.todayPunchBreakdown().phase === 'on_break' || (hov.breakHrs > 0 && hov.afterBreak === 0)) {
-                          Status: On Break ☕
-                        } @else if (punchService.todayPunchBreakdown().phase === 'clocked_out') {
-                          Status: Completed (Clocked Out)
-                        } @else if (hov.late > 0) {
-                          Status: Active (Late Arrival)
-                        } @else if (hov.beforeBreak > 0 || hov.afterBreak > 0 || hov.present > 0) {
-                          Status: Active (On Duty)
-                        } @else {
-                          Status: Awaiting Clock-In
-                        }
-                      } @else if (hov.missing > 0 && hov.beforeBreak === 0) {
-                        Status: Missing / Absent
-                      } @else if (hov.late > 0) {
-                        Status: Present (Late Arrival)
-                      } @else if (hov.present > 0) {
-                        Status: Present (On-Time)
-                      } @else {
-                        Status: Off / Weekend
-                      }
-                    </text>
-                  </g>
+                <g class="bar-tooltip-group"
+                  [attr.transform]="'translate(' + (hov.cx > 570 ? hov.cx - 180 : (hov.cx < 95 ? hov.cx + 5 : hov.cx - 90)) + ', ' + (hov.topY > 75 ? hov.topY - 67 : hov.topY + 12) + ')'">
+                  <rect width="180" height="64" rx="7" fill="#0f172a" opacity="0.96" />
+                  <text x="90" y="14" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="700">
+                    {{ selectedHrEmployeeName() }} ({{ selectedHrEmployeeCode() }})
+                  </text>
+                  <text x="90" y="27" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="600">
+                    {{ hov.formattedDate }}
+                  </text>
+                  <text x="90" y="41" text-anchor="middle" fill="#94a3b8" font-size="8.5" font-weight="500">
+                    @if (hov.totalHours > 0) {
+                    Work: {{ (hov.beforeBreak + hov.afterBreak) | number:'1.1-1' }}h | Break: {{ hov.breakHrs > 0 ?
+                    (hov.breakHrs | number:'1.1-1') + 'h' : '0h' }}
+                    } @else {
+                    No Activity Recorded
+                    }
+                  </text>
+                  <text x="90" y="55" text-anchor="middle" fill="#4ade80" font-size="8.5" font-weight="600">
+                    @if (hov.isToday) {
+                    @if (punchService.todayPunchBreakdown().phase === 'on_break' || (hov.breakHrs > 0 && hov.afterBreak
+                    === 0)) {
+                    Status: On Break ☕
+                    } @else if (punchService.todayPunchBreakdown().phase === 'clocked_out') {
+                    Status: Completed (Clocked Out)
+                    } @else if (hov.late > 0) {
+                    Status: Active (Late Arrival)
+                    } @else if (hov.beforeBreak > 0 || hov.afterBreak > 0 || hov.present > 0) {
+                    Status: Active (On Duty)
+                    } @else {
+                    Status: Awaiting Clock-In
+                    }
+                    } @else if (hov.missing > 0 && hov.beforeBreak === 0) {
+                    Status: Missing / Absent
+                    } @else if (hov.late > 0) {
+                    Status: Present (Late Arrival)
+                    } @else if (hov.present > 0) {
+                    Status: Present (On-Time)
+                    } @else {
+                    Status: Off / Weekend
+                    }
+                  </text>
+                </g>
                 }
               </svg>
             </div>
@@ -335,247 +277,252 @@
         </div>
       </div>
 
-    <!-- ROW 2: Absent Today + Workforce Highlights + Notice Board (3 Columns) -->
-    <div class="center-row bottom-widgets-row">
-      <!-- 3. Absent Today Card -->
-      <div class="dash-widget absent-widget">
-        <div class="widget-header">
-          <div class="header-left">
-            <span class="widget-indicator red"></span>
-            <h3>Absent Today</h3>
-            <span class="count-pill red">{{ absentToday().length }}</span>
+      <!-- ROW 2: Absent Today + Workforce Highlights + Notice Board (3 Columns) -->
+      <div class="center-row bottom-widgets-row">
+        <!-- 3. Absent Today Card -->
+        <div class="dash-widget absent-widget">
+          <div class="widget-header">
+            <div class="header-left">
+              <span class="widget-indicator red"></span>
+              <h3>Absent Today</h3>
+              <span class="count-pill red">{{ absentToday().length }}</span>
+            </div>
           </div>
-        </div>
 
-        <div class="widget-body widget-scroll-list">
-          <div class="widget-list">
-            @for (emp of absentToday(); track emp.employeeId) {
-            <div class="person-row">
-              <div class="person-avatar red">{{ getInitials(emp.employeeName) }}</div>
-              <div class="person-info">
-                <div class="person-name">{{ emp.employeeName }}</div>
-                <div class="person-sub">{{ emp.employeeCode }} · {{ emp.department }}</div>
+          <div class="widget-body widget-scroll-list">
+            <div class="widget-list">
+              @for (emp of absentToday(); track emp.employeeId) {
+              <div class="person-row">
+                <div class="person-avatar red">{{ getInitials(emp.employeeName) }}</div>
+                <div class="person-info">
+                  <div class="person-name">{{ emp.employeeName }}</div>
+                  <div class="person-sub">{{ emp.employeeCode }} · {{ emp.department }}</div>
+                </div>
+                <span class="status-pill status-absent">Unplanned</span>
               </div>
-              <span class="status-pill status-absent">Unplanned</span>
-            </div>
-            } @empty {
-            <div class="empty-state">
-              <span class="empty-icon">🎉</span>
-              <span>All scheduled staff present today!</span>
-            </div>
-            }
-          </div>
-        </div>
-      </div>
-
-      <!-- 4. Workforce Highlights Card -->
-      <div class="dash-widget highlights-widget">
-        <div class="widget-header">
-          <div class="header-left">
-            <span class="widget-indicator purple"></span>
-            <h3>Workforce Highlights</h3>
-          </div>
-          <div class="tab-pills">
-            <button class="tab-btn" [class.active]="activeCelebrationTab() === 'Birthday'"
-              (click)="activeCelebrationTab.set('Birthday')" title="Birthdays">
-              🎂 ({{ countForTab('Birthday') }})
-            </button>
-            <button class="tab-btn" [class.active]="activeCelebrationTab() === 'WorkAnniversary'"
-              (click)="activeCelebrationTab.set('WorkAnniversary')" title="Anniversaries">
-              🎖️ ({{ countForTab('WorkAnniversary') }})
-            </button>
-            <button class="tab-btn" [class.active]="activeCelebrationTab() === 'NewJoinee'"
-              (click)="activeCelebrationTab.set('NewJoinee')" title="New Joinees">
-              👋 ({{ countForTab('NewJoinee') }})
-            </button>
-          </div>
-        </div>
-
-        <div class="widget-body widget-scroll-list">
-          <div class="celebration-cards-grid">
-            @for (c of filteredCelebrations(); track c.employeeId + c.dateLabel) {
-            <div class="celebration-card">
-              <div class="celeb-avatar">{{ getInitials(c.employeeName) }}</div>
-              <div class="celeb-details">
-                <div class="celeb-name">{{ c.employeeName }}</div>
-                <div class="celeb-dept">{{ c.department }}</div>
-                <div class="celeb-badge">{{ c.dateLabel }}</div>
+              } @empty {
+              <div class="empty-state">
+                <span class="empty-icon">🎉</span>
+                <span>All scheduled staff present today!</span>
               </div>
+              }
             </div>
-            } @empty {
-            <div class="empty-state">
-              <span class="empty-icon">📅</span>
-              <span>No {{ activeCelebrationTab() }}s in this period.</span>
-            </div>
-            }
-          </div>
-        </div>
-      </div>
-
-      <!-- 5. Notice Board Card (Scrollable List within Widget) -->
-      <div class="dash-widget notice-widget">
-        <div class="widget-header">
-          <div class="header-left">
-            <span class="widget-indicator blue"></span>
-            <h3>Notice Board</h3>
-            @if (notices().length > 0) {
-            <span class="count-pill blue">{{ notices().length }}</span>
-            }
-          </div>
-          <div class="header-actions">
-            <a routerLink="/announcements" class="view-link">+ Add / View All</a>
           </div>
         </div>
 
-        <div class="widget-body widget-scroll-list">
-          <div class="notices-list">
-            @for (notice of notices(); track notice.id) {
-            <div class="notice-card" [class]="'severity-' + notice.severity.toLowerCase()">
-              <div class="notice-meta">
-                <span class="tag-pill">{{ notice.tag }}</span>
-                <span class="date-label">{{ notice.publishedAtUtc | date:'mediumDate' }}</span>
+        <!-- 4. Workforce Highlights Card -->
+        <div class="dash-widget highlights-widget">
+          <div class="widget-header">
+            <div class="header-left">
+              <span class="widget-indicator purple"></span>
+              <h3>Workforce Highlights</h3>
+            </div>
+            <div class="tab-pills">
+              <button class="tab-btn" [class.active]="activeCelebrationTab() === 'Birthday'"
+                (click)="activeCelebrationTab.set('Birthday')" title="Birthdays">
+                🎂 ({{ countForTab('Birthday') }})
+              </button>
+              <button class="tab-btn" [class.active]="activeCelebrationTab() === 'WorkAnniversary'"
+                (click)="activeCelebrationTab.set('WorkAnniversary')" title="Anniversaries">
+                🎖️ ({{ countForTab('WorkAnniversary') }})
+              </button>
+              <button class="tab-btn" [class.active]="activeCelebrationTab() === 'NewJoinee'"
+                (click)="activeCelebrationTab.set('NewJoinee')" title="New Joinees">
+                👋 ({{ countForTab('NewJoinee') }})
+              </button>
+            </div>
+          </div>
+
+          <div class="widget-body widget-scroll-list">
+            <div class="celebration-cards-grid">
+              @for (c of filteredCelebrations(); track c.employeeId + c.dateLabel) {
+              <div class="celebration-card">
+                <div class="celeb-avatar">{{ getInitials(c.employeeName) }}</div>
+                <div class="celeb-details">
+                  <div class="celeb-name">{{ c.employeeName }}</div>
+                  <div class="celeb-dept">{{ c.department }}</div>
+                  <div class="celeb-badge">{{ c.dateLabel }}</div>
+                </div>
               </div>
-              <h4 class="notice-title">{{ notice.title }}</h4>
-              <p class="notice-msg">{{ notice.message }}</p>
+              } @empty {
+              <div class="empty-state">
+                <span class="empty-icon">📅</span>
+                <span>No {{ activeCelebrationTab() }}s in this period.</span>
+              </div>
+              }
             </div>
-            } @empty {
-            <div class="empty-state">
-              <span class="empty-icon">📢</span>
-              <span>No announcements published yet.</span>
+          </div>
+        </div>
+
+        <!-- 5. Notice Board Card (Scrollable List within Widget) -->
+        <div class="dash-widget notice-widget">
+          <div class="widget-header">
+            <div class="header-left">
+              <span class="widget-indicator blue"></span>
+              <h3>Notice Board</h3>
+              @if (notices().length > 0) {
+              <span class="count-pill blue">{{ notices().length }}</span>
+              }
             </div>
-            }
+            <div class="header-actions">
+              <a routerLink="/announcements" class="view-link">+ Add / View All</a>
+            </div>
+          </div>
+
+          <div class="widget-body widget-scroll-list">
+            <div class="notices-list">
+              @for (notice of notices(); track notice.id) {
+              <div class="notice-card" [class]="'severity-' + notice.severity.toLowerCase()">
+                <div class="notice-meta">
+                  <span class="tag-pill">{{ notice.tag }}</span>
+                  <span class="date-label">{{ notice.publishedAtUtc | date:'mediumDate' }}</span>
+                </div>
+                <h4 class="notice-title">{{ notice.title }}</h4>
+                <p class="notice-msg">{{ notice.message }}</p>
+              </div>
+              } @empty {
+              <div class="empty-state">
+                <span class="empty-icon">📢</span>
+                <span>No announcements published yet.</span>
+              </div>
+              }
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- RIGHT COLUMN: Time Tracker & Holiday Calendar -->
-  <div class="dash-right-col">
-    <!-- 1. Time Tracker & Attendance Punch Card -->
-    <div class="dash-widget punch-widget">
-      <div class="punch-header">
-        <div class="punch-date">{{ currentTime() | date:'EEEE, MMM d, y' }}</div>
-        <div class="punch-live-clock">{{ currentTime() | date:'hh:mm:ss a' }}</div>
-      </div>
-
-      <!-- Shift & Status Badge -->
-      <div class="punch-status-badge" [class.active]="punchService.state() === 'active'"
-        [class.on-break]="punchService.onBreak()">
-        <span class="status-dot"></span>
-        @if (punchService.state() === 'active') {
-        {{ punchService.onBreak() ? 'Currently On Break' : 'Clocked In · Working' }}
-        } @else {
-        Standard Shift · Clocked Out
-        }
-      </div>
-
-      <!-- Timers: Production Time & Break Time -->
-      <div class="punch-timers">
-        <div class="timer-box">
-          <div class="timer-label">Production Time</div>
-          <div class="timer-value">{{ punchService.workTime() }}</div>
-        </div>
-        <div class="timer-box">
-          <div class="timer-label">Break Time</div>
-          <div class="timer-value break">{{ punchService.breakTime() }}</div>
-        </div>
-      </div>
-
-      <!-- Attendance Activity Timeline -->
-      <div class="punch-history">
-        <div class="history-title">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-          </svg>
-          Attendance Activity
+    <!-- RIGHT COLUMN: Time Tracker & Holiday Calendar -->
+    <div class="dash-right-col">
+      <!-- 1. Time Tracker & Attendance Punch Card -->
+      <div class="dash-widget punch-widget">
+        <div class="punch-header">
+          <div class="punch-date">{{ currentTime() | date:'EEEE, MMM d, y' }}</div>
+          <div class="punch-live-clock">{{ currentTime() | date:'hh:mm:ss a' }}</div>
         </div>
 
-        <div class="history-timeline">
-          @if (punchService.punchTimeline().length > 0) {
+        <!-- Shift & Status Badge -->
+        <div class="punch-status-badge" [class.active]="punchService.state() === 'active'"
+          [class.on-break]="punchService.onBreak()">
+          <span class="status-dot"></span>
+          @if (punchService.state() === 'active') {
+          {{ punchService.onBreak() ? 'Currently On Break' : 'Clocked In · Working' }}
+          } @else {
+          Standard Shift · Clocked Out
+          }
+        </div>
+
+        <!-- Timers: Production Time & Break Time -->
+        <div class="punch-timers">
+          <div class="timer-box">
+            <div class="timer-label">Work Time</div>
+            <div class="timer-value">{{ punchService.workTime() }}</div>
+          </div>
+          <div class="timer-box">
+            <div class="timer-label">Break Time</div>
+            <div class="timer-value break">{{ punchService.breakTime() }}</div>
+          </div>
+        </div>
+
+        <!-- Attendance Activity Timeline -->
+        <div class="punch-history">
+          <div class="history-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+            Attendance Activity
+          </div>
+
+          <div class="history-timeline">
+            @if (punchService.punchTimeline().length > 0) {
             <div class="timeline-stream">
               @for (item of punchService.punchTimeline(); track item.id) {
-                @if (item.kind === 'punch') {
-                  <div class="timeline-punch-row" [class.is-in]="item.isPunchIn" [class.is-out]="!item.isPunchIn" [title]="(item.punchType ?? '') + (item.note ? ' - ' + item.note : '')">
-                    <div class="punch-icon-circle" [class.in]="item.isPunchIn" [class.out]="!item.isPunchIn">
-                      @if (item.isPunchIn) {
-                        <!-- Punch In: Bracket on left, arrow entering/pointing right -->
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                          <polyline points="10 17 15 12 10 7" />
-                          <line x1="15" y1="12" x2="3" y2="12" />
-                        </svg>
-                      } @else {
-                        <!-- Punch Out: Bracket on left, arrow exiting to right -->
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                          <polyline points="16 17 21 12 16 7" />
-                          <line x1="21" y1="12" x2="9" y2="12" />
-                        </svg>
-                      }
-                    </div>
-                    <span class="punch-label">{{ item.label }}</span>
-                    <span class="punch-time">{{ item.timeStr }}</span>
-                  </div>
-                } @else if (item.kind === 'break') {
-                  <div class="timeline-break-row">
-                    <div class="break-line"></div>
-                    <div class="break-pill">
-                      <span class="coffee-icon">☕</span>
-                      <span class="break-text">{{ item.durationStr }}</span>
-                    </div>
-                  </div>
-                }
+              @if (item.kind === 'punch') {
+              <div class="timeline-punch-row" [class.is-in]="item.isPunchIn" [class.is-out]="!item.isPunchIn"
+                [title]="(item.punchType ?? '') + (item.note ? ' - ' + item.note : '')">
+                <div class="punch-icon-circle" [class.in]="item.isPunchIn" [class.out]="!item.isPunchIn">
+                  @if (item.isPunchIn) {
+                  <!-- Punch In: Bracket on left, arrow entering/pointing right -->
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                    <polyline points="10 17 15 12 10 7" />
+                    <line x1="15" y1="12" x2="3" y2="12" />
+                  </svg>
+                  } @else {
+                  <!-- Punch Out: Bracket on left, arrow exiting to right -->
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  }
+                </div>
+                <span class="punch-label">{{ item.label }}</span>
+                <span class="punch-time">{{ item.timeStr }}</span>
+              </div>
+              } @else if (item.kind === 'break') {
+              <div class="timeline-break-row">
+                <div class="break-line"></div>
+                <div class="break-pill">
+                  <span class="coffee-icon">☕</span>
+                  <span class="break-text">{{ item.durationStr }}</span>
+                </div>
+              </div>
+              }
               }
             </div>
-          } @else {
+            } @else {
             <div class="timeline-empty">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="empty-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                class="empty-icon">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
               <span>No punch activity recorded today.</span>
             </div>
-          }
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. Upcoming Holidays / Holiday Calendar Card -->
-    <div class="dash-widget holiday-widget">
-      <div class="widget-header">
-        <div class="header-left">
-          <span class="widget-indicator orange"></span>
-          <h3>Holiday Calendar</h3>
-          @if (upcomingHolidays().length > 0) {
-          <span class="badge badge-warning">{{ upcomingHolidays().length }} Scheduled</span>
-          }
-        </div>
-        <a routerLink="/company" [queryParams]="{ tab: 'holiday' }" class="view-link">Calendar ›</a>
-      </div>
-
-      <div class="widget-body widget-scroll-list">
-        <div class="holiday-list">
-          @for (h of upcomingHolidays(); track h.id) {
-          <a routerLink="/company" [queryParams]="{ tab: 'holiday' }" class="holiday-card" style="text-decoration: none; color: inherit; cursor: pointer; display: flex;">
-            <div class="holiday-date-badge">
-              <span class="month">{{ h.date | date:'MMM' }}</span>
-              <span class="day">{{ h.date | date:'d' }}</span>
-            </div>
-            <div class="holiday-details">
-              <div class="holiday-name">{{ h.name }}</div>
-              <div class="holiday-sub">{{ h.dayLabel }} · <span class="holiday-pill">{{ h.type }}</span></div>
-            </div>
-          </a>
-          } @empty {
-          <div class="empty-state">
-            <span class="empty-icon">🏖️</span>
-            <span>No upcoming holidays scheduled</span>
+            }
           </div>
-          }
+        </div>
+      </div>
+
+      <!-- 2. Upcoming Holidays / Holiday Calendar Card -->
+      <div class="dash-widget holiday-widget">
+        <div class="widget-header">
+          <div class="header-left">
+            <span class="widget-indicator orange"></span>
+            <h3>Holiday Calendar</h3>
+            @if (upcomingHolidays().length > 0) {
+            <span class="badge badge-warning">{{ upcomingHolidays().length }} Scheduled</span>
+            }
+          </div>
+          <a routerLink="/company" [queryParams]="{ tab: 'holiday' }" class="view-link">Calendar ›</a>
+        </div>
+
+        <div class="widget-body widget-scroll-list">
+          <div class="holiday-list">
+            @for (h of upcomingHolidays(); track h.id) {
+            <a routerLink="/company" [queryParams]="{ tab: 'holiday' }" class="holiday-card"
+              style="text-decoration: none; color: inherit; cursor: pointer; display: flex;">
+              <div class="holiday-date-badge">
+                <span class="month">{{ h.date | date:'MMM' }}</span>
+                <span class="day">{{ h.date | date:'d' }}</span>
+              </div>
+              <div class="holiday-details">
+                <div class="holiday-name">{{ h.name }}</div>
+                <div class="holiday-sub">{{ h.dayLabel }} · <span class="holiday-pill">{{ h.type }}</span></div>
+              </div>
+            </a>
+            } @empty {
+            <div class="empty-state">
+              <span class="empty-icon">🏖️</span>
+              <span>No upcoming holidays scheduled</span>
+            </div>
+            }
+          </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 </div>

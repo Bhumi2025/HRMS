@@ -49,6 +49,7 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly currentTime = signal(new Date());
 
   private clockInterval: ReturnType<typeof setInterval> | null = null;
+  private punchPollInterval: ReturnType<typeof setInterval> | null = null;
   private attChart?: { destroy(): void };
   private hoursChart?: { destroy(): void };
   private renderScheduled = false;
@@ -115,6 +116,9 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.clockInterval = setInterval(() => {
       this.currentTime.set(new Date());
     }, 1000);
+    this.punchPollInterval = setInterval(() => {
+      this.punchService.loadTodayPunches();
+    }, 4000);
   }
 
   loadData(): void {
@@ -169,6 +173,10 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.clockInterval) {
       clearInterval(this.clockInterval);
       this.clockInterval = null;
+    }
+    if (this.punchPollInterval) {
+      clearInterval(this.punchPollInterval);
+      this.punchPollInterval = null;
     }
     this.attChart?.destroy();
     this.hoursChart?.destroy();
