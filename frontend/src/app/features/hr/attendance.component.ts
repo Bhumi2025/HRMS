@@ -423,9 +423,11 @@ interface MusterDay {
                   <span class="roster-time-tag">{{ getEmpTodayCheckIn(emp.id) }}</span>
                   <span 
                     class="status-indicator-dot" 
-                    [class.dot-on-time]="isEmpOnTime(emp.id)" 
-                    [class.dot-late]="isEmpLate(emp.id)" 
+                    [class.dot-active]="isEmpActive(emp.id)"
+                    [class.dot-on-time]="!isEmpActive(emp.id) && isEmpOnTime(emp.id)" 
+                    [class.dot-late]="!isEmpActive(emp.id) && isEmpLate(emp.id)" 
                     [class.dot-absent]="!isEmpPresent(emp.id)"
+                    [title]="getEmpStatusTooltip(emp.id)"
                   ></span>
                 </div>
               </div>
@@ -1287,10 +1289,12 @@ interface MusterDay {
         color: var(--text);
       }
       .status-indicator-dot {
-        width: 7px;
-        height: 7px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
+        display: inline-block;
       }
+      .dot-active { background: #22c55e; box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25); }
       .dot-on-time { background: #16a34a; box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2); }
       .dot-late { background: #ea580c; box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.2); }
       .dot-absent { background: #94a3b8; }
@@ -2591,6 +2595,24 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected isEmpPresent(employeeId: string): boolean {
     const row = this.dailyRows().find((r) => r.id === employeeId);
     return !!(row && (row.status === 'Present' || row.status === 'Late'));
+  }
+
+  protected isEmpActive(employeeId: string): boolean {
+    const row = this.dailyRows().find((r) => r.id === employeeId);
+    if (!row) return false;
+    const hasIn = !!(row.checkIn && row.checkIn !== '—');
+    const hasOut = !!(row.checkOut && row.checkOut !== '—');
+    return hasIn && !hasOut;
+  }
+
+  protected getEmpStatusTooltip(employeeId: string): string {
+    const row = this.dailyRows().find((r) => r.id === employeeId);
+    if (!row || !row.checkIn || row.checkIn === '—') return 'Offline / Not Checked In';
+    if (!row.checkOut || row.checkOut === '—') {
+      const lateStr = this.isLateCheckIn(row.checkIn) ? ' (Late Arrival)' : '';
+      return `Active • Clocked In at ${row.checkIn}${lateStr}`;
+    }
+    return `Clocked Out at ${row.checkOut}`;
   }
 
   protected isOvertimeApproved(dateStr: string): boolean {
