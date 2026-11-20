@@ -1208,6 +1208,8 @@ export class KioskComponent implements OnInit, OnDestroy {
   private mediaStream?: MediaStream;
   private currentCameraFacing: 'user' | 'environment' = 'user';
   private audioCtx?: AudioContext;
+  private lastPunchedCode: string | null = null;
+  private lastPunchedTime = 0;
 
   protected readonly filteredEnrolled = computed(() => {
     const q = this.searchFilter.trim().toLowerCase();
@@ -1330,6 +1332,9 @@ export class KioskComponent implements OnInit, OnDestroy {
             }
 
             if (bestMatch && bestScore >= 75) {
+              if (this.lastPunchedCode === bestMatch.employeeCode && Date.now() - this.lastPunchedTime < 25000) {
+                return;
+              }
               this.liveMatchConfidence.set(bestScore);
               this.executePunch(bestMatch.employeeCode, bestMatch);
             }
@@ -1433,6 +1438,10 @@ export class KioskComponent implements OnInit, OnDestroy {
   }
 
   private executePunch(code: string, empInfo?: EnrolledFace): void {
+    if (this.lastPunchedCode === code && Date.now() - this.lastPunchedTime < 25000) {
+      return;
+    }
+
     this.processingPunch.set(true);
     const mode = this.punchMode();
     const punchType = mode === 'auto' ? null : mode;
@@ -1450,6 +1459,9 @@ export class KioskComponent implements OnInit, OnDestroy {
           this.lastResult.set(res);
           this.matchedEmployee.set(empInfo || null);
           this.showSuccessCard.set(true);
+
+          this.lastPunchedCode = code;
+          this.lastPunchedTime = Date.now();
 
           // Add to recent punches
           const now = new Date();

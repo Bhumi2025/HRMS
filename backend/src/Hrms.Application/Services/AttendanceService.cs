@@ -1519,24 +1519,8 @@ public sealed class AttendanceService : IAttendanceService
             }
 
             var itemUtc = entry.Utc;
-            var windowStart = itemUtc.AddMinutes(-2);
-            var windowEnd = itemUtc.AddMinutes(2);
-
             var knownPunches = punchesByEmployee.TryGetValue(employee.Id, out var known) ? known : new List<EmployeePunch>();
             var accepted = acceptedTimes.TryGetValue(employee.Id, out var times) ? times : new List<DateTime>();
-
-            // Deduplicate against existing punches and against earlier items in this payload.
-            var isDuplicate = knownPunches.Any(p => p.PunchTime >= windowStart && p.PunchTime <= windowEnd)
-                || accepted.Any(t => t >= windowStart && t <= windowEnd);
-
-            if (isDuplicate)
-            {
-                ignoredDuplicates++;
-                continue;
-            }
-
-            accepted.Add(itemUtc);
-            acceptedTimes[employee.Id] = accepted;
 
             // Determine punch type
             if (!Enum.TryParse<PunchType>(entry.Item.PunchType, true, out var punchType))
@@ -1546,6 +1530,21 @@ public sealed class AttendanceService : IAttendanceService
                 var todayCount = knownPunches.Count(p => p.PunchTime >= startOfDay && p.PunchTime < endOfDay);
                 punchType = (todayCount % 2 == 0) ? PunchType.ClockIn : PunchType.ClockOut;
             }
+
+            // Deduplicate: ignore ONLY if the exact same punch type occurred within 20 seconds, or any punch occurred within 3 seconds.
+            var isDuplicate = knownPunches.Any(p =>
+                (p.PunchType == punchType && Math.Abs((p.PunchTime - itemUtc).TotalSeconds) < 20) ||
+                Math.Abs((p.PunchTime - itemUtc).TotalSeconds) < 3)
+                || accepted.Any(t => Math.Abs((t - itemUtc).TotalSeconds) < 3);
+
+            if (isDuplicate)
+            {
+                ignoredDuplicates++;
+                continue;
+            }
+
+            accepted.Add(itemUtc);
+            acceptedTimes[employee.Id] = accepted;
 
             // Close any previous open punches for this employee when recording punch
             var previousOpenPunches = knownPunches.Where(p => p.IsOpen).ToList();
@@ -1747,8 +1746,11 @@ public sealed class AttendanceService : IAttendanceService
         var syncResult = await ProcessPunchBatchAsync(syncRequest, ct);
         var todayRecord = await _uow.Attendance.GetForEmployeeDateAsync(employee.Id, DateOnly.FromDateTime(DateTime.UtcNow), ct);
 
+        var isClockOut = string.Equals(request.PunchType, "ClockOut", StringComparison.OrdinalIgnoreCase) || 
+            (string.IsNullOrWhiteSpace(request.PunchType) && todayRecord?.CheckOut != null);
+
         var msg = syncResult.ProcessedCount > 0
-            ? $"Face verified! Welcome {employee.FullName}."
+            ? (isClockOut ? $"Successfully Punched Out: Goodbye {employee.FullName}!" : $"Successfully Punched In: Welcome {employee.FullName}!")
             : syncResult.IgnoredDuplicates > 0
                 ? $"{employee.FullName} was already punched recently (duplicate cooldown)."
                 : syncResult.Message;
@@ -1758,7 +1760,7 @@ public sealed class AttendanceService : IAttendanceService
             EmployeeId: employee.Id,
             EmployeeCode: employee.EmployeeCode,
             EmployeeName: employee.FullName,
-            PunchType: request.PunchType ?? (todayRecord?.CheckOut != null ? "ClockOut" : "ClockIn"),
+            PunchType: isClockOut ? "ClockOut" : "ClockIn",
             PunchTime: DateTime.UtcNow,
             Status: todayRecord?.Status.ToString() ?? "Present",
             Message: msg
