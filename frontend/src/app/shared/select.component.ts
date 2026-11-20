@@ -28,8 +28,8 @@ export interface SelectOption {
     '[class.csel-host-open]': 'open()',
   },
   template: `
-    <div class="csel-wrap" [class.csel-open]="open()" [style.width]="width() || null">
-      <button type="button" class="csel-btn" [class.open]="open()" (click)="toggle()">
+    <div class="csel-wrap" [class.csel-open]="open()" [class.disabled]="disabled()" [style.width]="width() || null">
+      <button type="button" class="csel-btn" [class.open]="open()" [disabled]="disabled()" (click)="toggle()">
         <span class="csel-label">{{ selectedLabel() }}</span>
         <span class="csel-arrow" [class.up]="open()" appIcon="chevron"></span>
       </button>
@@ -71,6 +71,14 @@ export interface SelectOption {
       left: auto !important;
       right: 0 !important;
     }
+    .csel-btn[disabled],
+    .csel-wrap.disabled .csel-btn {
+      opacity: 0.65;
+      cursor: not-allowed !important;
+      background: var(--bg, #f1f5f9) !important;
+      color: var(--muted, #64748b) !important;
+      pointer-events: none;
+    }
   `],
 })
 export class SelectComponent implements OnDestroy {
@@ -80,6 +88,8 @@ export class SelectComponent implements OnDestroy {
   readonly value = input<string>('');
   readonly width = input<string>('');
   readonly valueChange = output<string>();
+
+  readonly disabled = input<boolean>(false);
 
   readonly open = signal(false);
   readonly dropUp = signal(false);
@@ -98,6 +108,7 @@ export class SelectComponent implements OnDestroy {
   }
 
   toggle(): void {
+    if (this.disabled()) return;
     if (!this.open()) {
       try {
         const el = this.elementRef.nativeElement as HTMLElement;
