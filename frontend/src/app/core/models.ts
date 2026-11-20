@@ -21,6 +21,7 @@ export interface NavSection {
 }
 
 export interface SessionUser {
+  id?: string;
   role: Role;
   name: string;
   email?: string;

@@ -21,11 +21,38 @@ public sealed class NotificationService : INotificationService
     public async Task<IReadOnlyList<NotificationDto>> ListAsync(CancellationToken ct = default)
     {
         var userId = _currentUser.UserId;
+        var employeeId = _currentUser.EmployeeId;
+        var userEmail = _currentUser.Email;
+        var isEmployee = string.Equals(_currentUser.Role, "Employee", StringComparison.OrdinalIgnoreCase);
+
+        if (!userId.HasValue)
+        {
+            if (employeeId.HasValue)
+            {
+                var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(x => x.EmployeeId == employeeId.Value), ct);
+                userId = empUser?.Id;
+            }
+            else if (!string.IsNullOrEmpty(userEmail))
+            {
+                var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(x => x.Email == userEmail), ct);
+                userId = empUser?.Id;
+            }
+        }
+
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
+        var notifQuery = _uow.Notifications.Query();
+        if (isEmployee)
+        {
+            notifQuery = notifQuery.Where(n => n.UserId == null || (userId.HasValue && n.UserId == userId));
+        }
+        else
+        {
+            notifQuery = notifQuery.Where(n => n.UserId == null || n.UserId == userId || n.Title.StartsWith("HR Note"));
+        }
+
         var items = await _uow.Notifications.ToListAsync(
-            _uow.Notifications.Query()
-                .Where(n => n.UserId == null || n.UserId == userId)
+            notifQuery
                 .OrderByDescending(n => n.CreatedAtUtc)
                 .Take(100),
             ct);
@@ -65,8 +92,7 @@ public sealed class NotificationService : INotificationService
             await _uow.Notifications.AddRangeAsync(newBirthdayNotifs, ct);
             await _uow.SaveChangesAsync(ct);
             items = await _uow.Notifications.ToListAsync(
-                _uow.Notifications.Query()
-                    .Where(n => n.UserId == null || n.UserId == userId)
+                notifQuery
                     .OrderByDescending(n => n.CreatedAtUtc)
                     .Take(100),
                 ct);
@@ -152,7 +178,7 @@ public sealed class NotificationService : INotificationService
             }
         }
 
-        if (string.Equals(_currentUser.Role, "Employee", StringComparison.OrdinalIgnoreCase))
+        if (isEmployee)
         {
             var currentEmp = _currentUser.EmployeeId.HasValue
                 ? employees.FirstOrDefault(e => e.Id == _currentUser.EmployeeId.Value)
@@ -164,6 +190,9 @@ public sealed class NotificationService : INotificationService
                 var title = n.Title ?? string.Empty;
                 var msg = n.Message ?? string.Empty;
                 var icon = n.IconKey ?? string.Empty;
+
+                // 0. If notification is specifically targeted to this employee user, ALWAYS include it!
+                if (n.UserId.HasValue && userId.HasValue && n.UserId == userId.Value) return true;
 
                 // 1. Announcements (Notice, Policy, Company Update, Bell)
                 var isAnnouncement = icon is "bell" or "announcement" or "policy" or "notice"
@@ -191,15 +220,26 @@ public sealed class NotificationService : INotificationService
                     return false;
                 }
 
-                // 3. Attendance Reminders of this employee only
-                var isAttendanceReminder = title.Contains("Attendance Reminder", StringComparison.OrdinalIgnoreCase)
-                    || title.Contains("Clock In Reminder", StringComparison.OrdinalIgnoreCase)
-                    || title.Contains("Punch Reminder", StringComparison.OrdinalIgnoreCase);
-                if (isAttendanceReminder)
+                // 3. Attendance Reminders & Notes of this employee only
+                var isAttendance = title.Contains("Attendance", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Clock In", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Clock Out", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Punch", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Note", StringComparison.OrdinalIgnoreCase)
+                    || msg.Contains("late", StringComparison.OrdinalIgnoreCase)
+                    || msg.Contains("note", StringComparison.OrdinalIgnoreCase);
+                if (isAttendance)
                 {
                     if (n.UserId.HasValue && n.UserId == userId) return true;
-                    if (!string.IsNullOrEmpty(myName) && msg.Contains(myName, StringComparison.OrdinalIgnoreCase)) return true;
-                    return true;
+                    if (!string.IsNullOrEmpty(myName) && (msg.Contains(myName, StringComparison.OrdinalIgnoreCase) || title.Contains(myName, StringComparison.OrdinalIgnoreCase))) return true;
+                    if (currentEmp != null && (msg.Contains(currentEmp.EmployeeCode, StringComparison.OrdinalIgnoreCase) || title.Contains(currentEmp.EmployeeCode, StringComparison.OrdinalIgnoreCase))) return true;
+
+                    var isGenericAbsent = msg.Contains("recorded absent", StringComparison.OrdinalIgnoreCase) || msg.Contains("window closed", StringComparison.OrdinalIgnoreCase);
+                    if (!isGenericAbsent && (title.Contains("Reminder", StringComparison.OrdinalIgnoreCase) || title.Contains("Note", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return true;
+                    }
+                    return false;
                 }
 
                 // Strictly filter out all other unrelated notifications (other employees' birthdays, absent alerts, admin requests)
@@ -208,7 +248,7 @@ public sealed class NotificationService : INotificationService
         }
 
         return items
-            .Select(n => new NotificationDto(n.Id, n.IconKey, n.Title, n.Message, n.TimeLabel, n.IsRead))
+            .Select(n => new NotificationDto(n.Id, n.IconKey, n.Title, n.Message, n.TimeLabel, n.IsRead, n.UserId))
             .ToList();
     }
 

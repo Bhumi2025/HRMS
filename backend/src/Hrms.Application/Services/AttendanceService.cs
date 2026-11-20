@@ -957,11 +957,25 @@ public sealed class AttendanceService : IAttendanceService
             _uow.Attendance.Update(attendanceRecord);
         }
 
+        var targetUser = await _uow.Users.FirstOrDefaultAsync(
+            _uow.Users.Query().Where(u => u.EmployeeId == employee.Id || (employee.Email != null && u.Email == employee.Email)), ct);
+
+        var hasCustomNote = !string.IsNullOrWhiteSpace(request.Note)
+            && !request.Note.Equals("Manual Punch (HR Console)", StringComparison.OrdinalIgnoreCase)
+            && !request.Note.Equals("Web Browser", StringComparison.OrdinalIgnoreCase)
+            && !request.Note.Equals("Web Dashboard", StringComparison.OrdinalIgnoreCase);
+
+        var punchLabel = punchType == PunchType.ClockIn ? "Clock In" : (punchType == PunchType.ClockOut ? "Clock Out" : "Break");
+        var notifTitle = hasCustomNote ? $"HR Note: {punchLabel}" : $"{punchLabel} Activity";
+        var notifMessage = hasCustomNote ? request.Note!.Trim() : $"{employee.FirstName} {employee.LastName} ({employee.EmployeeCode}) recorded {punchType} at {localNow:hh:mm tt}.";
+        if (notifMessage.Length > 490) notifMessage = notifMessage.Substring(0, 490);
+
         await _uow.Notifications.AddAsync(new Notification
         {
-            IconKey = "clock",
-            Title = punchType == PunchType.ClockIn ? "Clock In Activity" : (punchType == PunchType.ClockOut ? "Clock Out Activity" : "Break Activity"),
-            Message = $"{employee.FirstName} {employee.LastName} ({employee.EmployeeCode}) recorded {punchType} at {localNow:hh:mm tt}.",
+            UserId = targetUser?.Id,
+            IconKey = hasCustomNote ? "bell" : "clock",
+            Title = notifTitle,
+            Message = notifMessage,
             TimeLabel = "Just now",
             IsRead = false,
             CreatedAtUtc = DateTime.UtcNow,
@@ -2253,6 +2267,22 @@ public sealed class AttendanceService : IAttendanceService
                 attendanceRecord.Status = (firstCheckIn.HasValue && firstCheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes)) ? AttendanceStatus.Late : AttendanceStatus.Present;
             }
             _uow.Attendance.Update(attendanceRecord);
+        }
+
+        var targetUser = await _uow.Users.FirstOrDefaultAsync(
+            _uow.Users.Query().Where(u => u.EmployeeId == employee.Id || (employee.Email != null && u.Email == employee.Email)), ct);
+        if (targetUser != null)
+        {
+            await _uow.Notifications.AddAsync(new Notification
+            {
+                UserId = targetUser.Id,
+                IconKey = "clock",
+                Title = punchType == PunchType.ClockIn ? "Clock In Activity" : "Clock Out Activity",
+                Message = punchType == PunchType.ClockIn ? $"Successfully punched in at {localNow:hh:mm tt} via Centralized Face Kiosk." : $"Successfully punched out at {localNow:hh:mm tt} via Centralized Face Kiosk.",
+                TimeLabel = "Just now",
+                IsRead = false,
+                CreatedAtUtc = DateTime.UtcNow,
+            }, ct);
         }
 
         await _uow.SaveChangesAsync(ct);

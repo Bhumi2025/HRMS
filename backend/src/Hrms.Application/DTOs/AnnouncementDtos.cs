@@ -25,4 +25,5 @@ public sealed record NotificationDto(
     string Title,
     string Message,
     string TimeLabel,
-    bool IsRead);
+    bool IsRead,
+    Guid? UserId = null);

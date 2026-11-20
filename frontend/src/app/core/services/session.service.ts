@@ -48,6 +48,7 @@ export class SessionService {
     }
 
     const user: SessionUser = {
+      id: apiUser.id,
       role,
       name: apiUser.fullName,
       email: apiUser.email,
