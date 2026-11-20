@@ -153,14 +153,13 @@ public sealed class AttendanceService : IAttendanceService
                     {
                         if (p.PunchType == "ClockIn")
                         {
-                            if (lastClockOutUtc.HasValue)
+                            if (bOpen.HasValue)
                             {
-                                var outDiff = p.PunchTime - lastClockOutUtc.Value;
-                                if (outDiff.TotalSeconds > 0) totalBreakSec += (long)outDiff.TotalSeconds;
-                                lastClockOutUtc = null;
+                                var diff = p.PunchTime - bOpen.Value;
+                                if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
+                                bOpen = null;
                             }
                             wOpen = p.PunchTime;
-                            bOpen = null;
                         }
                         else if (p.PunchType == "BreakIn")
                         {
@@ -196,20 +195,21 @@ public sealed class AttendanceService : IAttendanceService
                                 if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
                                 bOpen = null;
                             }
-                            lastClockOutUtc = p.PunchTime;
+                            bOpen = p.PunchTime;
                         }
                     }
 
                     // If active today and still open
                     if (date == today)
                     {
+                        var lastP = sortedPunches.Last();
                         var nowUtc = DateTime.UtcNow;
-                        if (wOpen.HasValue)
+                        if ((lastP.PunchType == "ClockIn" || lastP.PunchType == "BreakOut") && wOpen.HasValue)
                         {
                             var diff = nowUtc - wOpen.Value;
                             if (diff.TotalSeconds > 0) totalWorkSec += (long)diff.TotalSeconds;
                         }
-                        if (bOpen.HasValue)
+                        else if (lastP.PunchType == "BreakIn" && bOpen.HasValue)
                         {
                             var diff = nowUtc - bOpen.Value;
                             if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
@@ -319,7 +319,7 @@ public sealed class AttendanceService : IAttendanceService
                     0,
                     AttendanceStatus.Weekend.ToString()));
             }
-            else if (date > today)
+            else if (date >= today)
             {
                 result.Add(new MonthlyMusterDayDto(
                     date,
@@ -778,14 +778,13 @@ public sealed class AttendanceService : IAttendanceService
             if (p.PunchType == PunchType.ClockIn)
             {
                 firstCheckIn ??= pTimeOnly;
-                if (lastClockOutUtc.HasValue)
+                if (breakIntervalOpen.HasValue)
                 {
-                    var outDiff = p.PunchTime - lastClockOutUtc.Value;
-                    if (outDiff.TotalSeconds > 0) totalBreakSeconds += (long)outDiff.TotalSeconds;
-                    lastClockOutUtc = null;
+                    var diff = p.PunchTime - breakIntervalOpen.Value;
+                    if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+                    breakIntervalOpen = null;
                 }
                 workIntervalOpen = p.PunchTime;
-                breakIntervalOpen = null;
             }
             else if (p.PunchType == PunchType.BreakIn)
             {
@@ -822,7 +821,7 @@ public sealed class AttendanceService : IAttendanceService
                     if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
                     breakIntervalOpen = null;
                 }
-                lastClockOutUtc = p.PunchTime;
+                breakIntervalOpen = p.PunchTime;
             }
         }
 
@@ -834,7 +833,7 @@ public sealed class AttendanceService : IAttendanceService
                 var diff = nowUtc - workIntervalOpen.Value;
                 if (diff.TotalSeconds > 0) totalClosedSeconds += (long)diff.TotalSeconds;
             }
-            if (breakIntervalOpen.HasValue)
+            if (breakIntervalOpen.HasValue && punchType == PunchType.BreakIn)
             {
                 var diff = nowUtc - breakIntervalOpen.Value;
                 if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
@@ -1070,14 +1069,13 @@ public sealed class AttendanceService : IAttendanceService
             if (p.PunchType == PunchType.ClockIn)
             {
                 firstCheckIn ??= pTimeOnly;
-                if (lastClockOutUtc.HasValue)
+                if (activeBreakOpen.HasValue)
                 {
-                    var outDiff = p.PunchTime - lastClockOutUtc.Value;
-                    if (outDiff.TotalSeconds > 0) breakSeconds += (long)outDiff.TotalSeconds;
-                    lastClockOutUtc = null;
+                    var diff = p.PunchTime - activeBreakOpen.Value;
+                    if (diff.TotalSeconds > 0) breakSeconds += (long)diff.TotalSeconds;
+                    activeBreakOpen = null;
                 }
                 activeCalcOpen = p.PunchTime;
-                activeBreakOpen = null;
             }
             else if (p.PunchType == PunchType.BreakIn)
             {
@@ -1113,12 +1111,25 @@ public sealed class AttendanceService : IAttendanceService
                     if (diff.TotalSeconds > 0) breakSeconds += (long)diff.TotalSeconds;
                     activeBreakOpen = null;
                 }
-                lastClockOutUtc = p.PunchTime;
+                activeBreakOpen = p.PunchTime;
             }
         }
 
         var lastPunch = punchesQuery.LastOrDefault();
         bool isOnBreak = lastPunch != null && lastPunch.PunchType == PunchType.BreakIn;
+        if (lastPunch != null)
+        {
+            if (lastPunch.PunchType == PunchType.ClockOut)
+            {
+                isCheckedIn = false;
+                currentOpenInUtc = null;
+            }
+            else if (lastPunch.PunchType == PunchType.ClockIn || lastPunch.PunchType == PunchType.BreakIn || lastPunch.PunchType == PunchType.BreakOut)
+            {
+                isCheckedIn = true;
+                currentOpenInUtc = openPunch?.PunchTime ?? lastPunch.PunchTime;
+            }
+        }
 
         long liveOngoingSeconds = 0;
         if (isCheckedIn)
@@ -1128,7 +1139,7 @@ public sealed class AttendanceService : IAttendanceService
                 var ongoing = nowUtc - activeCalcOpen.Value;
                 if (ongoing.TotalSeconds > 0) liveOngoingSeconds = (long)ongoing.TotalSeconds;
             }
-            if (activeBreakOpen.HasValue)
+            if (activeBreakOpen.HasValue && isOnBreak)
             {
                 var ongoing = nowUtc - activeBreakOpen.Value;
                 if (ongoing.TotalSeconds > 0) breakSeconds += (long)ongoing.TotalSeconds;
@@ -1164,7 +1175,7 @@ public sealed class AttendanceService : IAttendanceService
             CompanyTimeZone: tzName,
             FirstCheckInTime: firstCheckIn?.ToString("hh:mm tt"),
             WorkedHoursToday: workedHours,
-            WorkedSecondsToday: closedSeconds,
+            WorkedSecondsToday: closedSeconds + liveOngoingSeconds,
             CurrentCheckInTimeUtc: currentOpenInUtc,
             TodayPunches: punchDtos,
             HasForgottenCheckOut: hasForgottenCheckOut,

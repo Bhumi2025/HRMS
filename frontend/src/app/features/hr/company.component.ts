@@ -17,6 +17,7 @@ import { IconDirective } from '../../core/icons/icon.directive';
 import { PermissionService } from '../../core/services/permission.service';
 import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 
 export type CompanyTab = 'directory' | 'profile' | 'departments' | 'designations' | 'holiday';
 
@@ -148,17 +149,17 @@ function emptyTenantForm(): CreateCompanyRequest {
                     <!-- Logo Upload Actions -->
                     <div style="flex: 1; min-width: 240px;">
                       <div style="font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px;">
-                        Brand Logo (PNG, JPEG, SVG, WebP)
+                        Brand Logo (PNG, JPG)
                       </div>
                       <div style="font-size: 12px; color: var(--muted); margin-bottom: 12px;">
-                        Max file size: 2MB. SVGs are automatically sanitized to prevent embedded scripts. Shown across sidebar, header, and login screen.
+                        Max file size: 2MB. Allowed formats: PNG and JPG only. Shown across sidebar, header, and login screen.
                       </div>
                       @if (canEditCompany()) {
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                           <label class="btn btn-primary btn-sm" [class.disabled]="uploadingLogo()" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
                             <span [appIcon]="'upload'"></span>
                             {{ uploadingLogo() ? 'Uploading...' : 'Upload Logo' }}
-                            <input type="file" (change)="onLogoSelected($event)" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="display: none;" [disabled]="uploadingLogo()" />
+                            <input type="file" (change)="onLogoSelected($event)" [accept]="acceptImgTypes" style="display: none;" [disabled]="uploadingLogo()" />
                           </label>
                           @if (profileForm.logoUrl) {
                             <button type="button" class="btn btn-outline btn-sm text-danger" (click)="removeLogo()" [disabled]="uploadingLogo()">
@@ -1889,22 +1890,16 @@ export class CompanyComponent implements OnInit, OnDestroy {
     });
   }
 
+  protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
+
   protected onLogoSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) return;
 
     const file = input.files[0];
-    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'];
-    const maxSizeBytes = 2 * 1024 * 1024; // 2 MB
-
-    if (!allowed.includes(file.type.toLowerCase())) {
-      this.toast.show('Invalid file type. Only PNG, JPEG, SVG, and WebP logos are accepted.', 'danger');
-      input.value = '';
-      return;
-    }
-
-    if (file.size > maxSizeBytes) {
-      this.toast.show('File is too large. Maximum logo size is 2 MB.', 'danger');
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      this.toast.show(check.error || 'Invalid logo image.', 'danger');
       input.value = '';
       return;
     }

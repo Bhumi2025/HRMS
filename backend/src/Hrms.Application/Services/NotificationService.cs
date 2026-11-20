@@ -152,6 +152,61 @@ public sealed class NotificationService : INotificationService
             }
         }
 
+        if (string.Equals(_currentUser.Role, "Employee", StringComparison.OrdinalIgnoreCase))
+        {
+            var currentEmp = _currentUser.EmployeeId.HasValue
+                ? employees.FirstOrDefault(e => e.Id == _currentUser.EmployeeId.Value)
+                : employees.FirstOrDefault(e => !string.IsNullOrEmpty(_currentUser.Email) && string.Equals(e.Email, _currentUser.Email, StringComparison.OrdinalIgnoreCase));
+            var myName = currentEmp != null ? $"{currentEmp.FirstName} {currentEmp.LastName}".Trim() : null;
+
+            items = items.Where(n =>
+            {
+                var title = n.Title ?? string.Empty;
+                var msg = n.Message ?? string.Empty;
+                var icon = n.IconKey ?? string.Empty;
+
+                // 1. Announcements (Notice, Policy, Company Update, Bell)
+                var isAnnouncement = icon is "bell" or "announcement" or "policy" or "notice"
+                    || title.Contains("Announcement", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Notice", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Policy", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Closure", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Holiday", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(n.TimeLabel, "HR Update", StringComparison.OrdinalIgnoreCase);
+                if (isAnnouncement) return true;
+
+                // 2. Leave Approval Updates for this employee only
+                var isLeaveOrApproval = title.Contains("Leave", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Approval", StringComparison.OrdinalIgnoreCase);
+                if (isLeaveOrApproval)
+                {
+                    // Must be targeted to current user or explicitly mention this employee and not another
+                    if (n.UserId.HasValue && n.UserId == userId) return true;
+                    if (!string.IsNullOrEmpty(myName) && msg.Contains(myName, StringComparison.OrdinalIgnoreCase)) return true;
+                    // Generic update without naming other employees
+                    if (!employees.Any(e => !string.IsNullOrEmpty(e.FirstName) && msg.Contains(e.FirstName, StringComparison.OrdinalIgnoreCase) && (myName == null || !string.Equals(e.FirstName, currentEmp?.FirstName, StringComparison.OrdinalIgnoreCase))))
+                    {
+                        return title.Contains("Approved", StringComparison.OrdinalIgnoreCase) || title.Contains("Rejected", StringComparison.OrdinalIgnoreCase);
+                    }
+                    return false;
+                }
+
+                // 3. Attendance Reminders of this employee only
+                var isAttendanceReminder = title.Contains("Attendance Reminder", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Clock In Reminder", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Punch Reminder", StringComparison.OrdinalIgnoreCase);
+                if (isAttendanceReminder)
+                {
+                    if (n.UserId.HasValue && n.UserId == userId) return true;
+                    if (!string.IsNullOrEmpty(myName) && msg.Contains(myName, StringComparison.OrdinalIgnoreCase)) return true;
+                    return true;
+                }
+
+                // Strictly filter out all other unrelated notifications (other employees' birthdays, absent alerts, admin requests)
+                return false;
+            }).ToList();
+        }
+
         return items
             .Select(n => new NotificationDto(n.Id, n.IconKey, n.Title, n.Message, n.TimeLabel, n.IsRead))
             .ToList();

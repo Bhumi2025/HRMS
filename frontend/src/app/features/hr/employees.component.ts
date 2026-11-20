@@ -10,6 +10,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
+import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 
 interface Employee {
   id: string;
@@ -516,8 +517,8 @@ interface Employee {
 
             <!-- Alternative: File Upload -->
             <div style="background: var(--bg); border: 1px dashed var(--border); border-radius: 8px; padding: 8px 12px; text-align: center; margin-bottom: 10px;">
-              <label style="font-size: 11px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 4px;">OR UPLOAD FACE PHOTO</label>
-              <input type="file" accept="image/*" (change)="onFaceFileSelected($event)" style="font-size: 12px;" />
+              <label style="font-size: 11px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 4px;">OR UPLOAD FACE PHOTO (JPG, PNG - Max 2MB)</label>
+              <input type="file" [accept]="acceptImgTypes" (change)="onFaceFileSelected($event)" style="font-size: 12px;" />
             </div>
           }
         </div>
@@ -1267,10 +1268,20 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
     this.uploadedPhotoBase64 = null;
   }
 
+  protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
+
   protected onFaceFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) return;
     const file = input.files[0];
+
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      this.toast.show(check.error || 'Invalid photo file.', 'danger');
+      input.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       this.uploadedPhotoBase64 = reader.result as string;

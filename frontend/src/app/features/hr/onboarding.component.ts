@@ -6,6 +6,7 @@ import { EnrolledFace } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ACCEPT_DOC_TYPES, ACCEPT_IMG_TYPES, validateDocumentFile, validateImageFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 
@@ -76,7 +77,7 @@ interface AccountItem {
                 <input
                   #photoFileInput
                   type="file"
-                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  [accept]="acceptImgTypes"
                   style="display: none"
                   (change)="onPhotoFileSelected($event)"
                 />
@@ -262,7 +263,7 @@ interface AccountItem {
                 <input
                   #docFileInput
                   type="file"
-                  accept=".pdf,.jpg,.jpeg"
+                  [accept]="acceptDocTypes"
                   style="display: none"
                   (change)="onDocFileSelected(d, $event)"
                 />
@@ -1400,24 +1401,17 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     this.toast.show(`${name} uploaded!`);
   }
 
+  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
+  protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
+
   protected onDocFileSelected(name: string, event: Event): void {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) return;
     const file = input.files[0];
 
-    // Max 3MB limit
-    const maxSizeBytes = 3 * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      this.toast.show('Document file size exceeds the 3MB limit.', 'danger');
-      input.value = '';
-      return;
-    }
-
-    // PDF, JPG, PNG, WEBP allowed (up to 3MB)
-    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
-    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
-    if (!allowed.includes(ext)) {
-      this.toast.show(`File format '${ext}' is not supported. Please upload PDF, JPG, or PNG (up to 3MB).`, 'danger');
+    const check = validateDocumentFile(file);
+    if (!check.valid) {
+      this.toast.show(check.error || 'Invalid file.', 'danger');
       input.value = '';
       return;
     }
@@ -1717,14 +1711,9 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     if (!input.files || input.files.length === 0) return;
 
     const file = input.files[0];
-    if (!file.type.startsWith('image/')) {
-      this.toast.show('Please select a valid image file (PNG, JPG, JPEG, WEBP)', 'warning');
-      input.value = '';
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      this.toast.show('Image size exceeds 10MB limit', 'warning');
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      this.toast.show(check.error || 'Invalid photo file.', 'danger');
       input.value = '';
       return;
     }

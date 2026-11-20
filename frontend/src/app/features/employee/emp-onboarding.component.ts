@@ -6,6 +6,7 @@ import { EnrolledFace } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 
@@ -160,9 +161,9 @@ import { KeyGroupSelectComponent } from '../../shared/key-select.component';
                         <line x1="12" y1="3" x2="12" y2="15" />
                       </svg>
                       <div class="doc-upload-title">{{ uploadedLabel(doc.key) }}</div>
-                      <div class="doc-upload-sub">PDF, JPG, PNG · 10MB</div>
+                      <div class="doc-upload-sub">PDF, JPG, PNG · 2MB</div>
                     </div>
-                    <input [id]="'file_' + doc.key" type="file" accept=".pdf,.jpg,.jpeg,.png" style="display: none" (change)="onUpload(doc.key, $event)" />
+                    <input [id]="'file_' + doc.key" type="file" [accept]="acceptDocTypes" style="display: none" (change)="onUpload(doc.key, $event)" />
                   </div>
                 }
               </div>
@@ -803,6 +804,8 @@ export class EmpOnboardingComponent implements OnDestroy {
     return `✓ ${name.length > 20 ? `${name.substring(0, 20)}…` : name}`;
   }
 
+  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
+
   protected triggerUpload(key: string): void {
     document.getElementById(`file_${key}`)?.click();
   }
@@ -811,6 +814,14 @@ export class EmpOnboardingComponent implements OnDestroy {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
+
+    const check = validateDocumentFile(file);
+    if (!check.valid) {
+      this.toast.show(check.error || 'Invalid file.', 'danger');
+      input.value = '';
+      return;
+    }
+
     this.uploaded.update((u) => ({ ...u, [key]: file.name }));
   }
 

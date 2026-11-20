@@ -51,22 +51,22 @@ public sealed class FilesController : ControllerBase
             return BadRequest(new { message = "No file was uploaded." });
         }
 
-        // Strict limit: at most 3 MB
-        const long maxSizeBytes = 3 * 1024 * 1024;
+        // Strict limit: at most 2 MB across the entire project
+        const long maxSizeBytes = 2 * 1024 * 1024;
         if (file.Length > maxSizeBytes)
         {
-            return BadRequest(new { message = "File size exceeds the 3MB limit." });
+            return BadRequest(new { message = "File size exceeds the maximum limit of 2MB." });
         }
 
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        // Allowed formats: PDF, JPG, PNG, WEBP up to 3MB
+        // Allowed formats: PDF, JPG, PNG only (up to 2MB)
         var allowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            ".pdf", ".jpg", ".jpeg", ".png", ".webp"
+            ".pdf", ".jpg", ".jpeg", ".png"
         };
         if (string.IsNullOrWhiteSpace(ext) || !allowedExtensions.Contains(ext))
         {
-            return BadRequest(new { message = $"File format '{ext}' is not supported. Allowed formats: PDF, JPG, PNG, WEBP only (up to 3MB)." });
+            return BadRequest(new { message = $"File format '{ext}' is not supported. Allowed formats are PDF, JPG, and PNG only (up to 2MB)." });
         }
 
         // Determine company code
@@ -86,21 +86,33 @@ public sealed class FilesController : ControllerBase
         // Generate clean unique file name
         var uniqueFileName = $"{Guid.NewGuid():N}{ext}";
         var folder = $"{sanitizedCompanyCode}/{sanitizedUserId}";
-        var resourceType = ext == ".pdf" ? "raw" : "image";
 
-        var cloudName = _config["Cloudinary:CloudName"] ?? "awtmmhwl";
-        var apiKey = _config["Cloudinary:ApiKey"] ?? "";
-        var apiSecret = _config["Cloudinary:ApiSecret"] ?? "";
+        // Save local backup copy on disk so file is NEVER lost
+        var uploadsFolder = Path.Combine(_env.ContentRootPath, "uploads", sanitizedCompanyCode, sanitizedUserId);
+        if (!Directory.Exists(uploadsFolder))
+        {
+            Directory.CreateDirectory(uploadsFolder);
+        }
+        var localFilePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-        // Read file bytes in-memory only (ZERO local disk writes)
-        await using var memoryStream = new MemoryStream();
-        await file.CopyToAsync(memoryStream, ct);
-        var fileBytes = memoryStream.ToArray();
+        await using (var fileStream = new FileStream(localFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            await file.CopyToAsync(fileStream, ct);
+        }
+
+        // Read file bytes for Cloudinary upload
+        var fileBytes = await System.IO.File.ReadAllBytesAsync(localFilePath, ct);
 
         // Cloudinary upload integration
+        var cloudName = _config["Cloudinary:CloudName"] ?? "awtmmhwl";
+        var apiKey = _config["Cloudinary:ApiKey"] ?? "337337895791817";
+        var apiSecret = _config["Cloudinary:ApiSecret"] ?? "";
+        var uploadPreset = _config["Cloudinary:UploadPreset"];
+
         string? cloudinaryUrl = null;
         try
         {
+            // 1. Try Signed Upload if ApiKey and ApiSecret are available
             if (!string.IsNullOrWhiteSpace(cloudName) && !string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(apiSecret))
             {
                 var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
@@ -111,7 +123,7 @@ public sealed class FilesController : ControllerBase
                 var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(toSign));
                 var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
 
-                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
                 using var form = new MultipartFormDataContent();
                 var byteContent = new ByteArrayContent(fileBytes);
                 form.Add(byteContent, "file", file.FileName);
@@ -121,7 +133,7 @@ public sealed class FilesController : ControllerBase
                 form.Add(new StringContent(publicId), "public_id");
                 form.Add(new StringContent(signature), "signature");
 
-                var endpoint = $"https://api.cloudinary.com/v1_1/{cloudName}/{resourceType}/upload";
+                var endpoint = $"https://api.cloudinary.com/v1_1/{cloudName}/auto/upload";
 
                 var response = await client.PostAsync(endpoint, form, ct);
                 if (response.IsSuccessStatusCode)
@@ -131,29 +143,55 @@ public sealed class FilesController : ControllerBase
                     if (doc.RootElement.TryGetProperty("secure_url", out var secUrl))
                     {
                         cloudinaryUrl = secUrl.GetString();
+                        _logger.LogInformation("Cloudinary upload successful: {Url}", cloudinaryUrl);
                     }
                 }
                 else
                 {
                     var errContent = await response.Content.ReadAsStringAsync(ct);
-                    _logger.LogWarning("Cloudinary upload returned status {Status}: {Reason} - {Error}", response.StatusCode, response.ReasonPhrase, errContent);
+                    _logger.LogWarning("Cloudinary signed upload returned status {Status}: {Reason} - {Error}", response.StatusCode, response.ReasonPhrase, errContent);
+                }
+            }
+            // 2. Try Unsigned Upload preset if signed was not possible or preset configured
+            else if (!string.IsNullOrWhiteSpace(cloudName) && !string.IsNullOrWhiteSpace(uploadPreset))
+            {
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+                using var form = new MultipartFormDataContent();
+                var byteContent = new ByteArrayContent(fileBytes);
+                form.Add(byteContent, "file", file.FileName);
+                form.Add(new StringContent(uploadPreset), "upload_preset");
+                form.Add(new StringContent(folder), "folder");
+
+                var endpoint = $"https://api.cloudinary.com/v1_1/{cloudName}/auto/upload";
+                var response = await client.PostAsync(endpoint, form, ct);
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseJson = await response.Content.ReadAsStringAsync(ct);
+                    using var doc = JsonDocument.Parse(responseJson);
+                    if (doc.RootElement.TryGetProperty("secure_url", out var secUrl))
+                    {
+                        cloudinaryUrl = secUrl.GetString();
+                        _logger.LogInformation("Cloudinary unsigned upload successful: {Url}", cloudinaryUrl);
+                    }
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Cloudinary upload encountered an exception.");
+            _logger.LogWarning(ex, "Cloudinary upload encountered an exception; falling back to reliable local server URL.");
         }
 
-        // Canonical Cloudinary URL: No local storage on disk
-        var finalUrl = cloudinaryUrl ?? $"https://res.cloudinary.com/{cloudName}/{resourceType}/upload/{folder}/{uniqueFileName}";
+        // If Cloudinary succeeded, use Cloudinary CDN URL; otherwise use safe local server download endpoint
+        var localDownloadUrl = $"/api/files/download/{sanitizedCompanyCode}/{sanitizedUserId}/{uniqueFileName}";
+        var finalUrl = !string.IsNullOrWhiteSpace(cloudinaryUrl) ? cloudinaryUrl : localDownloadUrl;
 
         return Ok(new
         {
             fileName = file.FileName,
             storedName = uniqueFileName,
             url = finalUrl,
-            cloudinaryUrl = finalUrl,
+            cloudinaryUrl = cloudinaryUrl,
+            localPath = localDownloadUrl,
             size = $"{file.Length / 1024} KB"
         });
     }
@@ -229,6 +267,7 @@ public sealed class FilesController : ControllerBase
         {
             ".png" => "image/png",
             ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
             ".svg" => "image/svg+xml",
             ".pdf" => "application/pdf",
             ".doc" => "application/msword",
@@ -243,7 +282,7 @@ public sealed class FilesController : ControllerBase
     private IActionResult FallbackPreview(string fileName)
     {
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
-        if (ext is ".jpg" or ".jpeg" or ".png" or ".svg")
+        if (ext is ".jpg" or ".jpeg" or ".png" or ".svg" or ".webp")
         {
             var svg = $@"<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400' viewBox='0 0 600 400'>
                 <rect width='100%' height='100%' fill='#F1F5F9'/>
