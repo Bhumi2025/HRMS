@@ -652,7 +652,11 @@ interface MusterDay {
                                 [style.left.%]="seg.leftPercent"
                                 [style.width.%]="seg.widthPercent"
                               >
-                                <span class="seg-label-txt">{{ seg.label }}</span>
+                                @if (seg.widthPercent >= 8.0) {
+                                  <span class="seg-label-txt">{{ seg.label }}</span>
+                                } @else if (seg.widthPercent >= 4.0) {
+                                  <span class="seg-label-txt">{{ seg.type === 'late' ? 'Late' : (seg.type === 'work' ? 'Work' : seg.label) }}</span>
+                                }
 
                                 <!-- Hover Tooltip -->
                                 <div class="seg-popup-tooltip">
@@ -3089,7 +3093,27 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       if (segments.length > 0) {
-        return segments;
+        // Merge contiguous or near-adjacent work segments so multiple test clicks don't shatter the bar
+        const merged: TimelineSegment[] = [];
+        for (const seg of segments) {
+          if (merged.length > 0) {
+            const prev = merged[merged.length - 1];
+            if (prev.type === seg.type && seg.type === 'work') {
+              const prevEndPercent = prev.leftPercent + prev.widthPercent;
+              if (seg.leftPercent <= prevEndPercent + 2.5) {
+                const combinedEnd = Math.min(100, Math.max(prevEndPercent, seg.leftPercent + seg.widthPercent));
+                prev.widthPercent = Math.max(prev.widthPercent, combinedEnd - prev.leftPercent);
+                const prevStartStr = prev.timeRange.split(' - ')[0];
+                const segEndStr = seg.timeRange.split(' - ')[1] || 'Now';
+                prev.timeRange = `${prevStartStr} - ${segEndStr}`;
+                prev.label = 'Working Time';
+                continue;
+              }
+            }
+          }
+          merged.push(seg);
+        }
+        return merged;
       }
     }
 
