@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import Chart from 'chart.js/auto';
 import { ApiService } from '../../core/api/api.service';
@@ -54,7 +54,20 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private renderScheduled = false;
 
   protected readonly firstName = computed(() => (this.dashboard()?.fullName ?? '').split(' ')[0]);
-  protected readonly workingHours = computed(() => this.dashboard()?.workingHoursThisWeek ?? 0);
+  protected readonly workingHours = computed(() => {
+    const apiHours = this.dashboard()?.workingHoursThisWeek ?? 0;
+    const liveTodayHours = Math.round((this.punchService.workSeconds() / 3600) * 10) / 10;
+    return Math.round(Math.max(apiHours, liveTodayHours) * 10) / 10;
+  });
+
+  constructor() {
+    effect(() => {
+      const secs = this.punchService.workSeconds();
+      if (secs > 0) {
+        this.scheduleRender();
+      }
+    });
+  }
 
   protected readonly totalLeaveBalance = computed(() => {
     const list = this.dashboard()?.leaveBalances ?? [];
@@ -218,6 +231,9 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
 
+    const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'short' });
+    const liveTodayHours = Math.round((this.punchService.workSeconds() / 3600) * 10) / 10;
+
     const hours = this.hoursCanvas()?.nativeElement;
     if (hours) {
       if (hours.clientHeight === 0) {
@@ -225,6 +241,20 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.hoursChart?.destroy();
+
+      const hoursData = trend.map((t) => {
+        if (typeof t.workHours === 'number' && t.workHours > 0) {
+          return t.workHours;
+        }
+        if (t.label.toLowerCase() === todayDayName.toLowerCase() && liveTodayHours > 0) {
+          return liveTodayHours;
+        }
+        if (t.beforeBreakHours || t.afterBreakHours) {
+          return Math.round(((t.beforeBreakHours || 0) + (t.afterBreakHours || 0)) * 10) / 10;
+        }
+        return 0;
+      });
+
       this.hoursChart = new Chart(hours, {
         type: 'line',
         data: {
@@ -232,24 +262,51 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           datasets: [
             {
               label: 'Hours',
-              data: trend.map((t) => t.present),
+              data: hoursData,
               borderColor: '#8b5cf6',
-              backgroundColor: 'rgba(139,92,246,.12)',
-              borderWidth: 2,
-              pointRadius: 3,
+              backgroundColor: 'rgba(139, 92, 246, 0.15)',
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointHoverRadius: 6,
               pointBackgroundColor: '#8b5cf6',
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 2,
               fill: true,
-              tension: 0.4,
+              tension: 0.35,
             },
           ],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.92)',
+              titleFont: { size: 12, weight: 'bold' },
+              bodyFont: { size: 11 },
+              padding: 8,
+              cornerRadius: 6,
+              callbacks: {
+                label: (item) => ` Work Hours: ${item.raw}h`,
+              },
+            },
+          },
           scales: {
-            y: { min: 0, grid: { color: 'rgba(0,0,0,.04)' }, ticks: { font: { size: 10 }, callback: (v) => `${v}h` } },
-            x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+            y: {
+              min: 0,
+              suggestedMax: 10,
+              grid: { color: 'rgba(0,0,0,.05)' },
+              ticks: {
+                font: { size: 10 },
+                stepSize: 2,
+                callback: (v) => `${v}h`,
+              },
+            },
+            x: {
+              grid: { display: false },
+              ticks: { font: { size: 10 } },
+            },
           },
         },
       });
