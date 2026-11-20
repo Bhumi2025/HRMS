@@ -57,6 +57,7 @@ export interface EmployeeListItem {
 export interface EmployeeDetail {
   id: string;
   employeeCode: string;
+  salutation?: string | null;
   firstName: string;
   middleName?: string | null;
   lastName: string;
@@ -110,6 +111,8 @@ export interface EmployeeDetail {
   roleName?: string | null;
   isFaceEnrolled?: boolean;
   facePhotoUrl?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
 }
 
 export interface LeaveType {

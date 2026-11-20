@@ -11,11 +11,14 @@ public sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.ToTable("Employees");
 
         builder.Property(e => e.EmployeeCode).HasMaxLength(20).IsRequired();
+        builder.Property(e => e.Salutation).HasMaxLength(20);
         builder.Property(e => e.FirstName).HasMaxLength(60).IsRequired();
         builder.Property(e => e.MiddleName).HasMaxLength(60);
         builder.Property(e => e.LastName).HasMaxLength(60).IsRequired();
         builder.Property(e => e.Email).HasMaxLength(160).IsRequired();
         builder.Property(e => e.Phone).HasMaxLength(30);
+        builder.Property(e => e.EmergencyContactName).HasMaxLength(120);
+        builder.Property(e => e.EmergencyContactPhone).HasMaxLength(40);
         builder.Property(e => e.BloodGroup).HasMaxLength(5);
         builder.Property(e => e.Nationality).HasMaxLength(60);
         builder.Property(e => e.Address).HasMaxLength(250);
