@@ -64,6 +64,7 @@ import {
   NoticeBoardItem,
   CelebrationItem,
   DashboardTemplateData,
+  HrEmployeeSummary,
   ShiftTemplateDto,
   NavigationItem,
   SaveNavigationItemRequest,
@@ -611,10 +612,14 @@ export class ApiService {
     return this.http.get<DepartmentHeadcount[]>(this.url('/dashboard/department-headcount'));
   }
 
-  attendanceTrend(year?: number, month?: number): Observable<AttendanceTrendPoint[]> {
+  attendanceTrend(year?: number, month?: number, employeeId?: string): Observable<AttendanceTrendPoint[]> {
     return this.http.get<AttendanceTrendPoint[]>(this.url('/dashboard/attendance-trend'), {
-      params: toParams({ year, month }),
+      params: toParams({ year, month, employeeId }),
     });
+  }
+
+  getHrTeam(): Observable<HrEmployeeSummary[]> {
+    return this.http.get<HrEmployeeSummary[]>(this.url('/dashboard/hr-team'));
   }
 
   recentActivity(take = 6): Observable<Activity[]> {

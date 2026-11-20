@@ -754,6 +754,15 @@ export interface CelebrationItem {
   avatarUrl?: string | null;
 }
 
+export interface HrEmployeeSummary {
+  id: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  jobTitle?: string;
+}
+
 export interface DashboardTemplateData {
   todayAttendance: TodayAttendanceOverview;
   notices: NoticeBoardItem[];
@@ -764,6 +773,7 @@ export interface DashboardTemplateData {
   attendanceGraph: AttendanceTrendPoint[];
   todayPunches: EmployeePunch[];
   leaveBalances: LeaveBalance[];
+  hrTeam?: HrEmployeeSummary[];
 }
 
 export interface ShiftdayDto {

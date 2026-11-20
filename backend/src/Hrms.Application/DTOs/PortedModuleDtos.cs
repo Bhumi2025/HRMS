@@ -210,6 +210,14 @@ public sealed record CelebrationDto(
     string DateLabel,
     string? AvatarUrl);
 
+public sealed record HrEmployeeSummaryDto(
+    Guid Id,
+    string EmployeeCode,
+    string FirstName,
+    string LastName,
+    string Email,
+    string? JobTitle);
+
 public sealed record DashboardTemplateDataDto(
     TodayAttendanceOverviewDto TodayAttendance,
     IReadOnlyList<NoticeBoardDto> Notices,
@@ -219,4 +227,5 @@ public sealed record DashboardTemplateDataDto(
     IReadOnlyList<PendingApprovalDto> PendingApprovals,
     IReadOnlyList<AttendanceTrendPointDto> AttendanceGraph,
     IReadOnlyList<EmployeePunchDto> TodayPunches,
-    IReadOnlyList<LeaveBalanceDto> LeaveBalances);
+    IReadOnlyList<LeaveBalanceDto> LeaveBalances,
+    IReadOnlyList<HrEmployeeSummaryDto>? HrTeam = null);

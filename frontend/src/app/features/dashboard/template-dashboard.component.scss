@@ -434,11 +434,13 @@
       white-space: nowrap;
     }
 
+    .hr-selector-badge,
     .month-selector-badge {
       position: relative;
       display: inline-flex;
       align-items: center;
 
+      .hr-dropdown,
       .month-dropdown {
         appearance: none;
         -webkit-appearance: none;
