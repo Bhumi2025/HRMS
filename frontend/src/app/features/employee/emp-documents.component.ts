@@ -10,6 +10,7 @@ import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-va
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 
 interface DocRow {
+  id: string;
   doc: string;
   type: string;
   iss: string;
@@ -79,6 +80,7 @@ interface CompanyDoc {
                       <div style="display: flex; gap: 6px">
                         <button class="btn btn-ghost btn-sm" data-tooltip="View" (click)="view(r)"><span [appIcon]="'eye'"></span></button>
                         <button class="btn btn-ghost btn-sm" data-tooltip="Download" (click)="downloadMyDoc(r)"><span [appIcon]="'download'"></span></button>
+                        <button class="btn btn-ghost btn-sm" data-tooltip="Delete" style="color: var(--danger)" (click)="deleteMyDoc(r)"><span [appIcon]="'trash'"></span></button>
                       </div>
                     </td>
                   </tr>
@@ -205,11 +207,16 @@ interface CompanyDoc {
               </div>
             }
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-outline" (click)="ui.close('docModal')">Close</button>
-            <button class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;" (click)="downloadMyDoc(r)">
-              <span [appIcon]="'download'"></span> Download Document
+          <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+            <button class="btn btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.3); display: flex; align-items: center; gap: 6px;" (click)="deleteMyDoc(r); ui.close('docModal')">
+              <span [appIcon]="'trash'"></span> Delete
             </button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline" (click)="ui.close('docModal')">Close</button>
+              <button class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;" (click)="downloadMyDoc(r)">
+                <span [appIcon]="'download'"></span> Download Document
+              </button>
+            </div>
           </div>
         }
       </div>
@@ -419,6 +426,7 @@ export class EmpDocumentsComponent implements OnInit {
 
   private toRow(row: DocumentDto): DocRow {
     return {
+      id: row.id,
       doc: row.name,
       type: row.type,
       iss: row.issueDate ?? ' · ',
@@ -430,6 +438,22 @@ export class EmpDocumentsComponent implements OnInit {
       fileUrl: row.fileUrl ?? null,
       fileSize: row.fileSize ?? null,
     };
+  }
+
+  protected deleteMyDoc(r: DocRow): void {
+    if (!r.id) return;
+    if (confirm(`Are you sure you want to delete "${r.doc}"?`)) {
+      this.api.deleteDocument(r.id).subscribe({
+        next: () => {
+          this.toast.show(`Deleted "${r.doc}" successfully!`, 'success');
+          const empId = this.currentEmpId();
+          if (empId) {
+            this.loadMyDocuments(empId);
+          }
+        },
+        error: () => this.toast.show('Could not delete document.', 'danger'),
+      });
+    }
   }
 
   protected downloadMyDoc(r: DocRow): void {
