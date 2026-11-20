@@ -85,6 +85,13 @@ export const routes: Routes = [
         loadComponent: () => import('./features/hr/employees.component').then((m) => m.EmployeesComponent),
       },
       {
+        path: 'punch-in-out',
+        data: { title: 'Punch-In / Punch-Out' },
+        canActivate: [nonEmployeeGuard],
+        loadComponent: () =>
+          import('./features/hr/punch-in-out.component').then((m) => m.PunchInOutComponent),
+      },
+      {
         path: 'employee-profile',
         data: { title: 'Profile' },
         canActivate: [nonEmployeeGuard],

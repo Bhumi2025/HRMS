@@ -52,7 +52,36 @@ public sealed record EmployeePunchDto(
     DateTime PunchTime,
     string PunchType,
     string? Note,
-    string? Device);
+    string? Device,
+    double? Latitude = null,
+    double? Longitude = null,
+    double? DistanceMeters = null,
+    string? VerificationStatus = null);
+
+public sealed record CentralizedPunchRequest(
+    Guid EmployeeId,
+    string PunchType,
+    double Latitude,
+    double Longitude,
+    float[]? FaceDescriptor = null,
+    string? PhotoSnapshot = null,
+    double? MatchScore = null);
+
+public sealed record CentralizedPunchResultDto(
+    bool Success,
+    string Message,
+    Guid EmployeeId,
+    string EmployeeName,
+    string EmployeeCode,
+    string PunchType,
+    DateTime PunchTime,
+    double Latitude,
+    double Longitude,
+    double DistanceMeters,
+    bool WithinGeofence,
+    double MatchScore,
+    bool FaceVerified,
+    string Status);
 
 public sealed record CreatePunchRequest(
     Guid? EmployeeId,

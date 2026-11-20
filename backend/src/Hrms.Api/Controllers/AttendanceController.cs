@@ -81,11 +81,21 @@ public sealed class AttendanceController : ControllerBase
         Ok(await _attendance.DecideRegularizationAsync(id, false, ct));
 
     [HttpPost("punch")]
+    [Authorize(Policy = "HrAdmin")]
     [ProducesResponseType(typeof(EmployeePunchDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<EmployeePunchDto>> Punch(
         [FromBody] CreatePunchRequest request,
         CancellationToken ct) =>
         Ok(await _attendance.RecordPunchAsync(request, ct));
+
+    /// <summary>Records a centralized Face-Verified & Geofenced Punch-In / Punch-Out by HR Manager.</summary>
+    [HttpPost("centralized-punch")]
+    [Authorize(Policy = "HrAdmin")]
+    [ProducesResponseType(typeof(CentralizedPunchResultDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<CentralizedPunchResultDto>> CentralizedPunch(
+        [FromBody] CentralizedPunchRequest request,
+        CancellationToken ct) =>
+        Ok(await _attendance.ProcessCentralizedPunchAsync(request, ct));
 
     [HttpGet("punch/status")]
     [ProducesResponseType(typeof(EmployeePunchStatusDto), StatusCodes.Status200OK)]

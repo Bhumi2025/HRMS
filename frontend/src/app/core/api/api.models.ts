@@ -713,6 +713,33 @@ export interface FacePunchResult {
   message: string;
 }
 
+export interface CentralizedPunchRequest {
+  employeeId: string;
+  punchType: 'ClockIn' | 'ClockOut';
+  latitude: number;
+  longitude: number;
+  faceDescriptor?: number[];
+  photoSnapshot?: string;
+  matchScore?: number;
+}
+
+export interface CentralizedPunchResult {
+  success: boolean;
+  message: string;
+  employeeId: string;
+  employeeName: string;
+  employeeCode: string;
+  punchType: string;
+  punchTime: string;
+  latitude: number;
+  longitude: number;
+  distanceMeters: number;
+  withinGeofence: boolean;
+  matchScore: number;
+  faceVerified: boolean;
+  status: string;
+}
+
 export interface AttendancePerson {
   employeeId: string;
   employeeName: string;

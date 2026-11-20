@@ -74,4 +74,12 @@ public class EmployeePunch : BaseEntity
     public string? Device { get; set; }
 
     public bool IsOpen { get; set; }
+
+    public double? Latitude { get; set; }
+
+    public double? Longitude { get; set; }
+
+    public double? DistanceMeters { get; set; }
+
+    public string? VerificationStatus { get; set; }
 }
