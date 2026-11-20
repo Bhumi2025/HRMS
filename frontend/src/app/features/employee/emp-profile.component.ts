@@ -57,7 +57,7 @@ interface DocRow {
           </div>
         </div>
         <div>
-          <div style="font-size: 1.2rem; font-weight: 700; color: var(--text); margin-bottom: 2px">{{ personal().fullName || 'Employee Profile' }}</div>
+          <div style="font-size: 1.2rem; font-weight: 700; color: var(--text); margin-bottom: 2px">{{ displayName() }}</div>
           <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px">{{ job().title }}{{ job().dept ? ' · ' + job().dept : '' }}{{ detail()?.employeeCode ? ' · ' + detail()?.employeeCode : '' }}</div>
           <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center">
             <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 20px; background: var(--success-soft); color: var(--success); border: 1px solid rgba(34,197,94,.3)">
@@ -89,33 +89,59 @@ interface DocRow {
         <div class="card" style="overflow: visible">
           <div class="card-header"><div class="card-title">Personal Details</div></div>
           <div class="card-body" style="overflow: visible">
-            <div class="form-group">
-              <label class="form-label">Full Name</label>
-              <input class="form-control" [value]="personal().fullName" (input)="patchPersonal('fullName', $any($event.target).value)" />
+            <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px">
+              <div class="form-group">
+                <label class="form-label">Salutation</label>
+                <app-select [options]="salutationOptions" [value]="personal().salutation" (valueChange)="patchPersonal('salutation', $event)" width="100%" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">First Name</label>
+                <input class="form-control" [value]="personal().firstName" (input)="patchPersonal('firstName', $any($event.target).value)" placeholder="First Name" />
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Date of Birth</label>
-              <input class="form-control" type="date" [value]="personal().dob" (input)="patchPersonal('dob', $any($event.target).value)" />
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+              <div class="form-group">
+                <label class="form-label">Middle Name</label>
+                <input class="form-control" [value]="personal().middleName" (input)="patchPersonal('middleName', $any($event.target).value)" placeholder="Middle Name" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Last Name</label>
+                <input class="form-control" [value]="personal().lastName" (input)="patchPersonal('lastName', $any($event.target).value)" placeholder="Last Name" />
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Gender</label>
-              <app-key-select groupCode="GENDER" [value]="personal().gender" (valueChange)="patchPersonal('gender', $event)" width="100%" />
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+              <div class="form-group">
+                <label class="form-label">Personal Email</label>
+                <input class="form-control" type="email" [value]="personal().email" (input)="patchPersonal('email', $any($event.target).value)" placeholder="Personal Email" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Contact Number</label>
+                <input class="form-control" type="tel" [value]="personal().phone" (input)="patchPersonal('phone', $any($event.target).value)" placeholder="Contact Number" />
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Nationality</label>
-              <input class="form-control" [value]="personal().nationality" (input)="patchPersonal('nationality', $any($event.target).value)" />
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+              <div class="form-group">
+                <label class="form-label">Date of Birth</label>
+                <input class="form-control" type="date" [value]="personal().dob" (input)="patchPersonal('dob', $any($event.target).value)" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Gender</label>
+                <app-key-select groupCode="GENDER" [value]="personal().gender" (valueChange)="patchPersonal('gender', $event)" width="100%" />
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Marital Status</label>
-              <app-key-select groupCode="MARITAL_STATUS" [value]="personal().marital" (valueChange)="patchPersonal('marital', $event)" width="100%" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Blood Group</label>
-              <app-key-select groupCode="BLOOD_GROUP" [value]="personal().blood" (valueChange)="patchPersonal('blood', $event)" width="100%" />
-            </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Personal details saved!')"><span [appIcon]="'check'"></span> Save</button>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+              <div class="form-group">
+                <label class="form-label">Marital Status</label>
+                <app-key-select groupCode="MARITAL_STATUS" [value]="personal().marital" (valueChange)="patchPersonal('marital', $event)" width="100%" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Blood Group</label>
+                <app-key-select groupCode="BLOOD_GROUP" [value]="personal().blood" (valueChange)="patchPersonal('blood', $event)" width="100%" />
+              </div>
             </div>
           </div>
         </div>
@@ -124,7 +150,7 @@ interface DocRow {
           <div class="card-body" style="overflow: visible">
             <div class="form-group">
               <label class="form-label">Employee ID</label>
-              <input class="form-control" value="EMP-1001" readonly style="background: var(--bg); color: var(--muted)" />
+              <input class="form-control" [value]="detail()?.employeeCode || ''" readonly style="background: var(--bg); color: var(--muted)" />
             </div>
             <div class="form-group">
               <label class="form-label">Job Title</label>
@@ -138,84 +164,52 @@ interface DocRow {
               <label class="form-label">Join Date</label>
               <input class="form-control" type="date" [value]="job().joinDate" (input)="patchJob('joinDate', $any($event.target).value)" />
             </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Job info saved!')"><span [appIcon]="'check'"></span> Save</button>
-            </div>
           </div>
         </div>
+      </div>
+
+      <div class="form-footer" style="margin-top: 16px;">
+        <button class="btn btn-outline btn-sm" (click)="load()">Cancel</button>
+        <button class="btn btn-primary btn-sm" (click)="save('Profile details saved!')"><span [appIcon]="'check'"></span> Save</button>
       </div>
     }
 
     <!-- CONTACT -->
     @if (tab() === 'contact') {
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-header"><div class="card-title">Contact Information</div></div>
-          <div class="card-body">
-            <div class="form-group">
-              <label class="form-label">Phone</label>
-              <input class="form-control" type="tel" [value]="contact().phone" (input)="patchContact('phone', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Email</label>
-              <input class="form-control" type="email" [value]="contact().email" (input)="patchContact('email', $any($event.target).value)" />
-            </div>
+      <div class="card" style="overflow: visible">
+        <div class="card-header"><div class="card-title">Contact Information</div></div>
+        <div class="card-body" style="overflow: visible">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
             <div class="form-group">
               <label class="form-label">Emergency Contact Name</label>
-              <input class="form-control" [value]="contact().emergencyName" (input)="patchContact('emergencyName', $any($event.target).value)" />
+              <input class="form-control" [value]="contact().emergencyName" (input)="patchContact('emergencyName', $any($event.target).value)" placeholder="Emergency Contact Name" />
             </div>
             <div class="form-group">
               <label class="form-label">Emergency Contact Phone</label>
-              <input class="form-control" type="tel" [value]="contact().emergencyPhone" (input)="patchContact('emergencyPhone', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Address</label>
-              <input class="form-control" [value]="contact().address" (input)="patchContact('address', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">City</label>
-              <input class="form-control" [value]="contact().city" (input)="patchContact('city', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Country</label>
-              <app-select [options]="countryOptions" [value]="contact().country" (valueChange)="patchContact('country', $event)" width="100%" />
-            </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Contact info saved!')"><span [appIcon]="'check'"></span> Save</button>
+              <input class="form-control" type="tel" [value]="contact().emergencyPhone" (input)="patchContact('emergencyPhone', $any($event.target).value)" placeholder="Emergency Contact Phone" />
             </div>
           </div>
-        </div>
-        <div class="card" style="overflow: visible">
-          <div class="card-header"><div class="card-title">Identity Documents</div></div>
-          <div class="card-body" style="overflow: visible">
-            <div class="form-group">
-              <label class="form-label">Passport No</label>
-              <input class="form-control" [value]="identity().passportNo" (input)="patchIdentity('passportNo', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Passport Expiry</label>
-              <input class="form-control" type="date" [value]="identity().passportExp" (input)="patchIdentity('passportExp', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Visa No</label>
-              <input class="form-control" [value]="identity().visaNo" (input)="patchIdentity('visaNo', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Visa Expiry</label>
-              <input class="form-control" type="date" [value]="identity().visaExp" (input)="patchIdentity('visaExp', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Emirates ID</label>
-              <input class="form-control" [value]="identity().emiratesId" (input)="patchIdentity('emiratesId', $any($event.target).value)" />
-            </div>
-            <div class="form-footer">
-              <button class="btn btn-outline btn-sm">Cancel</button>
-              <button class="btn btn-primary btn-sm" (click)="save('Identity info saved!')"><span [appIcon]="'check'"></span> Save</button>
-            </div>
+
+          <div class="form-group">
+            <label class="form-label">Address Line 1 (House No. / Street Name & City)</label>
+            <input class="form-control" [value]="contact().addressLine1" (input)="patchContact('addressLine1', $any($event.target).value)" placeholder="House / Flat No., Street, City (e.g., Surat, Ahmedabad, Mumbai)" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Address Line 2 (PIN / Zip Code)</label>
+            <input class="form-control" [value]="contact().addressLine2" (input)="patchContact('addressLine2', $any($event.target).value)" placeholder="PIN code or Zip code (e.g., 395007)" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Address Line 3 (State & Country)</label>
+            <input class="form-control" [value]="contact().addressLine3" (input)="patchContact('addressLine3', $any($event.target).value)" placeholder="State, Country (e.g., Gujarat, India)" />
           </div>
         </div>
+      </div>
+
+      <div class="form-footer" style="margin-top: 16px;">
+        <button class="btn btn-outline btn-sm" (click)="load()">Cancel</button>
+        <button class="btn btn-primary btn-sm" (click)="save('Contact information saved!')"><span [appIcon]="'check'"></span> Save</button>
       </div>
     }
 
@@ -512,17 +506,19 @@ export class EmpProfileComponent implements OnInit {
   protected readonly uploadExpiryDate = signal('');
   protected readonly uploadingDoc = signal(false);
 
+  protected readonly displayName = computed(() => {
+    const p = this.personal();
+    const parts = [p.salutation, p.firstName, p.middleName, p.lastName].filter((s) => !!s && !!s.trim());
+    if (parts.length > 0) return parts.join(' ');
+    return this.detail()?.fullName || 'Employee Profile';
+  });
+
   protected initials(): string {
-    const name = this.personal().fullName || this.detail()?.fullName || '';
-    if (!name.trim()) return 'EP';
-    return name
-      .trim()
-      .split(' ')
-      .filter(Boolean)
-      .map((n) => n[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
+    const p = this.personal();
+    const f = p.firstName || this.detail()?.firstName || '';
+    const l = p.lastName || this.detail()?.lastName || '';
+    const initials = `${f.slice(0, 1)}${l.slice(0, 1)}`.toUpperCase();
+    return initials || 'EP';
   }
 
   protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
@@ -678,10 +674,14 @@ export class EmpProfileComponent implements OnInit {
         this.apiId.set(employee.id);
 
         this.personal.set({
-          fullName: employee.fullName,
+          salutation: employee.salutation || (employee.gender === 'Male' ? 'Mr' : 'Miss'),
+          firstName: employee.firstName || '',
+          middleName: employee.middleName || '',
+          lastName: employee.lastName || '',
+          email: employee.email || '',
+          phone: employee.phone || '',
           dob: employee.dateOfBirth ?? '',
           gender: employee.gender,
-          nationality: employee.nationality ?? '',
           marital: employee.maritalStatus,
           blood: employee.bloodGroup ?? '',
         });
@@ -700,14 +700,26 @@ export class EmpProfileComponent implements OnInit {
           ];
         }
 
+        const rawAddr = employee.address ?? '';
+        let line1 = rawAddr;
+        let line2 = '';
+        const pinMatch = rawAddr.match(/(?:,\s*|\s*\[|\s*-\s*|\s+)PIN(?::\s*|\s+)(\d+)/i) || rawAddr.match(/\b(\d{6})\b/);
+        if (pinMatch) {
+          line2 = pinMatch[1] || '';
+          line1 = rawAddr.replace(pinMatch[0], '').replace(/[\[\]]/g, '').trim().replace(/,\s*$/, '');
+        }
+        if (employee.city && !line1.toLowerCase().includes(employee.city.toLowerCase())) {
+          line1 = line1 ? `${line1}, ${employee.city}` : employee.city;
+        }
+
+        const stateCountry = [employee.state, employee.country].filter(Boolean).join(', ');
+
         this.contact.set({
-          phone: employee.phone ?? '',
-          email: employee.email,
-          emergencyName: '',
-          emergencyPhone: '',
-          address: employee.address ?? '',
-          city: employee.city ?? '',
-          country: employee.country ?? '',
+          emergencyName: employee.emergencyContactName ?? '',
+          emergencyPhone: employee.emergencyContactPhone ?? '',
+          addressLine1: line1,
+          addressLine2: line2,
+          addressLine3: stateCountry,
         });
 
         this.identity.set({
@@ -773,8 +785,35 @@ export class EmpProfileComponent implements OnInit {
     const identity = this.identity();
     const bank = this.bank();
 
-    const [firstName, ...rest] = personal.fullName.trim().split(' ');
-    const lastName = rest.join(' ') || detail.lastName;
+    const firstName = personal.firstName.trim() || detail.firstName;
+    const middleName = personal.middleName?.trim() || null;
+    const lastName = personal.lastName.trim() || detail.lastName;
+    const email = (personal.email || detail.email).trim().toLowerCase();
+    const phone = personal.phone || detail.phone;
+
+    let addr = contact.addressLine1?.trim() || detail.address || null;
+    let city = detail.city;
+    if (contact.addressLine1?.trim()) {
+      const parts = contact.addressLine1.split(',').map((p) => p.trim()).filter(Boolean);
+      if (parts.length > 1) {
+        city = parts[parts.length - 1];
+      }
+    }
+    if (contact.addressLine2?.trim()) {
+      addr = `${addr ? addr + ', ' : ''}PIN: ${contact.addressLine2.trim()}`;
+    }
+
+    let state = detail.state;
+    let country = detail.country;
+    if (contact.addressLine3?.trim()) {
+      const scParts = contact.addressLine3.split(',').map((p) => p.trim()).filter(Boolean);
+      if (scParts.length === 1) {
+        state = scParts[0];
+      } else if (scParts.length >= 2) {
+        state = scParts[0];
+        country = scParts[1];
+      }
+    }
 
     const normalizeGender = (g: string | null | undefined): string | null => {
       if (!g || !g.trim()) return null;
@@ -808,11 +847,12 @@ export class EmpProfileComponent implements OnInit {
 
     this.api
       .updateEmployee(id, {
-        firstName: firstName || detail.firstName,
-        middleName: detail.middleName,
+        salutation: personal.salutation || null,
+        firstName,
+        middleName,
         lastName,
-        email: contact.email || detail.email,
-        phone: contact.phone || detail.phone,
+        email,
+        phone,
         departmentId: this.departmentIds.get(job.dept) ?? detail.departmentId,
         designationId: detail.designationId,
         branchId: detail.branchId,
@@ -830,7 +870,7 @@ export class EmpProfileComponent implements OnInit {
         otherAllowances: detail.otherAllowances,
         currency: bank.currency || detail.currency || 'AED',
         bankName: bank.bankName || detail.bankName || 'Emirates NBD',
-        accountName: bank.accountName || detail.accountName || personal.fullName.trim() || `${detail.firstName} ${detail.lastName}`.trim(),
+        accountName: bank.accountName || detail.accountName || `${firstName} ${lastName}`.trim() || detail.fullName,
         accountNumber: bank.accountNo || detail.accountNumber,
         iban: bank.iban || detail.iban,
         ifscCode: bank.ifsc || detail.ifscCode,
@@ -846,10 +886,13 @@ export class EmpProfileComponent implements OnInit {
         gender: normalizeGender(personal.gender) ?? detail.gender,
         maritalStatus: normalizeMarital(personal.marital) ?? detail.maritalStatus,
         bloodGroup: personal.blood || detail.bloodGroup || null,
-        nationality: personal.nationality || detail.nationality || null,
-        address: contact.address || detail.address || null,
-        city: contact.city || detail.city || null,
-        country: contact.country || detail.country || null,
+        nationality: detail.nationality || null,
+        address: addr,
+        city: city || null,
+        state: state || null,
+        country: country || null,
+        emergencyContactName: contact.emergencyName?.trim() || null,
+        emergencyContactPhone: contact.emergencyPhone?.trim() || null,
       })
       .subscribe({
         next: (updated) => {
@@ -877,10 +920,14 @@ export class EmpProfileComponent implements OnInit {
   protected readonly tab = signal<'personal' | 'contact' | 'bank' | 'docs'>('personal');
 
   protected readonly personal = signal({
-    fullName: '',
+    salutation: 'Mr',
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    email: '',
+    phone: '',
     dob: '',
     gender: 'Female',
-    nationality: '',
     marital: '',
     blood: '',
   });
@@ -893,13 +940,11 @@ export class EmpProfileComponent implements OnInit {
   });
 
   protected readonly contact = signal({
-    phone: '',
-    email: '',
     emergencyName: '',
     emergencyPhone: '',
-    address: '',
-    city: '',
-    country: '',
+    addressLine1: '',
+    addressLine2: '',
+    addressLine3: '',
   });
 
   protected readonly identity = signal({
@@ -1011,7 +1056,16 @@ export class EmpProfileComponent implements OnInit {
   ];
   protected readonly uploadTypeOptions: SelectOption[] = ['Passport', 'Visa', 'Work Permit', 'Emirates ID', 'Medical Insurance', 'Other'].map((t) => ({ v: t, l: t }));
 
-  protected patchPersonal(key: 'fullName' | 'dob' | 'gender' | 'nationality' | 'marital' | 'blood', value: string): void {
+  protected readonly salutationOptions: SelectOption[] = [
+    { v: 'Mr', l: 'Mr' },
+    { v: 'Mrs', l: 'Mrs' },
+    { v: 'Miss', l: 'Miss' },
+  ];
+
+  protected patchPersonal(
+    key: 'salutation' | 'firstName' | 'middleName' | 'lastName' | 'email' | 'phone' | 'dob' | 'gender' | 'marital' | 'blood',
+    value: string
+  ): void {
     this.personal.update((p) => ({ ...p, [key]: value }));
   }
 
@@ -1019,7 +1073,7 @@ export class EmpProfileComponent implements OnInit {
     this.job.update((j) => ({ ...j, [key]: value }));
   }
 
-  protected patchContact(key: 'phone' | 'email' | 'emergencyName' | 'emergencyPhone' | 'address' | 'city' | 'country', value: string): void {
+  protected patchContact(key: 'emergencyName' | 'emergencyPhone' | 'addressLine1' | 'addressLine2' | 'addressLine3', value: string): void {
     this.contact.update((c) => ({ ...c, [key]: value }));
   }
 

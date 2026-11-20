@@ -122,6 +122,28 @@
               <span class="widget-indicator"></span>
               <div class="header-title-box">
                 <h3 class="widget-title-nowrap">Attendance Overview</h3>
+                @if (hrEmployees().length > 1) {
+                  <div class="hr-selector-badge">
+                    <select
+                      class="hr-dropdown"
+                      [value]="selectedHrEmployeeId()"
+                      (change)="onHrEmployeeChange($event)"
+                      title="Select HR Employee"
+                    >
+                      @for (hr of hrEmployees(); track hr.id) {
+                        <option [value]="hr.id">{{ hr.firstName }} {{ hr.lastName }}</option>
+                      }
+                    </select>
+                    <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <path d="M6 9l6 6 6-6"/>
+                    </svg>
+                  </div>
+                } @else if (hrEmployees().length === 1) {
+                  <div class="hr-badge-single" title="HR Attendance Overview">
+                    <span class="hr-dot"></span>
+                    <span>{{ hrEmployees()[0].firstName }} {{ hrEmployees()[0].lastName }}</span>
+                  </div>
+                }
                 <div class="month-selector-badge">
                   <select
                     class="month-dropdown"
@@ -140,15 +162,19 @@
               </div>
             </div>
 
-            <!-- Legend & Action (Redirects to Monthly Muster Register) -->
+            <!-- Action (Redirects to Monthly Muster Register) -->
             <div class="header-actions">
-              <div class="graph-legend">
-                <span class="legend-item"><span class="legend-dot dot-before-break"></span> Before Break</span>
-                <span class="legend-item"><span class="legend-dot dot-break"></span> Break</span>
-                <span class="legend-item"><span class="legend-dot dot-after-break"></span> After Break</span>
-                <span class="legend-item"><span class="legend-dot dot-missing"></span> Missing</span>
-              </div>
               <a [routerLink]="['/attendance']" [queryParams]="{ tab: 'muster', month: selectedMonthKey() }" class="view-link" title="Open Monthly Muster Register">Detailed Log ›</a>
+            </div>
+          </div>
+
+          <!-- Dedicated Legend Row (Clean, spaced, zero collision) -->
+          <div class="chart-legend-bar">
+            <div class="graph-legend">
+              <span class="legend-item"><span class="legend-dot dot-before-break"></span> Before Break</span>
+              <span class="legend-item"><span class="legend-dot dot-break"></span> Break</span>
+              <span class="legend-item"><span class="legend-dot dot-after-break"></span> After Break</span>
+              <span class="legend-item"><span class="legend-dot dot-missing"></span> Missing</span>
             </div>
           </div>
 
@@ -262,30 +288,31 @@
                 @if (hoveredBar(); as hov) {
                   <g
                     class="bar-tooltip-group"
-                    [attr.transform]="'translate(' + (hov.cx > 600 ? hov.cx - 160 : (hov.cx < 90 ? hov.cx + 5 : hov.cx - 77)) + ', ' + (hov.topY > 65 ? hov.topY - 55 : hov.topY + 12) + ')'"
+                    [attr.transform]="'translate(' + (hov.cx > 570 ? hov.cx - 180 : (hov.cx < 95 ? hov.cx + 5 : hov.cx - 90)) + ', ' + (hov.topY > 75 ? hov.topY - 67 : hov.topY + 12) + ')'"
                   >
-                    <rect width="155" height="52" rx="7" fill="#0f172a" opacity="0.96" />
-                    <text x="77.5" y="15" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="700">
+                    <rect width="180" height="64" rx="7" fill="#0f172a" opacity="0.96" />
+                    <text x="90" y="14" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="700">
+                      {{ selectedHrEmployeeName() }} ({{ selectedHrEmployeeCode() }})
+                    </text>
+                    <text x="90" y="27" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="600">
                       {{ hov.formattedDate }}
                     </text>
-                    <text x="77.5" y="29" text-anchor="middle" fill="#94a3b8" font-size="8.5" font-weight="500">
+                    <text x="90" y="41" text-anchor="middle" fill="#94a3b8" font-size="8.5" font-weight="500">
                       @if (hov.totalHours > 0) {
-                        Work: {{ (hov.beforeBreak + hov.afterBreak) | number:'1.1-1' }}h | Break: {{ hov.breakHrs | number:'1.1-1' }}h
+                        Work: {{ (hov.beforeBreak + hov.afterBreak) | number:'1.1-1' }}h | Break: {{ hov.breakHrs > 0 ? (hov.breakHrs | number:'1.1-1') + 'h' : '0h' }}
                       } @else {
                         No Activity Recorded
                       }
                     </text>
-                    <text x="77.5" y="43" text-anchor="middle" fill="#38bdf8" font-size="8.5" font-weight="600">
+                    <text x="90" y="55" text-anchor="middle" fill="#4ade80" font-size="8.5" font-weight="600">
                       @if (hov.isToday) {
-                        @if (punchService.todayPunchBreakdown().phase === 'before_break' || (hov.beforeBreak > 0 && hov.afterBreak === 0 && hov.breakHrs === 0)) {
-                          Status: Active (Before Break)
-                        } @else if (punchService.todayPunchBreakdown().phase === 'on_break' || (hov.breakHrs > 0 && hov.afterBreak === 0)) {
+                        @if (punchService.todayPunchBreakdown().phase === 'on_break' || (hov.breakHrs > 0 && hov.afterBreak === 0)) {
                           Status: On Break ☕
-                        } @else if (punchService.todayPunchBreakdown().phase === 'after_break' || hov.afterBreak > 0) {
-                          Status: Active (After Break)
                         } @else if (punchService.todayPunchBreakdown().phase === 'clocked_out') {
-                          Status: Completed (Logged Out)
-                        } @else if (hov.present > 0) {
+                          Status: Completed (Clocked Out)
+                        } @else if (hov.late > 0) {
+                          Status: Active (Late Arrival)
+                        } @else if (hov.beforeBreak > 0 || hov.afterBreak > 0 || hov.present > 0) {
                           Status: Active (On Duty)
                         } @else {
                           Status: Awaiting Clock-In
@@ -293,9 +320,9 @@
                       } @else if (hov.missing > 0 && hov.beforeBreak === 0) {
                         Status: Missing / Absent
                       } @else if (hov.late > 0) {
-                        Status: Late Check-in
+                        Status: Present (Late Arrival)
                       } @else if (hov.present > 0) {
-                        Status: On-Time Work
+                        Status: Present (On-Time)
                       } @else {
                         Status: Off / Weekend
                       }

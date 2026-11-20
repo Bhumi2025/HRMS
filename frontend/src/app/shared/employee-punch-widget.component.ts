@@ -27,9 +27,9 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
             <p class="widget-subtitle">Record daily attendance punches with server-synchronized timestamps</p>
           </div>
 
-          <div class="status-indicator-badge" [class.live]="isCheckedIn()">
+          <div class="status-indicator-badge" [class.live]="isCheckedIn() && !isOnBreak()" [class.on-break]="isOnBreak()">
             <span class="pulse-dot"></span>
-            <span class="status-text">{{ isCheckedIn() ? 'CHECKED IN' : 'CHECKED OUT' }}</span>
+            <span class="status-text">{{ isOnBreak() ? 'ON BREAK' : isCheckedIn() ? 'CHECKED IN' : 'CHECKED OUT' }}</span>
           </div>
         </div>
 
@@ -58,11 +58,11 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
 
         <!-- Main Metrics & Action Area -->
         <div class="widget-body">
-          <!-- Left: Running Timer & First Punch -->
+          <!-- Left: Running Timer & First Punch & Break Time -->
           <div class="timer-section">
             <div class="timer-display-box">
               <span class="timer-label">TOTAL WORKED TODAY</span>
-              <span class="timer-digits" [class.ticking]="isCheckedIn()">{{ timerDisplay() }}</span>
+              <span class="timer-digits" [class.ticking]="isCheckedIn() && !isOnBreak()">{{ timerDisplay() }}</span>
               <span class="timer-subtext">Sum of today's closed punches + active duration</span>
             </div>
 
@@ -73,32 +73,77 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
                 <span class="metric-val">{{ status()?.firstCheckInTime || '—' }}</span>
               </div>
             </div>
+
+            <div class="metric-pill" [class.active-break]="isOnBreak()">
+              <span class="metric-icon">☕</span>
+              <div class="metric-data">
+                <span class="metric-title">Break Time</span>
+                <span class="metric-val">{{ breakTimerDisplay() }}</span>
+              </div>
+            </div>
           </div>
 
           <!-- Right: Action Button -->
           <div class="action-section">
-            <button
-              class="punch-toggle-btn"
-              [class.btn-check-in]="!isCheckedIn()"
-              [class.btn-check-out]="isCheckedIn()"
-              [disabled]="submitting() || loading()"
-              (click)="togglePunch()"
-            >
-              @if (submitting()) {
-                <span class="spinner"></span>
-                <span>Recording Punch...</span>
-              } @else if (isCheckedIn()) {
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-                <span>Check Out</span>
-              } @else {
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
-                </svg>
-                <span>Check In</span>
-              }
-            </button>
+            @if (!isCheckedIn()) {
+              <button
+                class="punch-toggle-btn btn-check-in"
+                [disabled]="submitting() || loading()"
+                (click)="togglePunch()"
+              >
+                @if (submitting() && lastAction() === 'punch') {
+                  <span class="spinner"></span>
+                  <span>Recording Punch...</span>
+                } @else {
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+                  </svg>
+                  <span>Check In</span>
+                }
+              </button>
+            } @else {
+              <div class="punch-active-row">
+                <button
+                  class="btn-punch-action btn-break"
+                  [class.active]="isOnBreak()"
+                  [disabled]="submitting() || loading()"
+                  (click)="toggleBreak()"
+                >
+                  @if (submitting() && lastAction() === 'break') {
+                    <span class="spinner-sm"></span>
+                    <span>Recording...</span>
+                  } @else if (isOnBreak()) {
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    <span>End Break</span>
+                  } @else {
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+                    </svg>
+                    <span>Break</span>
+                  }
+                </button>
+
+                <button
+                  class="btn-punch-action btn-check-out"
+                  [disabled]="submitting() || loading()"
+                  (click)="togglePunch()"
+                >
+                  @if (submitting() && lastAction() === 'punch') {
+                    <span class="spinner-sm"></span>
+                    <span>Checking out...</span>
+                  } @else {
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="15" y1="9" x2="9" y2="15" />
+                      <line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                    <span>Check Out</span>
+                  }
+                </button>
+              </div>
+            }
             <span class="anti-race-hint">Single-click protected • Server verified</span>
           </div>
         </div>
@@ -132,8 +177,12 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
                     @for (p of todayPunches(); track p.id) {
                       <tr>
                         <td>
-                          <span class="type-pill" [class.type-in]="p.punchType === 'ClockIn'" [class.type-out]="p.punchType === 'ClockOut'">
-                            {{ p.punchType === 'ClockIn' ? 'Check In' : 'Check Out' }}
+                          <span class="type-pill" 
+                            [class.type-in]="p.punchType === 'ClockIn'" 
+                            [class.type-out]="p.punchType === 'ClockOut'"
+                            [class.type-break-in]="p.punchType === 'BreakIn'"
+                            [class.type-break-out]="p.punchType === 'BreakOut'">
+                            {{ p.punchType === 'ClockIn' ? 'Check In' : p.punchType === 'ClockOut' ? 'Check Out' : p.punchType === 'BreakIn' ? 'Break In' : 'Break Out' }}
                           </span>
                         </td>
                         <td class="punch-time-cell">{{ formatTime(p.punchTime) }}</td>
@@ -225,6 +274,11 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
         color: #15803d;
         border-color: rgba(34, 197, 94, 0.3);
       }
+      .status-indicator-badge.on-break {
+        background: rgba(245, 158, 11, 0.12);
+        color: #b45309;
+        border-color: rgba(245, 158, 11, 0.3);
+      }
       .pulse-dot {
         width: 8px;
         height: 8px;
@@ -234,6 +288,11 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
       .status-indicator-badge.live .pulse-dot {
         background: #22c55e;
         box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+        animation: pulse 1.8s infinite;
+      }
+      .status-indicator-badge.on-break .pulse-dot {
+        background: #f59e0b;
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
         animation: pulse 1.8s infinite;
       }
       @keyframes pulse {
@@ -349,6 +408,11 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
         border: 1px solid #e2e8f0;
         padding: 8px 14px;
         border-radius: 10px;
+        transition: all 0.2s ease;
+      }
+      .metric-pill.active-break {
+        border-color: #f59e0b;
+        background: #fffbeb;
       }
       .metric-icon {
         font-size: 18px;
@@ -375,6 +439,58 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
         flex-direction: column;
         align-items: flex-end;
         gap: 6px;
+      }
+      .punch-active-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .btn-punch-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-width: 120px;
+        height: 46px;
+        padding: 0 16px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      }
+      .btn-punch-action:active:not(:disabled) {
+        transform: scale(0.98);
+      }
+      .btn-punch-action:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+      .btn-punch-action.btn-break {
+        background: #f8fafc;
+        color: #475569;
+        border: 1.5px solid #cbd5e1;
+      }
+      .btn-punch-action.btn-break:hover:not(:disabled) {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+        color: #1e293b;
+      }
+      .btn-punch-action.btn-break.active {
+        background: #fef3c7;
+        color: #b45309;
+        border-color: #fde68a;
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+      }
+      .btn-punch-action.btn-check-out {
+        background: linear-gradient(135deg, #e11d48, #be123c);
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(225, 29, 72, 0.3);
+      }
+      .btn-punch-action.btn-check-out:hover:not(:disabled) {
+        background: linear-gradient(135deg, #be123c, #9f1239);
+        box-shadow: 0 6px 18px rgba(225, 29, 72, 0.4);
       }
       .punch-toggle-btn {
         display: inline-flex;
@@ -517,6 +633,23 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
         background: #ffe4e6;
         color: #be123c;
       }
+      .type-break-in {
+        background: #fef3c7;
+        color: #b45309;
+      }
+      .type-break-out {
+        background: #e0f2fe;
+        color: #0369a1;
+      }
+      .spinner-sm {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        border-top-color: currentColor;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: inline-block;
+      }
 
       /* Mobile responsiveness */
       @media (max-width: 640px) {
@@ -563,6 +696,8 @@ export class EmployeePunchWidgetComponent implements OnInit, OnDestroy {
   // Server clock synchronization
   private serverOffsetMs = 0;
   protected readonly timerDisplay = signal('00:00:00');
+  protected readonly breakTimerDisplay = signal('00:00:00');
+  protected readonly lastAction = signal<'punch' | 'break' | null>(null);
   private intervalId: ReturnType<typeof setInterval> | null = null;
 
   protected readonly hasEmployeeRecord = computed(() => {
@@ -571,6 +706,7 @@ export class EmployeePunchWidgetComponent implements OnInit, OnDestroy {
   });
 
   protected readonly isCheckedIn = computed(() => this.status()?.isCheckedIn ?? false);
+  protected readonly isOnBreak = computed(() => this.status()?.isOnBreak ?? false);
   protected readonly companyTz = computed(() => this.status()?.companyTimeZone ?? 'Asia/Kolkata');
   protected readonly todayPunches = computed(() => this.status()?.todayPunches ?? []);
 
@@ -618,20 +754,47 @@ export class EmployeePunchWidgetComponent implements OnInit, OnDestroy {
     });
   }
 
+  toggleBreak(): void {
+    if (this.submitting() || this.loading()) return;
+    this.errorMessage.set(null);
+    this.submitting.set(true);
+    this.lastAction.set('break');
+
+    const nextType = this.isOnBreak() ? 'BreakOut' : 'BreakIn';
+
+    this.api.recordPunch({ punchType: nextType, device: 'Web Dashboard' }).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.lastAction.set(null);
+        this.loadStatus();
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.lastAction.set(null);
+        const msg = err.error?.message || err.error?.title || (err.status === 409 ? 'Punch action conflict.' : 'Failed to record break.');
+        this.errorMessage.set(msg);
+        this.loadStatus();
+      },
+    });
+  }
+
   togglePunch(): void {
     if (this.submitting() || this.loading()) return;
     this.errorMessage.set(null);
     this.submitting.set(true);
+    this.lastAction.set('punch');
 
     const nextType = this.isCheckedIn() ? 'ClockOut' : 'ClockIn';
 
     this.api.recordPunch({ punchType: nextType, device: 'Web Dashboard' }).subscribe({
       next: () => {
         this.submitting.set(false);
+        this.lastAction.set(null);
         this.loadStatus();
       },
       error: (err) => {
         this.submitting.set(false);
+        this.lastAction.set(null);
         const msg = err.error?.message || err.error?.title || (err.status === 409 ? 'Punch action conflict.' : 'Failed to record punch.');
         this.errorMessage.set(msg);
         this.loadStatus(); // refresh true state
@@ -651,24 +814,37 @@ export class EmployeePunchWidgetComponent implements OnInit, OnDestroy {
     const s = this.status();
     if (!s) {
       this.timerDisplay.set('00:00:00');
+      this.breakTimerDisplay.set('00:00:00');
       return;
     }
 
-    let totalSeconds = s.workedSecondsToday;
+    const pad = (n: number) => n.toString().padStart(2, '0');
 
-    if (s.isCheckedIn && s.currentCheckInTimeUtc) {
+    // Production (work) seconds
+    let totalSeconds = s.workedSecondsToday;
+    if (s.isCheckedIn && !s.isOnBreak && s.currentCheckInTimeUtc) {
       const nowServerMs = Date.now() + this.serverOffsetMs;
       const punchStartMs = new Date(s.currentCheckInTimeUtc).getTime();
       const openSeconds = Math.max(0, Math.floor((nowServerMs - punchStartMs) / 1000));
       totalSeconds += openSeconds;
     }
-
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
-
-    const pad = (n: number) => n.toString().padStart(2, '0');
     this.timerDisplay.set(`${pad(hours)}:${pad(minutes)}:${pad(seconds)}`);
+
+    // Break seconds
+    let totalBreakSec = s.breakSecondsToday || 0;
+    if (s.isOnBreak && s.lastPunchTimeUtc) {
+      const nowServerMs = Date.now() + this.serverOffsetMs;
+      const breakStartMs = new Date(s.lastPunchTimeUtc).getTime();
+      const openBreakSeconds = Math.max(0, Math.floor((nowServerMs - breakStartMs) / 1000));
+      totalBreakSec += openBreakSeconds;
+    }
+    const bHours = Math.floor(totalBreakSec / 3600);
+    const bMinutes = Math.floor((totalBreakSec % 3600) / 60);
+    const bSeconds = totalBreakSec % 60;
+    this.breakTimerDisplay.set(`${pad(bHours)}:${pad(bMinutes)}:${pad(bSeconds)}`);
   }
 
   formatTime(isoString: string): string {

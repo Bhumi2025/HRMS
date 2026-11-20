@@ -31,6 +31,7 @@ interface DynamicAttendanceRow {
   checkIn: string;
   checkOut: string;
   workHours: number;
+  breakMinutes?: number;
   status: string;
   device?: string;
   dayStatusBadge: 'FD' | 'HD' | 'WK' | 'AB' | 'LV' | 'HL' | 'OD' | '—';
@@ -156,15 +157,18 @@ interface MusterDay {
       </div>
     }
 
-    <!-- TAB 1: DAILY PUNCH LOG -->
+    <!-- TAB 1: DAILY PUNCH LOG WIDGET -->
     @if (tab() === 'daily') {
-      <div class="card">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <div class="card daily-punch-widget" style="height: calc(100vh - 275px); display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; flex-shrink: 0;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="card-title">Daily Punch Records</div>
             <span class="badge badge-success" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;">
               <span class="pulse-indicator"></span>
               Live Records
+            </span>
+            <span style="font-size: 12px; color: var(--muted); font-weight: 600; margin-left: 6px;">
+              ({{ filteredDailyRows().length }} {{ filteredDailyRows().length === 1 ? 'record' : 'records' }})
             </span>
           </div>
 
@@ -222,7 +226,7 @@ interface MusterDay {
               class="form-control" 
               style="width: 130px; font-size: 12px; padding: 6px 10px;"
               [ngModel]="filterStatus()"
-              (ngModelChange)="filterStatus.set($event)"
+              (ngModelChange)="onFilterStatusChange($event)"
             >
               <option value="">All Statuses</option>
               <option value="Present">Present</option>
@@ -245,9 +249,9 @@ interface MusterDay {
           </div>
         </div>
 
-        <div class="table-wrap" style="overflow-x: auto; overflow-y: auto; width: 100%; max-height: 460px; padding-bottom: 0;">
+        <div class="table-wrap custom-scroll" style="flex: 1; overflow-y: auto; overflow-x: auto; width: 100%; min-height: 0;">
           <table class="daily-punch-table" style="width: 100%; min-width: 1080px; border-collapse: collapse;">
-            <thead style="position: sticky; top: 0; z-index: 3; background: var(--surface, #fff);">
+            <thead style="position: sticky; top: 0; z-index: 5; background: var(--surface, #fff); box-shadow: 0 1px 2px rgba(0,0,0,0.06);">
               <tr>
                 <th style="min-width: 180px;">Employee</th>
                 <th style="min-width: 110px;">Department</th>
@@ -958,14 +962,17 @@ interface MusterDay {
     <!-- Modal: Quick Live Punch -->
     @if (showPunchModal()) {
       <div class="modal-overlay open" (click)="showPunchModal.set(false)">
-        <div class="modal" style="max-width: 450px;" (click)="$event.stopPropagation()">
+        <div class="modal" style="max-width: 520px; width: 100%;" (click)="$event.stopPropagation()">
           <div class="modal-header">
-            <div style="font-size: 1.1rem; font-weight: 700;">Record Live Punch</div>
+            <div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: var(--text, #0f172a);">Record Live Punch</div>
+              <div style="font-size: 12px; color: var(--muted, #64748b); margin-top: 2px;">Track employee attendance status and manually log a punch</div>
+            </div>
             <button class="btn btn-ghost btn-sm" (click)="showPunchModal.set(false)"><span [appIcon]="'x'"></span></button>
           </div>
-          <div class="modal-body">
-            <div class="form-group">
-              <label class="form-label">Employee <span style="color: var(--danger)">*</span></label>
+          <div class="modal-body" style="padding: 18px 24px;">
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label class="form-label" style="font-size: 13px; font-weight: 600;">Employee <span style="color: var(--danger)">*</span></label>
               <select class="form-control" [(ngModel)]="punchForm.employeeId" (change)="updateDefaultPunchTypeForSelected()">
                 @for (e of employees(); track e.id) {
                   <option [value]="e.id">{{ e.fullName }} ({{ e.department }})</option>
@@ -973,42 +980,73 @@ interface MusterDay {
               </select>
             </div>
 
-            <!-- Current Employee Live Punch Status Badge -->
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
-              <span style="color: #64748b; font-weight: 500;">Current State:</span>
-              <span [style.color]="currentEmpPunchState().badgeColor" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-                <span [style.background]="currentEmpPunchState().badgeColor" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
-                {{ currentEmpPunchState().badgeText }}
-              </span>
+            <!-- Employee Live Tracking Summary Card -->
+            <div class="emp-tracking-card">
+              <!-- Top Row: Status badge & Shift Info -->
+              <div class="tracking-top-row">
+                <div class="tracking-status-chip" [style.color]="currentEmpTracking().badgeColor" [style.borderColor]="currentEmpTracking().badgeColor + '40'" [style.background]="currentEmpTracking().badgeColor + '12'">
+                  <span class="tracking-pulse-dot" [style.background]="currentEmpTracking().badgeColor"></span>
+                  {{ currentEmpTracking().badgeText }}
+                </div>
+                <div class="tracking-shift-pill" title="Shift Schedule">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>{{ currentEmpTracking().shiftName }} ({{ currentEmpTracking().shiftTiming }})</span>
+                </div>
+              </div>
+
+              <!-- 3-Column Metrics Grid -->
+              <div class="tracking-metrics-grid">
+                <div class="tracking-metric-item">
+                  <span class="t-label">First In</span>
+                  <span class="t-value">{{ currentEmpTracking().firstCheckIn }}</span>
+                </div>
+                <div class="tracking-metric-item">
+                  <span class="t-label">Total Worked</span>
+                  <span class="t-value highlight">{{ currentEmpTracking().workedHours }}</span>
+                </div>
+                <div class="tracking-metric-item">
+                  <span class="t-label">Break Time</span>
+                  <span class="t-value">{{ currentEmpTracking().breakTime }}</span>
+                </div>
+              </div>
+
+              <!-- Bottom Row: Last Punch & Punches Today -->
+              <div class="tracking-bottom-row">
+                <div class="t-last-punch">
+                  <span class="t-sublabel">Last Punch:</span>
+                  <span class="t-last-val">{{ currentEmpTracking().lastPunch }}</span>
+                </div>
+                <div class="t-punch-count">
+                  {{ currentEmpTracking().punchesCount }} {{ currentEmpTracking().punchesCount === 1 ? 'punch' : 'punches' }} today
+                </div>
+              </div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Punch Type <span style="color: var(--danger)">*</span></label>
-              <div style="display: flex; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
-                <label [style.opacity]="isPunchTypeAllowed('ClockIn') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockIn') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockIn" name="punchType" [disabled]="!isPunchTypeAllowed('ClockIn')" />
-                  Clock In
+            <div class="form-group" style="margin-top: 16px; margin-bottom: 14px;">
+              <label class="form-label" style="font-size: 13px; font-weight: 600; margin-bottom: 8px; display: block;">Punch Type <span style="color: var(--danger)">*</span></label>
+              <div class="punch-type-selector">
+                <label class="punch-type-option" [class.selected]="punchForm.punchType === 'ClockIn'">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockIn" name="punchType" />
+                  <span class="punch-type-icon in">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                  </span>
+                  <span class="punch-type-text">Clock In</span>
                 </label>
-                <label [style.opacity]="isPunchTypeAllowed('BreakIn') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('BreakIn') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakIn" name="punchType" [disabled]="!isPunchTypeAllowed('BreakIn')" />
-                  Break In
-                </label>
-                <label [style.opacity]="isPunchTypeAllowed('BreakOut') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('BreakOut') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakOut" name="punchType" [disabled]="!isPunchTypeAllowed('BreakOut')" />
-                  Break Out
-                </label>
-                <label [style.opacity]="isPunchTypeAllowed('ClockOut') ? '1' : '0.4'" [style.cursor]="isPunchTypeAllowed('ClockOut') ? 'pointer' : 'not-allowed'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
-                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockOut" name="punchType" [disabled]="!isPunchTypeAllowed('ClockOut')" />
-                  Clock Out
+                <label class="punch-type-option" [class.selected]="punchForm.punchType === 'ClockOut'">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="ClockOut" name="punchType" />
+                  <span class="punch-type-icon out">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                  </span>
+                  <span class="punch-type-text">Clock Out</span>
                 </label>
               </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Note / Reason</label>
-              <input class="form-control" type="text" [(ngModel)]="punchForm.note" placeholder="Optional punch note..." />
+            <div class="form-group" style="margin-bottom: 4px;">
+              <label class="form-label" style="font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;">Note / Reason</label>
+              <input class="form-control" type="text" [(ngModel)]="punchForm.note" placeholder="Optional punch note or reason..." style="border-radius: 8px; border: 1px solid #cbd5e1; padding: 9px 12px; font-size: 13.5px;" />
             </div>
           </div>
-          <div class="modal-footer">
+          <div class="modal-footer" style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
             <button class="btn btn-outline" (click)="showPunchModal.set(false)" [disabled]="recordingPunch()">Cancel</button>
             <button class="btn btn-primary" (click)="submitQuickPunch()" [disabled]="recordingPunch()">
               @if (recordingPunch()) {
@@ -1023,6 +1061,164 @@ interface MusterDay {
     }
 
     <style>
+      /* ── Employee Live Tracking Summary Card in Quick Punch Modal ── */
+      .emp-tracking-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .tracking-top-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .tracking-status-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid currentColor;
+      }
+      .tracking-pulse-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .tracking-shift-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: #64748b;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-weight: 500;
+      }
+      .tracking-metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        background: #ffffff;
+        border: 1px solid #edf2f7;
+        border-radius: 10px;
+        padding: 10px 14px;
+      }
+      .tracking-metric-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .tracking-metric-item .t-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #64748b;
+        letter-spacing: 0.04em;
+      }
+      .tracking-metric-item .t-value {
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .tracking-metric-item .t-value.highlight {
+        color: #2563eb;
+      }
+      .tracking-bottom-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #64748b;
+        border-top: 1px dashed #e2e8f0;
+        padding-top: 8px;
+      }
+      .t-last-punch {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .t-sublabel {
+        font-weight: 500;
+      }
+      .t-last-val {
+        font-weight: 600;
+        color: #334155;
+      }
+      .t-punch-count {
+        background: #edf2f7;
+        color: #475569;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 10px;
+        white-space: nowrap;
+      }
+
+      /* ── Quick Punch Modal Punch Type Selector ── */
+      .punch-type-selector {
+        display: flex;
+        gap: 12px;
+      }
+      .punch-type-option {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 1.5px solid #e2e8f0;
+        background: #ffffff;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13.5px;
+        color: #475569;
+        transition: all 0.15s ease-in-out;
+        user-select: none;
+      }
+      .punch-type-option:hover {
+        border-color: #cbd5e1;
+        background: #f8fafc;
+      }
+      .punch-type-option.selected {
+        border-color: #2563eb;
+        background: #eff6ff;
+        color: #1d4ed8;
+        box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12);
+      }
+      .punch-type-option input[type="radio"] {
+        accent-color: #2563eb;
+        cursor: pointer;
+        margin: 0;
+      }
+      .punch-type-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .punch-type-icon.in {
+        color: #10b981;
+      }
+      .punch-type-icon.out {
+        color: #ef4444;
+      }
+
       .pulse-indicator {
         width: 8px;
         height: 8px;
@@ -1060,6 +1256,26 @@ interface MusterDay {
         color: #ffffff;
         border-color: #2563eb;
         transform: translateY(-1px);
+      }
+
+      /* ── Daily Records Widget & Scrollbar (Fill Viewport without Outer Page Scroll) ── */
+      .daily-punch-widget {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+      .custom-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .custom-scroll::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+      }
+      .custom-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .custom-scroll::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
       }
 
       /* ── Time Management & Muster Split View (Image 2) ── */
@@ -2083,21 +2299,34 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly showDayDetailModal = signal(false);
   protected readonly selectedDetailDay = signal<MusterDay | null>(null);
   protected readonly recordingPunch = signal(false);
-  protected readonly currentEmpPunchState = signal<{
+  protected readonly currentEmpTracking = signal<{
     badgeText: string;
     badgeColor: string;
+    shiftName: string;
+    shiftTiming: string;
+    firstCheckIn: string;
+    workedHours: string;
+    breakTime: string;
+    lastPunch: string;
+    punchesCount: number;
     canClockIn: boolean;
-    canBreakIn: boolean;
-    canBreakOut: boolean;
     canClockOut: boolean;
+    loading: boolean;
   }>({
     badgeText: 'Not Clocked In',
     badgeColor: '#64748b',
+    shiftName: 'General Shift',
+    shiftTiming: '09:00 AM – 06:00 PM',
+    firstCheckIn: '—',
+    workedHours: '00h 00m',
+    breakTime: '00m',
+    lastPunch: '—',
+    punchesCount: 0,
     canClockIn: true,
-    canBreakIn: false,
-    canBreakOut: false,
-    canClockOut: false,
+    canClockOut: true,
+    loading: false,
   });
+  protected readonly currentEmpPunchState = this.currentEmpTracking;
 
   private pollInterval: any = null;
 
@@ -2282,6 +2511,10 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       return matchQ && matchSt;
     });
   });
+
+  protected onFilterStatusChange(st: string): void {
+    this.filterStatus.set(st || '');
+  }
 
   ngOnInit(): void {
     this.route.queryParams.subscribe((params) => {
@@ -2986,12 +3219,29 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
       let currentWorkStart: number | null = null;
       let currentBreakStart: number | null = null;
+      let lastClockOutH: number | null = null;
       let accumulatedWorkHours = 0;
 
       for (const p of sorted) {
         const pH = Math.min(23.95, parseToDecimalHour(p.punchTime));
 
         if (p.punchType === 'ClockIn') {
+          // If there was a previous ClockOut, the interval between ClockOut and this ClockIn is a Break/Out interval!
+          if (lastClockOutH !== null && pH > lastClockOutH) {
+            const bDur = pH - lastClockOutH;
+            if (bDur > 0.01) {
+              segments.push({
+                type: 'break',
+                label: 'Break',
+                timeRange: `${this.formatHourDecimal(lastClockOutH)} - ${this.formatHourDecimal(pH)}`,
+                durationLabel: `${Math.round(bDur * 60)}m break`,
+                leftPercent: calcLeft(lastClockOutH),
+                widthPercent: calcWidth(lastClockOutH, pH),
+                tooltip: `Break: ${this.formatHourDecimal(lastClockOutH)} - ${this.formatHourDecimal(pH)} [${Math.round(bDur * 60)}m Break]`,
+              });
+            }
+            lastClockOutH = null;
+          }
           currentWorkStart = pH;
           currentBreakStart = null;
         } else if (p.punchType === 'BreakIn') {
@@ -3020,7 +3270,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
               durationLabel: `${Math.round(dur * 60)}m break`,
               leftPercent: calcLeft(currentBreakStart),
               widthPercent: calcWidth(currentBreakStart, pH),
-              tooltip: `Break interval: ${Math.round(dur * 60)} minutes`,
+              tooltip: `Break: ${this.formatHourDecimal(currentBreakStart)} - ${this.formatHourDecimal(pH)} [${Math.round(dur * 60)}m Break]`,
             });
             currentBreakStart = null;
           }
@@ -3035,7 +3285,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
               durationLabel: `${Math.round(bDur * 60)}m break`,
               leftPercent: calcLeft(currentBreakStart),
               widthPercent: calcWidth(currentBreakStart, pH),
-              tooltip: `Break interval: ${Math.round(bDur * 60)} minutes`,
+              tooltip: `Break: ${this.formatHourDecimal(currentBreakStart)} - ${this.formatHourDecimal(pH)} [${Math.round(bDur * 60)}m Break]`,
             });
             currentBreakStart = null;
           }
@@ -3052,7 +3302,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
                 durationLabel: `${regularDur.toFixed(1)}h`,
                 leftPercent: calcLeft(currentWorkStart),
                 widthPercent: calcWidth(currentWorkStart, regularEnd),
-                tooltip: `Working time: ${regularDur.toFixed(1)}h`,
+                tooltip: `Working time: ${this.formatHourDecimal(currentWorkStart)} - ${this.formatHourDecimal(regularEnd)} (${regularDur.toFixed(1)}h)`,
               });
             }
             if (pH > 18.0 || accumulatedWorkHours > 8.0) {
@@ -3066,12 +3316,13 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
                   durationLabel: `${otDur.toFixed(1)}h OT`,
                   leftPercent: calcLeft(otStart),
                   widthPercent: calcWidth(otStart, pH),
-                  tooltip: `Overtime: ${otDur.toFixed(1)}h extra work`,
+                  tooltip: `Overtime: ${this.formatHourDecimal(otStart)} - ${this.formatHourDecimal(pH)} (${otDur.toFixed(1)}h extra work)`,
                 });
               }
             }
             currentWorkStart = null;
           }
+          lastClockOutH = pH;
         }
       }
 
@@ -3115,14 +3366,14 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       if (segments.length > 0) {
-        // Merge contiguous or near-adjacent work segments so multiple test clicks don't shatter the bar
+        // Merge only truly adjacent identical segments (within 0.1% ~ 1 min) so deliberate breaks/intervals are preserved!
         const merged: TimelineSegment[] = [];
         for (const seg of segments) {
           if (merged.length > 0) {
             const prev = merged[merged.length - 1];
             if (prev.type === seg.type && seg.type === 'work') {
               const prevEndPercent = prev.leftPercent + prev.widthPercent;
-              if (seg.leftPercent <= prevEndPercent + 2.5) {
+              if (seg.leftPercent <= prevEndPercent + 0.1) {
                 const combinedEnd = Math.min(100, Math.max(prevEndPercent, seg.leftPercent + seg.widthPercent));
                 prev.widthPercent = Math.max(prev.widthPercent, combinedEnd - prev.leftPercent);
                 const prevStartStr = prev.timeRange.split(' - ')[0];
@@ -3400,11 +3651,6 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected isPunchTypeAllowed(type: string): boolean {
-    const s = this.currentEmpPunchState();
-    if (type === 'ClockIn') return s.canClockIn;
-    if (type === 'BreakIn') return s.canBreakIn;
-    if (type === 'BreakOut') return s.canBreakOut;
-    if (type === 'ClockOut') return s.canClockOut;
     return true;
   }
 
@@ -3412,64 +3658,108 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const targetId = this.punchForm.employeeId;
     if (!targetId) return;
 
+    this.currentEmpTracking.update((prev) => ({ ...prev, loading: true }));
+
     this.api.punchStatus(targetId).subscribe({
       next: (status) => {
         if (!status) return;
+
+        // Worked time
+        const totalSec = status.workedSecondsToday || 0;
+        const wH = Math.floor(totalSec / 3600);
+        const wM = Math.floor((totalSec % 3600) / 60);
+        const workedStr = totalSec > 0
+          ? `${wH}h ${String(wM).padStart(2, '0')}m`
+          : (status.workedHoursToday > 0 ? `${status.workedHoursToday}h` : '00h 00m');
+
+        // Break time
+        const bSec = status.breakSecondsToday || 0;
+        const bM = Math.round(bSec / 60);
+        const breakStr = bM > 0 ? `${bM}m` : '00m';
+
+        // Last punch
+        const punches = status.todayPunches || [];
+        const last = punches.length > 0 ? punches[0] : null;
+        let lastPunchStr = '—';
+        if (last) {
+          const pTime = this.formatTime12(last.punchTime);
+          const pType = last.punchType === 'ClockIn' ? 'Clock In' : last.punchType === 'ClockOut' ? 'Clock Out' : last.punchType === 'BreakIn' ? 'Break In' : 'Break Out';
+          const pDevice = last.device ? ` · ${last.device}` : '';
+          lastPunchStr = `${pTime} (${pType}${pDevice})`;
+        }
+
+        const shiftN = status.shiftName || 'General Shift';
+        const shiftT = status.shiftTiming || '09:00 AM – 06:00 PM';
+        const firstIn = status.firstCheckInTime || '—';
+
         if (!status.isCheckedIn) {
-          this.currentEmpPunchState.set({
+          this.currentEmpTracking.set({
             badgeText: 'Not Clocked In',
             badgeColor: '#64748b',
+            shiftName: shiftN,
+            shiftTiming: shiftT,
+            firstCheckIn: firstIn,
+            workedHours: workedStr,
+            breakTime: breakStr,
+            lastPunch: lastPunchStr,
+            punchesCount: punches.length,
             canClockIn: true,
-            canBreakIn: false,
-            canBreakOut: false,
-            canClockOut: false,
+            canClockOut: true,
+            loading: false,
           });
           this.punchForm.punchType = 'ClockIn';
         } else if (status.isOnBreak) {
-          this.currentEmpPunchState.set({
+          this.currentEmpTracking.set({
             badgeText: 'On Break',
             badgeColor: '#f59e0b',
-            canClockIn: false,
-            canBreakIn: false,
-            canBreakOut: true,
+            shiftName: shiftN,
+            shiftTiming: shiftT,
+            firstCheckIn: firstIn,
+            workedHours: workedStr,
+            breakTime: breakStr,
+            lastPunch: lastPunchStr,
+            punchesCount: punches.length,
+            canClockIn: true,
             canClockOut: true,
+            loading: false,
           });
-          this.punchForm.punchType = 'BreakOut';
+          this.punchForm.punchType = 'ClockOut';
         } else {
-          this.currentEmpPunchState.set({
-            badgeText: 'Working / Clocked In',
+          this.currentEmpTracking.set({
+            badgeText: 'Clocked In / Working',
             badgeColor: '#10b981',
-            canClockIn: false,
-            canBreakIn: true,
-            canBreakOut: false,
+            shiftName: shiftN,
+            shiftTiming: shiftT,
+            firstCheckIn: firstIn,
+            workedHours: workedStr,
+            breakTime: breakStr,
+            lastPunch: lastPunchStr,
+            punchesCount: punches.length,
+            canClockIn: true,
             canClockOut: true,
+            loading: false,
           });
-          this.punchForm.punchType = 'BreakIn';
+          this.punchForm.punchType = 'ClockOut';
         }
       },
       error: () => {
         const match = this.dailyRows().find((r) => r.id === targetId);
-        if (match && match.checkIn && match.checkIn !== '—' && (!match.checkOut || match.checkOut === '—')) {
-          this.currentEmpPunchState.set({
-            badgeText: 'Clocked In',
-            badgeColor: '#10b981',
-            canClockIn: false,
-            canBreakIn: true,
-            canBreakOut: false,
-            canClockOut: true,
-          });
-          this.punchForm.punchType = 'BreakIn';
-        } else {
-          this.currentEmpPunchState.set({
-            badgeText: 'Not Clocked In',
-            badgeColor: '#64748b',
-            canClockIn: true,
-            canBreakIn: false,
-            canBreakOut: false,
-            canClockOut: false,
-          });
-          this.punchForm.punchType = 'ClockIn';
-        }
+        const isWorking = match && match.checkIn && match.checkIn !== '—' && (!match.checkOut || match.checkOut === '—');
+        this.currentEmpTracking.set({
+          badgeText: isWorking ? 'Clocked In' : 'Not Clocked In',
+          badgeColor: isWorking ? '#10b981' : '#64748b',
+          shiftName: 'General Shift',
+          shiftTiming: '09:00 AM – 06:00 PM',
+          firstCheckIn: match?.checkIn && match.checkIn !== '—' ? match.checkIn : '—',
+          workedHours: match?.workHours ? `${match.workHours}h` : '00h 00m',
+          breakTime: match?.breakMinutes ? `${match.breakMinutes}m` : '00m',
+          lastPunch: match?.checkIn && match.checkIn !== '—' ? `${match.checkIn} (Clock In)` : '—',
+          punchesCount: isWorking ? 1 : 0,
+          canClockIn: true,
+          canClockOut: true,
+          loading: false,
+        });
+        this.punchForm.punchType = isWorking ? 'ClockOut' : 'ClockIn';
       },
     });
   }
@@ -3495,9 +3785,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           this.punchForm.note = '';
           this.toast.show(`Recorded ${p.punchType} for ${p.employeeName}!`, 'success');
           this.loadDailyAttendance();
-          if (this.tab() === 'muster') {
-            this.generateMuster();
-          }
+          this.generateMuster();
         },
         error: (err) => {
           this.recordingPunch.set(false);

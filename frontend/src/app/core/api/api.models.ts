@@ -57,6 +57,7 @@ export interface EmployeeListItem {
 export interface EmployeeDetail {
   id: string;
   employeeCode: string;
+  salutation?: string | null;
   firstName: string;
   middleName?: string | null;
   lastName: string;
@@ -110,6 +111,8 @@ export interface EmployeeDetail {
   roleName?: string | null;
   isFaceEnrolled?: boolean;
   facePhotoUrl?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
 }
 
 export interface LeaveType {
@@ -671,6 +674,8 @@ export interface EmployeePunchStatus {
   regularizationMessage?: string | null;
   isOnBreak?: boolean;
   breakSecondsToday?: number;
+  shiftName?: string | null;
+  shiftTiming?: string | null;
 }
 
 export interface EnrolledFace {
@@ -754,6 +759,15 @@ export interface CelebrationItem {
   avatarUrl?: string | null;
 }
 
+export interface HrEmployeeSummary {
+  id: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  jobTitle?: string;
+}
+
 export interface DashboardTemplateData {
   todayAttendance: TodayAttendanceOverview;
   notices: NoticeBoardItem[];
@@ -764,6 +778,7 @@ export interface DashboardTemplateData {
   attendanceGraph: AttendanceTrendPoint[];
   todayPunches: EmployeePunch[];
   leaveBalances: LeaveBalance[];
+  hrTeam?: HrEmployeeSummary[];
 }
 
 export interface ShiftdayDto {

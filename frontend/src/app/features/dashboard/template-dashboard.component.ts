@@ -17,6 +17,7 @@ import {
   AttendanceTrendPoint,
   EmployeePunch,
   LeaveBalance,
+  HrEmployeeSummary,
 } from '../../core/api/api.models';
 
 export interface TimelogBarItem {
@@ -109,6 +110,12 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly pendingApprovals = signal<PendingApproval[]>([]);
   protected readonly attendanceGraph = signal<AttendanceTrendPoint[]>([]);
   protected readonly leaveBalances = signal<LeaveBalance[]>([]);
+
+  // HR Team & Selected HR for Attendance Chart
+  protected readonly hrEmployees = signal<HrEmployeeSummary[]>([]);
+  protected readonly selectedHrEmployeeId = signal<string>('');
+  protected readonly selectedHrEmployeeName = signal<string>('HR');
+  protected readonly selectedHrEmployeeCode = signal<string>('');
 
   // Computed properties
   protected readonly role = computed(() => this.session.activeRole());
@@ -378,7 +385,24 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
         this.myTasks.set(data.myTasks || []);
         this.pendingApprovals.set(data.pendingApprovals || []);
         
-        this.attendanceGraph.set(data.attendanceGraph || []);
+        // Populate HR team and select default HR employee
+        if (data.hrTeam && data.hrTeam.length > 0) {
+          this.hrEmployees.set(data.hrTeam);
+          if (!this.selectedHrEmployeeId()) {
+            const currentEmpId = this.session.user()?.employeeId;
+            const matched = (currentEmpId ? data.hrTeam.find((h) => h.id === currentEmpId) : null) || data.hrTeam[0];
+            this.selectedHrEmployeeId.set(matched.id);
+            this.selectedHrEmployeeName.set(`${matched.firstName} ${matched.lastName}`);
+            this.selectedHrEmployeeCode.set(matched.employeeCode);
+          }
+        }
+
+        // Only overwrite attendanceGraph if current month is selected; otherwise keep selected month
+        const now = this.currentTime();
+        const defaultMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        if (this.selectedMonthKey() === defaultMonthKey) {
+          this.attendanceGraph.set(data.attendanceGraph || []);
+        }
         
         this.leaveBalances.set(data.leaveBalances || []);
         this.loading.set(false);
@@ -474,6 +498,22 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     this.hoveredBar.set(null);
   }
 
+  onHrEmployeeChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    if (!target) return;
+    const hrId = target.value;
+    this.selectedHrEmployeeId.set(hrId);
+    const hr = this.hrEmployees().find((h) => h.id === hrId);
+    if (hr) {
+      this.selectedHrEmployeeName.set(`${hr.firstName} ${hr.lastName}`);
+      this.selectedHrEmployeeCode.set(hr.employeeCode);
+    }
+    const [yStr, mStr] = this.selectedMonthKey().split('-');
+    const year = parseInt(yStr, 10);
+    const month = parseInt(mStr, 10);
+    this.loadAttendanceTrendForMonth(year, month, hrId);
+  }
+
   onMonthChange(event: Event): void {
     const target = event.target as HTMLSelectElement;
     if (!target) return;
@@ -482,11 +522,12 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
     const [yStr, mStr] = key.split('-');
     const year = parseInt(yStr, 10);
     const month = parseInt(mStr, 10);
-    this.loadAttendanceTrendForMonth(year, month);
+    this.loadAttendanceTrendForMonth(year, month, this.selectedHrEmployeeId());
   }
 
-  loadAttendanceTrendForMonth(year: number, month: number): void {
-    this.api.attendanceTrend(year, month).subscribe({
+  loadAttendanceTrendForMonth(year: number, month: number, employeeId?: string): void {
+    const empId = employeeId || this.selectedHrEmployeeId() || undefined;
+    this.api.attendanceTrend(year, month, empId).subscribe({
       next: (points) => {
         this.attendanceGraph.set(points || []);
       },
