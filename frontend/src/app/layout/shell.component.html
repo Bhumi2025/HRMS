@@ -65,7 +65,7 @@
           </svg>
           <span>{{ todayFormatted() }}</span>
         </div>
-        <div class="header-btn" data-tooltip="Fullscreen" style="cursor: pointer" (click)="toggleFullscreen()"
+        <div class="header-btn header-fullscreen-btn" data-tooltip="Fullscreen" style="cursor: pointer" (click)="toggleFullscreen()"
           [appIcon]="'expand'"></div>
         <!-- <div
           class="header-btn"
@@ -93,6 +93,62 @@
     <main class="page-content" id="pageContent">
       <router-outlet />
     </main>
+
+    <!-- Mobile Bottom Navigation Bar (Visible only on phone/tablet <= 1024px) -->
+    @if (role() === 'Employee') {
+    <nav class="bottom-nav employee-bottom-nav">
+      <a class="bn-item" routerLink="/me/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        <span class="bn-icon" [appIcon]="'dashboard'"></span>
+        <span class="bn-label">Dashboard</span>
+      </a>
+      <a class="bn-item" routerLink="/me/attendance" routerLinkActive="active">
+        <span class="bn-icon" [appIcon]="'attendance'"></span>
+        <span class="bn-label">Attendance</span>
+      </a>
+      <a class="bn-item" routerLink="/me/leave" routerLinkActive="active">
+        <span class="bn-icon" [appIcon]="'leave'"></span>
+        <span class="bn-label">Leave</span>
+      </a>
+      <a class="bn-item" routerLink="/me/payslips" routerLinkActive="active">
+        <span class="bn-icon" [appIcon]="'payslip'"></span>
+        <span class="bn-label">Payslips</span>
+      </a>
+      <a class="bn-item" routerLink="/me/profile" routerLinkActive="active">
+        <span class="bn-icon" [appIcon]="'user'"></span>
+        <span class="bn-label">Profile</span>
+      </a>
+    </nav>
+    } @else {
+    <nav class="bottom-nav portal-bottom-nav">
+      <a class="bn-item" routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        <span class="bn-icon" [appIcon]="'dashboard'"></span>
+        <span class="bn-label">Dashboard</span>
+      </a>
+      @if (role() === 'Super Admin') {
+      <a class="bn-item" routerLink="/company" routerLinkActive="active">
+        <span class="bn-icon" [appIcon]="'company'"></span>
+        <span class="bn-label">Company</span>
+      </a>
+      } @else {
+      <a class="bn-item" routerLink="/employees" routerLinkActive="active">
+        <span class="bn-icon" [appIcon]="'employees'"></span>
+        <span class="bn-label">Staff</span>
+      </a>
+      <a class="bn-item" routerLink="/attendance" routerLinkActive="active">
+        <span class="bn-icon" [appIcon]="'attendance'"></span>
+        <span class="bn-label">Attendance</span>
+      </a>
+      <a class="bn-item" routerLink="/leave" routerLinkActive="active">
+        <span class="bn-icon" [appIcon]="'leave'"></span>
+        <span class="bn-label">Leave</span>
+      </a>
+      <a class="bn-item" routerLink="/employee-profile" routerLinkActive="active">
+        <span class="bn-icon" [appIcon]="'user'"></span>
+        <span class="bn-label">Profile</span>
+      </a>
+      }
+    </nav>
+    }
   </div>
 </div>
 

@@ -502,90 +502,126 @@
 /* MOBILE */
 @media (max-width: 768px) {
   :root {
-    --header-h: 48px;
+    --header-h: 52px;
   }
   .main-header {
     padding: 0 10px;
-    gap: 6px;
+    gap: 8px;
+    height: 52px !important;
   }
-  .header-search {
-    display: none;
+  .header-search,
+  .header-greeting,
+  .header-date-badge,
+  .header-fullscreen-btn {
+    display: none !important;
+  }
+  .tenant-switcher-wrap {
+    margin-left: 2px !important;
+  }
+  .tenant-btn {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    max-width: 140px !important;
+    height: 32px !important;
+  }
+  .tenant-btn span {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-width: 90px !important;
   }
   .header-btn {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
   }
   .header-btn svg {
-    width: 15px;
-    height: 15px;
+    width: 16px;
+    height: 16px;
   }
   .header-avatar {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     font-size: 11px;
   }
   .sidebar-toggle {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
   }
   .sidebar-toggle svg {
-    width: 15px;
-    height: 15px;
+    width: 16px;
+    height: 16px;
   }
   .page-content {
-    padding: 12px !important;
-    /* padding-bottom: 72px !important; */
+    padding: 10px 10px 78px 10px !important;
   }
   .page-title {
     font-size: 14px;
   }
 
   .bottom-nav {
-    display: flex;
+    display: flex !important;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
+    height: 58px;
     background: var(--surface);
     border-top: 1px solid var(--border);
-    z-index: 300;
-    padding: 6px 0 env(safe-area-inset-bottom, 6px);
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.07);
+    z-index: 1000;
+    padding: 4px 4px env(safe-area-inset-bottom, 4px);
+    box-shadow: 0 -3px 18px rgba(0, 0, 0, 0.08);
+    justify-content: space-around;
+    align-items: center;
   }
   .bn-item {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
+    justify-content: center;
+    gap: 2px;
     padding: 4px 2px;
     cursor: pointer;
     color: var(--muted);
     font-size: 10px;
     font-weight: 600;
-    transition: var(--t);
+    text-decoration: none;
+    transition: all 0.15s ease;
     position: relative;
+    user-select: none;
+  }
+  .bn-item .bn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+  }
+  .bn-item .bn-icon svg {
+    width: 19px;
+    height: 19px;
   }
   .bn-item.active {
     color: var(--p);
+    font-weight: 700;
+  }
+  .bn-item.active .bn-icon {
+    transform: translateY(-1px);
   }
   .bn-item.active::before {
     content: "";
     position: absolute;
-    top: -6px;
+    top: -4px;
     left: 50%;
     transform: translateX(-50%);
-    width: 28px;
+    width: 22px;
     height: 3px;
     background: var(--p);
-    border-radius: 0 0 4px 4px;
-  }
-  .bn-item svg {
-    width: 20px;
-    height: 20px;
+    border-radius: 0 0 3px 3px;
   }
   .bn-label {
     font-size: 10px;
+    line-height: 1.1;
   }
 
   .hero-banner {

@@ -47,6 +47,14 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected readonly dashboard = signal<EmployeeDashboard | null>(null);
   protected readonly currentTime = signal(new Date());
+  protected readonly activeMobileSection = signal<'all' | 'clock' | 'attendance' | 'leave' | 'notices'>('all');
+
+  protected setMobileSection(section: 'all' | 'clock' | 'attendance' | 'leave' | 'notices'): void {
+    this.activeMobileSection.set(section);
+    if (section === 'all' || section === 'attendance') {
+      setTimeout(() => this.scheduleRender(), 50);
+    }
+  }
 
   private clockInterval: ReturnType<typeof setInterval> | null = null;
   private punchPollInterval: ReturnType<typeof setInterval> | null = null;

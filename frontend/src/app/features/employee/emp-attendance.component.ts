@@ -227,6 +227,29 @@ interface CalendarDay {
       .chip-halfday .dot { background: #f97316; }
       .chip-absent .dot { background: #ef4444; }
       .chip-hours .dot { background: #8b5cf6; }
+
+      @media (max-width: 768px) {
+        .grid-2 {
+          grid-template-columns: 1fr !important;
+          gap: 12px !important;
+        }
+        .trend-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+        }
+        .trend-toggle-group {
+          align-self: flex-start;
+        }
+        .card-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+        }
+        .card-header select {
+          width: 100% !important;
+        }
+      }
     `,
   ],
 })
