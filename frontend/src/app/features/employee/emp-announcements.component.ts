@@ -389,6 +389,10 @@ export class EmpAnnouncementsComponent implements OnInit {
   protected readonly activeFilter = signal<'all' | 'unread' | 'read'>('all');
   protected readonly readingItem = signal<Announcement | null>(null);
 
+  // Pagination state for announcements
+  protected readonly currentPage = signal(1);
+  protected readonly pageSize = signal(5);
+
   protected formTitle = '';
   protected formTag = 'HR Update';
   protected formSeverity = 'Info';
@@ -422,6 +426,9 @@ export class EmpAnnouncementsComponent implements OnInit {
     const filter = this.activeFilter();
     const items = this.announcements();
     const read = this.readIds();
+    if (this.isHrManager()) {
+      return items;
+    }
     if (filter === 'unread') {
       return items.filter((a) => !read.has(a.id || a.title));
     }
@@ -430,6 +437,35 @@ export class EmpAnnouncementsComponent implements OnInit {
     }
     return items;
   });
+
+  protected readonly totalPages = computed(() => {
+    const total = this.filteredAnnouncements().length;
+    const size = this.pageSize();
+    return Math.max(1, Math.ceil(total / size));
+  });
+
+  protected readonly paginatedAnnouncements = computed(() => {
+    const list = this.filteredAnnouncements();
+    const page = this.currentPage();
+    const size = this.pageSize();
+    const start = (page - 1) * size;
+    return list.slice(start, start + size);
+  });
+
+  protected readonly pageNumbers = computed(() => {
+    const total = this.totalPages();
+    const pages: number[] = [];
+    for (let i = 1; i <= total; i++) {
+      pages.push(i);
+    }
+    return pages;
+  });
+
+  protected goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages()) {
+      this.currentPage.set(page);
+    }
+  }
 
   ngOnInit(): void {
     this.loadReadState();
