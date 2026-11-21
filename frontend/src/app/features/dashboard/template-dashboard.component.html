@@ -424,6 +424,56 @@
           </div>
         </div>
 
+        <!-- Action Buttons (Clock In, Break, Clock Out, Face ID) -->
+        <div class="punch-buttons">
+          @if (punchService.state() === 'idle') {
+            <div class="punch-idle-row">
+              <button class="btn-punch btn-clockin" (click)="clockIn()" title="Punch In (Clock In)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                Punch In (Clock In)
+              </button>
+              <button class="btn-punch btn-face" (click)="facePunchIn()" title="Biometric Face Verification Clock In">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                Face ID
+              </button>
+            </div>
+          } @else {
+            <div class="punch-active-row">
+              <button class="btn-punch btn-break" [class.active]="punchService.onBreak()" (click)="toggleBreak()" [title]="punchService.onBreak() ? 'Resume Work (End Break)' : 'Take a Break (Start Break)'">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+                  <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+                  <line x1="6" y1="1" x2="6" y2="4"/>
+                  <line x1="10" y1="1" x2="10" y2="4"/>
+                  <line x1="14" y1="1" x2="14" y2="4"/>
+                </svg>
+                {{ punchService.onBreak() ? 'End Break' : 'Break' }}
+              </button>
+              <button class="btn-punch btn-clockout" (click)="clockOut()" title="Punch Out (Clock Out)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+                Punch Out (Clock Out)
+              </button>
+              <button class="btn-punch btn-face" (click)="facePunchActive()" title="Biometric Face Verification Punch">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                Face ID
+              </button>
+            </div>
+          }
+        </div>
+
         <!-- Attendance Activity Timeline -->
         <div class="punch-history">
           <div class="history-title">

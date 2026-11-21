@@ -81,7 +81,7 @@ public sealed class AttendanceController : ControllerBase
         Ok(await _attendance.DecideRegularizationAsync(id, false, ct));
 
     [HttpPost("punch")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize]
     [ProducesResponseType(typeof(EmployeePunchDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<EmployeePunchDto>> Punch(
         [FromBody] CreatePunchRequest request,
