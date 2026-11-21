@@ -107,27 +107,29 @@ interface Announcement {
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px" (click)="$event.stopPropagation()">
-                <!-- Mark as read button / action -->
-                @if (!isRead(a)) {
-                  <button
-                    type="button"
-                    class="btn btn-outline btn-xs"
-                    (click)="markAsRead(a, $event)"
-                    title="Mark news as read"
-                    style="font-size: 12px; padding: 4px 12px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
-                  >
-                    <span>✓</span> Mark as Read
-                  </button>
-                } @else {
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-xs"
-                    (click)="toggleRead(a, $event)"
-                    title="Mark as unread"
-                    style="font-size: 11px; padding: 4px 8px; border-radius: 6px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px;"
-                  >
-                    Mark Unread
-                  </button>
+                <!-- Mark as read button / action (hidden for HR Manager) -->
+                @if (!isHrManager()) {
+                  @if (!isRead(a)) {
+                    <button
+                      type="button"
+                      class="btn btn-outline btn-xs"
+                      (click)="markAsRead(a, $event)"
+                      title="Mark news as read"
+                      style="font-size: 12px; padding: 4px 12px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
+                    >
+                      <span>✓</span> Mark as Read
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-xs"
+                      (click)="toggleRead(a, $event)"
+                      title="Mark as unread"
+                      style="font-size: 11px; padding: 4px 8px; border-radius: 6px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px;"
+                    >
+                      Mark Unread
+                    </button>
+                  }
                 }
 
                 @if (canManage() && a.id) {
@@ -378,6 +380,7 @@ export class EmpAnnouncementsComponent implements OnInit {
   private readonly toast = inject(ToastService);
 
   protected readonly canManage = computed(() => this.session.role() !== 'Employee');
+  protected readonly isHrManager = computed(() => this.session.activeRole() === 'HR Manager');
 
   protected readonly announcements = signal<Announcement[]>([]);
   protected readonly showModal = signal(false);
