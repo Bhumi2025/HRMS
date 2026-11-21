@@ -839,5 +839,115 @@ public sealed class AttendancePunchTests
         Assert.Equal(300m, lossOfPayDeduction);
         Assert.Equal(5700m, earnedBasic);
     }
+
+    [Fact]
+    public async Task ProcessCentralizedPunchAsync_FirstScan_ClockIn_SucceedsWithinCampusGeofence()
+    {
+        var (db, uow, empId, userId, _) = SetupTestTenant();
+        var emp = await db.Employees.FindAsync(empId);
+        emp!.FaceDescriptor = "[0.1, 0.2, 0.3]";
+        await db.SaveChangesAsync();
+
+        var currentUser = new FakeCurrentUser { UserId = userId, EmployeeId = empId };
+        var service = new AttendanceService(uow, currentUser);
+
+        // Location 48.1 meters from office (real laptop Wi-Fi GPS location)
+        var req = new CentralizedPunchRequest(
+            EmployeeId: empId,
+            PunchType: "Auto",
+            Latitude: 21.238782,
+            Longitude: 72.889738,
+            MatchScore: 85);
+
+        var result = await service.ProcessCentralizedPunchAsync(req);
+
+        Assert.True(result.Success);
+        Assert.Equal("ClockIn", result.PunchType);
+        Assert.True(result.WithinGeofence);
+
+        // Check punch created
+        var punch = await db.EmployeePunches.FirstOrDefaultAsync(p => p.EmployeeId == empId);
+        Assert.NotNull(punch);
+        Assert.Equal(PunchType.ClockIn, punch.PunchType);
+        Assert.True(punch.IsOpen);
+
+        // Check AttendanceRecord created with CheckIn and Present status
+        var record = await db.AttendanceRecords.FirstOrDefaultAsync(a => a.EmployeeId == empId);
+        Assert.NotNull(record);
+        Assert.NotNull(record.CheckIn);
+        Assert.Null(record.CheckOut);
+        Assert.Equal(AttendanceStatus.Present, record.Status);
+
+        // Check GetPunchStatusAsync returns IsCheckedIn = true
+        var status = await service.GetPunchStatusAsync(empId);
+        Assert.True(status.IsCheckedIn);
+    }
+
+    [Fact]
+    public async Task ProcessCentralizedPunchAsync_SecondScan_AutomaticallyClocksOut()
+    {
+        var (db, uow, empId, userId, _) = SetupTestTenant();
+        var emp = await db.Employees.FindAsync(empId);
+        emp!.FaceDescriptor = "[0.1, 0.2, 0.3]";
+        await db.SaveChangesAsync();
+
+        var currentUser = new FakeCurrentUser { UserId = userId, EmployeeId = empId };
+        var service = new AttendanceService(uow, currentUser);
+
+        // 1st scan: Clock In
+        var req1 = new CentralizedPunchRequest(
+            EmployeeId: empId,
+            PunchType: "Auto",
+            Latitude: 21.238782,
+            Longitude: 72.889738,
+            MatchScore: 88);
+        var res1 = await service.ProcessCentralizedPunchAsync(req1);
+        Assert.Equal("ClockIn", res1.PunchType);
+
+        // 2nd scan: Clock Out
+        var req2 = new CentralizedPunchRequest(
+            EmployeeId: empId,
+            PunchType: "Auto",
+            Latitude: 21.238782,
+            Longitude: 72.889738,
+            MatchScore: 88);
+        var res2 = await service.ProcessCentralizedPunchAsync(req2);
+
+        Assert.True(res2.Success);
+        Assert.Equal("ClockOut", res2.PunchType);
+
+        // Check that open punch is now closed
+        var openCount = await db.EmployeePunches.CountAsync(p => p.EmployeeId == empId && p.IsOpen);
+        Assert.Equal(0, openCount);
+
+        // Check AttendanceRecord has CheckOut populated
+        var record = await db.AttendanceRecords.FirstOrDefaultAsync(a => a.EmployeeId == empId);
+        Assert.NotNull(record);
+        Assert.NotNull(record.CheckIn);
+        Assert.NotNull(record.CheckOut);
+
+        // Check GetPunchStatusAsync returns IsCheckedIn = false
+        var status = await service.GetPunchStatusAsync(empId);
+        Assert.False(status.IsCheckedIn);
+    }
+
+    [Fact]
+    public async Task ProcessCentralizedPunchAsync_Outside500mRadius_ThrowsValidationException()
+    {
+        var (db, uow, empId, userId, _) = SetupTestTenant();
+        var currentUser = new FakeCurrentUser { UserId = userId, EmployeeId = empId };
+        var service = new AttendanceService(uow, currentUser);
+
+        // Far location (~1.6 km away)
+        var req = new CentralizedPunchRequest(
+            EmployeeId: empId,
+            PunchType: "Auto",
+            Latitude: 21.250000,
+            Longitude: 72.900000,
+            MatchScore: 85);
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => service.ProcessCentralizedPunchAsync(req));
+        Assert.Contains("outside the permitted company location", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }
 

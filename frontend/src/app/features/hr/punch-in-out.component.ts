@@ -40,6 +40,11 @@ import { ToastService } from '../../core/services/toast.service';
               <input
                 type="text"
                 class="form-control"
+                name="kiosk_employee_search_query_no_autofill"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
                 placeholder="Search by name, ID (e.g. EMP-1003), or department..."
                 [ngModel]="searchQuery()"
                 (ngModelChange)="onSearchChange($event)"
@@ -135,7 +140,7 @@ import { ToastService } from '../../core/services/toast.service';
             <div class="geofence-card">
               <div class="geofence-row">
                 <div class="geo-label">Company Registered Location:</div>
-                <div class="geo-val">Lat: 21.238557, Lon: 72.890135 (20m Allowed Radius)</div>
+                <div class="geo-val">Lat: 21.238557, Lon: 72.890135 (500m Allowed Radius)</div>
               </div>
 
               <div class="geofence-row">
@@ -175,14 +180,14 @@ import { ToastService } from '../../core/services/toast.service';
               <div class="location-badge-wrap">
                 @if (isWithinGeofence()) {
                   <div class="badge-status badge-success-lg">
-                    <span>📍</span> Within Allowed Location (≤ 20m)
+                    <span>📍</span> Within Allowed Location (≤ 500m)
                   </div>
                 } @else {
                   <div class="badge-status badge-danger-lg">
                     <span>⛔</span> Outside Allowed Location
                   </div>
                   <div class="location-error-msg">
-                    "You are outside the permitted company location. Please move within 20 meters of the registered office to mark your attendance."
+                    "You are outside the permitted company location. Please move within the registered office campus (≤ 500m) to mark your attendance."
                   </div>
                 }
               </div>
@@ -323,7 +328,7 @@ import { ToastService } from '../../core/services/toast.service';
                 </div>
                 <div class="check-item" [class.checked]="isWithinGeofence()">
                   <span class="check-icon">{{ isWithinGeofence() ? '✓' : '○' }}</span>
-                  <span>2. Within 20m Geofence: <strong>{{ isWithinGeofence() ? 'Passed' : 'Outside Boundary' }}</strong></span>
+                  <span>2. Within 500m Geofence: <strong>{{ isWithinGeofence() ? 'Passed' : 'Outside Boundary' }}</strong></span>
                 </div>
                 <div class="check-item" [class.checked]="faceStatus() === 'verified'">
                   <span class="check-icon">{{ faceStatus() === 'verified' ? '✓' : '○' }}</span>
@@ -364,7 +369,7 @@ import { ToastService } from '../../core/services/toast.service';
 
               @if (!canExecutePunch()) {
                 <div class="validation-warning-note">
-                  * Punch action remains disabled until all 3 criteria (Employee Selection, 20m Geofence, and Face Match) are satisfied.
+                  * Punch action remains disabled until all 3 criteria (Employee Selection, 500m Geofence, and Face Match) are satisfied.
                 </div>
               }
             </div>
@@ -1144,7 +1149,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
   // Office Location Constants
   readonly OFFICE_LAT = 21.2385574033792;
   readonly OFFICE_LON = 72.89013466219234;
-  readonly ALLOWED_RADIUS = 20.0; // meters
+  readonly ALLOWED_RADIUS = 500.0; // meters (campus office radius)
 
   // State signals
   protected readonly liveTime = signal<Date>(new Date());
@@ -1369,8 +1374,8 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
   protected calcDistanceBar(): number {
     const d = this.distanceMeters() ?? 0;
     if (d <= 0) return 100;
-    if (d > 100) return 0;
-    return Math.max(5, 100 - (d / 100) * 100);
+    if (d > this.ALLOWED_RADIUS) return 0;
+    return Math.max(5, 100 - (d / this.ALLOWED_RADIUS) * 100);
   }
 
   // ── Camera & Face Recognition Loop ──
@@ -1586,7 +1591,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (!this.isWithinGeofence()) {
       this.toast.show(
-        'You are outside the permitted company location. Please move within 20 meters of the registered office to mark your attendance.',
+        'You are outside the permitted company location. Please move within the registered office campus (≤ 500m) to mark your attendance.',
         'danger'
       );
       return;

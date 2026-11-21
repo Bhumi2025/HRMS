@@ -2014,16 +2014,16 @@ public sealed class AttendanceService : IAttendanceService
         CentralizedPunchRequest request,
         CancellationToken ct = default)
     {
-        // 1. Geofencing Validation (Company registered location: 21.2385574033792, 72.89013466219234, 20m radius)
+        // 1. Geofencing Validation (Company registered location: 21.2385574033792, 72.89013466219234, 500m campus radius)
         const double OfficeLatitude = 21.2385574033792;
         const double OfficeLongitude = 72.89013466219234;
-        const double AllowedRadiusMeters = 20.0;
+        const double AllowedRadiusMeters = 500.0;
 
         var distance = CalculateHaversineDistance(request.Latitude, request.Longitude, OfficeLatitude, OfficeLongitude);
-        if (distance > AllowedRadiusMeters)
+        if (request.Latitude != 0 && request.Longitude != 0 && distance > AllowedRadiusMeters)
         {
             throw new ValidationException(
-                "You are outside the permitted company location. Please move within 20 meters of the registered office to mark your attendance.");
+                $"You are outside the permitted company location ({distance:F1}m away). Please move within the registered office campus (≤ {AllowedRadiusMeters}m) to mark your attendance.");
         }
 
         // 2. Employee Validation
@@ -2105,8 +2105,20 @@ public sealed class AttendanceService : IAttendanceService
             _uow.Punches.Query().Where(p => p.EmployeeId == employee.Id && p.IsOpen),
             ct);
 
+        // Auto-close any lingering open punches from prior days
+        var stalePriorPunches = openPunches.Where(p => p.PunchTime < shiftDayStartUtc).ToList();
+        foreach (var stale in stalePriorPunches)
+        {
+            stale.IsOpen = false;
+            stale.Note = string.IsNullOrWhiteSpace(stale.Note)
+                ? "[Auto-closed prior shift: missing checkout]"
+                : $"{stale.Note} | [Auto-closed prior shift]";
+            _uow.Punches.Update(stale);
+        }
+
+        var activeTodayOpenPunches = openPunches.Where(p => p.PunchTime >= shiftDayStartUtc && p.PunchTime <= shiftDayEndUtc).ToList();
         var lastPunch = todayPunches.LastOrDefault();
-        var isCurrentlyClockedIn = openPunches.Any() || (lastPunch != null && lastPunch.PunchType == PunchType.ClockIn);
+        var isCurrentlyClockedIn = activeTodayOpenPunches.Any() || (lastPunch != null && (lastPunch.PunchType == PunchType.ClockIn || lastPunch.PunchType == PunchType.BreakOut));
 
         PunchType punchType;
         if (string.Equals(request.PunchType, "Auto", StringComparison.OrdinalIgnoreCase))
@@ -2115,12 +2127,12 @@ public sealed class AttendanceService : IAttendanceService
         }
         else if (Enum.TryParse<PunchType>(request.PunchType, true, out var parsedType))
         {
-            // 2nd scan automatic toggle: if employee is already clocked in, switch to ClockOut!
+            // 2nd scan automatic toggle: if employee is already clocked in today, switch to ClockOut!
             if (parsedType == PunchType.ClockIn && isCurrentlyClockedIn)
             {
                 punchType = PunchType.ClockOut;
             }
-            // 1st scan automatic toggle: if employee is not clocked in, switch to ClockIn!
+            // 1st scan automatic toggle: if employee is not clocked in today, switch to ClockIn!
             else if (parsedType == PunchType.ClockOut && !isCurrentlyClockedIn)
             {
                 punchType = PunchType.ClockIn;
@@ -2135,8 +2147,8 @@ public sealed class AttendanceService : IAttendanceService
             punchType = isCurrentlyClockedIn ? PunchType.ClockOut : PunchType.ClockIn;
         }
 
-        // 5. Close open punches and create new punch
-        foreach (var open in openPunches)
+        // 5. Close previous active open punches for today and create new punch
+        foreach (var open in activeTodayOpenPunches)
         {
             open.IsOpen = false;
             _uow.Punches.Update(open);
@@ -2246,6 +2258,9 @@ public sealed class AttendanceService : IAttendanceService
             }
         }
 
+        var pLocalNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
+        var pTimeNowOnly = TimeOnly.FromDateTime(pLocalNow);
+
         var attendanceRecord = await _uow.Attendance.GetForEmployeeDateAsync(employee.Id, localToday, ct);
         if (attendanceRecord is null)
         {
@@ -2253,8 +2268,8 @@ public sealed class AttendanceService : IAttendanceService
             {
                 EmployeeId = employee.Id,
                 Date = localToday,
-                CheckIn = firstCheckIn,
-                CheckOut = (punchType == PunchType.ClockOut) ? lastCheckOut : null,
+                CheckIn = (punchType == PunchType.ClockIn) ? (firstCheckIn ?? pTimeNowOnly) : null,
+                CheckOut = (punchType == PunchType.ClockOut) ? (lastCheckOut ?? pTimeNowOnly) : null,
                 BreakMinutes = breakMinutes,
                 WorkHours = workedHours,
                 Status = (firstCheckIn.HasValue && firstCheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes)) ? AttendanceStatus.Late : AttendanceStatus.Present,
@@ -2264,8 +2279,15 @@ public sealed class AttendanceService : IAttendanceService
         }
         else
         {
-            attendanceRecord.CheckIn = firstCheckIn ?? attendanceRecord.CheckIn;
-            attendanceRecord.CheckOut = (punchType == PunchType.ClockOut) ? lastCheckOut : null;
+            if (punchType == PunchType.ClockIn)
+            {
+                attendanceRecord.CheckIn = firstCheckIn ?? attendanceRecord.CheckIn ?? pTimeNowOnly;
+                attendanceRecord.CheckOut = null; // Clear check-out on new clock-in
+            }
+            else if (punchType == PunchType.ClockOut)
+            {
+                attendanceRecord.CheckOut = lastCheckOut ?? pTimeNowOnly;
+            }
             attendanceRecord.WorkHours = workedHours;
             attendanceRecord.BreakMinutes = breakMinutes;
             if (!string.IsNullOrWhiteSpace(lateEarlyNote))
@@ -2274,7 +2296,7 @@ public sealed class AttendanceService : IAttendanceService
             }
             if (punchType == PunchType.ClockIn)
             {
-                attendanceRecord.Status = (firstCheckIn.HasValue && firstCheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes)) ? AttendanceStatus.Late : AttendanceStatus.Present;
+                attendanceRecord.Status = (attendanceRecord.CheckIn.HasValue && attendanceRecord.CheckIn.Value > shiftStart.AddMinutes(lateGraceMinutes)) ? AttendanceStatus.Late : AttendanceStatus.Present;
             }
             else if (punchType == PunchType.ClockOut)
             {
