@@ -411,6 +411,7 @@ interface MusterDay {
               <div 
                 class="roster-item-card" 
                 [class.active]="emp.id === selectedMusterEmpId()"
+                [id]="'roster-emp-' + emp.id"
                 (click)="selectEmployeeFromSidebar(emp.id)"
               >
                 <div class="roster-user-left">
@@ -1053,6 +1054,16 @@ interface MusterDay {
                   </span>
                   <span class="punch-type-text">Clock Out</span>
                 </label>
+                <label class="punch-type-option" [class.selected]="punchForm.punchType === 'BreakIn'">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakIn" name="punchType" />
+                  <span class="punch-type-icon" style="background:#fef3c7; color:#d97706; font-size:12px;">☕</span>
+                  <span class="punch-type-text">Start Break</span>
+                </label>
+                <label class="punch-type-option" [class.selected]="punchForm.punchType === 'BreakOut'">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakOut" name="punchType" />
+                  <span class="punch-type-icon" style="background:#e0f2fe; color:#0284c7; font-size:12px;">⚡</span>
+                  <span class="punch-type-text">End Break</span>
+                </label>
               </div>
             </div>
             <div class="form-group" style="margin-bottom: 4px;">
@@ -1195,8 +1206,9 @@ interface MusterDay {
 
       /* ── Quick Punch Modal Punch Type Selector ── */
       .punch-type-selector {
-        display: flex;
-        gap: 12px;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
       }
       .punch-type-option {
         flex: 1;
@@ -2794,6 +2806,12 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       this.punchForm.employeeId = emp.id;
     }
     this.generateMuster();
+    setTimeout(() => {
+      const rosterEl = document.getElementById('roster-emp-' + id);
+      if (rosterEl) {
+        rosterEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 60);
   }
 
   protected prevEmployee(): void {
