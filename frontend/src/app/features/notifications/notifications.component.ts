@@ -135,8 +135,8 @@ export type { DetailedNotification };
     <div style="display: flex; flex-direction: column; gap: 12px;">
       @for (n of filteredList(); track n.id || n.title) {
         <div
-          class="card"
-          style="padding: 16px 20px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; transition: 0.15s; border-left: 4px solid transparent;"
+          class="card notif-item-card"
+          style="padding: 14px 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; transition: 0.15s; border-left: 4px solid transparent; flex-wrap: wrap;"
           [style.border-left-color]="n.unread ? 'var(--p)' : 'var(--border)'"
           [style.background]="n.unread ? 'var(--p-soft)' : 'var(--surface)'"
         >

@@ -295,9 +295,9 @@ function emptyTenantForm(): CreateCompanyRequest {
                 </div>
               </div>
 
-              <!-- Sticky Action Footer -->
+              <!-- Action Footer -->
               @if (canEditCompany()) {
-                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 14px; position: sticky; bottom: 0; background: var(--surface); padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--r); box-shadow: 0 1px 3px rgba(0,0,0,0.04); z-index: 10;">
+                <div class="company-save-bar">
                   <button type="submit" class="btn btn-primary" [disabled]="savingProfile()" style="display: inline-flex; align-items: center; gap: 8px; padding: 9px 22px;">
                     <span [appIcon]="'check'"></span>
                     {{ savingProfile() ? 'Saving Profile...' : 'Save Profile Changes' }}
@@ -1608,6 +1608,46 @@ function emptyTenantForm(): CreateCompanyRequest {
     .btn-status-outline.status-suspended:hover {
       background: #ef4444;
       color: #ffffff;
+    }
+    .company-save-bar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 14px;
+      position: sticky;
+      bottom: 0;
+      background: var(--surface);
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      z-index: 10;
+    }
+    @media (max-width: 1024px) {
+      :host {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      .company-page {
+        height: auto !important;
+        overflow: visible !important;
+      }
+      .company-content-scroll {
+        overflow: visible !important;
+        height: auto !important;
+      }
+      .company-save-bar {
+        position: static !important;
+        margin-top: 16px !important;
+        margin-bottom: 24px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      .company-save-bar button {
+        width: 100% !important;
+        justify-content: center !important;
+      }
     }
   `],
 })

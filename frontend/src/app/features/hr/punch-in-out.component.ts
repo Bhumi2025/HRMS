@@ -473,6 +473,21 @@ import { ToastService } from '../../core/services/toast.service';
           grid-template-columns: 1fr;
         }
       }
+      @media (max-width: 600px) {
+        .module-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+        }
+        .live-clock-card {
+          width: 100%;
+          text-align: left;
+          box-sizing: border-box;
+        }
+        .module-title {
+          font-size: 1.25rem;
+        }
+      }
 
       .card-section-title {
         display: flex;

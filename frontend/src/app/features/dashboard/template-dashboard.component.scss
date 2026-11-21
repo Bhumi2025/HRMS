@@ -1293,3 +1293,179 @@
     font-size: 14px;
   }
 }
+
+// ── Mobile Responsive Dashboard Styles (Phone & Tablet) ──
+.mobile-section-tabs {
+  display: none;
+}
+
+.mobile-hidden {
+  // on desktop, always visible
+}
+
+@media (max-width: 1024px) {
+  :host {
+    height: auto !important;
+    max-height: none !important;
+    min-height: auto !important;
+    overflow-y: visible !important;
+    display: block !important;
+  }
+
+  .dash-container {
+    height: auto !important;
+    max-height: none !important;
+    min-height: auto !important;
+    overflow-y: visible !important;
+    gap: 12px !important;
+  }
+
+  .dash-main-area {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    overflow: visible !important;
+    gap: 12px !important;
+  }
+
+  .dash-right-col {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    overflow: visible !important;
+    gap: 12px !important;
+    order: -1 !important; // Bring Clock & Punch widget above charts on mobile
+  }
+
+  .dash-center-col {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    overflow: visible !important;
+    gap: 12px !important;
+  }
+
+  .top-widgets-row,
+  .bottom-widgets-row {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    overflow: visible !important;
+    gap: 12px !important;
+  }
+
+  .dash-widget {
+    height: auto !important;
+    min-height: auto !important;
+    border-radius: 12px !important;
+    padding: 12px 14px !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  .dash-widget .widget-scroll-list {
+    max-height: 280px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .attendance-graph-content {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+  }
+
+  .timelog-chart-wrapper {
+    min-width: 580px !important;
+    height: 185px !important;
+  }
+
+  .header-title-box {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .chart-legend-bar .graph-legend {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    font-size: 11px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .mobile-section-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 2px 2px 8px 2px;
+    margin-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    .m-tab-btn {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 13px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--surface, #ffffff);
+      border: 1px solid var(--border, #e2e8f0);
+      color: var(--muted, #64748b);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+
+      &:hover {
+        color: var(--text, #0f172a);
+        border-color: #cbd5e1;
+      }
+
+      &.active {
+        background: var(--p, #2563eb);
+        color: #ffffff;
+        border-color: var(--p, #2563eb);
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+      }
+    }
+  }
+
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  .kpi-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .kpi-card {
+    padding: 8px 10px !important;
+    border-radius: 10px !important;
+
+    .kpi-card-val {
+      font-size: 1.25rem !important;
+    }
+  }
+
+  .punch-header {
+    .punch-live-clock {
+      font-size: 1.2rem !important;
+    }
+  }
+
+  .punch-timers {
+    gap: 8px !important;
+    .timer-box {
+      padding: 8px 10px !important;
+      .timer-value {
+        font-size: 1.15rem !important;
+      }
+    }
+  }
+}
