@@ -2444,7 +2444,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     let absentCount = 0;
 
     for (const d of days) {
-      if (d.isWeekend || d.status === 'OnLeave') {
+      if ((d.isWeekend || d.status === 'OnLeave') && !d.inTimeRaw && !d.workHoursRaw && d.status !== 'Present' && d.status !== 'Late') {
         dayOffCount++;
       }
       if (d.isLateIn) lateInCount++;
@@ -2494,7 +2494,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       if (st === 'present') matchSt = d.status === 'Present';
       else if (st === 'late') matchSt = d.status === 'Late' || d.isLateIn;
       else if (st === 'absent') matchSt = d.status === 'Absent';
-      else if (st === 'dayoff') matchSt = d.isWeekend || d.status === 'OnLeave';
+      else if (st === 'dayoff') matchSt = (d.isWeekend || d.status === 'OnLeave') && !d.inTimeRaw && !d.workHoursRaw;
       else if (st === 'overtime') matchSt = d.workHoursRaw > 8;
 
       return matchQ && matchSt;
@@ -2899,7 +2899,16 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
           const dayLabel = d.date === todayStr ? 'Today' : `${dateObj.toLocaleDateString('en-US', { weekday: 'long' })}, ${dayNum}`;
           const dateFormatted = `${dayOfWeek} ${String(dayNum).padStart(2, '0')} ${dateObj.toLocaleDateString('en-US', { month: 'short' })}, ${dateObj.getFullYear()}`;
-          const isWeekend = d.status === 'Weekend' || dateObj.getDay() === 0 || dateObj.getDay() === 6;
+          const isWeekendDay = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+          const hasWorkActivity = !!(
+            d.checkIn ||
+            (d.punches && d.punches.length > 0) ||
+            (d.workHours && d.workHours > 0) ||
+            d.status === 'Present' ||
+            d.status === 'Late' ||
+            d.status === 'HalfDay'
+          );
+          const isWeekend = (d.status === 'Weekend' || isWeekendDay) && !hasWorkActivity;
           const isToday = d.date === todayStr;
           const isFuture = d.date > todayStr;
 
@@ -2914,7 +2923,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           let dayStatusColor = '#15803d';
           let dayStatusBg = '#dcfce7';
 
-          if (d.status === 'Weekend') {
+          if (d.status === 'Weekend' && !hasWorkActivity) {
             dayStatusBadge = 'WK';
             dayStatusColor = '#0284c7';
             dayStatusBg = '#e0f2fe';
@@ -2939,10 +2948,10 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           // Attendance Status Icon
           let attendanceIcon: 'P' | 'A' | 'L' | '⚠️' | '—' = '—';
           let attendanceIconClass = 'status-box-gray';
-          if (d.status === 'Present' && (!d.checkOut || d.checkOut === '—')) {
+          if ((d.status === 'Present' || hasWorkActivity) && (!d.checkOut || d.checkOut === '—')) {
             attendanceIcon = '⚠️';
             attendanceIconClass = 'status-box-warn';
-          } else if (d.status === 'Present') {
+          } else if (d.status === 'Present' || hasWorkActivity) {
             attendanceIcon = isLateIn ? 'L' : 'P';
             attendanceIconClass = isLateIn ? 'status-box-warn' : 'status-box-success';
           } else if (d.status === 'Absent') {
@@ -2955,11 +2964,11 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
           // Action Status
           let actionStatus = 'Present (P)';
-          if (d.status === 'Present' && (!d.checkOut || d.checkOut === '—')) {
+          if ((d.status === 'Present' || hasWorkActivity) && (!d.checkOut || d.checkOut === '—')) {
             actionStatus = 'On Going';
-          } else if (d.status === 'Present') {
+          } else if (d.status === 'Present' || (hasWorkActivity && d.status !== 'HalfDay')) {
             actionStatus = 'Present (P)';
-          } else if (d.status === 'Weekend') {
+          } else if (d.status === 'Weekend' && !hasWorkActivity) {
             actionStatus = 'Weekend';
           } else if (d.status === 'Absent') {
             actionStatus = 'Absent (A)';
@@ -3051,7 +3060,16 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     punches?: EmployeePunch[],
     isToday?: boolean
   ): TimelineSegment[] {
-    if (status === 'Weekend' || isWeekend) {
+    const hasWorkActivity = !!(
+      checkIn ||
+      (punches && punches.length > 0) ||
+      workHours > 0 ||
+      status === 'Present' ||
+      status === 'Late' ||
+      status === 'HalfDay'
+    );
+
+    if ((status === 'Weekend' || isWeekend) && !hasWorkActivity) {
       return [
         {
           type: 'dayoff',
@@ -3298,20 +3316,22 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
             });
             currentBreakStart = null;
           }
-          if (currentWorkStart !== null && pH > currentWorkStart) {
-            const wDur = pH - currentWorkStart;
+          if (currentWorkStart !== null && pH >= currentWorkStart) {
+            const wDur = Math.max(0.017, pH - currentWorkStart);
             accumulatedWorkHours += wDur;
-            const regularEnd = (accumulatedWorkHours > 8.0 && currentWorkStart < 18.0) ? 18.0 : pH;
-            const regularDur = regularEnd - currentWorkStart;
+            const regularEnd = (accumulatedWorkHours > 8.0 && currentWorkStart < 18.0) ? 18.0 : Math.max(currentWorkStart + 0.05, pH);
+            const regularDur = Math.max(0.017, regularEnd - currentWorkStart);
+            const durMins = Math.max(1, Math.round(regularDur * 60));
+            const durLabel = durMins < 60 ? `${durMins}m` : `${regularDur.toFixed(1)}h`;
             if (regularDur > 0) {
               segments.push({
                 type: 'work',
                 label: 'Working Time',
                 timeRange: `${this.formatHourDecimal(currentWorkStart)} - ${this.formatHourDecimal(regularEnd)}`,
-                durationLabel: `${regularDur.toFixed(1)}h`,
+                durationLabel: durLabel,
                 leftPercent: calcLeft(currentWorkStart),
                 widthPercent: calcWidth(currentWorkStart, regularEnd),
-                tooltip: `Working time: ${this.formatHourDecimal(currentWorkStart)} - ${this.formatHourDecimal(regularEnd)} (${regularDur.toFixed(1)}h)`,
+                tooltip: `Working time: ${this.formatHourDecimal(currentWorkStart)} - ${this.formatHourDecimal(regularEnd)} (${durLabel})`,
               });
             }
             if (pH > 18.0 || accumulatedWorkHours > 8.0) {
@@ -3483,6 +3503,24 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     const breakStart = 13.0; // standard 1:00 PM lunch break
     const breakEnd = 14.0;   // 1 hour break (13:00 - 14:00)
     const regularWorkEnd = 18.0; // 6:00 PM standard shift end
+    const effectiveEnd = endH ? Math.min(23.95, endH) : 18.0;
+
+    if (effectiveEnd <= breakStart) {
+      const dur = Math.max(0.017, effectiveEnd - workStart);
+      const durMins = Math.max(1, Math.round(dur * 60));
+      const durLabel = durMins < 60 ? `${durMins}m` : `${dur.toFixed(1)}h`;
+      segments.push({
+        type: 'work',
+        label: 'Working Time',
+        timeRange: `${this.formatHourDecimal(workStart)} - ${this.formatHourDecimal(effectiveEnd)}`,
+        durationLabel: durLabel,
+        leftPercent: calcLeft(workStart),
+        widthPercent: calcWidth(workStart, effectiveEnd),
+        tooltip: `Working time: ${this.formatHourDecimal(workStart)} - ${this.formatHourDecimal(effectiveEnd)} (${durLabel})`,
+      });
+      return segments;
+    }
+
     const overtimeEnd = Math.min(23.95, endH > 18.0 ? endH : (effectiveWork > 8.0 ? 18.0 + (effectiveWork - 8.0) : 18.0));
 
     // Part 1: Morning Working Time
