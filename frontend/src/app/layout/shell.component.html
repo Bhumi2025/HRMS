@@ -129,6 +129,10 @@
         <span class="bn-icon" [appIcon]="'company'"></span>
         <span class="bn-label">Company</span>
       </a>
+      <a class="bn-item" (click)="ui.togglePanel('avatar')" style="cursor: pointer;">
+        <span class="bn-icon" [appIcon]="'user'"></span>
+        <span class="bn-label">Profile</span>
+      </a>
       } @else {
       <a class="bn-item" routerLink="/employees" routerLinkActive="active">
         <span class="bn-icon" [appIcon]="'employees'"></span>

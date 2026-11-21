@@ -14,6 +14,80 @@ import { ToastService } from '../../core/services/toast.service';
   imports: [CommonModule, FormsModule, IconDirective, DatePipe],
   template: `
     <div class="super-admin-dashboard">
+      <!-- 4 Top KPI Cards for Super Admin Platform -->
+      <div class="kpi-cards-grid">
+        <div class="kpi-card">
+          <div class="kpi-card-header">
+            <div class="kpi-icon-wrap icon-purple">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 21h18" />
+                <path d="M5 21V7l8-4v18" />
+                <path d="M19 21V11l-6-4" />
+                <path d="M9 9v.01" /><path d="M9 12v.01" /><path d="M9 15v.01" /><path d="M9 18v.01" />
+              </svg>
+            </div>
+            <span class="kpi-label">Total Tenants</span>
+          </div>
+          <div class="kpi-card-val">{{ totalCompanies() }}</div>
+          <div class="kpi-card-meta">
+            <span class="meta-pill neutral">Organizations</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-card-header">
+            <div class="kpi-icon-wrap icon-green">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
+            <span class="kpi-label">Active Tenants</span>
+          </div>
+          <div class="kpi-card-val">{{ activeCompanies() }}</div>
+          <div class="kpi-card-meta">
+            <span class="meta-pill positive">Provisioned</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-card-header">
+            <div class="kpi-icon-wrap icon-coral">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+            </div>
+            <span class="kpi-label">Suspended</span>
+          </div>
+          <div class="kpi-card-val">{{ suspendedCompanies() }}</div>
+          <div class="kpi-card-meta">
+            <span class="meta-pill" [class.alert]="suspendedCompanies() > 0" [class.neutral]="suspendedCompanies() === 0">
+              {{ suspendedCompanies() > 0 ? 'Action Required' : 'All Running' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-card-header">
+            <div class="kpi-icon-wrap icon-amber">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <span class="kpi-label">Administrators</span>
+          </div>
+          <div class="kpi-card-val">{{ totalAdmins() }}</div>
+          <div class="kpi-card-meta">
+            <span class="meta-pill neutral">Tenant Admins</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Main Content: Tenant Organizations Full-Width Table -->
       <div class="content-panel">
         <div class="panel-header">
@@ -78,7 +152,8 @@ import { ToastService } from '../../core/services/toast.service';
           </div>
         </div>
 
-        <div class="table-responsive">
+        <!-- Desktop Table View (visible > 768px) -->
+        <div class="table-responsive desktop-table-wrap">
           <table class="modern-table">
             <thead>
               <tr>
@@ -160,6 +235,82 @@ import { ToastService } from '../../core/services/toast.service';
               }
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile Tenant Cards View (visible <= 768px) -->
+        <div class="mobile-tenant-cards">
+          @for (c of filteredCompanies(); track c.id) {
+            <div class="m-tenant-card">
+              <div class="m-card-header">
+                <div class="org-cell">
+                  <div class="org-avatar" (click)="openCompanyDetails(c)" role="button" title="View {{ c.name }} details & employees" style="cursor: pointer;">
+                    {{ c.name.charAt(0) }}
+                  </div>
+                  <div class="org-info">
+                    <button type="button" class="org-name-btn" (click)="openCompanyDetails(c)" title="View {{ c.name }} details & employees">
+                      {{ c.name }}
+                    </button>
+                    @if (c.isDefault) {
+                      <span class="badge badge-default">Primary Default</span>
+                    }
+                  </div>
+                </div>
+                <span
+                  class="badge"
+                  [style.background]="(c.status || '').toLowerCase() === 'active' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'"
+                  [style.color]="(c.status || '').toLowerCase() === 'active' ? '#059669' : '#dc2626'"
+                  style="font-weight: 700; font-size: 11px; padding: 3px 10px; border-radius: 12px;"
+                >
+                  {{ (c.status || '').toLowerCase() === 'suspended' ? 'Suspended' : 'Active' }}
+                </span>
+              </div>
+
+              <div class="m-card-body">
+                <div class="m-info-line">
+                  <span class="m-info-label">Tenant Code</span>
+                  <span class="code-badge">{{ c.code }}</span>
+                </div>
+                <div class="m-info-line">
+                  <span class="m-info-label">Database</span>
+                  <span class="db-badge"><span [appIcon]="'grid'"></span> {{ c.databaseName || 'HRMS (Default)' }}</span>
+                </div>
+                <div class="m-info-line">
+                  <span class="m-info-label">Administrator</span>
+                  <div class="m-admin-val">
+                    <div class="admin-name">{{ c.adminFullName || 'Administrator' }}</div>
+                    <div class="admin-email">{{ c.adminEmail }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="m-card-footer">
+                @if (!c.isDefault) {
+                  <button
+                    type="button"
+                    class="btn-status-outline"
+                    [class.status-active]="(c.status || '').toLowerCase() === 'active'"
+                    [class.status-suspended]="(c.status || '').toLowerCase() === 'suspended'"
+                    (click)="toggleCompanyStatus(c)"
+                  >
+                    {{ (c.status || '').toLowerCase() === 'suspended' ? 'Activate Tenant' : 'Suspend Tenant' }}
+                  </button>
+                }
+                <button
+                  class="action-btn btn-neutral"
+                  (click)="openCompanyDetails(c)"
+                  title="View {{ c.name }} Details & Employees"
+                >
+                  <span [appIcon]="'eye'"></span> Details
+                </button>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-state" style="padding: 32px 16px;">
+              <div class="empty-icon">🏢</div>
+              <div class="empty-title">No tenant organizations found</div>
+              <div class="empty-desc">Try clearing your search query or filter</div>
+            </div>
+          }
         </div>
       </div>
 
@@ -1233,6 +1384,194 @@ import { ToastService } from '../../core/services/toast.service';
       .btn-cancel:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+      }
+
+      /* Top 4 KPI Cards */
+      .kpi-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      .kpi-card {
+        background: var(--surface, #ffffff);
+        border: 1px solid var(--border, #e5e7eb);
+        border-radius: 12px;
+        padding: 10px 14px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      .kpi-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      }
+      .kpi-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .kpi-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted, #64748b);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .kpi-icon-wrap {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .kpi-icon-wrap.icon-purple { background: #f3e8ff; color: #9333ea; }
+      .kpi-icon-wrap.icon-green { background: #dcfce7; color: #16a34a; }
+      .kpi-icon-wrap.icon-coral { background: #fee2e2; color: #dc2626; }
+      .kpi-icon-wrap.icon-amber { background: #fef3c7; color: #d97706; }
+      .kpi-card-val {
+        font-size: 1.35rem;
+        font-weight: 800;
+        line-height: 1.15;
+        color: var(--text, #111827);
+        margin-bottom: 2px;
+        letter-spacing: -0.02em;
+      }
+      .kpi-card-meta {
+        display: flex;
+        align-items: center;
+      }
+      .meta-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 10px;
+      }
+      .meta-pill.positive { background: #ecfdf5; color: #059669; }
+      .meta-pill.neutral { background: #f1f5f9; color: #475569; }
+      .meta-pill.alert { background: #fff1f2; color: #e11d48; }
+
+      /* Mobile Tenant Cards */
+      .desktop-table-wrap {
+        display: block;
+      }
+      .mobile-tenant-cards {
+        display: none;
+      }
+
+      @media (max-width: 768px) {
+        .kpi-cards-grid {
+          grid-template-columns: repeat(2, 1fr) !important;
+          gap: 8px !important;
+        }
+        .desktop-table-wrap {
+          display: none !important;
+        }
+        .mobile-tenant-cards {
+          display: flex !important;
+          flex-direction: column;
+          gap: 12px;
+          padding: 12px;
+        }
+        .m-tenant-card {
+          background: var(--surface, #ffffff);
+          border: 1px solid var(--border, #e2e8f0);
+          border-radius: 12px;
+          padding: 14px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        }
+        .m-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        .m-card-body {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 10px 0;
+          border-top: 1px solid var(--border, #f1f5f9);
+          border-bottom: 1px solid var(--border, #f1f5f9);
+        }
+        .m-info-line {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+          font-size: 12.5px;
+        }
+        .m-info-label {
+          color: var(--muted, #64748b);
+          font-weight: 600;
+          font-size: 12px;
+        }
+        .m-admin-val {
+          text-align: right;
+        }
+        .m-admin-val .admin-name {
+          font-size: 12.5px;
+        }
+        .m-admin-val .admin-email {
+          font-size: 11px;
+        }
+        .m-card-footer {
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 8px;
+          margin-top: 12px;
+          flex-wrap: wrap;
+        }
+        .m-card-footer button {
+          flex: 1;
+          justify-content: center;
+          text-align: center;
+        }
+        .panel-header {
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 12px !important;
+          padding: 14px 16px !important;
+        }
+        .panel-controls {
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 10px !important;
+          width: 100% !important;
+        }
+        .filter-pills {
+          width: 100% !important;
+          box-sizing: border-box !important;
+          justify-content: space-between !important;
+        }
+        .filter-pills .pill-btn {
+          flex: 1 !important;
+          text-align: center !important;
+          padding: 6px 4px !important;
+          font-size: 11.5px !important;
+        }
+        .search-wrap {
+          width: 100% !important;
+        }
+        .search-input {
+          width: 100% !important;
+          box-sizing: border-box !important;
+        }
+        .search-input:focus {
+          width: 100% !important;
+        }
       }
     `,
   ],
