@@ -115,8 +115,31 @@ public sealed class DashboardService : IDashboardService
             ? checkIn.ToString("hh:mm tt")
             : "Not checked in";
 
+        // If today's attendance record has 0 work hours, try to compute live from today's punches
+        var todayHours = todayRecord?.WorkHours ?? 0m;
+        if (todayHours == 0m)
+        {
+            var todayPunches = await _uow.Punches.ToListAsync(
+                _uow.Punches.Query()
+                    .Where(p => p.EmployeeId == employeeId && p.PunchTime >= today.ToDateTime(TimeOnly.MinValue))
+                    .OrderBy(p => p.PunchTime),
+                ct);
+            if (todayPunches.Any())
+            {
+                var firstIn = todayPunches.FirstOrDefault(p => p.PunchType == PunchType.ClockIn);
+                if (firstIn != null)
+                {
+                    var elapsed = (DateTime.UtcNow - firstIn.PunchTime).TotalHours;
+                    if (elapsed > 0 && elapsed < 24)
+                    {
+                        todayHours = Math.Round((decimal)elapsed, 2);
+                    }
+                }
+            }
+        }
+
         var weekRecords = monthRecords.Where(r => r.Date >= weekStart).ToList();
-        var workingHours = weekRecords.Sum(r => r.WorkHours);
+        var workingHours = weekRecords.Where(r => r.Date != today).Sum(r => r.WorkHours) + todayHours;
 
         var trend = new List<AttendanceTrendPointDto>();
         for (var i = 6; i >= 0; i--)
@@ -126,11 +149,14 @@ public sealed class DashboardService : IDashboardService
             var isPresent = record is { Status: AttendanceStatus.Present or AttendanceStatus.Remote or AttendanceStatus.LeftEarly or AttendanceStatus.HalfDay };
             var isLate = record is { Status: AttendanceStatus.Late };
             var isAbsent = record is { Status: AttendanceStatus.Absent };
+            var dayHours = date == today ? todayHours : (record?.WorkHours ?? 0m);
             trend.Add(new AttendanceTrendPointDto(
                 date.DayOfWeek.ToString()[..3],
                 isPresent ? 1 : 0,
                 isAbsent ? 1 : 0,
-                isLate ? 1 : 0));
+                isLate ? 1 : 0,
+                Date: date.ToString("yyyy-MM-dd"),
+                WorkHours: Math.Round(dayHours, 2)));
         }
 
         // Leave balances

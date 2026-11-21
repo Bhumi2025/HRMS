@@ -358,6 +358,7 @@ export interface AttendanceTrendPoint {
   breakHours?: number;
   afterBreakHours?: number;
   missingHours?: number;
+  workHours?: number;
 }
 
 export interface Activity {

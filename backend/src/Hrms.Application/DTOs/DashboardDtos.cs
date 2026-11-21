@@ -25,7 +25,8 @@ public sealed record AttendanceTrendPointDto(
     decimal BeforeBreakHours = 0,
     decimal BreakHours = 0,
     decimal AfterBreakHours = 0,
-    decimal MissingHours = 0);
+    decimal MissingHours = 0,
+    decimal WorkHours = 0);
 
 public sealed record ActivityDto(
     Guid EmployeeId,
