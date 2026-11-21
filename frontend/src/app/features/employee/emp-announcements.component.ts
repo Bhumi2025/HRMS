@@ -21,40 +21,47 @@ interface Announcement {
   imports: [CommonModule, FormsModule],
   template: `
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 12px">
-      <!-- Filter Tabs: All, Unread, Read -->
-      <div style="display: flex; align-items: center; gap: 4px; background: var(--surface); padding: 4px; border-radius: 10px; border: 1px solid var(--border)">
-        <button
-          type="button"
-          (click)="activeFilter.set('all')"
-          [style.background]="activeFilter() === 'all' ? 'var(--p)' : 'transparent'"
-          [style.color]="activeFilter() === 'all' ? '#fff' : 'var(--text)'"
-          style="border: none; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s"
-        >
-          All ({{ announcements().length }})
-        </button>
-        <button
-          type="button"
-          (click)="activeFilter.set('unread')"
-          [style.background]="activeFilter() === 'unread' ? 'var(--p)' : 'transparent'"
-          [style.color]="activeFilter() === 'unread' ? '#fff' : 'var(--text)'"
-          style="border: none; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s"
-        >
-          Unread ({{ unreadCount() }})
-        </button>
-        <button
-          type="button"
-          (click)="activeFilter.set('read')"
-          [style.background]="activeFilter() === 'read' ? 'var(--p)' : 'transparent'"
-          [style.color]="activeFilter() === 'read' ? '#fff' : 'var(--text)'"
-          style="border: none; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s"
-        >
-          Read ({{ readCount() }})
-        </button>
-      </div>
+      <!-- Filter Tabs / Header Info -->
+      @if (!isHrManager()) {
+        <div style="display: flex; align-items: center; gap: 4px; background: var(--surface); padding: 4px; border-radius: 10px; border: 1px solid var(--border)">
+          <button
+            type="button"
+            (click)="activeFilter.set('all')"
+            [style.background]="activeFilter() === 'all' ? 'var(--p)' : 'transparent'"
+            [style.color]="activeFilter() === 'all' ? '#fff' : 'var(--text)'"
+            style="border: none; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s"
+          >
+            All ({{ announcements().length }})
+          </button>
+          <button
+            type="button"
+            (click)="activeFilter.set('unread')"
+            [style.background]="activeFilter() === 'unread' ? 'var(--p)' : 'transparent'"
+            [style.color]="activeFilter() === 'unread' ? '#fff' : 'var(--text)'"
+            style="border: none; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s"
+          >
+            Unread ({{ unreadCount() }})
+          </button>
+          <button
+            type="button"
+            (click)="activeFilter.set('read')"
+            [style.background]="activeFilter() === 'read' ? 'var(--p)' : 'transparent'"
+            [style.color]="activeFilter() === 'read' ? '#fff' : 'var(--text)'"
+            style="border: none; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s"
+          >
+            Read ({{ readCount() }})
+          </button>
+        </div>
+      } @else {
+        <div>
+          <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text); margin: 0 0 4px 0;">Announcements</h2>
+          <p style="font-size: 13px; color: var(--muted); margin: 0;">Total Announcements: {{ announcements().length }}</p>
+        </div>
+      }
 
       <!-- Header Actions -->
       <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
-        @if (unreadCount() > 0) {
+        @if (!isHrManager() && unreadCount() > 0) {
           <button
             class="btn btn-outline btn-sm"
             type="button"
@@ -73,34 +80,36 @@ interface Announcement {
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 14px">
-      @for (a of filteredAnnouncements(); track a.id ?? a.title) {
+      @for (a of paginatedAnnouncements(); track a.id ?? a.title) {
         <div
           class="news-card"
           (click)="readNews(a)"
           style="background: var(--surface); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;"
-          [style.opacity]="isRead(a) ? '0.88' : '1'"
+          [style.opacity]="!isHrManager() && isRead(a) ? '0.88' : '1'"
         >
-          <div [style.background]="barColor(a.type)" [style.height]="isRead(a) ? '2px' : '4px'"></div>
+          <div [style.background]="barColor(a.type)" [style.height]="!isHrManager() && isRead(a) ? '2px' : '4px'"></div>
           <div style="padding: 16px 20px">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px">
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
                 <span class="badge" [class]="badgeClass(a.type)">{{ a.tag }}</span>
                 
-                @if (isRead(a)) {
-                  <span
-                    class="badge"
-                    style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background: rgba(16,185,129,0.12); color: #10b981; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
-                  >
-                    ✓ Read
-                  </span>
-                } @else {
-                  <span
-                    class="badge"
-                    style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background: rgba(239,68,68,0.12); color: #ef4444; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"
-                  >
-                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
-                    Unread
-                  </span>
+                @if (!isHrManager()) {
+                  @if (isRead(a)) {
+                    <span
+                      class="badge"
+                      style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background: rgba(16,185,129,0.12); color: #10b981; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
+                    >
+                      ✓ Read
+                    </span>
+                  } @else {
+                    <span
+                      class="badge"
+                      style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background: rgba(239,68,68,0.12); color: #ef4444; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"
+                    >
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
+                      Unread
+                    </span>
+                  }
                 }
 
                 <span class="ann-time" style="font-size: 11px; color: var(--muted); white-space: nowrap">{{ a.time }}</span>
@@ -182,6 +191,50 @@ interface Announcement {
         </div>
       }
     </div>
+
+    <!-- Pagination Controls (shows when total pages > 1 or for navigation) -->
+    @if (totalPages() > 1) {
+      <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 20px; gap: 6px">
+        <button
+          type="button"
+          class="pg-btn"
+          [disabled]="currentPage() <= 1"
+          (click)="goToPage(currentPage() - 1)"
+          aria-label="Previous page"
+          style="width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--muted); font-size: 14px; transition: all 0.15s;"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+
+        @for (p of pageNumbers(); track p) {
+          <button
+            type="button"
+            (click)="goToPage(p)"
+            [style.background]="p === currentPage() ? 'var(--p)' : 'var(--surface)'"
+            [style.color]="p === currentPage() ? '#fff' : 'var(--muted)'"
+            [style.border-color]="p === currentPage() ? 'var(--p)' : 'var(--border)'"
+            style="min-width: 34px; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s;"
+          >
+            {{ p }}
+          </button>
+        }
+
+        <button
+          type="button"
+          class="pg-btn"
+          [disabled]="currentPage() >= totalPages()"
+          (click)="goToPage(currentPage() + 1)"
+          aria-label="Next page"
+          style="width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--muted); font-size: 14px; transition: all 0.15s;"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
+    }
 
     <!-- Read News Details Modal (automatically marks as read when opened) -->
     @if (readingItem(); as item) {
@@ -522,7 +575,7 @@ export class EmpAnnouncementsComponent implements OnInit {
     if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(this.storageKey, JSON.stringify([...this.readIds()]));
-    } catch {}
+    } catch { }
   }
 
   private loadReadState(): void {
@@ -535,7 +588,7 @@ export class EmpAnnouncementsComponent implements OnInit {
           this.readIds.set(new Set(arr));
         }
       }
-    } catch {}
+    } catch { }
   }
 
   loadAnnouncements(): void {
