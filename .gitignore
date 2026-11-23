@@ -61,7 +61,6 @@ backend/src/Hrms.Api/wwwroot/uploads/tenants/*
 .env
 *.env
 .env.*
-!.env.example
 appsettings.Local.json
 appsettings.Production.json
 appsettings.Staging.json
