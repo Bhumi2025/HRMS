@@ -58,7 +58,13 @@ backend/src/Hrms.Api/wwwroot/uploads/tenants/*
 !backend/src/Hrms.Api/wwwroot/uploads/tenants/.gitkeep
 
 # ── Local Environment & Database Files ──
+.env
+*.env
+.env.*
+!.env.example
 appsettings.Local.json
+appsettings.Production.json
+appsettings.Staging.json
 *.mdf
 *.ldf
 *.ndf
@@ -89,6 +95,10 @@ appsettings.Local.json
 .commandcode/
 %DST%/
 .gemini/
+
+# ── Python Cache ──
+__pycache__/
+*.py[cod]
 
 # ── Operating System Junk ──
 .DS_Store
