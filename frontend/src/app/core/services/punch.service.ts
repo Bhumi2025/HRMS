@@ -39,7 +39,7 @@ export interface PunchTimelineItem {
   id: string;
   kind: 'punch' | 'break';
   punchType?: 'ClockIn' | 'ClockOut' | 'BreakIn' | 'BreakOut';
-  label?: 'Punch In' | 'Punch Out';
+  label?: 'Punch In' | 'Punch Out' | 'Start Break' | 'End Break' | string;
   isPunchIn?: boolean;
   timeStr?: string;
   rawTime?: Date;
@@ -88,7 +88,9 @@ export class PunchService {
     for (let i = 0; i < sorted.length; i++) {
       const p = sorted[i];
       const isPunchIn = p.punchType === 'ClockIn' || p.punchType === 'BreakOut';
-      const label: 'Punch In' | 'Punch Out' = isPunchIn ? 'Punch In' : 'Punch Out';
+      let label: string = isPunchIn ? 'Punch In' : 'Punch Out';
+      if (p.punchType === 'BreakIn') label = 'Start Break';
+      else if (p.punchType === 'BreakOut') label = 'End Break';
 
       // Format time as hh:mm:ss a (e.g. 02:08:26 PM)
       const d = safeParseDate(p.punchTime);
@@ -424,9 +426,8 @@ export class PunchService {
       } else if (p.punchType === 'ClockOut') {
         if (breakStartMs !== null && !isNaN(breakStartMs) && t >= breakStartMs) {
           breakSec += Math.floor((t - breakStartMs) / 1000);
+          breakStartMs = null;
         }
-        // Track interval between ClockOut and subsequent ClockIn as break
-        breakStartMs = t;
       }
     }
 

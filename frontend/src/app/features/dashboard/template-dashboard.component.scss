@@ -991,11 +991,23 @@
         border-color: #fcd34d;
       }
     }
+
+    &.btn-face {
+      background: #3b82f6;
+      color: #fff;
+      &:hover { background: #2563eb; }
+    }
   }
 
   .punch-active-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 0.9fr 1.4fr 0.9fr;
+    gap: 6px;
+  }
+
+  .punch-idle-row {
+    display: grid;
+    grid-template-columns: 1.4fr 0.8fr;
     gap: 6px;
   }
 
