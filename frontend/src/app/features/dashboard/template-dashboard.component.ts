@@ -437,21 +437,21 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   }
 
   clockIn(): void {
-    this.punchService.requestClockIn();
+    this.punchService.clockIn();
     setTimeout(() => {
       this.loadData();
       this.notifState.refresh();
       this.punchService.loadTodayPunches();
-    }, 1200);
+    }, 800);
   }
 
   clockOut(): void {
-    this.punchService.requestClockOut();
+    this.punchService.clockOut();
     setTimeout(() => {
       this.loadData();
       this.notifState.refresh();
       this.punchService.loadTodayPunches();
-    }, 1200);
+    }, 800);
   }
 
   toggleBreak(): void {
@@ -460,7 +460,19 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
       this.loadData();
       this.notifState.refresh();
       this.punchService.loadTodayPunches();
-    }, 1200);
+    }, 800);
+  }
+
+  facePunchIn(): void {
+    this.punchService.requestClockIn();
+  }
+
+  facePunchActive(): void {
+    if (this.punchService.onBreak()) {
+      this.punchService.requestEndBreak();
+    } else {
+      this.punchService.requestClockOut();
+    }
   }
 
   approveRequest(id: string): void {

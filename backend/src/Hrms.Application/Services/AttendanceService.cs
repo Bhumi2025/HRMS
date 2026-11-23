@@ -196,7 +196,6 @@ public sealed class AttendanceService : IAttendanceService
                                 if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
                                 bOpen = null;
                             }
-                            bOpen = p.PunchTime;
                         }
                     }
 
@@ -564,7 +563,7 @@ public sealed class AttendanceService : IAttendanceService
 
         // 4. Common Windows vs IANA cross-mappings
         var lower = cleanId.ToLowerInvariant();
-        if (lower.Contains("dubai") || lower.Contains("arabian") || lower.Contains("uae") || lower.Contains("gst"))
+        if (lower.Contains("dubai") || lower.Contains("arabian") || lower.Contains("uae") || cleanId.Equals("GST", StringComparison.OrdinalIgnoreCase) || cleanId.Contains("(GST", StringComparison.OrdinalIgnoreCase))
         {
             if (TimeZoneInfo.TryFindSystemTimeZoneById("Arabian Standard Time", out tz) ||
                 TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Dubai", out tz))
@@ -572,7 +571,7 @@ public sealed class AttendanceService : IAttendanceService
                 return tz;
             }
         }
-        else if (lower.Contains("kolkata") || lower.Contains("india") || lower.Contains("calcutta") || lower.Contains("ist"))
+        else if (lower.Contains("kolkata") || lower.Contains("india") || lower.Contains("calcutta") || cleanId.Equals("IST", StringComparison.OrdinalIgnoreCase) || cleanId.Contains("(IST", StringComparison.OrdinalIgnoreCase))
         {
             if (TimeZoneInfo.TryFindSystemTimeZoneById("India Standard Time", out tz) ||
                 TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Kolkata", out tz) ||
@@ -581,7 +580,7 @@ public sealed class AttendanceService : IAttendanceService
                 return tz;
             }
         }
-        else if (lower.Contains("riyadh") || lower.Contains("saudi") || lower.Contains("ast"))
+        else if (lower.Contains("riyadh") || lower.Contains("saudi") || cleanId.Equals("AST", StringComparison.OrdinalIgnoreCase) || cleanId.Contains("(AST", StringComparison.OrdinalIgnoreCase))
         {
             if (TimeZoneInfo.TryFindSystemTimeZoneById("Arab Standard Time", out tz) ||
                 TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Riyadh", out tz))
@@ -589,7 +588,7 @@ public sealed class AttendanceService : IAttendanceService
                 return tz;
             }
         }
-        else if (lower.Contains("london") || lower.Contains("gmt") || lower.Contains("bst"))
+        else if (lower.Contains("london") || cleanId.Equals("GMT", StringComparison.OrdinalIgnoreCase) || cleanId.Equals("BST", StringComparison.OrdinalIgnoreCase) || cleanId.Contains("(GMT", StringComparison.OrdinalIgnoreCase) || cleanId.Contains("(BST", StringComparison.OrdinalIgnoreCase))
         {
             if (TimeZoneInfo.TryFindSystemTimeZoneById("GMT Standard Time", out tz) ||
                 TimeZoneInfo.TryFindSystemTimeZoneById("Europe/London", out tz))
@@ -597,7 +596,7 @@ public sealed class AttendanceService : IAttendanceService
                 return tz;
             }
         }
-        else if (lower.Contains("new_york") || lower.Contains("eastern") || lower.Contains("est"))
+        else if (lower.Contains("new_york") || cleanId.Equals("EST", StringComparison.OrdinalIgnoreCase) || cleanId.Contains("(EST", StringComparison.OrdinalIgnoreCase))
         {
             if (TimeZoneInfo.TryFindSystemTimeZoneById("Eastern Standard Time", out tz) ||
                 TimeZoneInfo.TryFindSystemTimeZoneById("America/New_York", out tz))
@@ -605,7 +604,7 @@ public sealed class AttendanceService : IAttendanceService
                 return tz;
             }
         }
-        else if (lower.Contains("singapore") || lower.Contains("sgt"))
+        else if (lower.Contains("singapore") || cleanId.Equals("SGT", StringComparison.OrdinalIgnoreCase) || cleanId.Contains("(SGT", StringComparison.OrdinalIgnoreCase))
         {
             if (TimeZoneInfo.TryFindSystemTimeZoneById("Singapore Standard Time", out tz) ||
                 TimeZoneInfo.TryFindSystemTimeZoneById("Asia/Singapore", out tz))
@@ -614,8 +613,8 @@ public sealed class AttendanceService : IAttendanceService
             }
         }
 
-        // Fallback gracefully to Utc instead of throwing a blocking error
-        return TimeZoneInfo.Utc;
+        // If unrecognized timezone string, throw BadRequestException
+        throw new BadRequestException($"Company timezone '{timeZoneId}' is not recognized by the server.");
     }
 
     private static (double MaxAllowedHours, decimal TargetDailyHours, int LateGraceMinutes, TimeOnly ShiftStart, bool IsOvernight) GetShiftParameters(Shift? shift, int maxPunchDurationHours = 16)
@@ -649,6 +648,15 @@ public sealed class AttendanceService : IAttendanceService
 
     public async Task<EmployeePunchDto> RecordPunchAsync(CreatePunchRequest request, CancellationToken ct = default)
     {
+        if (request.EmployeeId.HasValue && request.EmployeeId.Value != Guid.Empty && request.EmployeeId.Value != _currentUser.EmployeeId)
+        {
+            bool isHrOrAdmin = _currentUser.IsInRole("Admin") || _currentUser.IsInRole("HR") || _currentUser.IsInRole("SuperAdmin") || _currentUser.IsInRole("HRManager") || _currentUser.IsInRole("HrAdmin") || _currentUser.Role == "HR" || _currentUser.Role == "Admin";
+            if (!isHrOrAdmin)
+            {
+                throw new ForbiddenException("You can only record attendance punches for yourself.");
+            }
+        }
+
         var employeeId = await ResolveSelfOrExplicitEmployeeIdAsync(request.EmployeeId, ct);
         var employee = await _uow.Employees.GetWithDetailsAsync(employeeId, ct)
                        ?? await _uow.Employees.GetByIdAsync(employeeId, ct)
@@ -676,21 +684,48 @@ public sealed class AttendanceService : IAttendanceService
         var shiftDayEndUtc = shiftDayStartUtc.AddHours(maxAllowedHours + 4);
 
         // Expire older open punches from previous days
-        foreach (var open in existingOpenPunches.Where(p => p.PunchTime < shiftDayStartUtc))
+        EmployeePunch? staleOpenForClockOut = null;
+        foreach (var open in existingOpenPunches.Where(p => (nowUtc - p.PunchTime).TotalHours > maxAllowedHours || (!isOvernight && p.PunchTime < shiftDayStartUtc)))
         {
             open.IsOpen = false;
             open.Note = string.IsNullOrWhiteSpace(open.Note)
-                ? "Incomplete shift - missing check-out (auto-closed)"
-                : $"{open.Note} | Incomplete shift (auto-closed)";
+                ? "Incomplete shift - missing check-out (auto-closed, needs regularization)"
+                : $"{open.Note} | Incomplete shift (auto-closed, needs regularization)";
             _uow.Punches.Update(open);
+            staleOpenForClockOut = open;
+
+            var staleLocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(open.PunchTime, tz));
+            var staleRecord = await _uow.Attendance.GetForEmployeeDateAsync(employeeId, staleLocalDate, ct);
+            if (staleRecord != null)
+            {
+                staleRecord.Notes = string.IsNullOrWhiteSpace(staleRecord.Notes)
+                    ? "Incomplete shift - missing check-out (auto-closed, needs regularization)"
+                    : $"{staleRecord.Notes} | Incomplete shift (auto-closed, needs regularization)";
+                _uow.Attendance.Update(staleRecord);
+            }
         }
+
+        // If there is an active open punch within maxAllowedHours (such as an overnight shift started yesterday),
+        // include it in todayPunches so that ClockOut or Break actions can transition it.
+        var activeOpenPunch = existingOpenPunches.FirstOrDefault(p => p.IsOpen && (nowUtc - p.PunchTime).TotalHours <= maxAllowedHours);
+        var queryStartUtc = (activeOpenPunch != null && activeOpenPunch.PunchTime < shiftDayStartUtc)
+            ? activeOpenPunch.PunchTime
+            : shiftDayStartUtc;
 
         // Find the most recent punch today for this employee
         var todayPunches = await _uow.Punches.ToListAsync(
             _uow.Punches.Query()
-                .Where(p => p.EmployeeId == employeeId && p.PunchTime >= shiftDayStartUtc && p.PunchTime <= shiftDayEndUtc)
+                .Where(p => p.EmployeeId == employeeId && p.PunchTime >= queryStartUtc && p.PunchTime <= shiftDayEndUtc)
                 .OrderBy(p => p.PunchTime),
             ct);
+
+        if (punchType == PunchType.ClockOut && staleOpenForClockOut != null && todayPunches.Count == 0)
+        {
+            await _uow.SaveChangesAsync(ct);
+            var priorLocalTime = TimeZoneInfo.ConvertTimeFromUtc(staleOpenForClockOut.PunchTime, tz);
+            throw new ConflictException(
+                $"Your check-in from {priorLocalTime:MMM dd, yyyy hh:mm tt} exceeded the allowable shift limit ({maxAllowedHours:F0} hours) and has been closed as incomplete. Please submit an attendance regularization request.");
+        }
 
         var lastPunch = todayPunches.LastOrDefault();
 
@@ -712,7 +747,7 @@ public sealed class AttendanceService : IAttendanceService
                 }
                 if (punchType == PunchType.ClockOut)
                 {
-                    throw new ValidationException("Cannot check out without an active check-in.");
+                    throw new ConflictException("Cannot check out without an active check-in.");
                 }
             }
             else if (lastPunch.PunchType == PunchType.ClockIn || lastPunch.PunchType == PunchType.BreakOut)
@@ -758,10 +793,13 @@ public sealed class AttendanceService : IAttendanceService
 
         await _uow.Punches.AddAsync(punch, ct);
 
-        // Determine attendance record target date
-        var attendanceDate = localToday;
-
         var allPunches = todayPunches.Concat(new[] { punch }).OrderBy(p => p.PunchTime).ToList();
+
+        // Determine attendance record target date
+        var firstClockIn = allPunches.FirstOrDefault(p => p.PunchType == PunchType.ClockIn);
+        var attendanceDate = firstClockIn != null
+            ? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(firstClockIn.PunchTime, tz))
+            : localToday;
 
         TimeOnly? firstCheckIn = null;
         TimeOnly? lastCheckOut = null;
@@ -822,7 +860,6 @@ public sealed class AttendanceService : IAttendanceService
                     if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
                     breakIntervalOpen = null;
                 }
-                breakIntervalOpen = p.PunchTime;
             }
         }
 
@@ -1014,7 +1051,7 @@ public sealed class AttendanceService : IAttendanceService
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
         var localToday = DateOnly.FromDateTime(localNow);
 
-        var (maxAllowedHours, _, _, _, _) = GetShiftParameters(employee?.Shift, maxPunchDurationHours);
+        var (maxAllowedHours, _, _, _, isOvernight) = GetShiftParameters(employee?.Shift, maxPunchDurationHours);
 
         // Fetch any open punches for this employee (pure read-only, NO SaveChanges!)
         var openPunch = await _uow.Punches.FirstOrDefaultAsync(
@@ -1033,7 +1070,7 @@ public sealed class AttendanceService : IAttendanceService
         {
             var openDuration = nowUtc - openPunch.PunchTime;
             var localPunchDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(openPunch.PunchTime, tz));
-            if (openDuration.TotalHours > maxAllowedHours || localPunchDate < localToday)
+            if (openDuration.TotalHours > maxAllowedHours || (!isOvernight && localPunchDate < localToday))
             {
                 // Shift expired past shift end + grace period or from a previous day
                 openPunch.IsOpen = false;

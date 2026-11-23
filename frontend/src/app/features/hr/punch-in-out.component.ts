@@ -238,6 +238,19 @@ import { ToastService } from '../../core/services/toast.service';
                 </div>
               }
 
+              <!-- Error overlay when camera is blocked -->
+              @if (cameraError()) {
+                <div class="camera-error-overlay">
+                  <div style="font-size: 26px; margin-bottom: 8px;">📷⚠️</div>
+                  <div style="font-size: 13px; font-weight: 600; color: #fee2e2; margin-bottom: 12px; text-align: center; max-width: 320px; line-height: 1.4;">
+                    {{ cameraError() }}
+                  </div>
+                  <button type="button" class="btn-retry-camera" (click)="retryCamera()">
+                    🔄 Retry Camera Access
+                  </button>
+                </div>
+              }
+
               <!-- Face Reticle Overlay -->
               <div
                 class="face-hud-reticle"
@@ -859,6 +872,31 @@ import { ToastService } from '../../core/services/toast.service';
         font-size: 13px;
         font-weight: 600;
       }
+      .camera-error-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.92);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 15;
+        padding: 24px;
+      }
+      .btn-retry-camera {
+        padding: 8px 16px;
+        background: #3b82f6;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .btn-retry-camera:hover {
+        background: #2563eb;
+      }
 
       .face-hud-reticle {
         position: absolute;
@@ -1202,6 +1240,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Camera & Face scan signals
   protected readonly isCameraLoading = signal<boolean>(true);
+  protected readonly cameraError = signal<string | null>(null);
   protected readonly hasFaceDetected = signal<boolean>(false);
   protected readonly faceStatus = signal<'idle' | 'scanning' | 'verified' | 'mismatched'>('idle');
   protected readonly faceMatchScore = signal<number | null>(null);
@@ -1397,6 +1436,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
   private async startCameraAndFaceDetection(): Promise<void> {
     try {
       this.isCameraLoading.set(true);
+      this.cameraError.set(null);
       await this.faceService.loadModels();
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -1410,14 +1450,21 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
         videoEl.onloadedmetadata = () => {
           videoEl.play();
           this.isCameraLoading.set(false);
+          this.cameraError.set(null);
           this.startDetectionCycle();
         };
       }
     } catch (err) {
       console.error('Camera stream access failed:', err);
       this.isCameraLoading.set(false);
+      this.cameraError.set('Webcam access was blocked or is in use by another application. Please grant camera permission and click Retry.');
       this.toast.show('Camera access blocked. Please allow webcam permission.', 'danger');
     }
+  }
+
+  protected retryCamera(): void {
+    this.cameraError.set(null);
+    this.startCameraAndFaceDetection();
   }
 
   private startDetectionCycle(): void {

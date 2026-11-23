@@ -415,6 +415,7 @@ interface MusterDay {
               <div 
                 class="roster-item-card" 
                 [class.active]="emp.id === selectedMusterEmpId()"
+                [id]="'roster-emp-' + emp.id"
                 (click)="selectEmployeeFromSidebar(emp.id)"
               >
                 <div class="roster-user-left">
@@ -574,6 +575,16 @@ interface MusterDay {
                   <option value="absent">Absent</option>
                 </select>
 
+                <!-- Quick jump to Today button -->
+                <button
+                  type="button"
+                  class="btn-today-pill"
+                  (click)="scrollToToday()"
+                  title="Jump to Today's timeline"
+                >
+                  📍 Today
+                </button>
+
                 <!-- View mode toggle (Timeline vs Table) -->
                 <div class="view-mode-toggle">
                   <button 
@@ -604,7 +615,7 @@ interface MusterDay {
               @if (musterViewMode() === 'timeline') {
                 <div class="timeline-cards-list">
                   @for (day of filteredMusterDays(); track day.dateStr) {
-                    <div class="day-gantt-card" [class.is-today-card]="day.isToday">
+                    <div class="day-gantt-card" [class.is-today-card]="day.isToday" [id]="day.isToday ? 'muster-day-today' : null">
                       <div class="gantt-card-header">
                         <div class="gantt-day-name">
                           {{ day.dayLabel }}
@@ -623,10 +634,14 @@ interface MusterDay {
                             }
                           } @else if (day.status === 'OnLeave') {
                             <span class="badge-requested-off">Requested day off</span>
-                          } @else if (day.status === 'Weekend') {
+                          } @else if (day.status === 'Weekend' && !day.inTimeRaw && !day.workHoursRaw) {
                             <span class="badge-weekend-pill">Weekend</span>
                           } @else if (day.status === 'Present') {
                             <span class="badge-present-pill">✓ Present</span>
+                          } @else if (day.status === 'HalfDay') {
+                            <span class="badge-present-pill" style="background:#ffedd5; color:#ea580c;">Half Day</span>
+                          } @else if (day.status === 'Late') {
+                            <span class="badge-present-pill" style="background:#fef3c7; color:#d97706;">Late</span>
                           }
                         </div>
                       </div>
@@ -1043,6 +1058,16 @@ interface MusterDay {
                   </span>
                   <span class="punch-type-text">Clock Out</span>
                 </label>
+                <label class="punch-type-option" [class.selected]="punchForm.punchType === 'BreakIn'">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakIn" name="punchType" />
+                  <span class="punch-type-icon" style="background:#fef3c7; color:#d97706; font-size:12px;">☕</span>
+                  <span class="punch-type-text">Start Break</span>
+                </label>
+                <label class="punch-type-option" [class.selected]="punchForm.punchType === 'BreakOut'">
+                  <input type="radio" [(ngModel)]="punchForm.punchType" value="BreakOut" name="punchType" />
+                  <span class="punch-type-icon" style="background:#e0f2fe; color:#0284c7; font-size:12px;">⚡</span>
+                  <span class="punch-type-text">End Break</span>
+                </label>
               </div>
             </div>
             <div class="form-group" style="margin-bottom: 4px;">
@@ -1185,8 +1210,9 @@ interface MusterDay {
 
       /* ── Quick Punch Modal Punch Type Selector ── */
       .punch-type-selector {
-        display: flex;
-        gap: 12px;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
       }
       .punch-type-option {
         flex: 1;
@@ -1300,7 +1326,7 @@ interface MusterDay {
 
       /* ── Left Sidebar (Attendance & Employee Roster) ── */
       .time-mgmt-sidebar {
-        width: 320px;
+        width: 340px;
         flex-shrink: 0;
         background: var(--surface);
         border: 1px solid var(--border);
@@ -1486,6 +1512,8 @@ interface MusterDay {
         display: flex;
         align-items: center;
         gap: 8px;
+        min-width: 0;
+        flex: 1;
       }
       .roster-avatar-circle {
         width: 30px;
@@ -1496,32 +1524,49 @@ interface MusterDay {
         display: flex;
         align-items: center;
         justify-content: center;
+        flex-shrink: 0;
       }
-      .roster-names { display: flex; flex-direction: column; }
+      .roster-names {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        overflow: hidden;
+      }
       .roster-name-title {
         font-size: 12px;
         font-weight: 700;
         color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .roster-code-sub {
         font-size: 10px;
         color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .roster-clock-right {
         display: flex;
         align-items: center;
         gap: 6px;
+        flex-shrink: 0;
+        white-space: nowrap;
       }
       .roster-time-tag {
         font-size: 11px;
         font-weight: 700;
         color: var(--text);
+        white-space: nowrap;
+        display: inline-block;
       }
       .status-indicator-dot {
         width: 8px;
         height: 8px;
         border-radius: 50%;
         display: inline-block;
+        flex-shrink: 0;
       }
       .dot-active { background: #22c55e; box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25); }
       .dot-on-time { background: #16a34a; box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2); }
@@ -1847,8 +1892,27 @@ interface MusterDay {
         box-shadow: 0 3px 10px rgba(0,0,0,0.04);
       }
       .is-today-card {
+        border-color: #3b82f6;
+        background: #f8faff;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      }
+      .btn-today-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 12px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .btn-today-pill:hover {
+        background: #dbeafe;
         border-color: #93c5fd;
-        background: #fbfdff;
       }
 
       .gantt-card-header {
@@ -2828,6 +2892,12 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
       this.punchForm.employeeId = emp.id;
     }
     this.generateMuster();
+    setTimeout(() => {
+      const rosterEl = document.getElementById('roster-emp-' + id);
+      if (rosterEl) {
+        rosterEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 60);
   }
 
   protected prevEmployee(): void {
@@ -2902,6 +2972,13 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     if (val) {
       this.selectedMusterMonth.set(val);
       this.generateMuster();
+    }
+  }
+
+  protected scrollToToday(smooth: boolean = true): void {
+    const todayEl = document.getElementById('muster-day-today');
+    if (todayEl) {
+      todayEl.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
     }
   }
 
@@ -3128,6 +3205,9 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
           };
         });
         this.musterDays.set(mapped);
+        setTimeout(() => {
+          this.scrollToToday(false);
+        }, 150);
       },
       error: () => {
         this.musterDays.set([]);
