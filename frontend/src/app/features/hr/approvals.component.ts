@@ -39,7 +39,7 @@ interface Approval {
       </div>
     </div>
 
-    <div class="grid-4" style="margin-bottom: 15px">
+    <div class="approvals-kpi-grid">
       @for (k of kpis(); track k.l) {
         <div class="kpi-card">
           <div class="kpi-icon" [style.background]="k.c + '20'" [style.color]="k.c"><span [appIcon]="'approvals'"></span></div>
@@ -218,6 +218,12 @@ interface Approval {
   `,
   styles: [
     `
+      .approvals-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 15px;
+      }
       thead th,
       .approvals-table .table-avatar span,
       .approvals-table .badge,
@@ -225,6 +231,24 @@ interface Approval {
         white-space: nowrap;
       }
       @media (max-width: 768px) {
+        .approvals-kpi-grid {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        .approvals-kpi-grid .kpi-card {
+          padding: 10px 12px;
+        }
+        .approvals-kpi-grid .kpi-value {
+          font-size: 1.25rem;
+        }
+        .approvals-kpi-grid .kpi-label {
+          font-size: 11px;
+        }
+        .approvals-table th,
+        .approvals-table td {
+          padding: 10px 8px;
+        }
         .approvals-table th:nth-child(3),
         .approvals-table td:nth-child(3),
         .approvals-table th:nth-child(4),
