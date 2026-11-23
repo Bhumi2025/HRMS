@@ -113,7 +113,7 @@ interface MusterDay {
 
     <!-- Daily KPIs (when on daily or reg tab) -->
     @if (tab() !== 'muster') {
-      <div class="grid-4" style="margin-bottom: 20px;">
+      <div class="grid-4 attendance-kpis-grid" style="margin-bottom: 20px;">
         @for (k of kpis(); track k.l) {
           <div class="kpi-card">
             <div class="kpi-icon" [style.background]="k.c + '18'" [style.color]="k.c">
@@ -159,7 +159,7 @@ interface MusterDay {
 
     <!-- TAB 1: DAILY PUNCH LOG WIDGET -->
     @if (tab() === 'daily') {
-      <div class="card daily-punch-widget" style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0;">
+      <div class="card daily-punch-widget">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; flex-shrink: 0;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="card-title">Daily Punch Records</div>
@@ -249,7 +249,11 @@ interface MusterDay {
           </div>
         </div>
 
-        <div class="table-wrap custom-scroll" style="flex: 1; overflow-y: auto; overflow-x: auto; width: 100%; min-height: 0;">
+        <div class="mobile-scroll-hint" style="margin: 0 16px 10px 16px;">
+          <span [appIcon]="'chevron-right'"></span> Swipe horizontally to view all employee punch records
+        </div>
+
+        <div class="table-wrap custom-scroll daily-punch-table-wrap">
           <table class="daily-punch-table" style="width: 100%; min-width: 1080px; border-collapse: collapse;">
             <thead style="position: sticky; top: 0; z-index: 5; background: var(--surface, #fff); box-shadow: 0 1px 2px rgba(0,0,0,0.06);">
               <tr>
@@ -2221,6 +2225,40 @@ interface MusterDay {
       .action-icon-btn:hover { background: var(--bg); }
       .dash { color: var(--muted); }
 
+      .daily-punch-widget {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 20px;
+        min-height: 480px;
+        overflow: visible;
+      }
+      .daily-punch-table-wrap {
+        width: 100%;
+        overflow-x: auto !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        min-height: 380px;
+        flex: 1;
+        scrollbar-width: thin;
+        scrollbar-color: var(--p) rgba(0, 0, 0, 0.08);
+      }
+      .daily-punch-table-wrap::-webkit-scrollbar {
+        height: 7px;
+        width: 7px;
+        display: block;
+      }
+      .daily-punch-table-wrap::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 4px;
+      }
+      .daily-punch-table-wrap::-webkit-scrollbar-thumb {
+        background: var(--p);
+        border-radius: 4px;
+      }
+      .mobile-scroll-hint {
+        display: none;
+      }
+
       /* Responsive rules */
       @media (max-width: 1024px) {
         .time-mgmt-layout {
@@ -2231,6 +2269,54 @@ interface MusterDay {
         }
         .six-stats-grid {
           grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      @media (max-width: 768px) {
+        .attendance-kpis-grid {
+          display: grid !important;
+          grid-template-columns: repeat(2, 1fr) !important;
+          gap: 8px !important;
+          margin-bottom: 12px !important;
+        }
+        .attendance-kpis-grid .kpi-card {
+          padding: 8px 10px !important;
+          border-radius: 8px !important;
+        }
+        .attendance-kpis-grid .kpi-icon {
+          width: 28px !important;
+          height: 28px !important;
+          margin-bottom: 4px !important;
+        }
+        .attendance-kpis-grid .kpi-value {
+          font-size: 1.15rem !important;
+        }
+        .attendance-kpis-grid .kpi-label {
+          font-size: 11px !important;
+        }
+        .daily-punch-widget {
+          min-height: 450px !important;
+          height: auto !important;
+          overflow: visible !important;
+        }
+        .daily-punch-table-wrap {
+          min-height: 380px !important;
+          max-height: calc(100vh - 200px) !important;
+          overflow-y: auto !important;
+          overflow-x: auto !important;
+        }
+        .daily-punch-table {
+          min-width: 1080px !important;
+        }
+        .mobile-scroll-hint {
+          display: flex !important;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          color: var(--p);
+          background: rgba(37, 99, 235, 0.07);
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-weight: 600;
         }
       }
       @media (max-width: 640px) {

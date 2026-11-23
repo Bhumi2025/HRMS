@@ -64,7 +64,7 @@ interface DocRow {
             <span class="profile-badge"><span [appIcon]="'lock'"></span> System Authenticated</span>
           </div>
         </div>
-        @if (employeeOptions().length > 0) {
+        @if (currentRole() !== 'Super Admin' && employeeOptions().length > 0) {
           <div class="profile-header-actions">
             <button class="btn btn-outline btn-sm" type="button" (click)="goBack()">
               <span [appIcon]="'arrow-left'"></span> Back to List

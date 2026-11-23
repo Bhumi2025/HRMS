@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
@@ -318,9 +318,41 @@ function emptyTenantForm(): CreateCompanyRequest {
               @if (isSuperAdmin() && activeTab() === 'directory') {
                 <!-- Super Admin Tenant Companies Search Header + New Company Button -->
                 <div class="sa-company-controls" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                  <div class="input-group sa-search-box" style="max-width: 280px;">
+                  <!-- Anti-autofill decoy inputs to trap browser password manager autofill -->
+                  <input type="text" style="display:none" aria-hidden="true" autocomplete="username" tabindex="-1" />
+                  <input type="password" style="display:none" aria-hidden="true" autocomplete="current-password" tabindex="-1" />
+
+                  <div class="input-group sa-search-box" style="max-width: 280px; position: relative; display: flex; align-items: center;">
                     <span class="input-icon" [appIcon]="'search'"></span>
-                    <input class="form-control" type="text" placeholder="Search name, code, email..." [ngModel]="tenantSearch()" (ngModelChange)="tenantSearch.set($event)" />
+                    <input 
+                      #tenantSearchInput
+                      class="form-control" 
+                      type="search" 
+                      id="sa_tenant_search_filter"
+                      name="sa_tenant_search_filter"
+                      placeholder="Search name, code, email..." 
+                      autocomplete="off"
+                      autocorrect="off"
+                      autocapitalize="off"
+                      spellcheck="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-form-type="other"
+                      role="searchbox"
+                      style="padding-right: 28px;"
+                      [ngModel]="tenantSearch()" 
+                      (ngModelChange)="tenantSearch.set($event)" 
+                    />
+                    @if (tenantSearch()) {
+                      <button 
+                        type="button" 
+                        (click)="clearTenantSearch()"
+                        style="position: absolute; right: 8px; background: none; border: none; font-size: 13px; cursor: pointer; color: var(--muted); padding: 2px 4px; display: flex; align-items: center;"
+                        title="Clear search"
+                      >
+                        ✕
+                      </button>
+                    }
                   </div>
                   <button class="btn btn-primary btn-sm sa-new-btn" style="display: flex; align-items: center; gap: 6px;" (click)="openCreateTenant()">
                     <span [appIcon]="'plus'"></span> New Company
@@ -1896,6 +1928,26 @@ export class CompanyComponent implements OnInit, OnDestroy {
   protected readonly tenantCompanies = signal<CompanyListItem[]>([]);
   protected readonly tenantLoading = signal(false);
   protected readonly tenantSearch = signal('');
+
+  private tenantSearchRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('tenantSearchInput') set tenantSearchSetter(ref: ElementRef<HTMLInputElement> | undefined) {
+    this.tenantSearchRef = ref;
+    if (ref?.nativeElement && !this.tenantSearch()) {
+      ref.nativeElement.value = '';
+      setTimeout(() => {
+        if (ref?.nativeElement && !this.tenantSearch()) {
+          ref.nativeElement.value = '';
+        }
+      }, 50);
+    }
+  }
+
+  protected clearTenantSearch(): void {
+    this.tenantSearch.set('');
+    if (this.tenantSearchRef?.nativeElement) {
+      this.tenantSearchRef.nativeElement.value = '';
+    }
+  }
   protected readonly filteredTenantCompanies = computed(() => {
     const list = this.tenantCompanies();
     const q = this.tenantSearch().trim().toLowerCase();
@@ -2056,8 +2108,10 @@ export class CompanyComponent implements OnInit, OnDestroy {
             },
           });
         }
-        if (params['search']) {
-          this.tenantSearch.set(params['search']);
+        if (params['search'] && typeof params['search'] === 'string' && params['search'].trim()) {
+          this.tenantSearch.set(params['search'].trim());
+        } else {
+          this.tenantSearch.set('');
         }
       });
     } else {
