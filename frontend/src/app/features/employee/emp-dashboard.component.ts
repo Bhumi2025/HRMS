@@ -47,11 +47,24 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected readonly dashboard = signal<EmployeeDashboard | null>(null);
   protected readonly currentTime = signal(new Date());
+  protected readonly activeMobileSection = signal<'all' | 'clock' | 'notices' | 'holidays'>('all');
+
+  protected setMobileSection(section: 'all' | 'clock' | 'notices' | 'holidays'): void {
+    this.activeMobileSection.set(section);
+    if (section === 'all') {
+      setTimeout(() => {
+        this.renderCharts();
+        this.attChart?.resize();
+        this.hoursChart?.resize();
+      }, 50);
+    }
+  }
 
   private clockInterval: ReturnType<typeof setInterval> | null = null;
   private punchPollInterval: ReturnType<typeof setInterval> | null = null;
-  private attChart?: { destroy(): void };
-  private hoursChart?: { destroy(): void };
+  private attChart: Chart | null = null;
+  private hoursChart: Chart | null = null;
+  private resizeObserver: ResizeObserver | null = null;
   private renderScheduled = false;
 
   protected readonly firstName = computed(() => (this.dashboard()?.fullName ?? '').split(' ')[0]);
@@ -63,9 +76,14 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   constructor() {
     effect(() => {
-      const secs = this.punchService.workSeconds();
-      if (secs > 0) {
-        this.scheduleRender();
+      // Live smooth in-place update when working hours change, without bouncing/destroying charts
+      const hrs = this.workingHours();
+      if (this.hoursChart) {
+        const trend = this.getTrend();
+        const { labels, hoursData } = this.getHoursData(trend);
+        this.hoursChart.data.labels = labels;
+        this.hoursChart.data.datasets[0].data = hoursData;
+        this.hoursChart.update('none');
       }
     });
   }
@@ -166,7 +184,20 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    this.scheduleRender();
+    setTimeout(() => this.renderCharts(), 80);
+
+    // Keep charts responsive on container resize without destroying
+    if (typeof ResizeObserver !== 'undefined') {
+      const attWrap = this.attCanvas()?.nativeElement?.parentElement;
+      const hoursWrap = this.hoursCanvas()?.nativeElement?.parentElement;
+      this.resizeObserver = new ResizeObserver(() => {
+        if (this.attChart) this.attChart.resize();
+        if (this.hoursChart) this.hoursChart.resize();
+        this.renderCharts();
+      });
+      if (attWrap) this.resizeObserver.observe(attWrap);
+      if (hoursWrap) this.resizeObserver.observe(hoursWrap);
+    }
   }
 
   ngOnDestroy(): void {
@@ -178,147 +209,256 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       clearInterval(this.punchPollInterval);
       this.punchPollInterval = null;
     }
-    this.attChart?.destroy();
-    this.hoursChart?.destroy();
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    if (this.attChart) {
+      this.attChart.destroy();
+      this.attChart = null;
+    }
+    if (this.hoursChart) {
+      this.hoursChart.destroy();
+      this.hoursChart = null;
+    }
   }
 
   private scheduleRender(): void {
     if (this.renderScheduled) return;
     this.renderScheduled = true;
     requestAnimationFrame(() => {
-      setTimeout(() => {
-        this.renderScheduled = false;
-        this.renderCharts();
-      }, 60);
+      this.renderScheduled = false;
+      this.renderCharts();
     });
   }
 
-  private renderCharts(): void {
+  private getTrend(): { label: string; present: number; late: number; absent: number; workHours?: number; beforeBreakHours?: number; afterBreakHours?: number }[] {
     const rawTrend = this.dashboard()?.attendanceTrend ?? [];
-    let trend = rawTrend;
-    if (trend.length === 0) {
-      // Default 7-day fallback so graph always renders even before or without API data
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const today = new Date();
-      trend = Array.from({ length: 7 }, (_, idx) => {
-        const d = new Date(today);
-        d.setDate(today.getDate() - (6 - idx));
-        return { label: days[d.getDay()], present: 0, late: 0, absent: 0 };
-      });
-    }
+    if (rawTrend.length > 0) return rawTrend;
 
-    const P = '#2563eb';
-    const labels = trend.map((t) => t.label);
+    // Default 7-day fallback so graph always renders even before or without API data
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    return Array.from({ length: 7 }, (_, idx) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (6 - idx));
+      return { label: days[d.getDay()], present: 0, late: 0, absent: 0, workHours: 0 };
+    });
+  }
 
-    const att = this.attCanvas()?.nativeElement;
-    if (att) {
-      if (att.clientHeight === 0) {
-        setTimeout(() => this.scheduleRender(), 100);
-        return;
-      }
-      this.attChart?.destroy();
-      this.attChart = new Chart(att, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            { label: 'Present', data: trend.map((t) => t.present), backgroundColor: P, borderRadius: 4, stack: 's' },
-            { label: 'Late', data: trend.map((t) => t.late), backgroundColor: '#fcd34d', borderRadius: 4, stack: 's' },
-            { label: 'Absent', data: trend.map((t) => t.absent), backgroundColor: '#fca5a5', borderRadius: 4, stack: 's' },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
-            y: { stacked: true, min: 0, grid: { color: 'rgba(0,0,0,.04)' }, ticks: { font: { size: 10 } } },
-          },
-        },
-      });
-    }
-
+  private getHoursData(trend: ReturnType<typeof this.getTrend>): { labels: string[]; hoursData: number[] } {
     const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'short' });
     const liveTodayHours = Math.round((this.punchService.workSeconds() / 3600) * 10) / 10;
+    const labels = trend.map((t) => t.label);
 
-    const hours = this.hoursCanvas()?.nativeElement;
-    if (hours) {
-      if (hours.clientHeight === 0) {
-        setTimeout(() => this.scheduleRender(), 100);
-        return;
+    const hoursData = trend.map((t) => {
+      if (typeof t.workHours === 'number' && t.workHours > 0) {
+        return t.workHours;
       }
-      this.hoursChart?.destroy();
+      if (t.label.toLowerCase() === todayDayName.toLowerCase() && liveTodayHours > 0) {
+        return liveTodayHours;
+      }
+      if (t.beforeBreakHours || t.afterBreakHours) {
+        return Math.round(((t.beforeBreakHours || 0) + (t.afterBreakHours || 0)) * 10) / 10;
+      }
+      return 0;
+    });
 
-      const hoursData = trend.map((t) => {
-        if (typeof t.workHours === 'number' && t.workHours > 0) {
-          return t.workHours;
-        }
-        if (t.label.toLowerCase() === todayDayName.toLowerCase() && liveTodayHours > 0) {
-          return liveTodayHours;
-        }
-        if (t.beforeBreakHours || t.afterBreakHours) {
-          return Math.round(((t.beforeBreakHours || 0) + (t.afterBreakHours || 0)) * 10) / 10;
-        }
-        return 0;
-      });
+    return { labels, hoursData };
+  }
 
-      this.hoursChart = new Chart(hours, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [
-            {
-              label: 'Hours',
-              data: hoursData,
-              borderColor: '#8b5cf6',
-              backgroundColor: 'rgba(139, 92, 246, 0.15)',
-              borderWidth: 2.5,
-              pointRadius: 4,
-              pointHoverRadius: 6,
-              pointBackgroundColor: '#8b5cf6',
-              pointBorderColor: '#ffffff',
-              pointBorderWidth: 2,
-              fill: true,
-              tension: 0.35,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: 'rgba(15, 23, 42, 0.92)',
-              titleFont: { size: 12, weight: 'bold' },
-              bodyFont: { size: 11 },
-              padding: 8,
-              cornerRadius: 6,
-              callbacks: {
-                label: (item) => ` Work Hours: ${item.raw}h`,
-              },
-            },
-          },
-          scales: {
-            y: {
-              min: 0,
-              suggestedMax: 10,
-              grid: { color: 'rgba(0,0,0,.05)' },
-              ticks: {
-                font: { size: 10 },
-                stepSize: 2,
-                callback: (v) => `${v}h`,
-              },
-            },
-            x: {
-              grid: { display: false },
-              ticks: { font: { size: 10 } },
-            },
-          },
-        },
-      });
+  private renderCharts(): void {
+    this.renderAttendanceChart();
+    this.renderHoursChart();
+  }
+
+  private renderAttendanceChart(): void {
+    const canvas = this.attCanvas()?.nativeElement;
+    if (!canvas) return;
+
+    // If container is hidden (e.g. mobile tab not active), wait until shown
+    if (canvas.clientWidth === 0 && canvas.clientHeight === 0) {
+      return;
     }
+
+    const trend = this.getTrend();
+    const labels = trend.map((t) => t.label);
+    const presentData = trend.map((t) => t.present);
+    const lateData = trend.map((t) => t.late);
+    const absentData = trend.map((t) => t.absent);
+
+    // If chart already exists on this canvas, update in-place without dancing
+    if (this.attChart && this.attChart.canvas === canvas) {
+      this.attChart.data.labels = labels;
+      this.attChart.data.datasets[0].data = presentData;
+      this.attChart.data.datasets[1].data = lateData;
+      this.attChart.data.datasets[2].data = absentData;
+      this.attChart.update('none');
+      return;
+    }
+
+    if (this.attChart) {
+      this.attChart.destroy();
+      this.attChart = null;
+    }
+
+    this.attChart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Present',
+            data: presentData,
+            backgroundColor: '#2563eb',
+            borderRadius: { topLeft: 4, topRight: 4 },
+            borderSkipped: false,
+            stack: 'attendance',
+          },
+          {
+            label: 'Late',
+            data: lateData,
+            backgroundColor: '#f59e0b',
+            borderRadius: { topLeft: 4, topRight: 4 },
+            borderSkipped: false,
+            stack: 'attendance',
+          },
+          {
+            label: 'Absent',
+            data: absentData,
+            backgroundColor: '#ef4444',
+            borderRadius: { topLeft: 4, topRight: 4 },
+            borderSkipped: false,
+            stack: 'attendance',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 350 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            titleFont: { size: 12, weight: 'bold' },
+            bodyFont: { size: 11 },
+            padding: 8,
+            cornerRadius: 6,
+            callbacks: {
+              label: (context) => {
+                const status = context.dataset.label;
+                const val = context.raw as number;
+                return val > 0 ? ` Status: ${status}` : '';
+              },
+            },
+            filter: (item) => (item.raw as number) > 0,
+          },
+        },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { display: false },
+            ticks: { font: { size: 11, weight: '600' }, color: '#64748b' },
+          },
+          y: {
+            stacked: true,
+            min: 0,
+            max: 1,
+            grid: { color: 'rgba(0,0,0,.04)' },
+            ticks: {
+              stepSize: 1,
+              font: { size: 10, weight: '600' },
+              color: '#94a3b8',
+              callback: (val) => (val === 1 ? '1d' : '0'),
+            },
+          },
+        },
+      },
+    });
+  }
+
+  private renderHoursChart(): void {
+    const canvas = this.hoursCanvas()?.nativeElement;
+    if (!canvas) return;
+
+    if (canvas.clientWidth === 0 && canvas.clientHeight === 0) {
+      return;
+    }
+
+    const trend = this.getTrend();
+    const { labels, hoursData } = this.getHoursData(trend);
+
+    // If chart already exists on this canvas, update in-place without dancing
+    if (this.hoursChart && this.hoursChart.canvas === canvas) {
+      this.hoursChart.data.labels = labels;
+      this.hoursChart.data.datasets[0].data = hoursData;
+      this.hoursChart.update('none');
+      return;
+    }
+
+    if (this.hoursChart) {
+      this.hoursChart.destroy();
+      this.hoursChart = null;
+    }
+
+    this.hoursChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Hours',
+            data: hoursData,
+            borderColor: '#8b5cf6',
+            backgroundColor: 'rgba(139, 92, 246, 0.12)',
+            borderWidth: 2.5,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#8b5cf6',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            fill: true,
+            tension: 0.35,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 350 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            titleFont: { size: 12, weight: 'bold' },
+            bodyFont: { size: 11 },
+            padding: 8,
+            cornerRadius: 6,
+            callbacks: {
+              label: (item) => ` Work Hours: ${item.raw}h`,
+            },
+          },
+        },
+        scales: {
+          y: {
+            min: 0,
+            suggestedMax: 8,
+            grid: { color: 'rgba(0,0,0,.04)' },
+            ticks: {
+              font: { size: 10, weight: '600' },
+              color: '#94a3b8',
+              stepSize: 2,
+              callback: (v) => `${v}h`,
+            },
+          },
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11, weight: '600' }, color: '#64748b' },
+          },
+        },
+      },
+    });
   }
 
   private static greet(): string {

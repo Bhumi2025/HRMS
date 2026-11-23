@@ -56,14 +56,14 @@ export interface ComprehensivePayrollRow {
     </div>
 
     <!-- KPIs (3-Card Summary: Gross, Deductions, Net) -->
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">
+    <div class="payroll-kpis-grid">
       @for (k of kpis(); track k.l) {
-        <div class="kpi-card">
+        <div class="kpi-card payroll-kpi-card">
           <div class="kpi-icon" [style.background]="k.c + '18'" [style.color]="k.c">
             <span [appIcon]="'money'"></span>
           </div>
-          <div class="kpi-value" style="font-size: 1.35rem;">{{ k.v }}</div>
-          <div class="kpi-label">{{ k.l }}</div>
+          <div class="kpi-value payroll-kpi-val">{{ k.v }}</div>
+          <div class="kpi-label payroll-kpi-lbl">{{ k.l }}</div>
         </div>
       }
     </div>
@@ -692,6 +692,65 @@ export interface ComprehensivePayrollRow {
       }
       .payroll-scroll-container::-webkit-scrollbar-thumb:hover {
         background: #94a3b8;
+      }
+      .payroll-kpis-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .payroll-kpi-val {
+        font-size: 1.35rem;
+      }
+      @media (max-width: 768px) {
+        .payroll-kpis-grid {
+          gap: 8px;
+          margin-bottom: 14px;
+        }
+        .payroll-kpi-card {
+          padding: 10px 8px !important;
+          border-radius: 8px !important;
+        }
+        .payroll-kpi-card .kpi-icon {
+          width: 30px !important;
+          height: 30px !important;
+          margin-bottom: 4px !important;
+        }
+        .payroll-kpi-val {
+          font-size: 1.05rem !important;
+          font-weight: 800 !important;
+          line-height: 1.2 !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+        }
+        .payroll-kpi-lbl {
+          font-size: 11px !important;
+          line-height: 1.2 !important;
+          margin-top: 2px !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+        }
+      }
+      @media (max-width: 440px) {
+        .payroll-kpis-grid {
+          gap: 6px;
+        }
+        .payroll-kpi-card {
+          padding: 8px 6px !important;
+        }
+        .payroll-kpi-card .kpi-icon {
+          width: 26px !important;
+          height: 26px !important;
+        }
+        .payroll-kpi-val {
+          font-size: 0.92rem !important;
+          letter-spacing: -0.02em !important;
+        }
+        .payroll-kpi-lbl {
+          font-size: 10px !important;
+        }
       }
     `,
   ],

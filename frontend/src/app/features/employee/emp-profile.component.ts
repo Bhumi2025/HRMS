@@ -83,7 +83,7 @@ interface DocRow {
         <div class="card" style="overflow: visible">
           <div class="card-header"><div class="card-title">Personal Details</div></div>
           <div class="card-body" style="overflow: visible">
-            <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px">
+            <div class="form-grid-salutation">
               <div class="form-group">
                 <label class="form-label">Salutation</label>
                 <app-select [options]="salutationOptions" [value]="personal().salutation" [disabled]="true" width="100%" />
@@ -94,7 +94,7 @@ interface DocRow {
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+            <div class="form-grid-2">
               <div class="form-group">
                 <label class="form-label">Middle Name</label>
                 <input class="form-control" [value]="personal().middleName" disabled placeholder="Middle Name" />
@@ -105,7 +105,7 @@ interface DocRow {
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+            <div class="form-grid-2">
               <div class="form-group">
                 <label class="form-label">Personal Email</label>
                 <input class="form-control" type="email" [value]="personal().email" disabled placeholder="Personal Email" />
@@ -116,7 +116,7 @@ interface DocRow {
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+            <div class="form-grid-2">
               <div class="form-group">
                 <label class="form-label">Date of Birth</label>
                 <input class="form-control" type="date" [value]="personal().dob" disabled />
@@ -127,7 +127,7 @@ interface DocRow {
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+            <div class="form-grid-2">
               <div class="form-group">
                 <label class="form-label">Marital Status</label>
                 <app-key-select groupCode="MARITAL_STATUS" [value]="personal().marital" [disabled]="true" width="100%" />
@@ -168,7 +168,7 @@ interface DocRow {
       <div class="card" style="overflow: visible">
         <div class="card-header"><div class="card-title">Contact Information</div></div>
         <div class="card-body" style="overflow: visible">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+          <div class="form-grid-2">
             <div class="form-group">
               <label class="form-label">Emergency Contact Name</label>
               <input class="form-control" [value]="contact().emergencyName" (input)="patchContact('emergencyName', $any($event.target).value)" placeholder="Emergency Contact Name" />
@@ -461,15 +461,30 @@ interface DocRow {
         padding-top: 12px;
         border-top: 1px solid var(--border);
       }
+      .form-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .form-grid-salutation {
+        display: grid;
+        grid-template-columns: 130px 1fr;
+        gap: 12px;
+      }
       @media (max-width: 768px) {
         .grid-2 {
+          grid-template-columns: 1fr !important;
+        }
+        .form-grid-2,
+        .form-grid-salutation {
           grid-template-columns: 1fr !important;
         }
         .form-footer {
           flex-wrap: wrap;
         }
         .ptab {
-          font-size: 12px;
+          font-size: 13px;
+          padding: 8px 10px;
         }
       }
     `,

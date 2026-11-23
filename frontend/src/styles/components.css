@@ -335,6 +335,28 @@ textarea.form-control {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   border-radius: var(--r);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.75) rgba(0, 0, 0, 0.05);
+}
+.table-wrap::-webkit-scrollbar,
+.table-responsive::-webkit-scrollbar {
+  height: 7px;
+  width: 7px;
+  display: block;
+}
+.table-wrap::-webkit-scrollbar-track,
+.table-responsive::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 4px;
+}
+.table-wrap::-webkit-scrollbar-thumb,
+.table-responsive::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.75);
+  border-radius: 4px;
+}
+.table-wrap::-webkit-scrollbar-thumb:hover,
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.95);
 }
 table {
   width: 100%;
@@ -697,16 +719,62 @@ body.modal-open [data-tooltip]::after {
 }
 
 /* SCROLLBAR */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.02);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: rgba(148, 163, 184, 0.55);
   border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.85);
+}
+
+/* Tactile & clearly visible scrollbars on Mobile/Tablet */
+@media (max-width: 768px) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.75) rgba(0, 0, 0, 0.04);
+  }
+  ::-webkit-scrollbar {
+    width: 6px !important;
+    height: 6px !important;
+    display: block !important;
+  }
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.04) !important;
+    border-radius: 4px !important;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.75) !important;
+    border-radius: 4px !important;
+  }
+  .table-wrap,
+  .table-responsive {
+    scrollbar-color: rgba(37, 99, 235, 0.7) rgba(0, 0, 0, 0.06);
+  }
+  .table-wrap::-webkit-scrollbar,
+  .table-responsive::-webkit-scrollbar {
+    height: 6px !important;
+    display: block !important;
+  }
+  .table-wrap::-webkit-scrollbar-track,
+  .table-responsive::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.06) !important;
+  }
+  .table-wrap::-webkit-scrollbar-thumb,
+  .table-responsive::-webkit-scrollbar-thumb {
+    background: rgba(37, 99, 235, 0.75) !important;
+    border-radius: 4px !important;
+  }
 }
 
 /* ANIMATIONS */

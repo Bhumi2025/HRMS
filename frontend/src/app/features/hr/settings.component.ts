@@ -492,16 +492,16 @@ export interface FlatNavigationItem {
       @if (activeTab() === 'permission') {
         <div class="permission-grid-layout">
           <!-- Left Panel: Roles Selector -->
-          <div class="card p-0 roles-widget">
-            <div style="padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--bg); font-weight: 700; font-size: 13px; flex-shrink: 0;">
+          <div class="card p-0 roles-widget permission-roles-panel">
+            <div class="roles-panel-header" style="padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--bg); font-weight: 700; font-size: 13px; flex-shrink: 0;">
               Roles
             </div>
 
-            <div class="roles-list-scroll">
+            <div class="roles-list-scroll roles-list-container">
               @for (role of permissionRoles(); track role.id) {
                 <div 
+                  class="role-select-item"
                   (click)="selectRoleForPermissions(role)"
-                  style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background .15s; margin-bottom: 4px;"
                   [style.background]="selectedRole()?.id === role.id ? 'var(--p-soft)' : 'transparent'"
                   [style.color]="selectedRole()?.id === role.id ? 'var(--p)' : 'var(--text)'"
                 >
@@ -527,8 +527,8 @@ export interface FlatNavigationItem {
           </div>
 
           <!-- Right Panel: Permissions Matrix Table -->
-          <div class="card p-0 permissions-widget">
-            <div class="card-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; position: sticky; top: 0; z-index: 10;">
+          <div class="card p-0 permissions-widget perm-matrix-card">
+            <div class="card-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; flex-wrap: wrap; gap: 8px; position: sticky; top: 0; z-index: 10;">
               <div style="font-weight: 700; font-size: 14px; color: var(--text);">
                 Permissions for Role: 
                 <span style="color: var(--p);">{{ selectedRole()?.name }}</span>
@@ -543,30 +543,34 @@ export interface FlatNavigationItem {
               </button>
             </div>
 
-            <div class="table-wrap permissions-table-scroll">
+            <div class="mobile-scroll-hint">
+              <span [appIcon]="'chevron-right'"></span> Swipe horizontally to configure all permissions (Full, View, Create, Edit, Delete)
+            </div>
+
+            <div class="table-wrap permissions-table-scroll perm-table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Module / Navigation Title</th>
-                    <th>Route</th>
-                    <th style="width: 80px; text-align: center;">Full</th>
-                    <th style="width: 80px; text-align: center;">View</th>
-                    <th style="width: 80px; text-align: center;">Create</th>
-                    <th style="width: 80px; text-align: center;">Edit</th>
-                    <th style="width: 80px; text-align: center;">Delete</th>
+                    <th class="perm-title-col">Module / Navigation Title</th>
+                    <th class="perm-route-col">Route</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Full</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">View</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Create</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Edit</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Delete</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (perm of rolePermissions(); track perm.navigationItemId) {
                     <tr>
-                      <td style="font-weight: 700; font-size: 13px;">
+                      <td class="perm-title-col" style="font-weight: 700; font-size: 13px;">
                         <span>{{ perm.navigationTitle }}</span>
                         @if (isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()) {
                           <span style="margin-left: 6px; font-size: 11px; color: var(--muted); font-weight: normal;">(Admin Core - Protected)</span>
                         }
                       </td>
-                      <td style="font-size: 12px; font-family: monospace; color: var(--muted);">{{ perm.navigationRoute }}</td>
-                      <td style="text-align: center;">
+                      <td class="perm-route-col" style="font-size: 12px; font-family: monospace; color: var(--muted);">{{ perm.navigationRoute }}</td>
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isFull" 
@@ -574,7 +578,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isView" 
@@ -582,7 +586,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isCreate" 
@@ -590,7 +594,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isEdit" 
@@ -598,7 +602,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isDelete" 
@@ -929,6 +933,17 @@ export interface FlatNavigationItem {
       padding: 8px;
     }
 
+    .role-select-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-bottom: 4px;
+    }
+
     .permissions-widget {
       height: 100%;
       min-height: 0;
@@ -942,11 +957,34 @@ export interface FlatNavigationItem {
     }
 
     .widget-table-scroll,
-    .permissions-table-scroll {
+    .permissions-table-scroll,
+    .perm-table-wrap {
       flex: 1;
       min-height: 0;
       overflow-y: auto;
       overflow-x: auto;
+      width: 100%;
+      scrollbar-width: thin;
+      scrollbar-color: var(--p) rgba(0, 0, 0, 0.08);
+
+      &::-webkit-scrollbar {
+        height: 8px;
+        width: 8px;
+        display: block;
+      }
+      &::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 4px;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: var(--p);
+        border-radius: 4px;
+      }
+
+      table {
+        min-width: 680px;
+        width: 100%;
+      }
     }
 
     .editor-scroll-body {
@@ -958,12 +996,17 @@ export interface FlatNavigationItem {
 
     /* Sticky table headers inside widgets */
     .widget-table-scroll thead,
-    .permissions-table-scroll thead {
+    .permissions-table-scroll thead,
+    .perm-table-wrap thead {
       position: sticky;
       top: 0;
       z-index: 5;
       background: var(--surface, #ffffff);
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    .mobile-scroll-hint {
+      display: none;
     }
 
     /* Sleek custom scrollbars inside widgets */
@@ -1003,6 +1046,93 @@ export interface FlatNavigationItem {
     .widget-table-scroll::-webkit-scrollbar-thumb:hover,
     .editor-scroll-body::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
+    }
+
+    @media (max-width: 850px) {
+      :host {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      .settings-page {
+        height: auto !important;
+        overflow: visible !important;
+      }
+      .permission-grid-layout {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+      .roles-widget {
+        height: auto !important;
+        overflow: visible !important;
+      }
+      .roles-list-scroll,
+      .roles-list-container {
+        display: flex !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        gap: 8px !important;
+        padding: 8px 10px !important;
+        white-space: nowrap !important;
+        scrollbar-width: thin !important;
+      }
+      .role-select-item {
+        flex-shrink: 0 !important;
+        margin-bottom: 0 !important;
+        border: 1px solid var(--border) !important;
+        padding: 8px 12px !important;
+      }
+      .mobile-scroll-hint {
+        display: flex !important;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--p);
+        background: rgba(37, 99, 235, 0.07);
+        padding: 6px 12px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+      }
+      .permissions-widget {
+        height: auto !important;
+        overflow: visible !important;
+      }
+      .permissions-table-scroll,
+      .perm-table-wrap {
+        max-height: calc(100vh - 280px) !important;
+        overflow-y: auto !important;
+        overflow-x: auto !important;
+
+        table {
+          min-width: 720px !important;
+        }
+
+        th.perm-title-col,
+        td.perm-title-col {
+          position: sticky !important;
+          left: 0 !important;
+          background: var(--surface) !important;
+          z-index: 2 !important;
+          box-shadow: 2px 0 6px rgba(0, 0, 0, 0.08) !important;
+          min-width: 125px !important;
+          max-width: 155px !important;
+          white-space: normal !important;
+          word-break: break-word !important;
+        }
+        thead th.perm-title-col {
+          background: var(--bg) !important;
+          z-index: 3 !important;
+        }
+        thead th {
+          position: sticky !important;
+          top: 0 !important;
+          background: var(--bg) !important;
+          z-index: 2 !important;
+        }
+      }
     }
     `,
   ],

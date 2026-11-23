@@ -34,6 +34,20 @@ import { SuperAdminDashboardComponent } from './super-admin-dashboard.component'
         display: flex;
         flex-direction: column;
       }
+      @media (max-width: 1024px) {
+        :host {
+          height: auto !important;
+          max-height: none !important;
+          overflow-y: visible !important;
+          display: block !important;
+        }
+        .workspace-wrapper {
+          height: auto !important;
+          max-height: none !important;
+          overflow-y: visible !important;
+          display: block !important;
+        }
+      }
     `,
   ],
 })
