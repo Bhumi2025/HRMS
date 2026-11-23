@@ -28,6 +28,20 @@ interface LeaveHistory {
 @Component({
   selector: 'app-emp-leave',
   imports: [CommonModule, IconDirective, SelectComponent],
+  styles: [
+    `
+      @media (max-width: 768px) {
+        .grid-4 {
+          grid-template-columns: repeat(2, 1fr) !important;
+          gap: 8px !important;
+        }
+        .grid-2 {
+          grid-template-columns: 1fr !important;
+          gap: 12px !important;
+        }
+      }
+    `,
+  ],
   template: `
     <div class="flex justify-end items-center" style="margin-bottom: 24px">
       <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="ui.open('applyModal')">

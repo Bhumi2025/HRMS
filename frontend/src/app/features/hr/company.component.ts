@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
@@ -295,9 +295,9 @@ function emptyTenantForm(): CreateCompanyRequest {
                 </div>
               </div>
 
-              <!-- Sticky Action Footer -->
+              <!-- Action Footer -->
               @if (canEditCompany()) {
-                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 14px; position: sticky; bottom: 0; background: var(--surface); padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--r); box-shadow: 0 1px 3px rgba(0,0,0,0.04); z-index: 10;">
+                <div class="company-save-bar">
                   <button type="submit" class="btn btn-primary" [disabled]="savingProfile()" style="display: inline-flex; align-items: center; gap: 8px; padding: 9px 22px;">
                     <span [appIcon]="'check'"></span>
                     {{ savingProfile() ? 'Saving Profile...' : 'Save Profile Changes' }}
@@ -317,12 +317,44 @@ function emptyTenantForm(): CreateCompanyRequest {
 
               @if (isSuperAdmin() && activeTab() === 'directory') {
                 <!-- Super Admin Tenant Companies Search Header + New Company Button -->
-                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                  <div class="input-group" style="max-width: 280px;">
+                <div class="sa-company-controls" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                  <!-- Anti-autofill decoy inputs to trap browser password manager autofill -->
+                  <input type="text" style="display:none" aria-hidden="true" autocomplete="username" tabindex="-1" />
+                  <input type="password" style="display:none" aria-hidden="true" autocomplete="current-password" tabindex="-1" />
+
+                  <div class="input-group sa-search-box" style="max-width: 280px; position: relative; display: flex; align-items: center;">
                     <span class="input-icon" [appIcon]="'search'"></span>
-                    <input class="form-control" type="text" placeholder="Search name, code, email..." [ngModel]="tenantSearch()" (ngModelChange)="tenantSearch.set($event)" />
+                    <input 
+                      #tenantSearchInput
+                      class="form-control" 
+                      type="search" 
+                      id="sa_tenant_search_filter"
+                      name="sa_tenant_search_filter"
+                      placeholder="Search name, code, email..." 
+                      autocomplete="off"
+                      autocorrect="off"
+                      autocapitalize="off"
+                      spellcheck="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-form-type="other"
+                      role="searchbox"
+                      style="padding-right: 28px;"
+                      [ngModel]="tenantSearch()" 
+                      (ngModelChange)="tenantSearch.set($event)" 
+                    />
+                    @if (tenantSearch()) {
+                      <button 
+                        type="button" 
+                        (click)="clearTenantSearch()"
+                        style="position: absolute; right: 8px; background: none; border: none; font-size: 13px; cursor: pointer; color: var(--muted); padding: 2px 4px; display: flex; align-items: center;"
+                        title="Clear search"
+                      >
+                        ✕
+                      </button>
+                    }
                   </div>
-                  <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px;" (click)="openCreateTenant()">
+                  <button class="btn btn-primary btn-sm sa-new-btn" style="display: flex; align-items: center; gap: 6px;" (click)="openCreateTenant()">
                     <span [appIcon]="'plus'"></span> New Company
                   </button>
                 </div>
@@ -355,7 +387,8 @@ function emptyTenantForm(): CreateCompanyRequest {
 
         <!-- TAB 1: SUPER ADMIN TENANT COMPANIES TABLE -->
         @if (activeTab() === 'directory' && isSuperAdmin()) {
-          <div class="table-wrap" style="overflow-x: auto;">
+          <!-- Desktop Table (visible > 768px) -->
+          <div class="table-wrap desktop-tenant-table" style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse;">
               <thead>
                 <tr style="background: var(--bg); border-bottom: 1px solid var(--border);">
@@ -460,6 +493,83 @@ function emptyTenantForm(): CreateCompanyRequest {
                 }
               </tbody>
             </table>
+          </div>
+
+          <!-- Mobile Cards for Super Admin Tenant Companies (visible <= 768px) -->
+          <div class="mobile-sa-company-list">
+            @if (tenantLoading()) {
+              <div style="text-align: center; padding: 32px; color: var(--muted);">Loading tenant companies…</div>
+            } @else if (tenantCompanies().length === 0) {
+              <div style="text-align: center; padding: 32px; color: var(--muted);">No companies yet. Create one to provision its dedicated database.</div>
+            } @else {
+              @for (c of filteredTenantCompanies(); track c.id) {
+                <div class="m-sa-company-card">
+                  <div class="m-sa-card-header">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      @if (c.logoUrl) {
+                        <div style="width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                          <img [src]="c.logoUrl" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain; padding: 2px;" />
+                        </div>
+                      } @else {
+                        <div style="width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--border); background: var(--p-soft); color: var(--p); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;">
+                          {{ (c.name || 'C').substring(0, 2).toUpperCase() }}
+                        </div>
+                      }
+                      <div>
+                        <button type="button" class="company-name-link" (click)="viewTenant(c)">{{ c.name }}</button>
+                        <div style="display: flex; align-items: center; gap: 6px; margin-top: 3px;">
+                          <span class="badge" style="background: var(--p-soft); color: var(--p); font-weight: 700; font-size: 11px;">{{ c.code }}</span>
+                          @if (c.isDefault) {
+                            <span class="badge badge-info" style="font-size: 11px;">Default</span>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                    <span class="badge" [ngClass]="inviteBadge(c.invitationStatus)">{{ c.invitationStatus }}</span>
+                  </div>
+
+                  <div class="m-sa-card-body">
+                    <div class="m-sa-info-row">
+                      <span class="m-sa-label">Database</span>
+                      <span class="m-sa-val font-mono"><span [appIcon]="'grid'"></span> {{ c.databaseName || '—' }}</span>
+                    </div>
+                    <div class="m-sa-info-row">
+                      <span class="m-sa-label">Administrator</span>
+                      <div class="m-sa-admin-text">
+                        <div style="font-weight: 600; font-size: 12.5px;">{{ c.adminFullName }}</div>
+                        <div style="font-size: 11px; color: var(--muted);">{{ c.adminEmail }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="m-sa-card-actions">
+                    @if (!c.isDefault) {
+                      <button
+                        type="button"
+                        class="btn-status-outline"
+                        [class.status-active]="c.status !== 'Suspended'"
+                        [class.status-suspended]="c.status === 'Suspended'"
+                        (click)="toggleTenantStatus(c)"
+                        [disabled]="busyTenantId() === c.id"
+                      >
+                        {{ c.status === 'Suspended' ? 'Suspended' : 'Active' }}
+                      </button>
+                    }
+                    <button class="btn btn-outline btn-sm" (click)="viewTenant(c)" [disabled]="busyTenantId() === c.id" style="display: inline-flex; align-items: center; gap: 4px;">
+                      <span [appIcon]="'eye'"></span> Details
+                    </button>
+                    <button class="btn btn-outline btn-sm" (click)="editTenant(c)" [disabled]="busyTenantId() === c.id" style="display: inline-flex; align-items: center; gap: 4px;">
+                      <span [appIcon]="'edit'"></span> Edit
+                    </button>
+                    @if (!c.isDefault) {
+                      <button class="btn btn-outline btn-sm" style="color: var(--danger); border-color: var(--danger);" (click)="confirmDeleteTenant(c)" [disabled]="busyTenantId() === c.id">
+                        <span [appIcon]="'trash'"></span>
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            }
           </div>
         }
 
@@ -1609,6 +1719,121 @@ function emptyTenantForm(): CreateCompanyRequest {
       background: #ef4444;
       color: #ffffff;
     }
+    .company-save-bar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 14px;
+      position: sticky;
+      bottom: 0;
+      background: var(--surface);
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      z-index: 10;
+    }
+    @media (max-width: 1024px) {
+      :host {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      .company-page {
+        height: auto !important;
+        overflow: visible !important;
+      }
+      .company-content-scroll {
+        overflow: visible !important;
+        height: auto !important;
+      }
+      .company-save-bar {
+        position: static !important;
+        margin-top: 16px !important;
+        margin-bottom: 24px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      .company-save-bar button {
+        width: 100% !important;
+        justify-content: center !important;
+      }
+    }
+    .desktop-tenant-table {
+      display: block;
+    }
+    .mobile-sa-company-list {
+      display: none;
+    }
+    @media (max-width: 768px) {
+      .desktop-tenant-table {
+        display: none !important;
+      }
+      .mobile-sa-company-list {
+        display: flex !important;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px;
+      }
+      .m-sa-company-card {
+        background: var(--surface, #ffffff);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: 12px;
+        padding: 14px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      }
+      .m-sa-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .m-sa-card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 0;
+        border-top: 1px solid var(--border, #f1f5f9);
+        border-bottom: 1px solid var(--border, #f1f5f9);
+      }
+      .m-sa-info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+      .m-sa-label {
+        color: var(--muted, #64748b);
+        font-weight: 600;
+      }
+      .m-sa-card-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .m-sa-card-actions button {
+        flex: 1;
+        justify-content: center;
+      }
+      .sa-company-controls {
+        width: 100% !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+      }
+      .sa-search-box {
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+      .sa-new-btn {
+        width: 100% !important;
+        justify-content: center !important;
+      }
+    }
   `],
 })
 export class CompanyComponent implements OnInit, OnDestroy {
@@ -1703,6 +1928,26 @@ export class CompanyComponent implements OnInit, OnDestroy {
   protected readonly tenantCompanies = signal<CompanyListItem[]>([]);
   protected readonly tenantLoading = signal(false);
   protected readonly tenantSearch = signal('');
+
+  private tenantSearchRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('tenantSearchInput') set tenantSearchSetter(ref: ElementRef<HTMLInputElement> | undefined) {
+    this.tenantSearchRef = ref;
+    if (ref?.nativeElement && !this.tenantSearch()) {
+      ref.nativeElement.value = '';
+      setTimeout(() => {
+        if (ref?.nativeElement && !this.tenantSearch()) {
+          ref.nativeElement.value = '';
+        }
+      }, 50);
+    }
+  }
+
+  protected clearTenantSearch(): void {
+    this.tenantSearch.set('');
+    if (this.tenantSearchRef?.nativeElement) {
+      this.tenantSearchRef.nativeElement.value = '';
+    }
+  }
   protected readonly filteredTenantCompanies = computed(() => {
     const list = this.tenantCompanies();
     const q = this.tenantSearch().trim().toLowerCase();
@@ -1863,8 +2108,10 @@ export class CompanyComponent implements OnInit, OnDestroy {
             },
           });
         }
-        if (params['search']) {
-          this.tenantSearch.set(params['search']);
+        if (params['search'] && typeof params['search'] === 'string' && params['search'].trim()) {
+          this.tenantSearch.set(params['search'].trim());
+        } else {
+          this.tenantSearch.set('');
         }
       });
     } else {

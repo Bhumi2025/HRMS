@@ -1,7 +1,5 @@
 <!-- Hero Banner -->
-<div
-  style="background: var(--p-soft); border-radius: 16px; padding: 15px; display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 15px; gap: 12px; flex-wrap: wrap; border: 1px solid var(--p-mid)"
->
+<div class="payslip-hero-banner">
   <div style="min-width: 0">
     <div style="font-size: 1.2rem; font-weight: 800; color: var(--text); margin-bottom: 3px">Employee Payslips</div>
     <div style="font-size: 13px; color: #6b7280; margin-bottom: 10px">
@@ -18,7 +16,7 @@
       }
     </div>
   </div>
-  <div style="display: flex; gap: 8px; flex-wrap: wrap">
+  <div class="payslip-hero-actions">
     <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="print()">
       <span [appIcon]="'print2'"></span> Print
     </button>
@@ -32,9 +30,9 @@
 </div>
 
 <!-- Selectors: Employee & Month -->
-<div style="display: flex; gap: 12px; align-items: center; margin-bottom: 20px; flex-wrap: wrap">
+<div class="payslip-controls-bar">
   <!-- Employee Selector -->
-  <div style="position: relative; display: inline-block">
+  <div class="payslip-control-wrap">
     <button
       (click)="empDropdownOpen.update((v) => !v); monthOpen.set(false); $event.stopPropagation()"
       style="display: flex; align-items: center; gap: 10px; padding: 9px 16px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; box-shadow: var(--shadow); min-width: 240px; justify-content: space-between"
@@ -73,7 +71,7 @@
   </div>
 
   <!-- Month selector -->
-  <div style="position: relative; display: inline-block">
+  <div class="payslip-control-wrap">
     <button
       (click)="monthOpen.update((v) => !v); empDropdownOpen.set(false); $event.stopPropagation()"
       style="display: flex; align-items: center; gap: 10px; padding: 9px 16px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; box-shadow: var(--shadow); min-width: 160px; justify-content: space-between"
@@ -107,157 +105,153 @@
 </div>
 
 <!-- Payslip Document (Kautilyam Structure) -->
-<div class="card print-doc" #payslipDoc style="max-width: 1000px; margin: 0 auto; overflow: hidden; border: 1.5px solid var(--border); border-radius: 12px; background: #fff; color: #111827;">
+<div class="card print-doc payslip-card" #payslipDoc>
   <!-- Header Banner -->
-  <div style="text-align: center; padding: 20px 24px 16px; border-bottom: 1.5px solid #e5e7eb; background: #fbfbfc;">
-    <div style="font-size: 1.6rem; font-weight: 900; letter-spacing: 0.05em; color: #111827;">{{ company()?.companyName || 'HRNexus Corp' }}</div>
-    <div style="font-size: 12px; color: #4b5563; margin-top: 4px; line-height: 1.4;">
-      {{ companyAddress() }}
-    </div>
-    <div style="font-size: 13px; font-weight: 700; color: #2563eb; margin-top: 6px;">
-      Payslip for the period of {{ selectedMonthFull() }}
-    </div>
+  <div class="payslip-header-banner">
+    <div class="payslip-company-name">{{ company()?.companyName || 'HRNexus Corp' }}</div>
+    <div class="payslip-company-address">{{ companyAddress() }}</div>
+    <div class="payslip-period-title">Payslip for the period of {{ selectedMonthFull() }}</div>
   </div>
 
   <div class="card-body" style="padding: 0;">
-    <!-- Two-Column Employee & Bank Details -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1.5px solid #e5e7eb; font-size: 12.5px;">
+    <!-- Employee & Bank Details Section -->
+    <div class="payslip-details-grid">
       <!-- Left: Employee Details -->
-      <div style="padding: 14px 20px; border-right: 1.5px solid #e5e7eb;">
-        <div style="display: grid; grid-template-columns: 130px 1fr; row-gap: 6px;">
-          <span style="color: #6b7280;">Employee Name</span>
-          <span style="font-weight: 700; color: #111827;">: {{ selectedPayslip()?.employeeName ?? employee()?.fullName ?? '—' }}</span>
+      <div class="payslip-emp-section">
+        <div class="payslip-section-heading">Employee Information</div>
+        <div class="payslip-kv-grid">
+          <span class="ps-key">Employee Name</span>
+          <span class="ps-val font-bold">: {{ selectedPayslip()?.employeeName ?? employee()?.fullName ?? '—' }}</span>
 
-          <span style="color: #6b7280;">Employee Code</span>
-          <span style="font-weight: 600; color: #111827;">: {{ selectedPayslip()?.employeeCode || employee()?.employeeCode || '—' }}</span>
+          <span class="ps-key">Employee Code</span>
+          <span class="ps-val">: {{ selectedPayslip()?.employeeCode || employee()?.employeeCode || '—' }}</span>
 
-          <span style="color: #6b7280;">Designation</span>
-          <span style="font-weight: 600; color: #111827;">: {{ selectedPayslip()?.designation || employee()?.jobTitle || 'Specialist' }}</span>
+          <span class="ps-key">Designation</span>
+          <span class="ps-val">: {{ selectedPayslip()?.designation || employee()?.jobTitle || 'Specialist' }}</span>
 
-          <span style="color: #6b7280;">Department</span>
-          <span style="font-weight: 600; color: #111827;">: {{ selectedPayslip()?.department ?? employee()?.department ?? '—' }}</span>
+          <span class="ps-key">Department</span>
+          <span class="ps-val">: {{ selectedPayslip()?.department ?? employee()?.department ?? '—' }}</span>
 
-          <span style="color: #6b7280;">Date of Joining</span>
-          <span style="font-weight: 600; color: #111827;">: {{ employee()?.joinDate ? (employee()!.joinDate | date:'dd-MMM-yyyy') : '—' }}</span>
+          <span class="ps-key">Date of Joining</span>
+          <span class="ps-val">: {{ employee()?.joinDate ? (employee()!.joinDate | date:'dd-MMM-yyyy') : '—' }}</span>
 
-          <span style="color: #6b7280;">Work Location</span>
-          <span style="font-weight: 600; color: #111827;">: {{ company()?.city || '—' }}</span>
+          <span class="ps-key">Work Location</span>
+          <span class="ps-val">: {{ company()?.city || '—' }}</span>
         </div>
       </div>
 
       <!-- Right: Bank & Payment Details -->
-      <div style="padding: 14px 20px;">
-        <div style="display: grid; grid-template-columns: 120px 1fr; row-gap: 6px;">
-          <span style="color: #6b7280;">Bank Name</span>
-          <span style="font-weight: 600; color: #111827;">: {{ selectedPayslip()?.bankName || employee()?.bankName || '—' }}</span>
+      <div class="payslip-bank-section">
+        <div class="payslip-section-heading">Bank & Account Details</div>
+        <div class="payslip-kv-grid">
+          <span class="ps-key">Bank Name</span>
+          <span class="ps-val">: {{ selectedPayslip()?.bankName || employee()?.bankName || '—' }}</span>
 
-          <span style="color: #6b7280;">Bank A/c No.</span>
-          <span style="font-weight: 600; color: #111827;">: {{ selectedPayslip()?.accountNumber || employee()?.accountNumber || '—' }}</span>
+          <span class="ps-key">Bank A/c No.</span>
+          <span class="ps-val">: {{ selectedPayslip()?.accountNumber || employee()?.accountNumber || '—' }}</span>
 
-          <span style="color: #6b7280;">IFSC Code</span>
-          <span style="font-weight: 600; color: #111827;">: {{ selectedPayslip()?.ifscCode || '—' }}</span>
+          <span class="ps-key">IFSC Code</span>
+          <span class="ps-val">: {{ selectedPayslip()?.ifscCode || '—' }}</span>
 
-          <span style="color: #6b7280;">Branch Name</span>
-          <span style="font-weight: 600; color: #111827;">: —</span>
+          <span class="ps-key">Branch Name</span>
+          <span class="ps-val">: —</span>
 
-          <span style="color: #6b7280;">PF No / UAN</span>
-          <span style="font-weight: 600; color: #111827;">: —</span>
+          <span class="ps-key">PF No / UAN</span>
+          <span class="ps-val">: —</span>
 
-          <span style="color: #6b7280;">ESIC No</span>
-          <span style="font-weight: 600; color: #111827;">: —</span>
+          <span class="ps-key">ESIC No</span>
+          <span class="ps-val">: —</span>
         </div>
       </div>
     </div>
 
     <!-- Attendance & Working Days Summary Box -->
-    <div style="padding: 12px 20px; background: #f9fafb; border-bottom: 1.5px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 12px;">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-weight: 800; font-size: 13px; color: #111827;">Total Payable Days:</span>
-        <span style="background: #e0f2fe; color: #0369a1; padding: 3px 10px; border-radius: 6px; font-weight: 800; font-size: 14px;">
-          {{ selectedPayslip()?.workingDays ?? 21 }}
-        </span>
+    <div class="payslip-attendance-box">
+      <div class="ps-payable-pill">
+        <span class="ps-payable-label">Total Payable Days:</span>
+        <span class="ps-payable-val">{{ selectedPayslip()?.workingDays ?? 21 }}</span>
       </div>
-      <div style="display: flex; gap: 18px; color: #4b5563; font-size: 12px;">
-        <span>Worked Day: <b>{{ selectedPayslip()?.workedDays ?? (selectedPayslip()?.workingDays ?? 21) }}</b></span>
-        <span>Weekly Off: <b>{{ selectedPayslip()?.weeklyOffDays ?? 8 }}</b></span>
-        <span>Holiday: <b>0</b></span>
-        <span>Unpaid (LOP): <b style="color: #dc2626;">{{ selectedPayslip()?.unpaidDays ?? 0 }}</b></span>
-        <span>Paid Leaves: <b>{{ selectedPayslip()?.paidLeaveDays ?? 0 }}</b></span>
+      <div class="ps-days-breakdown">
+        <span class="day-chip">Worked Day: <b>{{ selectedPayslip()?.workedDays ?? (selectedPayslip()?.workingDays ?? 21) }}</b></span>
+        <span class="day-chip">Weekly Off: <b>{{ selectedPayslip()?.weeklyOffDays ?? 8 }}</b></span>
+        <span class="day-chip">Holiday: <b>0</b></span>
+        <span class="day-chip unpaid">Unpaid (LOP): <b>{{ selectedPayslip()?.unpaidDays ?? 0 }}</b></span>
+        <span class="day-chip">Paid Leaves: <b>{{ selectedPayslip()?.paidLeaveDays ?? 0 }}</b></span>
       </div>
     </div>
 
-    <!-- Side-by-Side Earnings & Deductions Tables -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1.5px solid #e5e7eb;">
+    <!-- Side-by-Side on Desktop, Stacked on Mobile: Earnings & Deductions Tables -->
+    <div class="payslip-financial-grid">
       <!-- Earnings Column -->
-      <div style="border-right: 1.5px solid #e5e7eb;">
-        <div style="background: #f3f4f6; padding: 8px 20px; font-weight: 800; font-size: 12.5px; color: #111827; display: flex; justify-content: space-between;">
+      <div class="payslip-fin-col earnings-col">
+        <div class="fin-header earnings-header">
           <span>Earnings</span>
           <span>Amount (₹)</span>
         </div>
-        <div style="padding: 14px 20px; font-size: 12.5px; min-height: 100px;">
+        <div class="fin-body">
           @for (line of earnings(); track line[0]) {
-            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
-              <span>{{ line[0] }}</span>
-              <span style="font-weight: 600;">₹{{ line[1].toLocaleString() }}.00</span>
+            <div class="fin-row">
+              <span class="fin-desc">{{ line[0] }}</span>
+              <span class="fin-val font-bold">₹{{ line[1].toLocaleString() }}.00</span>
             </div>
           }
           @if (earnings().length === 0) {
-            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
-              <span>Basic Salary</span>
-              <span style="font-weight: 600;">₹{{ (selectedPayslip()?.basicSalary ?? 4903).toLocaleString() }}.00</span>
+            <div class="fin-row">
+              <span class="fin-desc">Basic Salary</span>
+              <span class="fin-val font-bold">₹{{ (selectedPayslip()?.basicSalary ?? 4903).toLocaleString() }}.00</span>
             </div>
           }
         </div>
-        <div style="background: #f9fafb; padding: 10px 20px; border-top: 1px solid #e5e7eb; font-weight: 800; font-size: 13px; display: flex; justify-content: space-between;">
+        <div class="fin-footer earnings-footer">
           <span>Total Gross Earnings</span>
-          <span style="color: #059669;">₹{{ totalEarnings().toLocaleString() }}.00</span>
+          <span class="fin-total earnings-total">₹{{ totalEarnings().toLocaleString() }}.00</span>
         </div>
       </div>
 
       <!-- Deductions Column -->
-      <div>
-        <div style="background: #f3f4f6; padding: 8px 20px; font-weight: 800; font-size: 12.5px; color: #111827; display: flex; justify-content: space-between;">
+      <div class="payslip-fin-col deductions-col">
+        <div class="fin-header deductions-header">
           <span>Deductions</span>
           <span>Amount (₹)</span>
         </div>
-        <div style="padding: 14px 20px; font-size: 12.5px; min-height: 100px;">
+        <div class="fin-body">
           @for (line of deductions(); track line[0]) {
-            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
-              <span>{{ line[0] }}</span>
-              <span style="font-weight: 600; color: #dc2626;">₹{{ line[1].toLocaleString() }}.00</span>
+            <div class="fin-row">
+              <span class="fin-desc">{{ line[0] }}</span>
+              <span class="fin-val deduction-val">₹{{ line[1].toLocaleString() }}.00</span>
             </div>
           }
           @if (deductions().length === 0) {
-            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
-              <span>Unpaid Leave (LOP) Deduction</span>
-              <span style="font-weight: 600; color: #dc2626;">₹{{ (selectedPayslip()?.deductions ?? 0).toLocaleString() }}.00</span>
+            <div class="fin-row">
+              <span class="fin-desc">Unpaid Leave (LOP) Deduction</span>
+              <span class="fin-val deduction-val">₹{{ (selectedPayslip()?.deductions ?? 0).toLocaleString() }}.00</span>
             </div>
           }
         </div>
-        <div style="background: #f9fafb; padding: 10px 20px; border-top: 1px solid #e5e7eb; font-weight: 800; font-size: 13px; display: flex; justify-content: space-between;">
+        <div class="fin-footer deductions-footer">
           <span>Total Deductions</span>
-          <span style="color: #dc2626;">₹{{ totalDeductions().toLocaleString() }}.00</span>
+          <span class="fin-total deductions-total">₹{{ totalDeductions().toLocaleString() }}.00</span>
         </div>
       </div>
     </div>
 
     <!-- Total Net Payable Emerald Banner -->
-    <div style="background: #ecfdf5; border: 1.5px solid #10b981; margin: 18px 20px; border-radius: 8px; padding: 14px 18px;">
-      <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;">
-        <div style="font-size: 15px; font-weight: 800; color: #065f46;">
-          Total Net Payable: <span style="font-size: 19px; font-weight: 900; color: #047857;">₹{{ netPay().toLocaleString() }}.00</span>
+    <div class="payslip-net-banner">
+      <div class="net-banner-top">
+        <div class="net-title">
+          Total Net Payable: <span class="net-highlight">₹{{ netPay().toLocaleString() }}.00</span>
         </div>
-        <div style="font-size: 11.5px; color: #059669; font-weight: 600;">
+        <div class="net-calc-note">
           Total Net Payable = Gross Earnings - Total Deductions
         </div>
       </div>
-      <div style="font-size: 12px; color: #047857; margin-top: 6px; font-weight: 600;">
+      <div class="net-words">
         Amount in Words: <i>{{ getNetPayInWords(netPay()) }}</i>
       </div>
     </div>
 
     <!-- Disclaimer Footer -->
-    <div style="text-align: center; padding: 12px 20px; font-size: 11px; color: #9ca3af; border-top: 1px solid #f3f4f6;">
+    <div class="payslip-disclaimer">
       This PDF is system-generated, no signature required.
     </div>
   </div>

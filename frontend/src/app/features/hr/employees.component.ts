@@ -40,8 +40,8 @@ interface Employee {
     <!-- Single Card: Filter + Table -->
     <div class="card" style="overflow: visible;">
       <div style="padding: 10px 12px; border-bottom: 1px solid var(--border); position: relative; z-index: 25;">
-        <div class="filter-bar" style="display: flex; gap: 6px; flex-wrap: nowrap; align-items: center">
-          <div class="input-group" style="flex: 1; min-width: 120px; max-width: 320px; position: relative;">
+        <div class="filter-bar">
+          <div class="filter-search-box input-group">
             <span class="input-icon" style="display: flex" [appIcon]="'search'"></span>
             <input
               #searchInput
@@ -75,22 +75,24 @@ interface Employee {
               </button>
             }
           </div>
-          <app-select
-            [options]="departmentOptions()"
-            [value]="dept()"
-            (valueChange)="onDeptChange($event)"
-            width="140px"
-          />
-          <app-select
-            [options]="statusOptions"
-            [value]="status()"
-            (valueChange)="onStatusChange($event)"
-            width="105px"
-          />
-          <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 4px; white-space: nowrap;" (click)="clearFilters()">
-            <span [appIcon]="'x'"></span> Clear
-          </button>
-          <div style="display: flex; gap: 6px; margin-left: auto; flex-shrink: 0;">
+          <div class="filter-controls-group">
+            <app-select
+              [options]="departmentOptions()"
+              [value]="dept()"
+              (valueChange)="onDeptChange($event)"
+              width="140px"
+            />
+            <app-select
+              [options]="statusOptions"
+              [value]="status()"
+              (valueChange)="onStatusChange($event)"
+              width="105px"
+            />
+            <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 4px; white-space: nowrap;" (click)="clearFilters()">
+              <span [appIcon]="'x'"></span> Clear
+            </button>
+          </div>
+          <div class="filter-actions-group">
             <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px; white-space: nowrap;" (click)="exportCsv()">
               <span [appIcon]="'download'"></span> Export
             </button>
@@ -561,6 +563,57 @@ interface Employee {
         pointer-events: none;
         border-color: var(--border);
         color: var(--muted);
+      }
+      .filter-bar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .filter-search-box {
+        flex: 1;
+        min-width: 140px;
+        max-width: 320px;
+        position: relative;
+      }
+      .filter-controls-group {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .filter-actions-group {
+        display: flex;
+        gap: 6px;
+        margin-left: auto;
+        flex-shrink: 0;
+      }
+      @media (max-width: 768px) {
+        .filter-bar {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 8px;
+        }
+        .filter-search-box {
+          max-width: 100% !important;
+          width: 100% !important;
+        }
+        .filter-controls-group {
+          width: 100%;
+          justify-content: flex-start;
+        }
+        .filter-controls-group app-select {
+          flex: 1;
+        }
+        .filter-actions-group {
+          width: 100%;
+          justify-content: space-between;
+          margin-left: 0;
+        }
+        .filter-actions-group button {
+          flex: 1;
+          justify-content: center;
+        }
       }
       @media (max-width: 600px) {
         .emp-col-join,

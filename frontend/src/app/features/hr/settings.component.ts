@@ -50,15 +50,8 @@ export interface FlatNavigationItem {
   imports: [CommonModule, FormsModule, IconDirective],
   template: `
     <div class="settings-page">
-      <div class="flex justify-between items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-        <div>
-          <div class="page-title">Settings</div>
-          <div class="page-subtitle">Configure Key Groups, Navigation Routes, User Roles &amp; Security Permissions</div>
-        </div>
-      </div>
-
       <!-- Settings Top Tabs Navigation -->
-      <div class="card p-0" style="margin-bottom: 20px; border-radius: 10px; overflow: hidden;">
+      <div class="card p-0 settings-tabs-card" style="margin-bottom: 14px; border-radius: 10px; overflow: hidden; flex-shrink: 0;">
         <div style="display: flex; gap: 4px; border-bottom: 1px solid var(--border); background: var(--surface); padding: 4px 12px 0 12px;">
           @for (t of tabs(); track t.id) {
             <button
@@ -79,9 +72,9 @@ export interface FlatNavigationItem {
       @if (activeTab() === 'keygroup') {
         @if (isEditingKeyGroup()) {
           <!-- Screenshot 1: Key Group & Key Store Editor -->
-          <div class="card p-0" style="border-radius: 8px; border: 1px solid var(--border); overflow: hidden; background: var(--surface);">
+          <div class="card p-0 settings-widget" style="border-radius: 8px; border: 1px solid var(--border); overflow: hidden; background: var(--surface);">
             <!-- Top title row with clean close button -->
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border);">
+            <div style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border);">
               <div style="display: flex; align-items: center; gap: 10px;">
                 <h5 class="mb-0" style="font-weight: 800; font-size: 16px; color: var(--text);">
                   {{ keyGroupEditForm.id ? 'Edit Key Group' : 'Add Key Group' }}
@@ -103,115 +96,118 @@ export interface FlatNavigationItem {
               </button>
             </div>
 
-            <!-- Section 1 Header: Key Group -->
-            <div style="background: #e2e8f0; padding: 10px 20px; font-weight: 700; font-size: 13px; color: #334155; border-bottom: 1px solid #cbd5e1;">
-              Key Group
-            </div>
-            <div style="padding: 18px 20px; display: flex; align-items: center; gap: 24px; border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap;">
-              <div style="flex: 1; min-width: 260px; max-width: 340px;">
-                <label style="font-size: 12px; font-weight: 600; margin-bottom: 4px; display: block; color: var(--muted);">Name</label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  [(ngModel)]="keyGroupEditForm.name" 
-                  placeholder="Enter name..." 
-                  style="width: 100%; font-size: 13px;" 
-                />
+            <!-- Scrollable body for Key Group details and Key Store rows -->
+            <div class="editor-scroll-body">
+              <!-- Section 1 Header: Key Group -->
+              <div style="background: #e2e8f0; padding: 10px 20px; font-weight: 700; font-size: 13px; color: #334155; border-bottom: 1px solid #cbd5e1;">
+                Key Group
               </div>
-              <div style="flex: 1; min-width: 200px; max-width: 260px;">
-                <label style="font-size: 12px; font-weight: 600; margin-bottom: 4px; display: block; color: var(--muted);">Code</label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  [(ngModel)]="keyGroupEditForm.code" 
-                  [disabled]="!!keyGroupEditForm.id"
-                  placeholder="e.g. BLOOD_GROUP" 
-                  style="width: 100%; font-size: 13px;" 
-                />
-              </div>
-              <div style="flex: 1; min-width: 240px; max-width: 320px;">
-                <label style="font-size: 12px; font-weight: 600; margin-bottom: 4px; display: block; color: var(--muted);">Description</label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  [(ngModel)]="keyGroupEditForm.description" 
-                  placeholder="e.g. Employee blood groups dictionary" 
-                  style="width: 100%; font-size: 13px;" 
-                />
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px; margin-top: 18px;">
-                <input 
-                  type="checkbox" 
-                  id="sgIsGen" 
-                  [(ngModel)]="keyGroupEditForm.isGeneric" 
-                  style="cursor: pointer; width: 16px; height: 16px;" 
-                />
-                <label for="sgIsGen" style="font-weight: 600; font-size: 13px; cursor: pointer; margin: 0; color: var(--text);">Is Generic</label>
-              </div>
-            </div>
-
-            @if (isEnumLocked()) {
-              <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; padding: 10px 16px; margin: 12px 20px 0; font-size: 12px; color: #b45309; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 16px;">🔒</span>
-                <span><strong>System Enum Group:</strong> This group is mapped to backend system enumerations. Adding, renaming, or deleting values is locked to prevent database inconsistency. You may reorder options or toggle them active/inactive.</span>
-              </div>
-            }
-
-            <!-- Section 2 Header: Key Store with dark [+] button on far right -->
-            <div style="background: #e2e8f0; padding: 8px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #cbd5e1; margin-top: 12px;">
-              <span style="font-weight: 700; font-size: 13px; color: #334155;">Key Store</span>
-              <button 
-                type="button" 
-                (click)="addKeyStoreRow()"
-                [disabled]="isEnumLocked()"
-                [style.opacity]="isEnumLocked() ? '0.4' : '1'"
-                [style.cursor]="isEnumLocked() ? 'not-allowed' : 'pointer'"
-                style="background: #1e293b; color: white; border-radius: 4px; padding: 4px 10px; display: flex; align-items: center; justify-content: center; border: none;"
-                [attr.data-tooltip]="isEnumLocked() ? 'Adding values is locked for system enum groups' : 'Add Key Store Row'"
-              >
-                <span [appIcon]="'plus'"></span>
-              </button>
-            </div>
-
-            <!-- Key Store Table / Rows -->
-            <div style="padding: 16px 20px; background: var(--surface);">
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 60px 44px; gap: 12px; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--muted); align-items: center;">
-                <div>Key</div>
-                <div>Value</div>
-                <div>Sub Value</div>
-                <div style="text-align: center;">Active</div>
-                <div></div>
-              </div>
-
-              @for (row of keyStoreRows(); track $index) {
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 60px 44px; gap: 12px; margin-bottom: 10px; align-items: center;">
-                  <input type="text" class="form-control" [(ngModel)]="row.key" [disabled]="isEnumLocked()" placeholder="Key" style="font-size: 13px;" />
-                  <input type="text" class="form-control" [(ngModel)]="row.value" [disabled]="isEnumLocked()" placeholder="Value" style="font-size: 13px;" />
-                  <input type="text" class="form-control" [(ngModel)]="row.subValue" placeholder="Sub Value" style="font-size: 13px;" />
-                  <div style="text-align: center;">
-                    <input type="checkbox" [(ngModel)]="row.isActive" style="cursor: pointer; width: 16px; height: 16px;" title="Toggle Active/Inactive" />
-                  </div>
-                  <button 
-                    type="button" 
-                    (click)="removeKeyStoreRow($index)"
-                    [disabled]="isEnumLocked()"
-                    [style.opacity]="isEnumLocked() ? '0.3' : '1'"
-                    [style.cursor]="isEnumLocked() ? 'not-allowed' : 'pointer'"
-                    style="background: transparent; border: 1px solid #f87171; color: #dc2626; border-radius: 4px; height: 34px; width: 34px; display: flex; align-items: center; justify-content: center;"
-                    [attr.data-tooltip]="isEnumLocked() ? 'Deleting is locked for enum groups' : 'Remove Row'"
-                  >
-                    <span style="font-weight: 800; font-size: 16px; line-height: 1;">—</span>
-                  </button>
+              <div style="padding: 18px 20px; display: flex; align-items: center; gap: 24px; border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 260px; max-width: 340px;">
+                  <label style="font-size: 12px; font-weight: 600; margin-bottom: 4px; display: block; color: var(--muted);">Name</label>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    [(ngModel)]="keyGroupEditForm.name" 
+                    placeholder="Enter name..." 
+                    style="width: 100%; font-size: 13px;" 
+                  />
                 </div>
-              } @empty {
-                <div style="padding: 24px; text-align: center; color: var(--muted); font-size: 13px;">
-                  No key store rows added yet. Click [+] to add values.
+                <div style="flex: 1; min-width: 200px; max-width: 260px;">
+                  <label style="font-size: 12px; font-weight: 600; margin-bottom: 4px; display: block; color: var(--muted);">Code</label>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    [(ngModel)]="keyGroupEditForm.code" 
+                    [disabled]="!!keyGroupEditForm.id"
+                    placeholder="e.g. BLOOD_GROUP" 
+                    style="width: 100%; font-size: 13px;" 
+                  />
+                </div>
+                <div style="flex: 1; min-width: 240px; max-width: 320px;">
+                  <label style="font-size: 12px; font-weight: 600; margin-bottom: 4px; display: block; color: var(--muted);">Description</label>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    [(ngModel)]="keyGroupEditForm.description" 
+                    placeholder="e.g. Employee blood groups dictionary" 
+                    style="width: 100%; font-size: 13px;" 
+                  />
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 18px;">
+                  <input 
+                    type="checkbox" 
+                    id="sgIsGen" 
+                    [(ngModel)]="keyGroupEditForm.isGeneric" 
+                    style="cursor: pointer; width: 16px; height: 16px;" 
+                  />
+                  <label for="sgIsGen" style="font-weight: 600; font-size: 13px; cursor: pointer; margin: 0; color: var(--text);">Is Generic</label>
+                </div>
+              </div>
+
+              @if (isEnumLocked()) {
+                <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; padding: 10px 16px; margin: 12px 20px 0; font-size: 12px; color: #b45309; display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 16px;">🔒</span>
+                  <span><strong>System Enum Group:</strong> This group is mapped to backend system enumerations. Adding, renaming, or deleting values is locked to prevent database inconsistency. You may reorder options or toggle them active/inactive.</span>
                 </div>
               }
+
+              <!-- Section 2 Header: Key Store with dark [+] button on far right -->
+              <div style="background: #e2e8f0; padding: 8px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #cbd5e1; margin-top: 12px;">
+                <span style="font-weight: 700; font-size: 13px; color: #334155;">Key Store</span>
+                <button 
+                  type="button" 
+                  (click)="addKeyStoreRow()"
+                  [disabled]="isEnumLocked()"
+                  [style.opacity]="isEnumLocked() ? '0.4' : '1'"
+                  [style.cursor]="isEnumLocked() ? 'not-allowed' : 'pointer'"
+                  style="background: #1e293b; color: white; border-radius: 4px; padding: 4px 10px; display: flex; align-items: center; justify-content: center; border: none;"
+                  [attr.data-tooltip]="isEnumLocked() ? 'Adding values is locked for system enum groups' : 'Add Key Store Row'"
+                >
+                  <span [appIcon]="'plus'"></span>
+                </button>
+              </div>
+
+              <!-- Key Store Table / Rows -->
+              <div style="padding: 16px 20px; background: var(--surface);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 60px 44px; gap: 12px; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--muted); align-items: center;">
+                  <div>Key</div>
+                  <div>Value</div>
+                  <div>Sub Value</div>
+                  <div style="text-align: center;">Active</div>
+                  <div></div>
+                </div>
+
+                @for (row of keyStoreRows(); track $index) {
+                  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 60px 44px; gap: 12px; margin-bottom: 10px; align-items: center;">
+                    <input type="text" class="form-control" [(ngModel)]="row.key" [disabled]="isEnumLocked()" placeholder="Key" style="font-size: 13px;" />
+                    <input type="text" class="form-control" [(ngModel)]="row.value" [disabled]="isEnumLocked()" placeholder="Value" style="font-size: 13px;" />
+                    <input type="text" class="form-control" [(ngModel)]="row.subValue" placeholder="Sub Value" style="font-size: 13px;" />
+                    <div style="text-align: center;">
+                      <input type="checkbox" [(ngModel)]="row.isActive" style="cursor: pointer; width: 16px; height: 16px;" title="Toggle Active/Inactive" />
+                    </div>
+                    <button 
+                      type="button" 
+                      (click)="removeKeyStoreRow($index)"
+                      [disabled]="isEnumLocked()"
+                      [style.opacity]="isEnumLocked() ? '0.3' : '1'"
+                      [style.cursor]="isEnumLocked() ? 'not-allowed' : 'pointer'"
+                      style="background: transparent; border: 1px solid #f87171; color: #dc2626; border-radius: 4px; height: 34px; width: 34px; display: flex; align-items: center; justify-content: center;"
+                      [attr.data-tooltip]="isEnumLocked() ? 'Deleting is locked for enum groups' : 'Remove Row'"
+                    >
+                      <span style="font-weight: 800; font-size: 16px; line-height: 1;">—</span>
+                    </button>
+                  </div>
+                } @empty {
+                  <div style="padding: 24px; text-align: center; color: var(--muted); font-size: 13px;">
+                    No key store rows added yet. Click [+] to add values.
+                  </div>
+                }
+              </div>
             </div>
 
             <!-- Bottom Actions matching Screenshot 1 -->
-            <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--surface);">
+            <div style="flex-shrink: 0; display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--surface);">
               <button 
                 type="button" 
                 class="btn btn-sm" 
@@ -241,8 +237,8 @@ export interface FlatNavigationItem {
           </div>
         } @else {
           <!-- Key Groups List View -->
-          <div class="card">
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="card p-0 settings-widget">
+            <div class="card-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border);">
               <div>
                 <h5 class="mb-0" style="font-weight: 700; font-size: 15px;">Key Group Management</h5>
                 <div style="font-size: 12px; color: var(--muted);">Tenant dictionary options and drop-down value configurations</div>
@@ -257,7 +253,7 @@ export interface FlatNavigationItem {
               </div>
             </div>
 
-            <div class="table-wrap">
+            <div class="table-wrap widget-table-scroll">
               <table>
                 <thead>
                   <tr>
@@ -358,8 +354,8 @@ export interface FlatNavigationItem {
 
       <!-- TAB 2: NAVIGATION (HIERARCHY TREE) -->
       @if (activeTab() === 'navigation') {
-        <div class="card">
-          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="card p-0 settings-widget">
+          <div class="card-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border);">
             <div>
               <h5 class="mb-0" style="font-weight: 700; font-size: 15px;">Navigation Management</h5>
               <div style="font-size: 12px; color: var(--muted);">Configure hierarchical menu structure (Level 1, 2, 3)</div>
@@ -374,7 +370,7 @@ export interface FlatNavigationItem {
             </div>
           </div>
 
-          <div class="table-wrap" style="overflow-x: auto;">
+          <div class="table-wrap widget-table-scroll" style="overflow-x: auto;">
             <table style="min-width: 950px;">
               <thead>
                 <tr>
@@ -494,18 +490,18 @@ export interface FlatNavigationItem {
 
       <!-- TAB 3: PERMISSION (DYNAMIC MATRIX) -->
       @if (activeTab() === 'permission') {
-        <div style="display: grid; grid-template-columns: 240px 1fr; gap: 16px;" class="permission-grid-layout">
+        <div class="permission-grid-layout">
           <!-- Left Panel: Roles Selector -->
-          <div class="card p-0" style="overflow: hidden; height: fit-content;">
-            <div style="padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--bg); font-weight: 700; font-size: 13px;">
+          <div class="card p-0 roles-widget permission-roles-panel">
+            <div class="roles-panel-header" style="padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--bg); font-weight: 700; font-size: 13px; flex-shrink: 0;">
               Roles
             </div>
 
-            <div style="padding: 8px;">
+            <div class="roles-list-scroll roles-list-container">
               @for (role of permissionRoles(); track role.id) {
                 <div 
+                  class="role-select-item"
                   (click)="selectRoleForPermissions(role)"
-                  style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background .15s; margin-bottom: 4px;"
                   [style.background]="selectedRole()?.id === role.id ? 'var(--p-soft)' : 'transparent'"
                   [style.color]="selectedRole()?.id === role.id ? 'var(--p)' : 'var(--text)'"
                 >
@@ -531,8 +527,8 @@ export interface FlatNavigationItem {
           </div>
 
           <!-- Right Panel: Permissions Matrix Table -->
-          <div class="card p-0">
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px;">
+          <div class="card p-0 permissions-widget perm-matrix-card">
+            <div class="card-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; flex-wrap: wrap; gap: 8px; position: sticky; top: 0; z-index: 10;">
               <div style="font-weight: 700; font-size: 14px; color: var(--text);">
                 Permissions for Role: 
                 <span style="color: var(--p);">{{ selectedRole()?.name }}</span>
@@ -547,30 +543,34 @@ export interface FlatNavigationItem {
               </button>
             </div>
 
-            <div class="table-wrap">
+            <div class="mobile-scroll-hint">
+              <span [appIcon]="'chevron-right'"></span> Swipe horizontally to configure all permissions (Full, View, Create, Edit, Delete)
+            </div>
+
+            <div class="table-wrap permissions-table-scroll perm-table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Module / Navigation Title</th>
-                    <th>Route</th>
-                    <th style="width: 80px; text-align: center;">Full</th>
-                    <th style="width: 80px; text-align: center;">View</th>
-                    <th style="width: 80px; text-align: center;">Create</th>
-                    <th style="width: 80px; text-align: center;">Edit</th>
-                    <th style="width: 80px; text-align: center;">Delete</th>
+                    <th class="perm-title-col">Module / Navigation Title</th>
+                    <th class="perm-route-col">Route</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Full</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">View</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Create</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Edit</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Delete</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (perm of rolePermissions(); track perm.navigationItemId) {
                     <tr>
-                      <td style="font-weight: 700; font-size: 13px;">
+                      <td class="perm-title-col" style="font-weight: 700; font-size: 13px;">
                         <span>{{ perm.navigationTitle }}</span>
                         @if (isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()) {
                           <span style="margin-left: 6px; font-size: 11px; color: var(--muted); font-weight: normal;">(Admin Core - Protected)</span>
                         }
                       </td>
-                      <td style="font-size: 12px; font-family: monospace; color: var(--muted);">{{ perm.navigationRoute }}</td>
-                      <td style="text-align: center;">
+                      <td class="perm-route-col" style="font-size: 12px; font-family: monospace; color: var(--muted);">{{ perm.navigationRoute }}</td>
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isFull" 
@@ -578,7 +578,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isView" 
@@ -586,7 +586,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isCreate" 
@@ -594,7 +594,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isEdit" 
@@ -602,7 +602,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isDelete" 
@@ -627,8 +627,8 @@ export interface FlatNavigationItem {
 
       <!-- TAB 4: ROLE (DYNAMIC CRUD) -->
       @if (activeTab() === 'role') {
-        <div class="card">
-          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="card p-0 settings-widget">
+          <div class="card-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border);">
             <div>
               <h5 class="mb-0" style="font-weight: 700; font-size: 15px;">Role Management</h5>
               <div style="font-size: 12px; color: var(--muted);">Create and manage dynamic system and custom roles</div>
@@ -643,7 +643,7 @@ export interface FlatNavigationItem {
             </div>
           </div>
 
-          <div class="table-wrap">
+          <div class="table-wrap widget-table-scroll">
             <table>
               <thead>
                 <tr>
@@ -855,7 +855,287 @@ export interface FlatNavigationItem {
         </div>
       </div>
     }
-  `
+  `,
+  styles: [
+    `
+    :host {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      height: calc(100vh - var(--header-h, 52px) - 32px);
+      max-height: calc(100vh - var(--header-h, 52px) - 32px);
+      min-height: 0;
+      overflow: hidden;
+      box-sizing: border-box;
+      width: 100%;
+    }
+
+    .settings-page {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .settings-tabs-card {
+      flex-shrink: 0;
+      margin-bottom: 14px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    /* Common widget container for all tabs */
+    .settings-widget {
+      flex: 1;
+      min-height: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    /* Permission Tab Grid */
+    .permission-grid-layout {
+      flex: 1;
+      min-height: 0;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    .roles-widget {
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .roles-list-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 8px;
+    }
+
+    .role-select-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-bottom: 4px;
+    }
+
+    .permissions-widget {
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .widget-table-scroll,
+    .permissions-table-scroll,
+    .perm-table-wrap {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: auto;
+      width: 100%;
+      scrollbar-width: thin;
+      scrollbar-color: var(--p) rgba(0, 0, 0, 0.08);
+
+      &::-webkit-scrollbar {
+        height: 8px;
+        width: 8px;
+        display: block;
+      }
+      &::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 4px;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: var(--p);
+        border-radius: 4px;
+      }
+
+      table {
+        min-width: 680px;
+        width: 100%;
+      }
+    }
+
+    .editor-scroll-body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* Sticky table headers inside widgets */
+    .widget-table-scroll thead,
+    .permissions-table-scroll thead,
+    .perm-table-wrap thead {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--surface, #ffffff);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    .mobile-scroll-hint {
+      display: none;
+    }
+
+    /* Sleek custom scrollbars inside widgets */
+    .roles-list-scroll,
+    .permissions-table-scroll,
+    .widget-table-scroll,
+    .editor-scroll-body {
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+    }
+
+    .roles-list-scroll::-webkit-scrollbar,
+    .permissions-table-scroll::-webkit-scrollbar,
+    .widget-table-scroll::-webkit-scrollbar,
+    .editor-scroll-body::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    .roles-list-scroll::-webkit-scrollbar-track,
+    .permissions-table-scroll::-webkit-scrollbar-track,
+    .widget-table-scroll::-webkit-scrollbar-track,
+    .editor-scroll-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .roles-list-scroll::-webkit-scrollbar-thumb,
+    .permissions-table-scroll::-webkit-scrollbar-thumb,
+    .widget-table-scroll::-webkit-scrollbar-thumb,
+    .editor-scroll-body::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    .roles-list-scroll::-webkit-scrollbar-thumb:hover,
+    .permissions-table-scroll::-webkit-scrollbar-thumb:hover,
+    .widget-table-scroll::-webkit-scrollbar-thumb:hover,
+    .editor-scroll-body::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    @media (max-width: 850px) {
+      :host {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      .settings-page {
+        height: auto !important;
+        overflow: visible !important;
+      }
+      .permission-grid-layout {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+      .roles-widget {
+        height: auto !important;
+        overflow: visible !important;
+      }
+      .roles-list-scroll,
+      .roles-list-container {
+        display: flex !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        gap: 8px !important;
+        padding: 8px 10px !important;
+        white-space: nowrap !important;
+        scrollbar-width: thin !important;
+      }
+      .role-select-item {
+        flex-shrink: 0 !important;
+        margin-bottom: 0 !important;
+        border: 1px solid var(--border) !important;
+        padding: 8px 12px !important;
+      }
+      .mobile-scroll-hint {
+        display: flex !important;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--p);
+        background: rgba(37, 99, 235, 0.07);
+        padding: 6px 12px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+      }
+      .permissions-widget {
+        height: auto !important;
+        overflow: visible !important;
+      }
+      .permissions-table-scroll,
+      .perm-table-wrap {
+        max-height: calc(100vh - 280px) !important;
+        overflow-y: auto !important;
+        overflow-x: auto !important;
+
+        table {
+          min-width: 720px !important;
+        }
+
+        th.perm-title-col,
+        td.perm-title-col {
+          position: sticky !important;
+          left: 0 !important;
+          background: var(--surface) !important;
+          z-index: 2 !important;
+          box-shadow: 2px 0 6px rgba(0, 0, 0, 0.08) !important;
+          min-width: 125px !important;
+          max-width: 155px !important;
+          white-space: normal !important;
+          word-break: break-word !important;
+        }
+        thead th.perm-title-col {
+          background: var(--bg) !important;
+          z-index: 3 !important;
+        }
+        thead th {
+          position: sticky !important;
+          top: 0 !important;
+          background: var(--bg) !important;
+          z-index: 2 !important;
+        }
+      }
+    }
+    `,
+  ],
 })
 export class SettingsComponent implements OnInit {
   private readonly api = inject(ApiService);

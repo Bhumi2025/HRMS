@@ -117,6 +117,13 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly selectedHrEmployeeName = signal<string>('HR');
   protected readonly selectedHrEmployeeCode = signal<string>('');
 
+  // Mobile Dashboard Section Filter
+  protected readonly activeMobileSection = signal<'all' | 'approvals' | 'clock' | 'notices' | 'highlights' | 'holidays'>('all');
+
+  setMobileSection(sec: 'all' | 'approvals' | 'clock' | 'notices' | 'highlights' | 'holidays'): void {
+    this.activeMobileSection.set(sec);
+  }
+
   // Computed properties
   protected readonly role = computed(() => this.session.activeRole());
 
