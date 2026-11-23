@@ -47,11 +47,11 @@ export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected readonly dashboard = signal<EmployeeDashboard | null>(null);
   protected readonly currentTime = signal(new Date());
-  protected readonly activeMobileSection = signal<'all' | 'clock' | 'attendance' | 'leave' | 'notices'>('all');
+  protected readonly activeMobileSection = signal<'all' | 'clock' | 'notices' | 'holidays'>('all');
 
-  protected setMobileSection(section: 'all' | 'clock' | 'attendance' | 'leave' | 'notices'): void {
+  protected setMobileSection(section: 'all' | 'clock' | 'notices' | 'holidays'): void {
     this.activeMobileSection.set(section);
-    if (section === 'all' || section === 'attendance') {
+    if (section === 'all') {
       setTimeout(() => {
         this.renderCharts();
         this.attChart?.resize();

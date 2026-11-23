@@ -548,33 +548,33 @@ export interface FlatNavigationItem {
             </div>
 
             <div class="mobile-scroll-hint">
-              <span [appIcon]="'chevron-right'"></span> Swipe horizontally to configure permissions
+              <span [appIcon]="'chevron-right'"></span> Swipe horizontally to configure all permissions (Full, View, Create, Edit, Delete)
             </div>
 
             <div class="table-wrap perm-table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Module / Navigation Title</th>
-                    <th>Route</th>
-                    <th style="width: 80px; text-align: center;">Full</th>
-                    <th style="width: 80px; text-align: center;">View</th>
-                    <th style="width: 80px; text-align: center;">Create</th>
-                    <th style="width: 80px; text-align: center;">Edit</th>
-                    <th style="width: 80px; text-align: center;">Delete</th>
+                    <th class="perm-title-col">Module / Navigation Title</th>
+                    <th class="perm-route-col">Route</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Full</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">View</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Create</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Edit</th>
+                    <th class="perm-check-col" style="width: 75px; text-align: center;">Delete</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (perm of rolePermissions(); track perm.navigationItemId) {
                     <tr>
-                      <td style="font-weight: 700; font-size: 13px;">
+                      <td class="perm-title-col" style="font-weight: 700; font-size: 13px;">
                         <span>{{ perm.navigationTitle }}</span>
                         @if (isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()) {
                           <span style="margin-left: 6px; font-size: 11px; color: var(--muted); font-weight: normal;">(Admin Core - Protected)</span>
                         }
                       </td>
-                      <td style="font-size: 12px; font-family: monospace; color: var(--muted);">{{ perm.navigationRoute }}</td>
-                      <td style="text-align: center;">
+                      <td class="perm-route-col" style="font-size: 12px; font-family: monospace; color: var(--muted);">{{ perm.navigationRoute }}</td>
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isFull" 
@@ -582,7 +582,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isView" 
@@ -590,7 +590,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isCreate" 
@@ -598,7 +598,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isEdit" 
@@ -606,7 +606,7 @@ export interface FlatNavigationItem {
                           [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
                         />
                       </td>
-                      <td style="text-align: center;">
+                      <td class="perm-check-col" style="text-align: center;">
                         <input 
                           type="checkbox" 
                           [(ngModel)]="perm.isDelete" 
@@ -899,10 +899,10 @@ export interface FlatNavigationItem {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: thin;
-        scrollbar-color: var(--p) rgba(0, 0, 0, 0.06);
+        scrollbar-color: var(--p) rgba(0, 0, 0, 0.08);
 
         &::-webkit-scrollbar {
-          height: 7px;
+          height: 8px;
           display: block;
         }
         &::-webkit-scrollbar-track {
@@ -915,7 +915,8 @@ export interface FlatNavigationItem {
         }
 
         table {
-          min-width: 620px;
+          min-width: 680px;
+          width: 100%;
         }
       }
 
@@ -952,17 +953,35 @@ export interface FlatNavigationItem {
           font-weight: 600;
         }
         .perm-table-wrap {
-          th:first-child,
-          td:first-child {
+          max-height: calc(100vh - 280px) !important;
+          overflow-y: auto !important;
+          overflow-x: auto !important;
+
+          table {
+            min-width: 720px !important;
+          }
+
+          th.perm-title-col,
+          td.perm-title-col {
             position: sticky !important;
             left: 0 !important;
             background: var(--surface) !important;
             z-index: 2 !important;
             box-shadow: 2px 0 6px rgba(0, 0, 0, 0.08) !important;
+            min-width: 125px !important;
+            max-width: 155px !important;
+            white-space: normal !important;
+            word-break: break-word !important;
           }
-          thead th:first-child {
+          thead th.perm-title-col {
             background: var(--bg) !important;
             z-index: 3 !important;
+          }
+          thead th {
+            position: sticky !important;
+            top: 0 !important;
+            background: var(--bg) !important;
+            z-index: 2 !important;
           }
         }
       }

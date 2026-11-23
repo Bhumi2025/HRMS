@@ -5,16 +5,13 @@
       <span>✨ All</span>
     </button>
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'clock'" (click)="setMobileSection('clock')">
-      <span>⏱️ Clock In/Out</span>
-    </button>
-    <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'attendance'" (click)="setMobileSection('attendance')">
-      <span>📊 Attendance</span>
-    </button>
-    <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'leave'" (click)="setMobileSection('leave')">
-      <span>🏖️ Leaves</span>
+      <span>⏱️ Time Tracker</span>
     </button>
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'notices'" (click)="setMobileSection('notices')">
       <span>📢 Notices</span>
+    </button>
+    <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'holidays'" (click)="setMobileSection('holidays')">
+      <span>🏖️ Holidays</span>
     </button>
   </div>
 
@@ -99,7 +96,7 @@
       <!-- ROW 1: Leave Balance (No Apply Button) + Attendance Overview -->
       <div class="center-row">
         <!-- 1. Leave Balance Card -->
-        <div class="dash-widget leave-widget" [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'leave'">
+        <div class="dash-widget leave-widget" [class.mobile-hidden]="activeMobileSection() !== 'all'">
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator amber"></span>
@@ -147,7 +144,7 @@
         </div>
 
         <!-- 2. Attendance Overview Card -->
-        <div class="dash-widget attendance-widget" [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'attendance'">
+        <div class="dash-widget attendance-widget" [class.mobile-hidden]="activeMobileSection() !== 'all'">
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator green"></span>
@@ -173,7 +170,7 @@
       <!-- ROW 2: Working Hours + Notice Board -->
       <div class="center-row">
         <!-- 3. Working Hours Card -->
-        <div class="dash-widget hours-widget" [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'attendance'">
+        <div class="dash-widget hours-widget" [class.mobile-hidden]="activeMobileSection() !== 'all'">
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator purple"></span>
@@ -324,7 +321,7 @@
       </div>
 
       <!-- 2. Upcoming Holidays / Holiday Calendar Card -->
-      <div class="dash-widget holiday-widget" [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'notices'">
+      <div class="dash-widget holiday-widget" [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'holidays'">
         <div class="widget-header">
           <div class="header-left">
             <span class="widget-indicator orange"></span>

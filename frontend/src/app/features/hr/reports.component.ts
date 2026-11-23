@@ -79,6 +79,9 @@ interface OtReport {
               <app-select [options]="yearOptions()" [value]="year()" (valueChange)="year.set($event)" width="150px" />
             </div>
           </div>
+          <div class="mobile-scroll-hint">
+            <span [appIcon]="'chevron-right'"></span> Swipe horizontally to view full report
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -120,6 +123,9 @@ interface OtReport {
         <div class="card">
           <div class="card-header">
             <div class="card-title">Attendance Report · {{ reportPeriod() }}</div>
+          </div>
+          <div class="mobile-scroll-hint">
+            <span [appIcon]="'chevron-right'"></span> Swipe horizontally to view full report
           </div>
           <div class="table-wrap">
             <table>
@@ -163,6 +169,9 @@ interface OtReport {
           <div class="card-header">
             <div class="card-title">Leave Report · {{ reportPeriod() }}</div>
           </div>
+          <div class="mobile-scroll-hint">
+            <span [appIcon]="'chevron-right'"></span> Swipe horizontally to view full report
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -202,6 +211,9 @@ interface OtReport {
         <div class="card">
           <div class="card-header">
             <div class="card-title">Overtime Report · {{ reportPeriod() }}</div>
+          </div>
+          <div class="mobile-scroll-hint">
+            <span [appIcon]="'chevron-right'"></span> Swipe horizontally to view full report
           </div>
           <div class="table-wrap">
             <table>
@@ -243,9 +255,44 @@ interface OtReport {
       tbody td {
         white-space: nowrap;
       }
-      @media (max-width: 600px) {
-        .rpt-col-hide {
-          display: none;
+      .table-wrap {
+        width: 100%;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: thin;
+        scrollbar-color: var(--p) rgba(0, 0, 0, 0.08);
+      }
+      .table-wrap::-webkit-scrollbar {
+        height: 7px !important;
+        display: block !important;
+      }
+      .table-wrap::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05) !important;
+        border-radius: 4px;
+      }
+      .table-wrap::-webkit-scrollbar-thumb {
+        background: var(--p) !important;
+        border-radius: 4px;
+      }
+      .table-wrap table {
+        min-width: 680px !important;
+        width: 100%;
+      }
+      .mobile-scroll-hint {
+        display: none;
+      }
+      @media (max-width: 768px) {
+        .mobile-scroll-hint {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          color: var(--p);
+          background: rgba(37, 99, 235, 0.07);
+          padding: 6px 12px;
+          border-radius: 6px;
+          margin-bottom: 8px;
+          font-weight: 600;
         }
       }
     `,
