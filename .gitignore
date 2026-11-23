@@ -39,6 +39,8 @@ lerna-debug.log*
 # Angular build outputs & caches
 frontend/dist/
 dist/
+release_iis/
+*.zip
 tmp/
 out-tsc/
 bazel-out/
