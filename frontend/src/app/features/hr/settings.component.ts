@@ -494,18 +494,18 @@ export interface FlatNavigationItem {
 
       <!-- TAB 3: PERMISSION (DYNAMIC MATRIX) -->
       @if (activeTab() === 'permission') {
-        <div style="display: grid; grid-template-columns: 240px 1fr; gap: 16px;" class="permission-grid-layout">
+        <div class="permission-grid-layout">
           <!-- Left Panel: Roles Selector -->
-          <div class="card p-0" style="overflow: hidden; height: fit-content;">
-            <div style="padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--bg); font-weight: 700; font-size: 13px;">
+          <div class="permission-roles-panel card p-0">
+            <div class="roles-panel-header">
               Roles
             </div>
 
-            <div style="padding: 8px;">
+            <div class="roles-list-container">
               @for (role of permissionRoles(); track role.id) {
                 <div 
+                  class="role-select-item"
                   (click)="selectRoleForPermissions(role)"
-                  style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background .15s; margin-bottom: 4px;"
                   [style.background]="selectedRole()?.id === role.id ? 'var(--p-soft)' : 'transparent'"
                   [style.color]="selectedRole()?.id === role.id ? 'var(--p)' : 'var(--text)'"
                 >
@@ -531,8 +531,8 @@ export interface FlatNavigationItem {
           </div>
 
           <!-- Right Panel: Permissions Matrix Table -->
-          <div class="card p-0">
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px;">
+          <div class="card p-0 perm-matrix-card">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; flex-wrap: wrap; gap: 8px;">
               <div style="font-weight: 700; font-size: 14px; color: var(--text);">
                 Permissions for Role: 
                 <span style="color: var(--p);">{{ selectedRole()?.name }}</span>
@@ -547,7 +547,11 @@ export interface FlatNavigationItem {
               </button>
             </div>
 
-            <div class="table-wrap">
+            <div class="mobile-scroll-hint">
+              <span [appIcon]="'chevron-right'"></span> Swipe horizontally to configure permissions
+            </div>
+
+            <div class="table-wrap perm-table-wrap">
               <table>
                 <thead>
                   <tr>
@@ -855,7 +859,115 @@ export interface FlatNavigationItem {
         </div>
       </div>
     }
-  `
+  `,
+  styles: [
+    `
+      .permission-grid-layout {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        gap: 16px;
+      }
+      .permission-roles-panel {
+        overflow: hidden;
+        height: fit-content;
+      }
+      .roles-panel-header {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg);
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .roles-list-container {
+        padding: 8px;
+      }
+      .role-select-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.15s;
+        margin-bottom: 4px;
+      }
+      .mobile-scroll-hint {
+        display: none;
+      }
+      .perm-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: var(--p) rgba(0, 0, 0, 0.06);
+
+        &::-webkit-scrollbar {
+          height: 7px;
+          display: block;
+        }
+        &::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.05);
+          border-radius: 4px;
+        }
+        &::-webkit-scrollbar-thumb {
+          background: var(--p);
+          border-radius: 4px;
+        }
+
+        table {
+          min-width: 620px;
+        }
+      }
+
+      @media (max-width: 850px) {
+        .permission-grid-layout {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 12px !important;
+        }
+        .roles-list-container {
+          display: flex !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          gap: 8px !important;
+          padding: 8px 10px !important;
+          white-space: nowrap !important;
+          scrollbar-width: thin !important;
+        }
+        .role-select-item {
+          flex-shrink: 0 !important;
+          margin-bottom: 0 !important;
+          border: 1px solid var(--border) !important;
+          padding: 8px 12px !important;
+        }
+        .mobile-scroll-hint {
+          display: flex !important;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          color: var(--p);
+          background: rgba(37, 99, 235, 0.07);
+          padding: 6px 12px;
+          border-bottom: 1px solid var(--border);
+          font-weight: 600;
+        }
+        .perm-table-wrap {
+          th:first-child,
+          td:first-child {
+            position: sticky !important;
+            left: 0 !important;
+            background: var(--surface) !important;
+            z-index: 2 !important;
+            box-shadow: 2px 0 6px rgba(0, 0, 0, 0.08) !important;
+          }
+          thead th:first-child {
+            background: var(--bg) !important;
+            z-index: 3 !important;
+          }
+        }
+      }
+    `,
+  ],
 })
 export class SettingsComponent implements OnInit {
   private readonly api = inject(ApiService);
