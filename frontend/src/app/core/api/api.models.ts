@@ -326,6 +326,7 @@ export interface NotificationItem {
   timeLabel: string;
   isRead: boolean;
   userId?: string | null;
+  createdAtUtc?: string | null;
 }
 
 export interface DashboardStats {

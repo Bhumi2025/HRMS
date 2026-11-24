@@ -11,8 +11,29 @@ export interface DetailedNotification {
   category: 'Approval' | 'Attendance' | 'Policy' | 'Birthday' | 'Document' | 'Payroll' | 'System';
   unread: boolean;
   userId?: string | null;
+  createdAtUtc?: string | null;
   actionUrl?: string;
   actionLabel?: string;
+}
+
+function formatRelativeTime(dateStr?: string | null, fallback = 'Just now'): string {
+  if (!dateStr) return fallback;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return fallback;
+  const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diffSec < 0 || diffSec < 45) return 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${Math.max(1, diffMin)}m ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 4) return `${diffWeeks}w ago`;
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) return `${diffMonths}mo ago`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 @Injectable({
@@ -93,14 +114,16 @@ export class NotificationStateService {
             actionLabel = 'View Payroll';
           }
 
+          const timeDisplay = n.createdAtUtc ? formatRelativeTime(n.createdAtUtc, n.timeLabel) : n.timeLabel;
           return {
             id: n.id,
             title: n.title,
             message: n.message,
-            time: n.timeLabel,
+            time: timeDisplay,
             category,
             unread: !n.isRead,
             userId: n.userId,
+            createdAtUtc: n.createdAtUtc,
             actionUrl,
             actionLabel,
           };
@@ -136,6 +159,10 @@ export class NotificationStateService {
 
             // 2. Leave Approval Updates for this employee only
             if (item.category === 'Approval' || t.includes('leave') || t.includes('approval')) {
+              // Ignore "New Leave Request" or "New Approval Request" or "Pending" review items (those are for HR managers)
+              if (t.includes('new leave') || t.includes('new approval') || t.includes('pending')) {
+                return false;
+              }
               // If it names this employee
               if (myFirstName && (m.includes(myFirstName) || t.includes(myFirstName))) {
                 return true;
@@ -176,6 +203,24 @@ export class NotificationStateService {
                 m.includes('late');
               const isGenericAbsent = m.includes('recorded absent') || m.includes('window closed');
               return isReminderOrNote && !isGenericAbsent;
+            }
+
+            // 4. Payroll / Payslip notifications for this employee
+            if (
+              item.category === 'Payroll' ||
+              t.includes('payroll') ||
+              t.includes('payslip') ||
+              t.includes('salary') ||
+              m.includes('payslip') ||
+              m.includes('salary')
+            ) {
+              if (item.userId && myId && item.userId === myId) {
+                return true;
+              }
+              if (myFirstName && (m.includes(myFirstName) || t.includes(myFirstName))) {
+                return true;
+              }
+              return true;
             }
 
             // Filter out all other unrelated items for employees (birthdays of others, system alerts, approvals of others)

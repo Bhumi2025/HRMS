@@ -668,8 +668,22 @@ export class PayslipComponent implements OnInit {
     }
 
     const payslip = this.selectedPayslip();
-    const month = payslip?.month || (new Date().getMonth() + 1);
-    const year = payslip?.year || new Date().getFullYear();
+    let month = payslip?.month || (new Date().getMonth() + 1);
+    let year = payslip?.year || new Date().getFullYear();
+
+    const selMonthStr = this.selectedMonth();
+    if (selMonthStr) {
+      const parts = selMonthStr.trim().split(' ');
+      if (parts.length === 2) {
+        const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const mIdx = shortMonths.findIndex((sm) => sm.toLowerCase() === parts[0].toLowerCase());
+        const yVal = parseInt(parts[1], 10);
+        if (mIdx >= 0 && !isNaN(yVal)) {
+          month = mIdx + 1;
+          year = yVal;
+        }
+      }
+    }
 
     this.sendingMails.set(true);
     this.toast.show(`Dispatching payslips to ${selectedIds.length} employee(s)...`);

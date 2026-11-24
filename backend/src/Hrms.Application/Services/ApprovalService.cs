@@ -142,8 +142,15 @@ public sealed class ApprovalService : IApprovalService
             _uow.LeaveRequests.Update(leave);
 
             var empName = leave.Employee != null ? $"{leave.Employee.FirstName} {leave.Employee.LastName}".Trim() : "Employee";
+            var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.EmployeeId == leave.EmployeeId), ct);
+            if (empUser == null && leave.Employee != null && !string.IsNullOrWhiteSpace(leave.Employee.Email))
+            {
+                empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.Email == leave.Employee.Email), ct);
+            }
+
             await _uow.Notifications.AddAsync(new Notification
             {
+                UserId = empUser?.Id,
                 IconKey = approved ? "check" : "x",
                 Title = approved ? "Leave Request Approved" : "Leave Request Rejected",
                 Message = $"{leave.LeaveType?.Name ?? "Leave"} request for {empName} was {(approved ? "approved" : "rejected")}.",
@@ -172,8 +179,15 @@ public sealed class ApprovalService : IApprovalService
         _uow.Approvals.Update(approval);
 
         var employeeName = approval.Employee != null ? $"{approval.Employee.FirstName} {approval.Employee.LastName}".Trim() : "Employee";
+        var approvalEmpUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.EmployeeId == approval.EmployeeId), ct);
+        if (approvalEmpUser == null && approval.Employee != null && !string.IsNullOrWhiteSpace(approval.Employee.Email))
+        {
+            approvalEmpUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.Email == approval.Employee.Email), ct);
+        }
+
         await _uow.Notifications.AddAsync(new Notification
         {
+            UserId = approvalEmpUser?.Id,
             IconKey = approved ? "check" : "x",
             Title = approved ? "Approval Request Approved" : "Approval Request Rejected",
             Message = $"{approval.Title} request for {employeeName} was {(approved ? "approved" : "rejected")}.",
@@ -195,6 +209,19 @@ public sealed class ApprovalService : IApprovalService
             approval.DecidedAtUtc = DateTime.UtcNow;
             approval.DecidedByUserId = _currentUser.UserId;
             _uow.Approvals.Update(approval);
+
+            var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.EmployeeId == approval.EmployeeId), ct);
+            var empName = approval.Employee != null ? $"{approval.Employee.FirstName} {approval.Employee.LastName}".Trim() : "Employee";
+            await _uow.Notifications.AddAsync(new Notification
+            {
+                UserId = empUser?.Id,
+                IconKey = "check",
+                Title = "Approval Request Approved",
+                Message = $"{approval.Title} request for {empName} was approved.",
+                TimeLabel = "Just now",
+                IsRead = false,
+                CreatedAtUtc = DateTime.UtcNow,
+            }, ct);
         }
 
         var pendingLeaves = await _uow.LeaveRequests.ToListAsync(
@@ -206,6 +233,20 @@ public sealed class ApprovalService : IApprovalService
             leave.DecidedAtUtc = DateTime.UtcNow;
             leave.DecidedByUserId = _currentUser.UserId;
             _uow.LeaveRequests.Update(leave);
+
+            var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.EmployeeId == leave.EmployeeId), ct);
+            var emp = await _uow.Employees.GetByIdAsync(leave.EmployeeId, ct);
+            var empName = emp != null ? $"{emp.FirstName} {emp.LastName}".Trim() : "Employee";
+            await _uow.Notifications.AddAsync(new Notification
+            {
+                UserId = empUser?.Id,
+                IconKey = "check",
+                Title = "Leave Request Approved",
+                Message = $"Leave request for {empName} was approved.",
+                TimeLabel = "Just now",
+                IsRead = false,
+                CreatedAtUtc = DateTime.UtcNow,
+            }, ct);
         }
 
         var total = pendingApprovals.Count(a => a.Type != ApprovalType.Leave) + pendingLeaves.Count;

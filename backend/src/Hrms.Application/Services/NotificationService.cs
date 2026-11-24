@@ -44,7 +44,7 @@ public sealed class NotificationService : INotificationService
         var notifQuery = _uow.Notifications.Query();
         if (isEmployee)
         {
-            notifQuery = notifQuery.Where(n => n.UserId == null || (userId.HasValue && n.UserId == userId));
+            notifQuery = notifQuery.Where(n => n.UserId == null || (userId.HasValue && n.UserId == userId) || n.Title.Contains("Payslip") || n.Title.Contains("Payroll"));
         }
         else
         {
@@ -90,6 +90,56 @@ public sealed class NotificationService : INotificationService
         if (newBirthdayNotifs.Count > 0)
         {
             await _uow.Notifications.AddRangeAsync(newBirthdayNotifs, ct);
+            await _uow.SaveChangesAsync(ct);
+            items = await _uow.Notifications.ToListAsync(
+                notifQuery
+                    .OrderByDescending(n => n.CreatedAtUtc)
+                    .Take(100),
+                ct);
+        }
+
+        // Check recent payslips and ensure payslip notifications exist for employees
+        var recentPayslips = await _uow.Payslips.ToListAsync(
+            _uow.Payslips.Query().OrderByDescending(p => p.Year).ThenByDescending(p => p.Month).Take(25),
+            ct);
+
+        var newPayslipNotifs = new List<Notification>();
+        foreach (var p in recentPayslips)
+        {
+            var emp = employees.FirstOrDefault(e => e.Id == p.EmployeeId);
+            if (emp == null) continue;
+            var empName = $"{emp.FirstName} {emp.LastName}".Trim();
+            var monthName = new DateTime(p.Year, p.Month, 1).ToString("MMMM yyyy");
+
+            var alreadyExists = items.Any(n =>
+                (n.Title == "Payslip Dispatched" || n.Title.Contains("Payslip")) &&
+                n.Message.Contains(monthName) &&
+                (n.Message.Contains(empName) || (!string.IsNullOrEmpty(emp.EmployeeCode) && n.Message.Contains(emp.EmployeeCode))));
+
+            if (!alreadyExists)
+            {
+                var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.EmployeeId == emp.Id), ct);
+                if (empUser == null && !string.IsNullOrWhiteSpace(emp.Email))
+                {
+                    empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.Email == emp.Email), ct);
+                }
+
+                newPayslipNotifs.Add(new Notification
+                {
+                    UserId = empUser?.Id,
+                    IconKey = "card",
+                    Title = "Payslip Dispatched",
+                    Message = $"Your payslip for {monthName} has been dispatched to {empName}. Net Pay: ₹{p.NetPay:N2}.",
+                    TimeLabel = "Recent",
+                    IsRead = false,
+                    CreatedAtUtc = p.CreatedAtUtc != default ? p.CreatedAtUtc : DateTime.UtcNow,
+                });
+            }
+        }
+
+        if (newPayslipNotifs.Count > 0)
+        {
+            await _uow.Notifications.AddRangeAsync(newPayslipNotifs, ct);
             await _uow.SaveChangesAsync(ct);
             items = await _uow.Notifications.ToListAsync(
                 notifQuery
@@ -209,6 +259,12 @@ public sealed class NotificationService : INotificationService
                     || title.Contains("Approval", StringComparison.OrdinalIgnoreCase);
                 if (isLeaveOrApproval)
                 {
+                    // Ignore "New Leave Request" or "New Approval Request" or "Pending" review items for the employee who applied (these are for HR / Managers)
+                    if (title.StartsWith("New Leave", StringComparison.OrdinalIgnoreCase) || title.StartsWith("New Approval", StringComparison.OrdinalIgnoreCase) || title.Contains("Pending", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+
                     // Must be targeted to current user or explicitly mention this employee and not another
                     if (n.UserId.HasValue && n.UserId == userId) return true;
                     if (!string.IsNullOrEmpty(myName) && msg.Contains(myName, StringComparison.OrdinalIgnoreCase)) return true;
@@ -242,14 +298,67 @@ public sealed class NotificationService : INotificationService
                     return false;
                 }
 
+                // 4. Payroll / Payslip notifications for this employee
+                var isPayroll = icon is "card" or "payroll" or "receipt"
+                    || title.Contains("Payroll", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Payslip", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Salary", StringComparison.OrdinalIgnoreCase)
+                    || msg.Contains("payslip", StringComparison.OrdinalIgnoreCase)
+                    || msg.Contains("salary", StringComparison.OrdinalIgnoreCase);
+                if (isPayroll)
+                {
+                    if (n.UserId.HasValue && userId.HasValue && n.UserId == userId.Value) return true;
+                    if (!string.IsNullOrEmpty(myName) && (msg.Contains(myName, StringComparison.OrdinalIgnoreCase) || title.Contains(myName, StringComparison.OrdinalIgnoreCase))) return true;
+                    if (currentEmp != null && (msg.Contains(currentEmp.EmployeeCode, StringComparison.OrdinalIgnoreCase) || title.Contains(currentEmp.EmployeeCode, StringComparison.OrdinalIgnoreCase))) return true;
+                    // Generic payslip notification intended for the current employee
+                    return !employees.Any(e => !string.IsNullOrEmpty(e.FirstName) && msg.Contains(e.FirstName, StringComparison.OrdinalIgnoreCase) && (myName == null || !string.Equals(e.FirstName, currentEmp?.FirstName, StringComparison.OrdinalIgnoreCase)));
+                }
+
                 // Strictly filter out all other unrelated notifications (other employees' birthdays, absent alerts, admin requests)
                 return false;
             }).ToList();
         }
 
         return items
-            .Select(n => new NotificationDto(n.Id, n.IconKey, n.Title, n.Message, n.TimeLabel, n.IsRead, n.UserId))
+            .Select(n =>
+            {
+                var dynamicTimeLabel = FormatTimeAgo(n.CreatedAtUtc);
+                return new NotificationDto(n.Id, n.IconKey, n.Title, n.Message, dynamicTimeLabel, n.IsRead, n.UserId, n.CreatedAtUtc);
+            })
             .ToList();
+    }
+
+    private static string FormatTimeAgo(DateTime createdAtUtc)
+    {
+        var elapsed = DateTime.UtcNow - createdAtUtc;
+        if (elapsed.TotalSeconds < 0 || elapsed.TotalSeconds < 45)
+            return "Just now";
+        if (elapsed.TotalMinutes < 60)
+        {
+            var mins = Math.Max(1, (int)elapsed.TotalMinutes);
+            return $"{mins}m ago";
+        }
+        if (elapsed.TotalHours < 24)
+        {
+            var hours = Math.Max(1, (int)elapsed.TotalHours);
+            return $"{hours}h ago";
+        }
+        if (elapsed.TotalDays < 7)
+        {
+            var days = Math.Max(1, (int)elapsed.TotalDays);
+            return $"{days}d ago";
+        }
+        if (elapsed.TotalDays < 30)
+        {
+            var weeks = Math.Max(1, (int)(elapsed.TotalDays / 7));
+            return $"{weeks}w ago";
+        }
+        if (elapsed.TotalDays < 365)
+        {
+            var months = Math.Max(1, (int)(elapsed.TotalDays / 30));
+            return $"{months}mo ago";
+        }
+        return createdAtUtc.ToString("MMM d, yyyy");
     }
 
     public async Task MarkReadAsync(Guid id, CancellationToken ct = default)

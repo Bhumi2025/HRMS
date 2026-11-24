@@ -157,8 +157,15 @@ public sealed class LeaveService : ILeaveService
         _uow.LeaveRequests.Update(leave);
 
         var empName = leave.Employee != null ? $"{leave.Employee.FirstName} {leave.Employee.LastName}".Trim() : "Employee";
+        var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.EmployeeId == leave.EmployeeId), ct);
+        if (empUser == null && leave.Employee != null && !string.IsNullOrWhiteSpace(leave.Employee.Email))
+        {
+            empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.Email == leave.Employee.Email), ct);
+        }
+
         await _uow.Notifications.AddAsync(new Notification
         {
+            UserId = empUser?.Id,
             IconKey = approved ? "check" : "x",
             Title = approved ? "Leave Approved" : "Leave Rejected",
             Message = $"Leave request for {empName} ({leave.Days} day{(leave.Days > 1 ? "s" : "")}) was {(approved ? "approved" : "rejected")}.",

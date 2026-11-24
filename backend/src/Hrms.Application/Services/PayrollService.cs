@@ -292,6 +292,31 @@ public sealed class PayrollService : IPayrollService
         await _uow.PayrollRuns.AddAsync(run, ct);
         await _uow.Payslips.AddRangeAsync(payslips, ct);
 
+        var runMonthName = new DateTime(request.Year, request.Month, 1).ToString("MMMM yyyy");
+        foreach (var p in payslips)
+        {
+            var emp = active.FirstOrDefault(e => e.Id == p.EmployeeId);
+            if (emp == null) continue;
+            var empName = $"{emp.FirstName} {emp.LastName}".Trim();
+
+            var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.EmployeeId == p.EmployeeId), ct);
+            if (empUser == null && !string.IsNullOrWhiteSpace(emp.Email))
+            {
+                empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.Email == emp.Email), ct);
+            }
+
+            await _uow.Notifications.AddAsync(new Notification
+            {
+                UserId = empUser?.Id,
+                IconKey = "card",
+                Title = "Payslip Dispatched",
+                Message = $"Your payslip for {runMonthName} has been dispatched to {empName}. Net Pay: ₹{p.NetPay:N2}.",
+                TimeLabel = "Just now",
+                IsRead = false,
+                CreatedAtUtc = DateTime.UtcNow,
+            }, ct);
+        }
+
         await _uow.Notifications.AddAsync(new Notification
         {
             IconKey = "card",
@@ -324,7 +349,7 @@ public sealed class PayrollService : IPayrollService
         foreach (var empId in request.EmployeeIds)
         {
             var employee = await _uow.Employees.GetWithDetailsAsync(empId, ct);
-            if (employee == null || string.IsNullOrWhiteSpace(employee.Email)) continue;
+            if (employee == null) continue;
 
             var payslip = await _uow.Payslips.FirstOrDefaultAsync(
                 _uow.Payslips.Query().Where(p => p.EmployeeId == empId && p.Month == request.Month && p.Year == request.Year),
@@ -341,6 +366,25 @@ public sealed class PayrollService : IPayrollService
             var deptName = employee.Department?.Name ?? "General";
             var bankName = employee.BankName ?? "—";
             var accountNum = employee.AccountNumber ?? "—";
+
+            // In-app notification for the employee
+            var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.EmployeeId == employee.Id), ct);
+            if (empUser == null && !string.IsNullOrWhiteSpace(employee.Email))
+            {
+                empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.Email == employee.Email), ct);
+            }
+
+            var empName = $"{employee.FirstName} {employee.LastName}".Trim();
+            await _uow.Notifications.AddAsync(new Notification
+            {
+                UserId = empUser?.Id,
+                IconKey = "card",
+                Title = "Payslip Dispatched",
+                Message = $"Your payslip for {monthName} has been dispatched to {empName}. Net Pay: ₹{netPay:N2}.",
+                TimeLabel = "Just now",
+                IsRead = false,
+                CreatedAtUtc = DateTime.UtcNow,
+            }, ct);
 
             var html = $@"
 <!DOCTYPE html>
@@ -434,7 +478,7 @@ public sealed class PayrollService : IPayrollService
 </body>
 </html>";
 
-            if (_emailSender != null)
+            if (_emailSender != null && !string.IsNullOrWhiteSpace(employee.Email))
             {
                 var msg = new EmailMessage(
                     employee.Email,
@@ -445,6 +489,8 @@ public sealed class PayrollService : IPayrollService
                 if (res.Delivered || res.Simulated) sentCount++;
             }
         }
+
+        await _uow.SaveChangesAsync(ct);
 
         return new SendPayslipsResultDto(
             request.EmployeeIds.Count,
