@@ -892,6 +892,11 @@ export class LeaveComponent implements OnInit, AfterViewInit {
       return;
     }
 
+    if (!this.applyReason() || !this.applyReason().trim()) {
+      this.toast.show('Enter the reason first', 'danger');
+      return;
+    }
+
     if (to < from) {
       this.toast.show('End date must be on or after start date.', 'danger');
       return;

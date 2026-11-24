@@ -83,6 +83,16 @@ public sealed class LeaveController : ControllerBase
         [FromBody] CreateLeaveRequest request,
         CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Enter the reason first",
+                Detail = "Enter the reason first",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
         var created = await _leave.CreateAsync(request, ct);
         return CreatedAtAction(nameof(ForEmployee), new { employeeId = created.EmployeeId }, created);
     }
