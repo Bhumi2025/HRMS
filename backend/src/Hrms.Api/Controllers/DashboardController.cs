@@ -89,7 +89,28 @@ public sealed class DashboardController : ControllerBase
         [FromQuery] Guid? employeeId,
         CancellationToken ct)
     {
-        var id = await _employees.ResolveEmployeeIdAsync(employeeId, ct);
-        return Ok(await _dashboard.GetTemplateDataAsync(id, ct));
+        Guid? id = null;
+        try { id = await _employees.ResolveEmployeeIdAsync(employeeId, ct); }
+        catch { /* Admin with no employee linked — id stays null */ }
+
+        if (id is null)
+        {
+            // Return an empty default for admin/HR users not linked to an employee
+            var empty = new DashboardTemplateDataDto(
+                new TodayAttendanceOverviewDto(0, 0, 0, 0, 0,
+                    Array.Empty<AttendancePersonDto>(), Array.Empty<AttendancePersonDto>(),
+                    Array.Empty<AttendancePersonDto>(), Array.Empty<AttendancePersonDto>()),
+                Array.Empty<NoticeBoardDto>(),
+                Array.Empty<CelebrationDto>(),
+                Array.Empty<HolidayDto>(),
+                Array.Empty<TaskDto>(),
+                Array.Empty<PendingApprovalDto>(),
+                Array.Empty<AttendanceTrendPointDto>(),
+                Array.Empty<EmployeePunchDto>(),
+                Array.Empty<LeaveBalanceDto>());
+            return Ok(empty);
+        }
+
+        return Ok(await _dashboard.GetTemplateDataAsync(id.Value, ct));
     }
 }
