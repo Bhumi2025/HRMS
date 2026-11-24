@@ -221,6 +221,20 @@ import { ToastService } from '../../core/services/toast.service';
                         <span [appIcon]="'eye'"></span>
                         Details
                       </button>
+
+                      @if (!c.isDefault) {
+                        <button
+                          type="button"
+                          class="action-btn"
+                          style="color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);"
+                          (click)="confirmDeleteCompany(c)"
+                          data-tooltip="Delete Company & Drop Database"
+                          title="Delete {{ c.name }} & Drop Database"
+                        >
+                          <span [appIcon]="'trash'"></span>
+                          Delete
+                        </button>
+                      }
                     </div>
                   </td>
                 </tr>
@@ -302,6 +316,16 @@ import { ToastService } from '../../core/services/toast.service';
                 >
                   <span [appIcon]="'eye'"></span> Details
                 </button>
+                @if (!c.isDefault) {
+                  <button
+                    type="button"
+                    class="action-btn"
+                    style="color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);"
+                    (click)="confirmDeleteCompany(c)"
+                  >
+                    <span [appIcon]="'trash'"></span> Delete
+                  </button>
+                }
               </div>
             </div>
           } @empty {
@@ -524,8 +548,20 @@ import { ToastService } from '../../core/services/toast.service';
               }
             </div>
 
-            <!-- Modal Footer (Resend Invitation removed!) -->
-            <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end;">
+            <!-- Modal Footer -->
+            <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+              @if (!d.isDefault) {
+                <button
+                  type="button"
+                  class="action-btn"
+                  style="color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); display: inline-flex; align-items: center; gap: 6px;"
+                  (click)="closeCompanyDetails(); confirmDeleteCompany(d)"
+                >
+                  <span [appIcon]="'trash'"></span> Delete Organization & Drop Database
+                </button>
+              } @else {
+                <div></div>
+              }
               <button class="btn-cancel" type="button" (click)="closeCompanyDetails()" style="min-width: 80px;">Close</button>
             </div>
           </div>

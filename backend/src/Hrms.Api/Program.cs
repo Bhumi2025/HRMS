@@ -14,7 +14,15 @@ using Hrms.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
+// ── Environment Variables (.env) ──
+var envDict = EnvLoader.Load();
+
 var builder = WebApplication.CreateBuilder(args);
+
+if (envDict.Count > 0)
+{
+    builder.Configuration.AddInMemoryCollection(envDict);
+}
 
 // Ensure listening on all interfaces (0.0.0.0) so LAN devices can access directly
 var configuredUrls = builder.Configuration["Urls"] ?? "http://0.0.0.0:5096";
@@ -128,27 +136,53 @@ builder.Services.AddAuthorization(options =>
 // ── Response Compression ──
 builder.Services.AddResponseCompression();
 
-// ── CORS (Angular dev server & local network) ──
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                     ?? new[] { "http://localhost:4200" };
+// ── CORS (Angular dev server & deployed client) ──
+var rawAllowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                     ?? new[] { "https://webnewhrms.aviquon.com", "http://localhost:4200" };
+var allowedOrigins = rawAllowedOrigins
+    .Where(o => !string.IsNullOrWhiteSpace(o))
+    .Select(o => o.Trim().TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Angular", policy =>
     {
-        if (builder.Environment.IsDevelopment())
+        policy.SetIsOriginAllowed(origin =>
         {
-            policy.SetIsOriginAllowed(_ => true)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials();
-        }
-        else
-        {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        }
+            if (string.IsNullOrWhiteSpace(origin)) return false;
+            try
+            {
+                var uri = new Uri(origin);
+                // Allow local development on any port
+                if (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                    uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+                // Allow exact configured origins
+                var normalizedOrigin = origin.TrimEnd('/');
+                if (allowedOrigins.Any(ao => ao.Equals(normalizedOrigin, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return true;
+                }
+                // Allow aviquon.com subdomains
+                if (uri.Host.EndsWith("aviquon.com", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // Invalid URI format
+            }
+            return false;
+        })
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()
+        .WithExposedHeaders("Content-Disposition", "X-Company-Code", "X-Company-Id");
     });
 });
 
@@ -184,9 +218,9 @@ await DatabaseBootstrap.InitializeAsync(app.Services, builder.Configuration);
 // ── Pipeline ──
 // ForwardedHeaders MUST execute first so subsequent middleware and logging see the true RemoteIpAddress
 app.UseForwardedHeaders();
+app.UseCors("Angular");
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseResponseCompression();
-app.UseCors("Angular");
 
 var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
 Directory.CreateDirectory(Path.Combine(webRoot, "uploads"));

@@ -95,6 +95,7 @@ public sealed class EmployeeRepository : Repository<Employee>, IEmployeeReposito
     public async Task<IReadOnlyList<Employee>> ListWithDepartmentAsync(CancellationToken ct = default) =>
         await Set.AsNoTracking()
             .Include(e => e.Department)
+            .Include(e => e.Banks)
             .OrderBy(e => e.EmployeeCode)
             .ToListAsync(ct);
 }

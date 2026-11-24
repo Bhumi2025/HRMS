@@ -6,7 +6,8 @@ public sealed class AppOptions
     public const string SectionName = "App";
 
     /// <summary>Base URL of the frontend, used to build account-activation links.</summary>
-    public string FrontendBaseUrl { get; set; } = "http://localhost:4200";
+    // Local reference: "http://localhost:4200"
+    public string FrontendBaseUrl { get; set; } = "https://webnewhrms.aviquon.com";
 
     /// <summary>How long an invitation/activation link stays valid.</summary>
     public int InvitationExpiryHours { get; set; } = 72;

@@ -3,7 +3,9 @@ using Hrms.Application.Common;
 using Hrms.Application.DTOs;
 using Hrms.Domain.Entities;
 using Hrms.Domain.Enums;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Hrms.Infrastructure.Persistence.Tenancy;
 
@@ -15,10 +17,12 @@ namespace Hrms.Infrastructure.Persistence.Tenancy;
 public sealed class TenantDatabaseService : ITenantDatabaseService
 {
     private readonly ITenantConnectionFactory _factory;
+    private readonly ILogger<TenantDatabaseService> _logger;
 
-    public TenantDatabaseService(ITenantConnectionFactory factory)
+    public TenantDatabaseService(ITenantConnectionFactory factory, ILogger<TenantDatabaseService> logger)
     {
         _factory = factory;
+        _logger = logger;
     }
 
     public async Task<bool> DatabaseExistsAsync(string databaseName, CancellationToken ct = default)
@@ -459,13 +463,54 @@ END
 
     public async Task DropDatabaseAsync(string databaseName, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(databaseName))
+        if (string.IsNullOrWhiteSpace(databaseName) || !Hrms.Application.Common.Tenancy.TenantNaming.IsValidDatabaseName(databaseName))
         {
             return;
         }
 
-        await using var db = Create(databaseName, provisioning: true);
-        await db.Database.EnsureDeletedAsync(ct);
+        // Safety guard: NEVER drop system or master/default databases
+        var protectedDbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "master", "tempdb", "model", "msdb", "HRMS", "HRMS_Master", "HRMS_Dummy", "HRMS_Dummy_Master", "HRMS_new_Defualt", "HRMS_new_master"
+        };
+        if (protectedDbs.Contains(databaseName))
+        {
+            _logger.LogWarning("Refusing to drop protected database {DbName}.", databaseName);
+            return;
+        }
+
+        try
+        {
+            // Connect to master database to drop the tenant database forcefully
+            var masterConnStr = _factory.BuildProvisioning("master");
+            await using var conn = new SqlConnection(masterConnStr);
+            await conn.OpenAsync(ct);
+
+            var sql = $@"
+IF EXISTS (SELECT 1 FROM sys.databases WHERE name = @dbName)
+BEGIN
+    ALTER DATABASE [{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE [{databaseName}];
+END";
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.Add(new SqlParameter("@dbName", databaseName));
+            await cmd.ExecuteNonQueryAsync(ct);
+            _logger.LogInformation("Tenant database {DbName} dropped successfully from SQL Server.", databaseName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to drop tenant database {DbName} via master connection; attempting EF fallback.", databaseName);
+            try
+            {
+                await using var db = Create(databaseName, provisioning: true);
+                await db.Database.EnsureDeletedAsync(ct);
+            }
+            catch (Exception innerEx)
+            {
+                _logger.LogWarning(innerEx, "Fallback EF Core EnsureDeletedAsync also failed for {DbName}.", databaseName);
+            }
+        }
     }
 
     private HrmsDbContext Create(string databaseName, bool provisioning = false)

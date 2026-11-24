@@ -1,4 +1,5 @@
-@Hrms.Api_HostAddress = http://localhost:5096
+# Local: http://localhost:5096
+@Hrms.Api_HostAddress = https://webnewhrms.aviquon.com
 
 ### Health
 GET {{Hrms.Api_HostAddress}}/health
