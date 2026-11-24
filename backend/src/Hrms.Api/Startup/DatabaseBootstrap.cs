@@ -118,6 +118,31 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Payr
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Payslips' AND COLUMN_NAME = 'ReductionPercent')
     ALTER TABLE Payslips ADD ReductionPercent DECIMAL(5,2) NOT NULL CONSTRAINT DF_Payslips_ReductionPercent DEFAULT 0;
 
+-- 10c. Ensure OffboardingRecords table
+IF OBJECT_ID('OffboardingRecords', 'U') IS NULL
+BEGIN
+    CREATE TABLE OffboardingRecords (
+        Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        EmployeeId UNIQUEIDENTIFIER NOT NULL,
+        ResignationDate DATE NOT NULL,
+        FinalWorkingDate DATE NOT NULL,
+        Reason NVARCHAR(250) NOT NULL,
+        ReasonDetails NVARCHAR(MAX) NULL,
+        Status INT NOT NULL DEFAULT 1,
+        HandoverNotes NVARCHAR(MAX) NULL,
+        CompanyAssetsReturned BIT NOT NULL DEFAULT 0,
+        AccessRevoked BIT NOT NULL DEFAULT 0,
+        FinalSettlementProcessed BIT NOT NULL DEFAULT 0,
+        Remarks NVARCHAR(MAX) NULL,
+        InitiatedByUserId UNIQUEIDENTIFIER NULL,
+        CompletedAtUtc DATETIME2 NULL,
+        CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAtUtc DATETIME2 NULL,
+        CONSTRAINT FK_OffboardingRecords_Employees FOREIGN KEY (EmployeeId) REFERENCES Employees(Id),
+        CONSTRAINT FK_OffboardingRecords_Users FOREIGN KEY (InitiatedByUserId) REFERENCES Users(Id)
+    );
+END
+
 -- 11. Remove legacy ShiftAssignments table (Shift Roster Matrix removed)
 IF OBJECT_ID('ShiftAssignments', 'U') IS NOT NULL
     DROP TABLE ShiftAssignments;

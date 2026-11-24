@@ -149,11 +149,18 @@ public sealed class PermissionAuthorizationFilter : IAsyncActionFilter
                     }
                     else
                     {
-                        var hasOffboardRecord = await uowCheck.OffboardingRecords.AnyAsync(
-                            uowCheck.OffboardingRecords.Query().Where(o => o.EmployeeId == callerEmpId.Value && (o.Status == Domain.Entities.OffboardingStatus.Completed || o.AccessRevoked)));
-                        if (hasOffboardRecord)
+                        try
                         {
-                            isBlocked = true;
+                            var hasOffboardRecord = await uowCheck.OffboardingRecords.AnyAsync(
+                                uowCheck.OffboardingRecords.Query().Where(o => o.EmployeeId == callerEmpId.Value && (o.Status == Domain.Entities.OffboardingStatus.Completed || o.AccessRevoked)));
+                            if (hasOffboardRecord)
+                            {
+                                isBlocked = true;
+                            }
+                        }
+                        catch
+                        {
+                            // Soft-fail: if the table cannot be queried, do not block or crash the request
                         }
                     }
                 }
