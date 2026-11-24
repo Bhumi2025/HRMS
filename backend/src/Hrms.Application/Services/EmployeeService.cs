@@ -134,7 +134,7 @@ public sealed class EmployeeService : IEmployeeService
             TransportAllowance = request.TransportAllowance,
             MobileAllowance = request.MobileAllowance,
             OtherAllowances = request.OtherAllowances,
-            Currency = string.IsNullOrWhiteSpace(request.Currency) ? "USD" : request.Currency.Trim(),
+            Currency = string.IsNullOrWhiteSpace(request.Currency) ? "INR" : request.Currency.Trim(),
             DateOfBirth = request.DateOfBirth,
             Gender = request.Gender ?? Gender.Female,
             MaritalStatus = request.MaritalStatus ?? MaritalStatus.Single,

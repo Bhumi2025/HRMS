@@ -7,6 +7,7 @@ import { IconDirective } from '../../core/icons/icon.directive';
 import { PermissionService } from '../../core/services/permission.service';
 import { UiService } from '../../core/services/ui.service';
 import { ToastService } from '../../core/services/toast.service';
+import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
@@ -635,6 +636,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
   protected readonly perms = inject(PermissionService);
   private readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
+  protected readonly currencyService = inject(CurrencyService);
   private readonly faceService = inject(FaceRecognitionService);
 
   @ViewChild('searchInput') private searchInputRef?: ElementRef<HTMLInputElement>;
@@ -900,22 +902,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
   }
 
   private currencySymbol(code: string): string {
-    switch (code) {
-      case 'INR':
-        return '₹';
-      case 'AED':
-        return 'AED ';
-      case 'GBP':
-        return '£';
-      case 'EUR':
-        return '€';
-      case 'SAR':
-        return 'SAR ';
-      case 'USD':
-        return '$';
-      default:
-        return '₹';
-    }
+    return this.currencyService.getSymbol(code);
   }
 
   private parseMoney(value: string): number {

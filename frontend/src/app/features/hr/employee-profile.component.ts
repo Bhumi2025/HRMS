@@ -7,6 +7,7 @@ import { IconDirective } from '../../core/icons/icon.directive';
 import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
+import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { triggerDocumentDownload } from '../../core/utils/document-download.util';
@@ -495,7 +496,7 @@ interface DocRow {
           <div class="card-header"><div class="card-title">Salary Structure</div></div>
           <div class="card-body">
             <div style="margin-bottom: 14px">
-              <div style="font-size: 20px; font-weight: 800; color: var(--p)">{{ profile().salary || '$0' }}</div>
+              <div style="font-size: 20px; font-weight: 800; color: var(--p)">{{ profile().salary || (currencyService.currencySymbol() + '0') }}</div>
               <div style="font-size: 14px; color: var(--muted)">Gross Monthly Salary</div>
             </div>
             @for (s of salaryStructure; track s[0]) {
@@ -1081,6 +1082,7 @@ export class EmployeeProfileComponent implements OnInit {
   protected readonly ui = inject(UiService);
   protected readonly toast = inject(ToastService);
   protected readonly session = inject(SessionService);
+  protected readonly currencyService = inject(CurrencyService);
   private readonly api = inject(ApiService);
   private readonly faceService = inject(FaceRecognitionService);
   private readonly route = inject(ActivatedRoute);
@@ -1415,8 +1417,7 @@ export class EmployeeProfileComponent implements OnInit {
     this.detail.set(employee);
     this.apiId.set(employee.id);
 
-    const cur = employee.currency || 'USD';
-    const sym = cur === 'AED' ? 'AED ' : '$';
+    const sym = this.currencyService.getSymbol(employee.currency || this.currencyService.currencyCode());
     this.profile.set({
       id: employee.employeeCode,
       name: employee.fullName,
@@ -2018,7 +2019,7 @@ export class EmployeeProfileComponent implements OnInit {
       grade: '',
       status: 'Active',
       join: '',
-      salary: '$0',
+      salary: '',
       email: '',
     };
     try {

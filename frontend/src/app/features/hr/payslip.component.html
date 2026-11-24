@@ -186,25 +186,25 @@
       <div class="payslip-fin-col earnings-col">
         <div class="fin-header earnings-header">
           <span>Earnings</span>
-          <span>Amount (₹)</span>
+          <span>Amount ({{ currencyService.currencySymbol() }})</span>
         </div>
         <div class="fin-body">
           @for (line of earnings(); track line[0]) {
             <div class="fin-row">
               <span class="fin-desc">{{ line[0] }}</span>
-              <span class="fin-val font-bold">₹{{ line[1].toLocaleString() }}.00</span>
+              <span class="fin-val font-bold">{{ currencyService.currencySymbol() }}{{ line[1].toLocaleString() }}.00</span>
             </div>
           }
           @if (earnings().length === 0) {
             <div class="fin-row">
               <span class="fin-desc">Basic Salary</span>
-              <span class="fin-val font-bold">₹{{ (selectedPayslip()?.basicSalary ?? 4903).toLocaleString() }}.00</span>
+              <span class="fin-val font-bold">{{ currencyService.currencySymbol() }}{{ (selectedPayslip()?.basicSalary ?? 4903).toLocaleString() }}.00</span>
             </div>
           }
         </div>
         <div class="fin-footer earnings-footer">
           <span>Total Gross Earnings</span>
-          <span class="fin-total earnings-total">₹{{ totalEarnings().toLocaleString() }}.00</span>
+          <span class="fin-total earnings-total">{{ currencyService.currencySymbol() }}{{ totalEarnings().toLocaleString() }}.00</span>
         </div>
       </div>
 
@@ -212,25 +212,25 @@
       <div class="payslip-fin-col deductions-col">
         <div class="fin-header deductions-header">
           <span>Deductions</span>
-          <span>Amount (₹)</span>
+          <span>Amount ({{ currencyService.currencySymbol() }})</span>
         </div>
         <div class="fin-body">
           @for (line of deductions(); track line[0]) {
             <div class="fin-row">
               <span class="fin-desc">{{ line[0] }}</span>
-              <span class="fin-val deduction-val">₹{{ line[1].toLocaleString() }}.00</span>
+              <span class="fin-val deduction-val">{{ currencyService.currencySymbol() }}{{ line[1].toLocaleString() }}.00</span>
             </div>
           }
           @if (deductions().length === 0) {
             <div class="fin-row">
               <span class="fin-desc">Unpaid Leave (LOP) Deduction</span>
-              <span class="fin-val deduction-val">₹{{ (selectedPayslip()?.deductions ?? 0).toLocaleString() }}.00</span>
+              <span class="fin-val deduction-val">{{ currencyService.currencySymbol() }}{{ (selectedPayslip()?.deductions ?? 0).toLocaleString() }}.00</span>
             </div>
           }
         </div>
         <div class="fin-footer deductions-footer">
           <span>Total Deductions</span>
-          <span class="fin-total deductions-total">₹{{ totalDeductions().toLocaleString() }}.00</span>
+          <span class="fin-total deductions-total">{{ currencyService.currencySymbol() }}{{ totalDeductions().toLocaleString() }}.00</span>
         </div>
       </div>
     </div>
@@ -239,7 +239,7 @@
     <div class="payslip-net-banner">
       <div class="net-banner-top">
         <div class="net-title">
-          Total Net Payable: <span class="net-highlight">₹{{ netPay().toLocaleString() }}.00</span>
+          Total Net Payable: <span class="net-highlight">{{ currencyService.currencySymbol() }}{{ netPay().toLocaleString() }}.00</span>
         </div>
         <div class="net-calc-note">
           Total Net Payable = Gross Earnings - Total Deductions

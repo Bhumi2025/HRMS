@@ -17,6 +17,7 @@ import { IconDirective } from '../../core/icons/icon.directive';
 import { PermissionService } from '../../core/services/permission.service';
 import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
+import { CurrencyService } from '../../core/services/currency.service';
 import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 
 export type CompanyTab = 'directory' | 'profile' | 'departments' | 'designations' | 'holiday';
@@ -1890,6 +1891,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
   private readonly session = inject(SessionService);
   private readonly route = inject(ActivatedRoute);
   protected readonly perms = inject(PermissionService);
+  protected readonly currencyService = inject(CurrencyService);
 
   protected readonly standardTimezones = STANDARD_TIMEZONES;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -2249,6 +2251,9 @@ export class CompanyComponent implements OnInit, OnDestroy {
           if (data.logoUrl) {
             this.session.updateCompanyLogo(data.logoUrl);
           }
+          if (data.payrollCurrency) {
+            this.currencyService.setCurrency(data.payrollCurrency);
+          }
         }
       },
       error: () => {
@@ -2286,6 +2291,9 @@ export class CompanyComponent implements OnInit, OnDestroy {
         }
         if (res.companyName) {
           this.session.updateUser({ companyName: res.companyName });
+        }
+        if (res.payrollCurrency) {
+          this.currencyService.setCurrency(res.payrollCurrency);
         }
       },
       error: (err) => {
@@ -3008,7 +3016,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
       phone: this.companyForm.contactNumber?.trim() || '',
       hrEmail: this.companyForm.contactEmail?.trim() || '',
       timeZone: this.companyForm.timeZone || 'Asia/Dubai',
-      payrollCurrency: 'USD',
+      payrollCurrency: this.profileForm.payrollCurrency || this.currencyService.currencyCode() || 'INR',
     };
     this.api.updateCompany(body).subscribe({
       next: () => {

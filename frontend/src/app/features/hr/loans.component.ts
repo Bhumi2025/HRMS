@@ -4,6 +4,7 @@ import { ApiService } from '../../core/api/api.service';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
+import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 
 interface Loan {
@@ -69,11 +70,11 @@ interface Loan {
                   </div>
                 </td>
                 <td><span class="badge badge-primary loan-type-badge">{{ r.t }}</span></td>
-                <td class="loan-col-amt" style="font-weight: 700">{{ '$' + r.amt.toLocaleString() }}</td>
-                <td class="loan-col-emi">{{ r.emi ? '$' + r.emi : ' · ' }}</td>
-                <td class="loan-col-paid" style="color: var(--success); font-weight: 600">{{ '$' + r.paid.toLocaleString() }}</td>
+                <td class="loan-col-amt" style="font-weight: 700">{{ currencyService.format(r.amt) }}</td>
+                <td class="loan-col-emi">{{ r.emi ? currencyService.format(r.emi) : ' · ' }}</td>
+                <td class="loan-col-paid" style="color: var(--success); font-weight: 600">{{ currencyService.format(r.paid) }}</td>
                 <td class="loan-col-bal" [style.color]="r.bal ? 'var(--danger)' : 'var(--success)'" style="font-weight: 700">
-                  {{ '$' + r.bal.toLocaleString() }}
+                  {{ currencyService.format(r.bal) }}
                 </td>
                 <td class="loan-col-ten" style="font-size: 13px; color: var(--muted)">{{ r.ten }}</td>
                 <td class="loan-col-status">
@@ -168,10 +169,11 @@ export class LoansComponent implements OnInit {
   protected readonly ui = inject(UiService);
   protected readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
+  protected readonly currencyService = inject(CurrencyService);
 
   protected readonly kpis = signal([
-    { l: 'Total Disbursed', v: '$0', c: 'var(--p)' },
-    { l: 'Outstanding', v: '$0', c: 'var(--danger)' },
+    { l: 'Total Disbursed', v: '0', c: 'var(--p)' },
+    { l: 'Outstanding', v: '0', c: 'var(--danger)' },
     { l: 'Active Loans', v: '0', c: 'var(--warning)' },
     { l: 'Pending Approval', v: '0', c: 'var(--p)' },
   ]);
@@ -265,7 +267,7 @@ export class LoansComponent implements OnInit {
   }
 
   private money(value: number): string {
-    return `$${value.toLocaleString()}`;
+    return this.currencyService.format(value);
   }
 
   protected initials(name: string): string {
