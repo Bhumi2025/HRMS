@@ -93,6 +93,21 @@
 
     <main class="page-content" id="pageContent">
       <router-outlet />
+
+      <!-- Global Footer with clean divider line for Mobile (iPhone, iPad, Android) & Desktop -->
+      <footer class="app-page-footer" role="contentinfo">
+        <div class="footer-divider-line"></div>
+        <div class="footer-inner">
+          <div class="footer-copyright">
+            © {{ currentYear }} <strong>{{ currentCompanyName() }}</strong>. All rights reserved.
+          </div>
+          <div class="footer-details">
+            <span class="footer-badge">HRMS Cloud</span>
+            <span class="footer-sep">•</span>
+            <span class="footer-status"><span class="footer-dot"></span> System Online</span>
+          </div>
+        </div>
+      </footer>
     </main>
   </div>
 </div>

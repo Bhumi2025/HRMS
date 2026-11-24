@@ -347,19 +347,18 @@ public sealed class PayrollService : IPayrollService
         foreach (var p in payslips)
         {
             var u = empUsers.FirstOrDefault(usr => usr.EmployeeId == p.EmployeeId);
-            if (u != null)
+            var emp = active.FirstOrDefault(e => e.Id == p.EmployeeId);
+            var empName = emp != null ? $"{emp.FirstName} {emp.LastName}".Trim() : "Employee";
+            await _uow.Notifications.AddAsync(new Notification
             {
-                await _uow.Notifications.AddAsync(new Notification
-                {
-                    UserId = u.Id,
-                    IconKey = "payroll",
-                    Title = $"Payslip Available: {monthDate:MMMM yyyy}",
-                    Message = $"Your payslip for {monthDate:MMMM yyyy} is now available in your portal. Net Salary: ₹{p.NetPay:N2}.",
-                    TimeLabel = "Payslip",
-                    IsRead = false,
-                    CreatedAtUtc = DateTime.UtcNow,
-                }, ct);
-            }
+                UserId = u?.Id,
+                IconKey = "card",
+                Title = "Payslip Dispatched",
+                Message = $"Your payslip for {monthDate:MMMM yyyy} has been dispatched to {empName}. Net Pay: ₹{p.NetPay:N2}.",
+                TimeLabel = "Just now",
+                IsRead = false,
+                CreatedAtUtc = DateTime.UtcNow,
+            }, ct);
         }
 
         await _uow.SaveChangesAsync(ct);
@@ -384,7 +383,7 @@ public sealed class PayrollService : IPayrollService
         foreach (var empId in request.EmployeeIds)
         {
             var employee = await _uow.Employees.GetWithDetailsAsync(empId, ct);
-            if (employee == null || string.IsNullOrWhiteSpace(employee.Email)) continue;
+            if (employee == null) continue;
 
             var payslip = await _uow.Payslips.FirstOrDefaultAsync(
                 _uow.Payslips.Query().Where(p => p.EmployeeId == empId && p.Month == request.Month && p.Year == request.Year),
@@ -401,6 +400,25 @@ public sealed class PayrollService : IPayrollService
             var deptName = employee.Department?.Name ?? "General";
             var bankName = employee.BankName ?? "—";
             var accountNum = employee.AccountNumber ?? "—";
+
+            // In-app notification for the employee
+            var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.EmployeeId == employee.Id), ct);
+            if (empUser == null && !string.IsNullOrWhiteSpace(employee.Email))
+            {
+                empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.Email == employee.Email), ct);
+            }
+
+            var empName = $"{employee.FirstName} {employee.LastName}".Trim();
+            await _uow.Notifications.AddAsync(new Notification
+            {
+                UserId = empUser?.Id,
+                IconKey = "card",
+                Title = "Payslip Dispatched",
+                Message = $"Your payslip for {monthName} has been dispatched to {empName}. Net Pay: ₹{netPay:N2}.",
+                TimeLabel = "Just now",
+                IsRead = false,
+                CreatedAtUtc = DateTime.UtcNow,
+            }, ct);
 
             var html = $@"
 <!DOCTYPE html>
@@ -494,7 +512,7 @@ public sealed class PayrollService : IPayrollService
 </body>
 </html>";
 
-            if (_emailSender != null)
+            if (_emailSender != null && !string.IsNullOrWhiteSpace(employee.Email))
             {
                 var msg = new EmailMessage(
                     employee.Email,
@@ -503,22 +521,6 @@ public sealed class PayrollService : IPayrollService
                     $"Your payslip for {monthName} is ready. Net Payable: ₹{netPay:N2}.");
                 var res = await _emailSender.SendAsync(msg, ct);
                 if (res.Delivered || res.Simulated) sentCount++;
-            }
-
-            var empUser = await _uow.Users.FirstOrDefaultAsync(
-                _uow.Users.Query().Where(u => u.EmployeeId == empId), ct);
-            if (empUser != null)
-            {
-                await _uow.Notifications.AddAsync(new Notification
-                {
-                    UserId = empUser.Id,
-                    IconKey = "payroll",
-                    Title = $"Payslip Delivered: {monthName}",
-                    Message = $"Your payslip for {monthName} has been distributed to your portal and email. Net Salary: ₹{netPay:N2}.",
-                    TimeLabel = "Payslip",
-                    IsRead = false,
-                    CreatedAtUtc = DateTime.UtcNow
-                }, ct);
             }
         }
 
