@@ -121,33 +121,55 @@ public sealed class PayrollService : IPayrollService
         var start = new DateOnly(year, month, 1);
         var end = new DateOnly(year, month, daysInMonth);
 
-        // Find unresolved pending leaves that intersect with this payroll cycle
+        // 1. Find unresolved pending leaves that intersect with this payroll cycle
         var pendingLeaves = await _uow.LeaveRequests.ToListAsync(
             _uow.LeaveRequests.Query()
                 .Where(l => l.Status == LeaveStatus.Pending && l.FromDate <= end && l.ToDate >= start),
             ct);
 
+        var allEmployees = await _uow.Employees.ListWithDepartmentAsync(ct);
+        var activeEmployees = allEmployees.Where(e => e.Status != EmploymentStatus.Terminated).ToList();
+
+        // 2. Check for active employees missing compulsory bank details (Bank A/c No. & IFSC Code)
+        var missingBankEmps = activeEmployees
+            .Where(e =>
+                (string.IsNullOrWhiteSpace(e.AccountNumber) || string.IsNullOrWhiteSpace(e.IfscCode)) &&
+                !e.Banks.Any(b => !string.IsNullOrWhiteSpace(b.AccountNumber) && !string.IsNullOrWhiteSpace(b.IfscOrSwiftCode)))
+            .Select(e => $"{e.FullName} ({e.EmployeeCode})")
+            .ToList();
+
+        var pendingNames = new List<string>();
         if (pendingLeaves.Count > 0)
         {
             var empIds = pendingLeaves.Select(l => l.EmployeeId).Distinct().ToHashSet();
-            var allEmployees = await _uow.Employees.ListAsync(ct);
-            var names = allEmployees
+            pendingNames = allEmployees
                 .Where(e => empIds.Contains(e.Id))
                 .Select(e => $"{e.FirstName} {e.LastName}".Trim())
                 .ToList();
-
-            return new PayrollPreflightCheckDto(
-                false,
-                pendingLeaves.Count,
-                $"You have {pendingLeaves.Count} pending leave approval(s) requiring HR resolution. Unresolved leaves affect attendance and unpaid salary deductions. Please approve or reject them before executing payroll.",
-                names);
         }
 
+        var canRun = pendingLeaves.Count == 0 && missingBankEmps.Count == 0;
+        var messages = new List<string>();
+        if (pendingLeaves.Count > 0)
+        {
+            messages.Add($"{pendingLeaves.Count} pending leave approval(s) requiring HR resolution.");
+        }
+        if (missingBankEmps.Count > 0)
+        {
+            messages.Add($"{missingBankEmps.Count} active employee(s) missing compulsory bank details (Bank A/c No. & IFSC Code).");
+        }
+
+        var message = canRun
+            ? "All pre-flight checks passed: 0 pending leaves, all active employees have verified bank details."
+            : $"Pre-flight audit failed: {string.Join(" ", messages)}";
+
         return new PayrollPreflightCheckDto(
-            true,
-            0,
-            "All pre-flight checks passed: 0 pending leave requests found.",
-            Array.Empty<string>());
+            canRun,
+            pendingLeaves.Count,
+            message,
+            pendingNames,
+            missingBankEmps.Count,
+            missingBankEmps);
     }
 
     public async Task<PayrollRunDto> RunPayrollAsync(RunPayrollRequest request, CancellationToken ct = default)
@@ -164,6 +186,19 @@ public sealed class PayrollService : IPayrollService
         if (active.Count == 0)
         {
             throw new ValidationException("There are no employees to run payroll for.");
+        }
+
+        var missingBankDetails = active
+            .Where(e =>
+                (string.IsNullOrWhiteSpace(e.AccountNumber) || string.IsNullOrWhiteSpace(e.IfscCode)) &&
+                !e.Banks.Any(b => !string.IsNullOrWhiteSpace(b.AccountNumber) && !string.IsNullOrWhiteSpace(b.IfscOrSwiftCode)))
+            .Select(e => $"{e.FullName} ({e.EmployeeCode})")
+            .ToList();
+
+        if (missingBankDetails.Count > 0)
+        {
+            throw new ValidationException(
+                $"Cannot process payroll. Bank details (Bank A/c No. and IFSC Code) are compulsory and missing for {missingBankDetails.Count} active employee(s): {string.Join(", ", missingBankDetails)}. Please fill these missing bank details before running payroll.");
         }
 
         var daysInMonth = DateTime.DaysInMonth(request.Year, request.Month);

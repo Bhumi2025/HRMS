@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
 import {
@@ -34,7 +34,7 @@ function emptyForm(): CreateCompanyRequest {
   imports: [CommonModule, FormsModule, IconDirective],
   templateUrl: './companies.component.html',
 })
-export class CompaniesComponent implements OnInit {
+export class CompaniesComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
 
@@ -48,6 +48,9 @@ export class CompaniesComponent implements OnInit {
   protected readonly editingCompany = signal<CompanyListItem | null>(null);
   protected readonly companyToDelete = signal<CompanyListItem | null>(null);
   protected readonly saving = signal(false);
+  protected readonly creationProgress = signal(0);
+  protected readonly creationStage = signal('Initializing database...');
+  private creationProgressTimer: ReturnType<typeof setInterval> | null = null;
   protected form: CreateCompanyRequest = emptyForm();
   protected editForm: UpdateCompanyRequest = {
     name: '',
@@ -89,6 +92,43 @@ export class CompaniesComponent implements OnInit {
     this.showCreate.set(false);
   }
 
+  ngOnDestroy(): void {
+    if (this.creationProgressTimer) {
+      clearInterval(this.creationProgressTimer);
+      this.creationProgressTimer = null;
+    }
+  }
+
+  private startCreationProgress(): void {
+    if (this.creationProgressTimer) clearInterval(this.creationProgressTimer);
+    this.creationProgress.set(12);
+    this.creationStage.set('Connecting to cluster & allocating database...');
+
+    const stages = [
+      { at: 600, pct: 32, label: 'Allocating dedicated database schema...' },
+      { at: 1300, pct: 58, label: 'Applying EF Core migrations & system tables...' },
+      { at: 2200, pct: 78, label: 'Configuring default roles & admin security...' },
+      { at: 3000, pct: 92, label: 'Registering tenant in central company registry...' },
+    ];
+
+    const start = Date.now();
+    this.creationProgressTimer = setInterval(() => {
+      const elapsed = Date.now() - start;
+      for (let i = stages.length - 1; i >= 0; i--) {
+        if (elapsed >= stages[i].at) {
+          if (this.creationProgress() < stages[i].pct) {
+            this.creationProgress.set(stages[i].pct);
+            this.creationStage.set(stages[i].label);
+          }
+          break;
+        }
+      }
+      if (this.creationProgress() >= 92 && this.creationProgress() < 96) {
+        this.creationProgress.update((p) => Math.min(96, p + 1));
+      }
+    }, 250);
+  }
+
   protected save(): void {
     if (!this.form.name?.trim() || !this.form.adminFullName?.trim() || !this.form.adminEmail?.trim()) {
       this.toast.show('Company name, administrator name and email are required.', 'warning');
@@ -96,15 +136,32 @@ export class CompaniesComponent implements OnInit {
     }
 
     this.saving.set(true);
+    this.startCreationProgress();
+
     this.api.createTenantCompany(this.form).subscribe({
       next: (result) => {
-        this.saving.set(false);
-        this.showCreate.set(false);
-        this.handleResult(result);
-        this.load();
+        if (this.creationProgressTimer) {
+          clearInterval(this.creationProgressTimer);
+          this.creationProgressTimer = null;
+        }
+        this.creationProgress.set(100);
+        this.creationStage.set('Provisioning complete!');
+
+        setTimeout(() => {
+          this.saving.set(false);
+          this.creationProgress.set(0);
+          this.showCreate.set(false);
+          this.handleResult(result);
+          this.load();
+        }, 450);
       },
       error: (error) => {
+        if (this.creationProgressTimer) {
+          clearInterval(this.creationProgressTimer);
+          this.creationProgressTimer = null;
+        }
         this.saving.set(false);
+        this.creationProgress.set(0);
         this.toast.show(error?.error?.title ?? 'Could not create the company.', 'danger');
       },
     });

@@ -419,33 +419,56 @@ export interface ComprehensivePayrollRow {
               <div style="padding: 12px 14px;">
                 @if (isCheckingPreflight()) {
                   <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); padding: 8px 0;">
-                    <span class="spinner-sm"></span> Checking pending leaves and approvals in {{ runForm.month }}...
+                    <span class="spinner-sm"></span> Auditing pending leaves & compulsory bank details in {{ runForm.month }}...
                   </div>
-                } @else if (preflightResult() && preflightResult()!.pendingLeavesCount > 0) {
-                  <!-- Pending Leaves Warning: Blocks Payroll Run -->
-                  <div style="background: rgba(239,68,68,0.08); border: 1.5px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 12px;">
-                    <div style="display: flex; align-items: flex-start; gap: 10px;">
-                      <span [appIcon]="'alert_triangle'" style="color: var(--danger); font-size: 1.3rem; flex-shrink: 0; margin-top: 1px;"></span>
-                      <div style="flex: 1;">
-                        <div style="font-weight: 800; color: var(--danger); font-size: 13px;">
-                          Action Required: {{ preflightResult()!.pendingLeavesCount }} Pending Leave Request(s) Detected
-                        </div>
-                        <div style="font-size: 12px; color: var(--text); margin-top: 4px; line-height: 1.4;">
-                          Pending employee requests: <b>{{ preflightResult()!.pendingEmployeeNames.join(', ') }}</b>
-                        </div>
-                        <div style="font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4;">
-                          ⚠️ Unresolved leaves directly skew Unpaid Leave (LOP) calculations and daily salary deductions. HR must approve or reject pending requests before payroll can be authorized.
+                } @else if (preflightResult() && (preflightResult()!.pendingLeavesCount > 0 || (preflightResult()!.missingBankDetailsCount || 0) > 0)) {
+                  <!-- Warning Box: Blocks Payroll Run -->
+                  <div style="display: flex; flex-direction: column; gap: 10px;">
+                    @if ((preflightResult()!.missingBankDetailsCount || 0) > 0) {
+                      <div style="background: rgba(239,68,68,0.08); border: 1.5px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 12px;">
+                        <div style="display: flex; align-items: flex-start; gap: 10px;">
+                          <span [appIcon]="'alert_triangle'" style="color: var(--danger); font-size: 1.3rem; flex-shrink: 0; margin-top: 1px;"></span>
+                          <div style="flex: 1;">
+                            <div style="font-weight: 800; color: var(--danger); font-size: 13px;">
+                              Compulsory Action: {{ preflightResult()!.missingBankDetailsCount }} Active Employee(s) Missing Bank Details
+                            </div>
+                            <div style="font-size: 12px; color: var(--text); margin-top: 4px; line-height: 1.4;">
+                              Missing Bank A/c No. or IFSC Code: <b>{{ preflightResult()!.missingBankEmployeeNames?.join(', ') }}</b>
+                            </div>
+                            <div style="font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.4;">
+                              ⚠️ Bank details (Bank A/c No. &amp; IFSC Code) are compulsory for payroll processing and disbursement. Please update their profile bank details before running payroll.
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    }
+
+                    @if (preflightResult()!.pendingLeavesCount > 0) {
+                      <div style="background: rgba(245,158,11,0.08); border: 1.5px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 12px;">
+                        <div style="display: flex; align-items: flex-start; gap: 10px;">
+                          <span [appIcon]="'alert_triangle'" style="color: #d97706; font-size: 1.3rem; flex-shrink: 0; margin-top: 1px;"></span>
+                          <div style="flex: 1;">
+                            <div style="font-weight: 800; color: #b45309; font-size: 13px;">
+                              Action Required: {{ preflightResult()!.pendingLeavesCount }} Pending Leave Request(s)
+                            </div>
+                            <div style="font-size: 12px; color: var(--text); margin-top: 4px; line-height: 1.4;">
+                              Pending requests: <b>{{ preflightResult()!.pendingEmployeeNames.join(', ') }}</b>
+                            </div>
+                            <div style="font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4;">
+                              ⚠️ Unresolved leaves directly skew Unpaid Leave (LOP) calculations. Please approve or reject pending requests first.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    }
                   </div>
                 } @else {
                   <!-- All Checks Passed -->
                   <div style="background: rgba(16,185,129,0.08); border: 1.5px solid rgba(16,185,129,0.3); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 10px;">
                     <div style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; flex-shrink: 0;">✓</div>
                     <div>
-                      <div style="font-weight: 700; color: #065f46; font-size: 12.5px;">All HR Pre-Flight Checks Settled</div>
-                      <div style="font-size: 11px; color: #047857; margin-top: 1px;">No pending leave approvals detected for {{ runForm.month }}. Ready for authorization.</div>
+                      <div style="font-weight: 700; color: #065f46; font-size: 12.5px;">All HR Pre-Flight Checks Passed</div>
+                      <div style="font-size: 11px; color: #047857; margin-top: 1px;">All active employees have verified bank details and all leaves are resolved for {{ runForm.month }}. Ready for authorization.</div>
                     </div>
                   </div>
                 }
@@ -459,7 +482,11 @@ export interface ComprehensivePayrollRow {
           <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
             <button class="btn btn-outline" [disabled]="runningPayroll()" (click)="showRunModal.set(false)">Cancel</button>
             
-            @if (preflightResult() && preflightResult()!.pendingLeavesCount > 0) {
+            @if (preflightResult() && (preflightResult()!.missingBankDetailsCount || 0) > 0) {
+              <button class="btn btn-danger" disabled style="opacity: 0.65; cursor: not-allowed;" title="Fill missing bank details first">
+                Fill Missing Bank Details First
+              </button>
+            } @else if (preflightResult() && preflightResult()!.pendingLeavesCount > 0) {
               <button class="btn btn-danger" disabled style="opacity: 0.65; cursor: not-allowed;" title="Resolve all pending leaves first">
                 Resolve Pending Leaves First
               </button>
@@ -772,7 +799,14 @@ export class PayrollComponent implements OnInit, AfterViewInit {
   protected readonly selectedRow = signal<ComprehensivePayrollRow | null>(null);
 
   protected readonly isCheckingPreflight = signal(false);
-  protected readonly preflightResult = signal<{ canRun: boolean; pendingLeavesCount: number; message: string; pendingEmployeeNames: string[] } | null>(null);
+  protected readonly preflightResult = signal<{
+    canRun: boolean;
+    pendingLeavesCount: number;
+    message: string;
+    pendingEmployeeNames: string[];
+    missingBankDetailsCount?: number;
+    missingBankEmployeeNames?: string[];
+  } | null>(null);
 
   protected readonly isSearchReadonly = signal(true);
   private userInteracted = false;
@@ -1399,6 +1433,22 @@ export class PayrollComponent implements OnInit, AfterViewInit {
   }
 
   protected executeRunPayroll(): void {
+    if (this.preflightResult() && (this.preflightResult()!.missingBankDetailsCount || 0) > 0) {
+      this.toast.show(
+        `Cannot run payroll: Compulsory bank details (Bank A/c No. & IFSC Code) are missing for: ${this.preflightResult()!.missingBankEmployeeNames?.join(', ')}. Please fill them first.`,
+        'danger'
+      );
+      return;
+    }
+
+    if (this.preflightResult() && this.preflightResult()!.pendingLeavesCount > 0) {
+      this.toast.show(
+        `Cannot run payroll: Please approve or reject pending leaves for: ${this.preflightResult()!.pendingEmployeeNames.join(', ')} first.`,
+        'danger'
+      );
+      return;
+    }
+
     this.runningPayroll.set(true);
     const [yearStr, monthStr] = this.runForm.month.split('-');
     const year = parseInt(yearStr, 10) || new Date().getFullYear();
@@ -1446,9 +1496,12 @@ export class PayrollComponent implements OnInit, AfterViewInit {
           this.toast.show(`Payroll for ${this.runForm.month} was already recorded in database.`, 'info');
           this.loadBackendPayroll();
         } else {
-          // Process locally
-          this.markCurrentRowsProcessed();
-          this.toast.show(`Payroll for ${this.runForm.month} processed successfully!`, 'success');
+          const errObj = err?.error;
+          let msg = 'Failed to execute payroll.';
+          if (errObj?.detail) msg = errObj.detail;
+          else if (errObj?.message) msg = errObj.message;
+          else if (errObj?.title) msg = errObj.title;
+          this.toast.show(msg, 'danger');
         }
         this.loadPayrollRuns();
       },

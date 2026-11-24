@@ -645,7 +645,7 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
     const samples: number[][] = [];
     let snapshot = '';
     for (let i = 0; i < 3; i++) {
-      const scan = await this.faceService.detectFace(video, canvas);
+      const scan = await this.faceService.detectFace(video, canvas, true);
       if (scan.hasFace && scan.descriptor) {
         samples.push(scan.descriptor);
         if (scan.snapshot) snapshot = scan.snapshot;

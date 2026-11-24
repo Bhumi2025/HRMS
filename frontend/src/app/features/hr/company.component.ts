@@ -1036,14 +1036,36 @@ function emptyTenantForm(): CreateCompanyRequest {
                 <input class="form-control" type="email" [(ngModel)]="tenantCreateForm.contactEmail" placeholder="Optional" />
               </div>
             </div>
-            <div style="background: var(--p-soft); border-radius: 8px; padding: 12px; margin-top: 14px; font-size: 13px;">
-              ⚡ A dedicated, isolated SQLite/Postgres database will automatically be provisioned with its own schema migrations for this company.
-            </div>
+            @if (savingTenant()) {
+              <div class="provisioning-progress-card" style="margin-top: 14px; padding: 14px 16px; background: linear-gradient(135deg, rgba(37,99,235,0.06), rgba(99,102,241,0.08)); border: 1px solid rgba(37,99,235,0.25); border-radius: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span style="font-size: 13px; font-weight: 600; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+                    <span class="spinner-border" style="width: 14px; height: 14px; border: 2px solid #2563eb; border-top-color: transparent; border-radius: 50%; display: inline-block; animation: spin-progress 0.8s linear infinite;"></span>
+                    {{ tenantCreationStage() }}
+                  </span>
+                  <span style="font-size: 13px; font-weight: 700; color: #2563eb;">{{ tenantCreationProgress() }}%</span>
+                </div>
+                <div style="width: 100%; height: 9px; background: #e2e8f0; border-radius: 6px; overflow: hidden; position: relative;">
+                  <div style="height: 100%; background: linear-gradient(90deg, #2563eb, #3b82f6, #6366f1); border-radius: 6px; transition: width 0.35s ease-in-out; position: relative; overflow: hidden;"
+                       [style.width.%]="tenantCreationProgress()">
+                    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.3) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0.3) 75%, transparent 75%, transparent); background-size: 18px 18px; animation: progress-stripes 1s linear infinite;"></div>
+                  </div>
+                </div>
+                <div style="font-size: 11.5px; color: #64748b; margin-top: 6px; display: flex; justify-content: space-between;">
+                  <span>Creating isolated tenant database</span>
+                  <span>~3–4 seconds</span>
+                </div>
+              </div>
+            } @else {
+              <div style="background: var(--p-soft); border-radius: 8px; padding: 12px; margin-top: 14px; font-size: 13px;">
+                ⚡ A dedicated, isolated database will automatically be provisioned with its own schema migrations for this company.
+              </div>
+            }
           </div>
           <div class="modal-footer">
-            <button class="btn btn-outline" (click)="showCreateTenant.set(false)">Cancel</button>
+            <button class="btn btn-outline" (click)="showCreateTenant.set(false)" [disabled]="savingTenant()">Cancel</button>
             <button class="btn btn-primary" (click)="saveTenant()" [disabled]="savingTenant()">
-              {{ savingTenant() ? 'Provisioning…' : 'Create & Provision Database' }}
+              {{ savingTenant() ? 'Provisioning Database (' + tenantCreationProgress() + '%)...' : 'Create & Provision Database' }}
             </button>
           </div>
         </div>
@@ -1323,7 +1345,15 @@ function emptyTenantForm(): CreateCompanyRequest {
                 }
               </div>
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end;">
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+              @if (!d.isDefault) {
+                <button class="btn btn-outline" style="color: var(--danger); border-color: var(--danger); display: inline-flex; align-items: center; gap: 6px;" (click)="closeTenantDetail(); confirmDeleteTenant(d)">
+                  <span [appIcon]="'trash'"></span>
+                  <span>Delete Company & Database</span>
+                </button>
+              } @else {
+                <div></div>
+              }
               <button class="btn btn-outline" (click)="closeTenantDetail()">Close</button>
             </div>
           </div>
@@ -1834,6 +1864,24 @@ function emptyTenantForm(): CreateCompanyRequest {
         justify-content: center !important;
       }
     }
+
+    @keyframes progress-stripes {
+      0% {
+        background-position: 0 0;
+      }
+      100% {
+        background-position: 18px 0;
+      }
+    }
+
+    @keyframes spin-progress {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
   `],
 })
 export class CompanyComponent implements OnInit, OnDestroy {
@@ -1969,6 +2017,9 @@ export class CompanyComponent implements OnInit, OnDestroy {
   protected readonly editingTenant = signal<CompanyListItem | null>(null);
   protected readonly tenantToDelete = signal<CompanyListItem | null>(null);
   protected readonly savingTenant = signal(false);
+  protected readonly tenantCreationProgress = signal<number>(0);
+  protected readonly tenantCreationStage = signal<string>('Initializing database...');
+  private tenantCreationTimer: ReturnType<typeof setInterval> | null = null;
   protected readonly busyTenantId = signal<string | null>(null);
   protected readonly activationUrl = signal<string | null>(null);
 
@@ -2133,6 +2184,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+    this.stopTenantCreationProgress();
   }
 
   protected selectTab(tab: CompanyTab): void {
@@ -2349,6 +2401,43 @@ export class CompanyComponent implements OnInit, OnDestroy {
     this.showCreateTenant.set(true);
   }
 
+  private startTenantCreationProgress(): void {
+    this.stopTenantCreationProgress();
+    this.tenantCreationProgress.set(12);
+    this.tenantCreationStage.set('Connecting to cluster & allocating database...');
+
+    const stages = [
+      { at: 600, pct: 32, label: 'Allocating dedicated database schema...' },
+      { at: 1300, pct: 58, label: 'Applying EF Core migrations & system tables...' },
+      { at: 2200, pct: 78, label: 'Configuring default roles & admin security...' },
+      { at: 3000, pct: 92, label: 'Registering tenant in central company registry...' },
+    ];
+
+    const start = Date.now();
+    this.tenantCreationTimer = setInterval(() => {
+      const elapsed = Date.now() - start;
+      for (let i = stages.length - 1; i >= 0; i--) {
+        if (elapsed >= stages[i].at) {
+          if (this.tenantCreationProgress() < stages[i].pct) {
+            this.tenantCreationProgress.set(stages[i].pct);
+            this.tenantCreationStage.set(stages[i].label);
+          }
+          break;
+        }
+      }
+      if (this.tenantCreationProgress() >= 92 && this.tenantCreationProgress() < 96) {
+        this.tenantCreationProgress.update((p) => Math.min(96, p + 1));
+      }
+    }, 250);
+  }
+
+  private stopTenantCreationProgress(): void {
+    if (this.tenantCreationTimer) {
+      clearInterval(this.tenantCreationTimer);
+      this.tenantCreationTimer = null;
+    }
+  }
+
   protected saveTenant(): void {
     if (!this.tenantCreateForm.name?.trim() || !this.tenantCreateForm.adminFullName?.trim() || !this.tenantCreateForm.adminEmail?.trim()) {
       this.toast.show('Company name, administrator name and email are required.', 'warning');
@@ -2367,15 +2456,26 @@ export class CompanyComponent implements OnInit, OnDestroy {
     };
 
     this.savingTenant.set(true);
+    this.startTenantCreationProgress();
+
     this.api.createTenantCompany(payload).subscribe({
       next: (result) => {
-        this.savingTenant.set(false);
-        this.showCreateTenant.set(false);
-        this.handleProvisioningResult(result);
-        this.loadTenantCompanies();
+        this.stopTenantCreationProgress();
+        this.tenantCreationProgress.set(100);
+        this.tenantCreationStage.set('Provisioning complete!');
+
+        setTimeout(() => {
+          this.savingTenant.set(false);
+          this.tenantCreationProgress.set(0);
+          this.showCreateTenant.set(false);
+          this.handleProvisioningResult(result);
+          this.loadTenantCompanies();
+        }, 450);
       },
       error: (error) => {
+        this.stopTenantCreationProgress();
         this.savingTenant.set(false);
+        this.tenantCreationProgress.set(0);
         const errObj = error?.error;
         let msg = 'Could not create the company.';
         if (errObj?.errors && typeof errObj.errors === 'object') {

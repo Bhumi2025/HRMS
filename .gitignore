@@ -11,6 +11,10 @@
 TestResults/
 *.pdb
 *.dll.config
+publish/
+[Pp]ublish/
+release_iis/
+*.zip
 
 # Visual Studio temporary files, user options & state
 .vs/
@@ -58,6 +62,10 @@ backend/src/Hrms.Api/wwwroot/uploads/tenants/*
 !backend/src/Hrms.Api/wwwroot/uploads/tenants/.gitkeep
 
 # ── Local Environment & Database Files ──
+.env
+.env.*
+*.env
+!.env.example
 appsettings.Local.json
 *.mdf
 *.ldf
