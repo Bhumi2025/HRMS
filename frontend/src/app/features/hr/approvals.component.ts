@@ -104,7 +104,7 @@ interface Approval {
                       <td>
                         <div style="display: flex; gap: 6px">
                           <button class="btn btn-success btn-sm" data-tooltip="Approve" (click)="decide(r, true)"><span [appIcon]="'check'"></span></button>
-                          <button class="btn btn-danger btn-sm" data-tooltip="Reject" (click)="decide(r, false)"><span [appIcon]="'x'"></span></button>
+                          <button class="btn btn-danger btn-sm" data-tooltip="Reject" (click)="promptReject(r)"><span [appIcon]="'x'"></span></button>
                         </div>
                       </td>
                     </tr>
@@ -164,7 +164,7 @@ interface Approval {
                       <td>
                         <div style="display: flex; gap: 6px">
                           <button class="btn btn-success btn-sm" data-tooltip="Approve" (click)="decide(r, true)"><span [appIcon]="'check'"></span></button>
-                          <button class="btn btn-danger btn-sm" data-tooltip="Reject" (click)="decide(r, false)"><span [appIcon]="'x'"></span></button>
+                          <button class="btn btn-danger btn-sm" data-tooltip="Reject" (click)="promptReject(r)"><span [appIcon]="'x'"></span></button>
                           <button class="btn btn-ghost btn-sm" data-tooltip="View" (click)="view(r)"><span [appIcon]="'eye'"></span></button>
                         </div>
                       </td>
@@ -210,8 +210,71 @@ interface Approval {
         }
         <div class="modal-footer">
           <button class="btn btn-outline" (click)="ui.close('approvalModal')">Close</button>
-          <button class="btn btn-danger" (click)="decideFromModal(false)"><span [appIcon]="'x'"></span> Reject</button>
+          <button class="btn btn-danger" (click)="promptRejectFromModal()"><span [appIcon]="'x'"></span> Reject</button>
           <button class="btn btn-success" (click)="decideFromModal(true)"><span [appIcon]="'check'"></span> Approve</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reject Reason Modal (matches Leave Request rejection dialog) -->
+    <div class="modal-overlay" [class.open]="ui.isOpen('approvalRejectModal')" (click)="ui.onOverlayClick($event, 'approvalRejectModal')">
+      <div class="modal" style="max-width: 480px; width: 100%">
+        <div class="modal-header">
+          <div>
+            <div class="card-title" style="font-size: 15px; color: #dc2626; font-weight: 700;">
+              Reject {{ rejectTarget()?.type === 'leave' || (rejectTarget()?.t?.toLowerCase()?.includes('leave') ?? false) ? 'Leave Request' : 'Approval Request' }}
+            </div>
+            <div class="card-subtitle" style="font-size: 13px; color: var(--muted, #64748b); margin-top: 2px;">
+              {{ rejectTarget()?.n }} · {{ rejectTarget()?.t }}
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" (click)="ui.close('approvalRejectModal')"><span [appIcon]="'x'"></span></button>
+        </div>
+        <div class="modal-body" style="padding: 20px 24px;">
+          <div style="background: var(--bg-card, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px">
+              <span style="color: var(--muted, #64748b)">Dates:</span>
+              <span style="font-weight: 600; color: var(--text, #0f172a)">{{ getRejectDates(rejectTarget()?.d) }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between">
+              <span style="color: var(--muted, #64748b)">Employee Reason:</span>
+              <span style="font-weight: 600; color: var(--text, #0f172a)">{{ getRejectReason(rejectTarget()) }}</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text, #0f172a);">
+              Reason For Rejection <span style="color: #dc2626">*</span>
+            </label>
+            <textarea
+              class="form-control"
+              [class.is-invalid]="!!rejectionReasonError()"
+              style="width: 100%; min-height: 90px; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border, #cbd5e1); font-size: 13px; font-family: inherit; resize: vertical; box-sizing: border-box;"
+              rows="3"
+              placeholder="State the mandatory reason for rejecting this leave request..."
+              [value]="rejectionReason()"
+              (input)="rejectionReason.set($any($event.target).value); rejectionReasonError.set('')"
+            ></textarea>
+            @if (rejectionReasonError()) {
+              <div style="font-size: 11.5px; color: #dc2626; margin-top: 4px; font-weight: 500">
+                {{ rejectionReasonError() }}
+              </div>
+            }
+            <div style="font-size: 11.5px; color: var(--muted, #64748b); margin-top: 6px">
+              This Rejection Reason Will Be Saved In The Database And Visible To The Employee.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--border, #e2e8f0); display: flex; justify-content: flex-end; gap: 10px;">
+          <button class="btn btn-outline" [disabled]="isRejecting()" (click)="ui.close('approvalRejectModal')">Cancel</button>
+          <button
+            class="btn"
+            style="color: #dc2626; border: 1px solid #dc2626; background: #ffffff; font-weight: 600;"
+            [disabled]="isRejecting()"
+            (click)="confirmReject()"
+          >
+            {{ isRejecting() ? 'Rejecting...' : 'Confirm Rejection' }}
+          </button>
         </div>
       </div>
     </div>
@@ -273,6 +336,10 @@ export class ApprovalsComponent implements OnInit {
 
   protected readonly tab = signal<'all' | 'leave' | 'ot' | 'reg'>('all');
   protected readonly viewTarget = signal<Approval | null>(null);
+  protected readonly rejectTarget = signal<Approval | null>(null);
+  protected readonly rejectionReason = signal<string>('');
+  protected readonly rejectionReasonError = signal<string>('');
+  protected readonly isRejecting = signal<boolean>(false);
 
   protected readonly allData = signal<Approval[]>([]);
 
@@ -389,11 +456,37 @@ export class ApprovalsComponent implements OnInit {
     this.allData.update((list) => list.filter((x) => x.apiId !== r.apiId));
   }
 
-  protected decide(r: Approval, approved: boolean): void {
+  protected promptReject(r: Approval): void {
+    this.rejectTarget.set(r);
+    this.rejectionReason.set('');
+    this.rejectionReasonError.set('');
+    this.ui.open('approvalRejectModal');
+  }
+
+  protected promptRejectFromModal(): void {
+    const r = this.viewTarget();
+    this.ui.close('approvalModal');
+    if (r) this.promptReject(r);
+  }
+
+  protected confirmReject(): void {
+    const r = this.rejectTarget();
+    if (!r) return;
+
+    const reason = this.rejectionReason().trim();
+    if (!reason) {
+      this.rejectionReasonError.set('Rejection reason is mandatory.');
+      return;
+    }
+
+    this.isRejecting.set(true);
+
     const finish = () => {
+      this.isRejecting.set(false);
+      this.ui.close('approvalRejectModal');
       this.drop(r);
       this.notifState.refresh();
-      this.toast.show(approved ? 'Approved!' : 'Rejected', approved ? 'success' : 'danger');
+      this.toast.show('Request Rejected', 'danger');
     };
 
     if (!r.apiId) {
@@ -402,7 +495,64 @@ export class ApprovalsComponent implements OnInit {
     }
 
     if (r.type === 'reg') {
-      const request = approved ? this.api.approveRegularization(r.apiId) : this.api.rejectRegularization(r.apiId);
+      this.api.rejectRegularization(r.apiId).subscribe({
+        next: finish,
+        error: (error) => {
+          this.isRejecting.set(false);
+          this.toast.show(error?.error?.title ?? 'Could not reject request.', 'danger');
+        },
+      });
+      return;
+    }
+
+    this.api.rejectApproval(r.apiId, reason).subscribe({
+      next: finish,
+      error: (error) => {
+        this.isRejecting.set(false);
+        this.toast.show(error?.error?.title ?? error?.error?.message ?? 'Could not reject request.', 'danger');
+      },
+    });
+  }
+
+  protected getRejectDates(d?: string): string {
+    if (!d) return '—';
+    const match = d.match(/(\d{2}[-/.]\d{2}[-/.]\d{4}\s*[-–]\s*\d{2}[-/.]\d{2}[-/.]\d{4})/);
+    if (match) return match[1];
+    const singleDate = d.match(/(\d{2}[-/.]\d{2}[-/.]\d{4})/);
+    if (singleDate) return singleDate[1];
+    const parts = d.split('·');
+    return parts.length > 1 ? parts[1].trim() : d;
+  }
+
+  protected getRejectReason(r?: Approval | null): string {
+    if (!r) return '—';
+    if (r.reason) return r.reason;
+    if (!r.d) return '—';
+    const bracketMatch = r.d.match(/\[(.*?)\]/) || r.d.match(/\((.*?)\)/);
+    if (bracketMatch) return bracketMatch[1];
+    const parts = r.d.split('·');
+    return parts.length > 2 ? parts.slice(2).join('·').trim() : '—';
+  }
+
+  protected decide(r: Approval, approved: boolean): void {
+    if (!approved) {
+      this.promptReject(r);
+      return;
+    }
+
+    const finish = () => {
+      this.drop(r);
+      this.notifState.refresh();
+      this.toast.show('Approved!', 'success');
+    };
+
+    if (!r.apiId) {
+      finish();
+      return;
+    }
+
+    if (r.type === 'reg') {
+      const request = this.api.approveRegularization(r.apiId);
       request.subscribe({
         next: finish,
         error: (error) => this.toast.show(error?.error?.title ?? 'Could not update the request.', 'danger'),
@@ -410,7 +560,7 @@ export class ApprovalsComponent implements OnInit {
       return;
     }
 
-    const request = approved ? this.api.approveApproval(r.apiId) : this.api.rejectApproval(r.apiId);
+    const request = this.api.approveApproval(r.apiId);
     request.subscribe({
       next: finish,
       error: (error) => this.toast.show(error?.error?.title ?? 'Could not update the request.', 'danger'),
