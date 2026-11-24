@@ -165,11 +165,33 @@
         <div class="alert alert-info" style="font-size: 12px;">
           A dedicated database will be created and initialized with the application schema only. No existing data is copied.
         </div>
+
+        @if (saving()) {
+          <div style="margin-top: 14px; padding: 14px 16px; background: rgba(37,99,235,0.06); border: 1px solid rgba(37,99,235,0.25); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 13px; font-weight: 600; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+                <span class="spinner-border" style="width: 14px; height: 14px; border: 2px solid #2563eb; border-top-color: transparent; border-radius: 50%; display: inline-block; animation: spin-progress 0.8s linear infinite;"></span>
+                {{ creationStage() }}
+              </span>
+              <span style="font-size: 13px; font-weight: 700; color: #2563eb;">{{ creationProgress() }}%</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; position: relative;">
+              <div style="height: 100%; background: linear-gradient(90deg, #2563eb, #3b82f6, #6366f1); border-radius: 4px; transition: width 0.35s ease-in-out; position: relative; overflow: hidden;"
+                   [style.width.%]="creationProgress()">
+                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.3) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0.3) 75%, transparent 75%, transparent); background-size: 18px 18px; animation: progress-stripes 1s linear infinite;"></div>
+              </div>
+            </div>
+            <div style="font-size: 11.5px; color: #64748b; margin-top: 6px; display: flex; justify-content: space-between;">
+              <span>Creating tenant database & executing migrations</span>
+              <span>~3–4 seconds</span>
+            </div>
+          </div>
+        }
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline" (click)="closeCreate()">Cancel</button>
+        <button class="btn btn-outline" (click)="closeCreate()" [disabled]="saving()">Cancel</button>
         <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
-          {{ saving() ? 'Provisioning…' : 'Create & Provision' }}
+          {{ saving() ? 'Provisioning (' + creationProgress() + '%)…' : 'Create & Provision' }}
         </button>
       </div>
     </div>

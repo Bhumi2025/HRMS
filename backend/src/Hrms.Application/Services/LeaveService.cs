@@ -149,10 +149,15 @@ public sealed class LeaveService : ILeaveService
             throw new ConflictException("This leave request has already been decided.");
         }
 
+        if (!approved && string.IsNullOrWhiteSpace(request?.Note))
+        {
+            throw new ValidationException("Rejection reason is mandatory when rejecting a leave request.");
+        }
+
         leave.Status = approved ? LeaveStatus.Approved : LeaveStatus.Rejected;
         leave.DecidedAtUtc = DateTime.UtcNow;
         leave.DecidedByUserId = _currentUser.UserId;
-        leave.DecisionNote = request?.Note;
+        leave.DecisionNote = request?.Note?.Trim();
 
         _uow.LeaveRequests.Update(leave);
 
@@ -163,12 +168,17 @@ public sealed class LeaveService : ILeaveService
             empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.Email == leave.Employee.Email), ct);
         }
 
+        var reasonSuffix = !approved && !string.IsNullOrWhiteSpace(leave.DecisionNote) ? $" Reason: {leave.DecisionNote}" : "";
+        var notifMessage = approved
+            ? $"Your leave request for {leave.Days} day(s) ({leave.FromDate:MMM d} - {leave.ToDate:MMM d}) was approved by HR."
+            : $"Your leave request for {leave.Days} day(s) ({leave.FromDate:MMM d} - {leave.ToDate:MMM d}) was rejected by HR.{reasonSuffix}";
+
         await _uow.Notifications.AddAsync(new Notification
         {
             UserId = empUser?.Id,
             IconKey = approved ? "check" : "x",
             Title = approved ? "Leave Approved" : "Leave Rejected",
-            Message = $"Leave request for {empName} ({leave.Days} day{(leave.Days > 1 ? "s" : "")}) was {(approved ? "approved" : "rejected")}.",
+            Message = notifMessage,
             TimeLabel = "Just now",
             IsRead = false,
             CreatedAtUtc = DateTime.UtcNow,
@@ -259,6 +269,8 @@ public sealed class LeaveService : ILeaveService
             r.Reason,
             r.Status.ToString(),
             r.SubmittedAtUtc,
-            Formatting.Relative(r.SubmittedAtUtc));
+            Formatting.Relative(r.SubmittedAtUtc),
+            r.DecisionNote,
+            r.DecidedAtUtc);
     }
 }

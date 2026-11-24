@@ -111,7 +111,7 @@ export class NotificationStateService {
           } else if (full.includes('payroll') || full.includes('salary') || full.includes('payslip')) {
             category = 'Payroll';
             actionUrl = isEmp ? '/me/payslips' : '/payroll';
-            actionLabel = 'View Payroll';
+            actionLabel = isEmp ? 'View Payslip' : 'View Payroll';
           }
 
           const timeDisplay = n.createdAtUtc ? formatRelativeTime(n.createdAtUtc, n.timeLabel) : n.timeLabel;
@@ -212,7 +212,8 @@ export class NotificationStateService {
               t.includes('payslip') ||
               t.includes('salary') ||
               m.includes('payslip') ||
-              m.includes('salary')
+              m.includes('salary') ||
+              m.includes('net pay')
             ) {
               if (item.userId && myId && item.userId === myId) {
                 return true;

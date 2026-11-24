@@ -170,6 +170,34 @@ interface DocRow {
         <div class="card-body" style="overflow: visible">
           <div class="form-grid-2">
             <div class="form-group">
+              <label class="form-label">Email</label>
+              <input class="form-control" type="email" [value]="personal().email" disabled placeholder="Email Address" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <div class="profile-pwd-box">
+                <span class="profile-pwd-icon" [appIcon]="'lock'"></span>
+                <input
+                  class="form-control profile-pwd-input"
+                  [type]="showContactPassword() ? 'text' : 'password'"
+                  [value]="personal().password"
+                  disabled
+                  placeholder="Password"
+                />
+                <button
+                  type="button"
+                  class="profile-pwd-toggle"
+                  (click)="showContactPassword.set(!showContactPassword())"
+                  [title]="showContactPassword() ? 'Hide password' : 'Show password'"
+                >
+                  <span [appIcon]="showContactPassword() ? 'eye_off' : 'eye'"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
               <label class="form-label">Emergency Contact Name</label>
               <input class="form-control" [value]="contact().emergencyName" (input)="patchContact('emergencyName', $any($event.target).value)" placeholder="Emergency Contact Name" />
             </div>
@@ -471,6 +499,68 @@ interface DocRow {
         grid-template-columns: 130px 1fr;
         gap: 12px;
       }
+      .profile-pwd-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 100%;
+      }
+      .profile-pwd-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #2563eb;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 2;
+      }
+      .profile-pwd-icon svg {
+        width: 16px;
+        height: 16px;
+      }
+      .profile-pwd-input {
+        width: 100%;
+        padding-left: 36px !important;
+        padding-right: 38px !important;
+        background: #f8fafc;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        font-size: 14px;
+        color: var(--text);
+        transition: var(--t);
+      }
+      .profile-pwd-input:focus {
+        background: #fff;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+      }
+      .profile-pwd-toggle {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        padding: 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        z-index: 2;
+        transition: color 0.15s ease;
+      }
+      .profile-pwd-toggle:hover {
+        color: #2563eb;
+      }
+      .profile-pwd-toggle svg {
+        width: 16px;
+        height: 16px;
+      }
       @media (max-width: 768px) {
         .grid-2 {
           grid-template-columns: 1fr !important;
@@ -709,6 +799,7 @@ export class EmpProfileComponent implements OnInit {
           middleName: employee.middleName || '',
           lastName: employee.lastName || '',
           email: employee.email || '',
+          password: employee.password || 'Employee@123',
           phone: employee.phone || '',
           dob: employee.dateOfBirth ?? '',
           gender: employee.gender,
@@ -949,12 +1040,15 @@ export class EmpProfileComponent implements OnInit {
 
   protected readonly tab = signal<'personal' | 'contact' | 'bank' | 'docs'>('personal');
 
+  protected readonly showContactPassword = signal(false);
+
   protected readonly personal = signal({
     salutation: 'Mr',
     firstName: '',
     middleName: '',
     lastName: '',
     email: '',
+    password: '',
     phone: '',
     dob: '',
     gender: 'Female',

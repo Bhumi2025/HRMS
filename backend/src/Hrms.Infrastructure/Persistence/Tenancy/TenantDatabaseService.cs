@@ -3,7 +3,9 @@ using Hrms.Application.Common;
 using Hrms.Application.DTOs;
 using Hrms.Domain.Entities;
 using Hrms.Domain.Enums;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Hrms.Infrastructure.Persistence.Tenancy;
 
@@ -15,10 +17,12 @@ namespace Hrms.Infrastructure.Persistence.Tenancy;
 public sealed class TenantDatabaseService : ITenantDatabaseService
 {
     private readonly ITenantConnectionFactory _factory;
+    private readonly ILogger<TenantDatabaseService> _logger;
 
-    public TenantDatabaseService(ITenantConnectionFactory factory)
+    public TenantDatabaseService(ITenantConnectionFactory factory, ILogger<TenantDatabaseService> logger)
     {
         _factory = factory;
+        _logger = logger;
     }
 
     public async Task<bool> DatabaseExistsAsync(string databaseName, CancellationToken ct = default)
@@ -65,6 +69,8 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Empl
     ALTER TABLE Employees ADD EmergencyContactName NVARCHAR(200) NULL;
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Employees' AND COLUMN_NAME = 'EmergencyContactPhone')
     ALTER TABLE Employees ADD EmergencyContactPhone NVARCHAR(50) NULL;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Employees' AND COLUMN_NAME = 'Password')
+    ALTER TABLE Employees ADD Password NVARCHAR(250) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'KeyGroups' AND COLUMN_NAME = 'IsGeneric')
     ALTER TABLE KeyGroups ADD IsGeneric BIT NOT NULL CONSTRAINT DF_KeyGroups_IsGeneric DEFAULT 0;
@@ -116,6 +122,31 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Shif
 -- 9. Ensure LeaveRequests.IsHalfDay
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'LeaveRequests' AND COLUMN_NAME = 'IsHalfDay')
     ALTER TABLE LeaveRequests ADD IsHalfDay BIT NOT NULL CONSTRAINT DF_LeaveRequests_IsHalfDay DEFAULT 0;
+
+-- 10. Ensure OffboardingRecords table
+IF OBJECT_ID('OffboardingRecords', 'U') IS NULL
+BEGIN
+    CREATE TABLE OffboardingRecords (
+        Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        EmployeeId UNIQUEIDENTIFIER NOT NULL,
+        ResignationDate DATE NOT NULL,
+        FinalWorkingDate DATE NOT NULL,
+        Reason NVARCHAR(250) NOT NULL,
+        ReasonDetails NVARCHAR(MAX) NULL,
+        Status INT NOT NULL DEFAULT 1,
+        HandoverNotes NVARCHAR(MAX) NULL,
+        CompanyAssetsReturned BIT NOT NULL DEFAULT 0,
+        AccessRevoked BIT NOT NULL DEFAULT 0,
+        FinalSettlementProcessed BIT NOT NULL DEFAULT 0,
+        Remarks NVARCHAR(MAX) NULL,
+        InitiatedByUserId UNIQUEIDENTIFIER NULL,
+        CompletedAtUtc DATETIME2 NULL,
+        CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAtUtc DATETIME2 NULL,
+        CONSTRAINT FK_OffboardingRecords_Employees FOREIGN KEY (EmployeeId) REFERENCES Employees(Id),
+        CONSTRAINT FK_OffboardingRecords_Users FOREIGN KEY (InitiatedByUserId) REFERENCES Users(Id)
+    );
+END
 
 -- 12. Clean up legacy ApprovalRequests with Type = 'Leave' so LeaveRequests is the single source of truth
 IF OBJECT_ID('ApprovalRequests', 'U') IS NOT NULL
@@ -313,21 +344,54 @@ END
                 u.EmployeeId,
                 RoleName = u.Role != null ? u.Role.Name : "Employee",
                 RoleCode = u.Role != null ? u.Role.Code.ToString() : "Employee",
+                EmployeeStatus = u.Employee != null ? (EmploymentStatus?)u.Employee.Status : null,
+                IsEmployeeOffboarded = (u.Employee != null && (u.Employee.Status == EmploymentStatus.Offboarding || u.Employee.Status == EmploymentStatus.Terminated || u.Employee.Status == EmploymentStatus.Resigned))
             })
             .FirstOrDefaultAsync(ct);
 
-        return record is null
-            ? null
-            : new TenantUserRecord(
-                record.Id,
-                record.Email,
-                record.FullName,
-                record.Initials,
-                record.PasswordHash,
-                record.IsActive,
-                record.EmployeeId,
-                record.RoleName,
-                record.RoleCode);
+        // Also check if there is an employee matching this email directly
+        var empRecord = await db.Employees
+            .AsNoTracking()
+            .Where(e => e.Email.Trim().ToUpper() == normalizedEmail)
+            .Select(e => new { e.Id, e.Status })
+            .FirstOrDefaultAsync(ct);
+
+        if (record is null)
+        {
+            if (empRecord is not null && (empRecord.Status == EmploymentStatus.Offboarding || empRecord.Status == EmploymentStatus.Terminated || empRecord.Status == EmploymentStatus.Resigned))
+            {
+                return new TenantUserRecord(
+                    Guid.Empty,
+                    email,
+                    "",
+                    "",
+                    "",
+                    false,
+                    empRecord.Id,
+                    "Employee",
+                    "Employee",
+                    empRecord.Status,
+                    true);
+            }
+            return null;
+        }
+
+        var empStatus = record.EmployeeStatus ?? empRecord?.Status;
+        var isOffboarded = record.IsEmployeeOffboarded ||
+                           (empRecord != null && (empRecord.Status == EmploymentStatus.Offboarding || empRecord.Status == EmploymentStatus.Terminated || empRecord.Status == EmploymentStatus.Resigned));
+
+        return new TenantUserRecord(
+            record.Id,
+            record.Email,
+            record.FullName,
+            record.Initials,
+            record.PasswordHash,
+            record.IsActive,
+            record.EmployeeId ?? empRecord?.Id,
+            record.RoleName,
+            record.RoleCode,
+            empStatus,
+            isOffboarded);
     }
 
     public async Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default)
@@ -398,13 +462,54 @@ END
 
     public async Task DropDatabaseAsync(string databaseName, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(databaseName))
+        if (string.IsNullOrWhiteSpace(databaseName) || !Hrms.Application.Common.Tenancy.TenantNaming.IsValidDatabaseName(databaseName))
         {
             return;
         }
 
-        await using var db = Create(databaseName, provisioning: true);
-        await db.Database.EnsureDeletedAsync(ct);
+        // Safety guard: NEVER drop system or master/default databases
+        var protectedDbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "master", "tempdb", "model", "msdb", "HRMS", "HRMS_Master", "HRMS_Dummy", "HRMS_Dummy_Master", "HRMS_new_Defualt", "HRMS_new_master"
+        };
+        if (protectedDbs.Contains(databaseName))
+        {
+            _logger.LogWarning("Refusing to drop protected database {DbName}.", databaseName);
+            return;
+        }
+
+        try
+        {
+            // Connect to master database to drop the tenant database forcefully
+            var masterConnStr = _factory.BuildProvisioning("master");
+            await using var conn = new SqlConnection(masterConnStr);
+            await conn.OpenAsync(ct);
+
+            var sql = $@"
+IF EXISTS (SELECT 1 FROM sys.databases WHERE name = @dbName)
+BEGIN
+    ALTER DATABASE [{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE [{databaseName}];
+END";
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.Add(new SqlParameter("@dbName", databaseName));
+            await cmd.ExecuteNonQueryAsync(ct);
+            _logger.LogInformation("Tenant database {DbName} dropped successfully from SQL Server.", databaseName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to drop tenant database {DbName} via master connection; attempting EF fallback.", databaseName);
+            try
+            {
+                await using var db = Create(databaseName, provisioning: true);
+                await db.Database.EnsureDeletedAsync(ct);
+            }
+            catch (Exception innerEx)
+            {
+                _logger.LogWarning(innerEx, "Fallback EF Core EnsureDeletedAsync also failed for {DbName}.", databaseName);
+            }
+        }
     }
 
     private HrmsDbContext Create(string databaseName, bool provisioning = false)

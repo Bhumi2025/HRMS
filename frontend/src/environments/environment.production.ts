@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: '/api',
+  apiUrl: 'https://apinewhrms.aviquon.com/api',
   allowOfflineFallback: false,
 };

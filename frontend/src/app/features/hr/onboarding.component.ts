@@ -28,7 +28,7 @@ interface AccountItem {
     <!-- Stepper -->
     <div class="ob-stepper">
       @for (s of steps; track s.label; let i = $index) {
-        <div class="ob-step" [class.done]="i < step()" [class.active]="i === step()">
+        <div class="ob-step" [class.done]="i < step()" [class.active]="i === step()" (click)="goToStep(i)" style="cursor: pointer;" [title]="'Go to ' + s.label">
           <div class="ob-circle">
             @if (i < step()) {
               <span [appIcon]="'check'"></span>
@@ -96,29 +96,49 @@ interface AccountItem {
           <div class="ob-grid ob-grid-4">
             <div class="form-group">
               <label class="form-label">First Name<span class="req">*</span></label>
-              <input class="form-control" placeholder="Alex" [value]="personal().firstName" (input)="patchP('firstName', $any($event.target).value)" />
+              <input 
+                class="form-control" 
+                [class.is-invalid]="!!fieldError('firstName')"
+                placeholder="Alex" 
+                [value]="personal().firstName" 
+                (input)="patchP('firstName', $any($event.target).value); clearError('firstName')" 
+              />
+              @if (fieldError('firstName')) {
+                <div class="field-error-msg">{{ fieldError('firstName') }}</div>
+              }
             </div>
             <div class="form-group">
-              <label class="form-label">Middle Name<span class="req">*</span></label>
-              <input class="form-control" placeholder="Alex" [value]="personal().middleName" (input)="patchP('middleName', $any($event.target).value)" />
+              <label class="form-label">Middle Name</label>
+              <input class="form-control" placeholder="Optional" [value]="personal().middleName" (input)="patchP('middleName', $any($event.target).value)" />
             </div>
             <div class="form-group">
               <label class="form-label">Last Name<span class="req">*</span></label>
-              <input class="form-control" placeholder="Morgan" [value]="personal().lastName" (input)="patchP('lastName', $any($event.target).value)" />
+              <input 
+                class="form-control" 
+                [class.is-invalid]="!!fieldError('lastName')"
+                placeholder="Morgan" 
+                [value]="personal().lastName" 
+                (input)="patchP('lastName', $any($event.target).value); clearError('lastName')" 
+              />
+              @if (fieldError('lastName')) {
+                <div class="field-error-msg">{{ fieldError('lastName') }}</div>
+              }
             </div>
             <div class="form-group">
               <label class="form-label">Email Address<span class="req">*</span></label>
               <input
                 class="form-control"
-                [class.is-invalid]="emailTouched() && !isEmailValid()"
+                [class.is-invalid]="(emailTouched() && !isEmailValid()) || !!fieldError('email')"
                 type="email"
                 placeholder="alex.morgan@company.com"
                 [value]="personal().email"
-                (input)="patchP('email', $any($event.target).value)"
+                (input)="patchP('email', $any($event.target).value); clearError('email')"
                 (blur)="emailTouched.set(true)"
               />
-              @if (emailTouched() && !isEmailValid()) {
-                <div style="font-size: 11px; color: #ef4444; margin-top: 4px; font-weight: 500">
+              @if (fieldError('email')) {
+                <div class="field-error-msg">{{ fieldError('email') }}</div>
+              } @else if (emailTouched() && !isEmailValid()) {
+                <div class="field-error-msg">
                   Please enter a valid email address (e.g. name@company.com)
                 </div>
               }
@@ -127,14 +147,16 @@ interface AccountItem {
               <label class="form-label">Phone Number<span class="req">*</span></label>
               <input
                 class="form-control"
-                [class.is-invalid]="phoneTouched() && !isPhoneValid()"
+                [class.is-invalid]="(phoneTouched() && !isPhoneValid()) || !!fieldError('phone')"
                 placeholder="+91 98765 43210"
                 [value]="personal().phone"
-                (input)="patchP('phone', $any($event.target).value)"
+                (input)="patchP('phone', $any($event.target).value); clearError('phone')"
                 (blur)="phoneTouched.set(true)"
               />
-              @if (phoneTouched() && !isPhoneValid()) {
-                <div style="font-size: 11px; color: #ef4444; margin-top: 4px; font-weight: 500">
+              @if (fieldError('phone')) {
+                <div class="field-error-msg">{{ fieldError('phone') }}</div>
+              } @else if (phoneTouched() && !isPhoneValid()) {
+                <div class="field-error-msg">
                   Please enter a valid 10-digit Indian phone number (e.g. +91 98765 43210)
                 </div>
               }
@@ -179,11 +201,28 @@ interface AccountItem {
           <div class="ob-grid ob-grid-3">
             <div class="form-group">
               <label class="form-label">Job Title<span class="req">*</span></label>
-              <input class="form-control" placeholder="Software Engineer" [value]="job().jobTitle" (input)="patchJ('jobTitle', $any($event.target).value)" />
+              <input 
+                class="form-control" 
+                [class.is-invalid]="!!fieldError('jobTitle')"
+                placeholder="Software Engineer" 
+                [value]="job().jobTitle" 
+                (input)="patchJ('jobTitle', $any($event.target).value); clearError('jobTitle')" 
+              />
+              @if (fieldError('jobTitle')) {
+                <div class="field-error-msg">{{ fieldError('jobTitle') }}</div>
+              }
             </div>
             <div class="form-group">
               <label class="form-label">Department<span class="req">*</span></label>
-              <app-select [options]="deptOptions()" [value]="job().department" (valueChange)="patchJ('department', $event)" width="100%" />
+              <app-select 
+                [options]="deptOptions()" 
+                [value]="job().department" 
+                (valueChange)="patchJ('department', $event); clearError('department')" 
+                width="100%" 
+              />
+              @if (fieldError('department')) {
+                <div class="field-error-msg">{{ fieldError('department') }}</div>
+              }
             </div>
             <div class="form-group">
               <label class="form-label">Designation</label>
@@ -195,7 +234,16 @@ interface AccountItem {
             </div>
             <div class="form-group">
               <label class="form-label">Join Date<span class="req">*</span></label>
-              <input class="form-control" type="date" [value]="job().joinDate" (input)="patchJ('joinDate', $any($event.target).value)" />
+              <input 
+                class="form-control" 
+                [class.is-invalid]="!!fieldError('joinDate')"
+                type="date" 
+                [value]="job().joinDate" 
+                (input)="patchJ('joinDate', $any($event.target).value); clearError('joinDate')" 
+              />
+              @if (fieldError('joinDate')) {
+                <div class="field-error-msg">{{ fieldError('joinDate') }}</div>
+              }
             </div>
             <div class="form-group">
               <label class="form-label">Employment Type</label>
@@ -225,7 +273,16 @@ interface AccountItem {
           <div class="ob-grid ob-grid-3">
             <div class="form-group">
               <label class="form-label">Basic Salary<span class="req">*</span></label>
-              <input class="form-control" placeholder="$0.00" [value]="salary().basicSalary" (input)="patchS('basicSalary', $any($event.target).value)" />
+              <input 
+                class="form-control" 
+                [class.is-invalid]="!!fieldError('basicSalary')"
+                placeholder="$0.00" 
+                [value]="salary().basicSalary" 
+                (input)="patchS('basicSalary', $any($event.target).value); clearError('basicSalary')" 
+              />
+              @if (fieldError('basicSalary')) {
+                <div class="field-error-msg">{{ fieldError('basicSalary') }}</div>
+              }
             </div>
             <div class="form-group">
               <label class="form-label">Payment Mode</label>
@@ -233,11 +290,29 @@ interface AccountItem {
             </div>
             <div class="form-group">
               <label class="form-label">Bank Name</label>
-              <input class="form-control" placeholder="Emirates NBD" [value]="salary().bankName" (input)="patchS('bankName', $any($event.target).value)" />
+              <input 
+                class="form-control" 
+                [class.is-invalid]="!!fieldError('bankName')"
+                placeholder="Emirates NBD" 
+                [value]="salary().bankName" 
+                (input)="patchS('bankName', $any($event.target).value); clearError('bankName')" 
+              />
+              @if (fieldError('bankName')) {
+                <div class="field-error-msg">{{ fieldError('bankName') }}</div>
+              }
             </div>
             <div class="form-group">
               <label class="form-label">Account Number</label>
-              <input class="form-control" placeholder="1234567890" [value]="salary().accountNumber" (input)="patchS('accountNumber', $any($event.target).value)" />
+              <input 
+                class="form-control" 
+                [class.is-invalid]="!!fieldError('accountNumber')"
+                placeholder="1234567890" 
+                [value]="salary().accountNumber" 
+                (input)="patchS('accountNumber', $any($event.target).value); clearError('accountNumber')" 
+              />
+              @if (fieldError('accountNumber')) {
+                <div class="field-error-msg">{{ fieldError('accountNumber') }}</div>
+              }
             </div>
             <div class="form-group">
               <label class="form-label">IFSC Code</label>
@@ -305,10 +380,11 @@ interface AccountItem {
                   <div style="position: relative; display: flex; align-items: center">
                     <input
                       class="form-control"
+                      [class.is-invalid]="!!fieldError('password')"
                       [type]="showPassword() ? 'text' : 'password'"
                       placeholder="Enter minimum 6 characters"
                       [value]="accountForm().password"
-                      (input)="patchAccount('password', $any($event.target).value)"
+                      (input)="patchAccount('password', $any($event.target).value); clearError('password')"
                       style="padding-right: 40px"
                     />
                     <button
@@ -321,6 +397,9 @@ interface AccountItem {
                       <span [appIcon]="showPassword() ? 'eye' : 'lock'"></span>
                     </button>
                   </div>
+                  @if (fieldError('password')) {
+                    <div class="field-error-msg">{{ fieldError('password') }}</div>
+                  }
                   <!-- Inline Spotify Volume Password Strength Bar -->
                   @if (accountForm().password.length > 0) {
                     <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
@@ -1190,6 +1269,18 @@ interface AccountItem {
         from { opacity: 0; transform: scale(0.95) translateY(12px); }
         to { opacity: 1; transform: scale(1) translateY(0); }
       }
+      .field-error-msg {
+        font-size: 11px;
+        color: #ef4444;
+        margin-top: 4px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .form-control.is-invalid {
+        border-color: #ef4444 !important;
+      }
     `,
   ],
 })
@@ -1587,35 +1678,161 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     input.value = '';
   }
 
-  protected next(): void {
-    if (this.step() === 0) {
-      this.emailTouched.set(true);
-      this.phoneTouched.set(true);
+  protected readonly errors = signal<Record<string, string>>({});
+
+  protected fieldError(key: string): string | undefined {
+    return this.errors()[key];
+  }
+
+  protected clearError(key: string): void {
+    if (this.errors()[key]) {
+      this.errors.update((e) => {
+        const copy = { ...e };
+        delete copy[key];
+        return copy;
+      });
+    }
+  }
+
+  protected validateStep(stepIndex: number): boolean {
+    const errs: Record<string, string> = { ...this.errors() };
+
+    if (stepIndex === 0) {
+      delete errs['firstName'];
+      delete errs['lastName'];
+      delete errs['email'];
+      delete errs['phone'];
+
       const p = this.personal();
-      if (!p.firstName.trim() || !p.lastName.trim() || !p.email.trim()) {
-        this.toast.show('First name, last name and email are required.', 'danger');
-        return;
+      if (!p.firstName.trim()) {
+        errs['firstName'] = 'First name is required.';
+      } else if (p.firstName.trim().length < 2) {
+        errs['firstName'] = 'First name must be at least 2 characters.';
       }
-      if (!this.isEmailValid()) {
-        this.toast.show('Please enter a valid email address (e.g. name@company.com).', 'danger');
-        return;
+
+      if (!p.lastName.trim()) {
+        errs['lastName'] = 'Last name is required.';
       }
+
+      if (!p.email.trim()) {
+        errs['email'] = 'Email address is required.';
+      } else if (!this.isEmailValid()) {
+        errs['email'] = 'Please enter a valid email address (e.g. name@company.com).';
+      }
+
       const phoneClean = p.phone.trim().replace(/[\s\-]/g, '');
-      if (phoneClean && !/^(?:\+91|91|0)?[6-9]\d{9}$/.test(phoneClean)) {
-        this.toast.show('Please enter a valid 10-digit Indian mobile number (e.g. +91 98765 43210 or 9876543210).', 'danger');
+      if (!phoneClean) {
+        errs['phone'] = 'Phone number is required.';
+      } else if (!/^(?:\+91|91|0)?[6-9]\d{9}$/.test(phoneClean)) {
+        errs['phone'] = 'Please enter a valid 10-digit Indian phone number (e.g. +91 98765 43210).';
+      }
+
+      this.errors.set(errs);
+      const isValid = !errs['firstName'] && !errs['lastName'] && !errs['email'] && !errs['phone'];
+      if (!isValid) {
+        this.toast.show('Please complete all required personal details.', 'danger');
+      }
+      return isValid;
+    }
+
+    if (stepIndex === 1) {
+      delete errs['jobTitle'];
+      delete errs['department'];
+      delete errs['joinDate'];
+
+      const j = this.job();
+      if (!j.jobTitle.trim()) {
+        errs['jobTitle'] = 'Job title is required.';
+      }
+
+      if (!j.department || !j.department.trim()) {
+        errs['department'] = 'Department is required.';
+      }
+
+      if (!j.joinDate) {
+        errs['joinDate'] = 'Join date is required.';
+      }
+
+      this.errors.set(errs);
+      const isValid = !errs['jobTitle'] && !errs['department'] && !errs['joinDate'];
+      if (!isValid) {
+        this.toast.show('Please complete all required job details.', 'danger');
+      }
+      return isValid;
+    }
+
+    if (stepIndex === 2) {
+      delete errs['basicSalary'];
+      delete errs['bankName'];
+      delete errs['accountNumber'];
+
+      const s = this.salary();
+      const numSal = this.numeric(s.basicSalary);
+      if (!s.basicSalary.trim() || isNaN(numSal) || numSal < 0) {
+        errs['basicSalary'] = 'Basic salary is required and must be a valid amount.';
+      }
+
+      if (s.paymentMode === 'Bank Transfer') {
+        if (!s.bankName.trim()) {
+          errs['bankName'] = 'Bank name is required for bank transfer.';
+        }
+        if (!s.accountNumber.trim()) {
+          errs['accountNumber'] = 'Account number is required for bank transfer.';
+        }
+      }
+
+      this.errors.set(errs);
+      const isValid = !errs['basicSalary'] && !errs['bankName'] && !errs['accountNumber'];
+      if (!isValid) {
+        this.toast.show('Please complete all required salary details.', 'danger');
+      }
+      return isValid;
+    }
+
+    if (stepIndex === 3) {
+      return true;
+    }
+
+    if (stepIndex === 4) {
+      delete errs['password'];
+
+      const pw = this.accountForm().password.trim();
+      if (!pw) {
+        errs['password'] = 'Account password is required for employee login access.';
+      } else if (pw.length < 6) {
+        errs['password'] = 'Password must be at least 6 characters.';
+      }
+
+      this.errors.set(errs);
+      const isValid = !errs['password'];
+      if (!isValid) {
+        this.toast.show('Please enter a valid password (minimum 6 characters).', 'danger');
+      }
+      return isValid;
+    }
+
+    return true;
+  }
+
+  protected goToStep(targetIndex: number): void {
+    if (targetIndex === this.step()) return;
+    if (targetIndex < this.step()) {
+      // Free navigation back without losing data
+      this.step.set(targetIndex);
+      return;
+    }
+    for (let s = this.step(); s < targetIndex; s++) {
+      if (!this.validateStep(s)) {
+        this.step.set(s);
         return;
       }
     }
-    if (this.step() === 4) {
-      const pw = this.accountForm().password.trim();
-      if (!pw) {
-        this.toast.show('Please enter a password so the employee can log in.', 'danger');
-        return;
-      }
-      if (pw.length < 6) {
-        this.toast.show('Password must be at least 6 characters.', 'danger');
-        return;
-      }
+    this.step.set(targetIndex);
+  }
+
+  protected next(): void {
+    if (!this.validateStep(this.step())) {
+      return;
     }
 
     if (this.step() < 5) {
@@ -1625,15 +1842,23 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     }
   }
 
+  protected back(): void {
+    if (this.step() > 0) {
+      this.step.update((s) => s - 1);
+    }
+  }
+
   private submit(): void {
+    for (let s = 0; s <= 4; s++) {
+      if (!this.validateStep(s)) {
+        this.step.set(s);
+        this.toast.show(`Please complete required fields in Step ${s + 1}: ${this.steps[s].label}.`, 'danger');
+        return;
+      }
+    }
+
     const personal = this.personal();
     const job = this.job();
-
-    if (!personal.firstName.trim() || !personal.lastName.trim() || !personal.email.trim()) {
-      this.toast.show('First name, last name and email are required.', 'danger');
-      this.step.set(0);
-      return;
-    }
 
     let departmentId = this.departmentIds.get(job.department);
 
@@ -1824,10 +2049,6 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
-  }
-
-  protected back(): void {
-    this.step.update((s) => Math.max(0, s - 1));
   }
 
   protected restart(): void {

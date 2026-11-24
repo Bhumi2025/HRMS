@@ -22,6 +22,7 @@ interface LeaveHistory {
   d: number;
   r: string;
   s: string;
+  decisionNote?: string | null;
 }
 
 /** My Leave — ported from pages/emp-leave.html. */
@@ -109,6 +110,12 @@ interface LeaveHistory {
                 <span class="badge" [class]="historyClass(r.s)">{{ r.s }}</span>
               </div>
               <div style="font-size: 13px; color: var(--muted)">{{ r.f }} – {{ r.to }} · {{ r.d }}d · {{ r.r }}</div>
+              @if (r.s === 'Rejected' && r.decisionNote) {
+                <div style="margin-top: 5px; font-size: 12px; color: var(--danger); background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 6px; padding: 6px 10px;">
+                  <strong style="display: block; margin-bottom: 2px;">Rejection Reason:</strong>
+                  {{ r.decisionNote }}
+                </div>
+              }
             </div>
           }
         </div>
@@ -230,6 +237,7 @@ export class EmpLeaveComponent implements OnInit {
       d: r.days,
       r: r.reason || '—',
       s: r.status,
+      decisionNote: r.decisionNote,
     })),
   );
 

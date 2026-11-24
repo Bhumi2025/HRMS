@@ -49,6 +49,31 @@ public sealed class EmployeeService : IEmployeeService
 
     public async Task<EmployeeDetailDto> CreateAsync(CreateEmployeeRequest request, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(request.FirstName) || request.FirstName.Trim().Length < 2)
+        {
+            throw new ValidationException("First name is required and must be at least 2 characters.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.LastName))
+        {
+            throw new ValidationException("Last name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.JobTitle))
+        {
+            throw new ValidationException("Job title is required.");
+        }
+
+        if (request.BasicSalary < 0)
+        {
+            throw new ValidationException("Basic salary must be non-negative.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Password) && request.Password.Trim().Length < 6)
+        {
+            throw new ValidationException("Account password must be at least 6 characters.");
+        }
+
         var email = request.Email.Trim().ToLowerInvariant();
         if (!System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
         {
@@ -126,6 +151,7 @@ public sealed class EmployeeService : IEmployeeService
             Iban = string.IsNullOrWhiteSpace(request.Iban) ? request.IfscCode?.Trim() : request.Iban.Trim(),
             IfscCode = string.IsNullOrWhiteSpace(request.IfscCode) ? request.Iban?.Trim() : request.IfscCode.Trim(),
             PaymentMode = request.PaymentMode ?? PaymentMode.BankTransfer,
+            Password = !string.IsNullOrWhiteSpace(request.Password) ? request.Password.Trim() : "Employee@123",
         };
 
         await _uow.Employees.AddAsync(employee, ct);
@@ -253,6 +279,17 @@ public sealed class EmployeeService : IEmployeeService
         if (request.Country != null) employee.Country = string.IsNullOrWhiteSpace(request.Country) ? null : request.Country.Trim();
         if (request.EmergencyContactName != null) employee.EmergencyContactName = string.IsNullOrWhiteSpace(request.EmergencyContactName) ? null : request.EmergencyContactName.Trim();
         if (request.EmergencyContactPhone != null) employee.EmergencyContactPhone = string.IsNullOrWhiteSpace(request.EmergencyContactPhone) ? null : request.EmergencyContactPhone.Trim();
+        if (!string.IsNullOrWhiteSpace(request.Password))
+        {
+            employee.Password = request.Password.Trim();
+            var userToUpdate = await _uow.Users.FirstOrDefaultAsync(
+                _uow.Users.Query().Where(u => u.EmployeeId == employee.Id || u.Email == employee.Email), ct);
+            if (userToUpdate != null)
+            {
+                userToUpdate.PasswordHash = _passwordHasher.Hash(request.Password.Trim());
+                _uow.Users.Update(userToUpdate);
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(request.RoleCode))
         {
@@ -288,6 +325,22 @@ public sealed class EmployeeService : IEmployeeService
                     }
                 }
             }
+        }
+
+        // Synchronize user active state with employee employment status (restores access on Active, deactivates on Offboarding/Terminated/Resigned)
+        var statusSyncUser = await _uow.Users.FirstOrDefaultAsync(
+            _uow.Users.Query().Where(u => u.EmployeeId == employee.Id || u.Email == employee.Email), ct);
+        if (statusSyncUser != null)
+        {
+            if (employee.Status == EmploymentStatus.Active)
+            {
+                statusSyncUser.IsActive = true;
+            }
+            else if (employee.Status is EmploymentStatus.Offboarding or EmploymentStatus.Terminated or EmploymentStatus.Resigned)
+            {
+                statusSyncUser.IsActive = false;
+            }
+            _uow.Users.Update(statusSyncUser);
         }
 
         // Keep dedicated EmployeeBanks table in sync with primary employee bank details
@@ -507,7 +560,8 @@ public sealed class EmployeeService : IEmployeeService
         e.IsFaceEnrolled,
         e.FacePhotoUrl,
         e.EmergencyContactName,
-        e.EmergencyContactPhone);
+        e.EmergencyContactPhone,
+        e.Password ?? "Employee@123");
 
     private static decimal Gross(Employee e) =>
         e.BasicSalary + e.HousingAllowance + e.TransportAllowance + e.MobileAllowance + e.OtherAllowances;

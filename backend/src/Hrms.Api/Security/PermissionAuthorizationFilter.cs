@@ -35,6 +35,7 @@ public sealed class PermissionAuthorizationFilter : IAsyncActionFilter
         { "/api/payroll", "PAYR" },
         { "/api/payslips", "PAYS" },
         { "/api/onboarding", "ONBD" },
+        { "/api/offboarding", "EMPL" },
         { "/api/documents", "DOCS" },
         { "/api/approvals", "APPR" },
         { "/api/reports", "REPT" },
@@ -98,6 +99,79 @@ public sealed class PermissionAuthorizationFilter : IAsyncActionFilter
         // Lockout protection: Company Admin ALWAYS retains full access to Settings, Roles, Permissions, Navigation
         bool isCompanyAdmin = roleName.Equals("Company Admin", StringComparison.OrdinalIgnoreCase) ||
                               roleName.Equals("CompanyAdmin", StringComparison.OrdinalIgnoreCase);
+        bool isHrManager = roleName.Equals("HR Manager", StringComparison.OrdinalIgnoreCase) ||
+                           roleName.Equals("HrManager", StringComparison.OrdinalIgnoreCase);
+
+        // Immediate offboarding & deactivation check for employee callers across all protected endpoints
+        if (!isCompanyAdmin && !isHrManager)
+        {
+            var uowCheck = context.HttpContext.RequestServices.GetService(typeof(IUnitOfWork)) as IUnitOfWork;
+            if (uowCheck != null)
+            {
+                var idClaim = user.FindFirstValue(ClaimTypes.NameIdentifier);
+                Guid? callerUserId = Guid.TryParse(idClaim, out var pUid) ? pUid : null;
+                var empClaimStr = user.FindFirstValue("employeeId");
+                Guid? callerEmpId = Guid.TryParse(empClaimStr, out var pEid) ? pEid : null;
+
+                bool isBlocked = false;
+
+                if (callerUserId.HasValue)
+                {
+                    var dbUser = await uowCheck.Users.GetByIdAsync(callerUserId.Value);
+                    if (dbUser != null)
+                    {
+                        if (!dbUser.IsActive)
+                        {
+                            isBlocked = true;
+                        }
+                        if (!callerEmpId.HasValue && dbUser.EmployeeId.HasValue)
+                        {
+                            callerEmpId = dbUser.EmployeeId.Value;
+                        }
+                        if (!callerEmpId.HasValue && !string.IsNullOrWhiteSpace(dbUser.Email))
+                        {
+                            var matchedEmp = await uowCheck.Employees.FirstOrDefaultAsync(
+                                uowCheck.Employees.Query().Where(e => e.Email.ToLower() == dbUser.Email.ToLower()));
+                            if (matchedEmp != null)
+                            {
+                                callerEmpId = matchedEmp.Id;
+                            }
+                        }
+                    }
+                }
+
+                if (!isBlocked && callerEmpId.HasValue)
+                {
+                    var emp = await uowCheck.Employees.GetByIdAsync(callerEmpId.Value);
+                    if (emp != null && (emp.Status is Domain.Enums.EmploymentStatus.Offboarding or Domain.Enums.EmploymentStatus.Terminated or Domain.Enums.EmploymentStatus.Resigned))
+                    {
+                        isBlocked = true;
+                    }
+                    else
+                    {
+                        var hasOffboardRecord = await uowCheck.OffboardingRecords.AnyAsync(
+                            uowCheck.OffboardingRecords.Query().Where(o => o.EmployeeId == callerEmpId.Value && (o.Status == Domain.Entities.OffboardingStatus.Completed || o.AccessRevoked)));
+                        if (hasOffboardRecord)
+                        {
+                            isBlocked = true;
+                        }
+                    }
+                }
+
+                if (isBlocked)
+                {
+                    context.Result = new ObjectResult(new
+                    {
+                        message = "Your account has been deactivated. Please contact HR.",
+                        title = "Your account has been deactivated. Please contact HR."
+                    })
+                    {
+                        StatusCode = StatusCodes.Status403Forbidden
+                    };
+                    return;
+                }
+            }
+        }
 
         // 4. Employee self-service opt-outs (personal data operations and read-only lookups)
         var empClaim = user.FindFirstValue("employeeId");

@@ -61,7 +61,9 @@ public sealed record PayrollPreflightCheckDto(
     bool CanRun,
     int PendingLeavesCount,
     string Message,
-    IReadOnlyList<string> PendingEmployeeNames);
+    IReadOnlyList<string> PendingEmployeeNames,
+    int MissingBankDetailsCount = 0,
+    IReadOnlyList<string>? MissingBankEmployeeNames = null);
 
 public sealed record SendPayslipsRequest(
     IReadOnlyList<Guid> EmployeeIds,

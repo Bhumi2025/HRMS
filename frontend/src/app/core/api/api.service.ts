@@ -91,6 +91,11 @@ import {
   CreateCompanyRequest,
   ResendInvitationResult,
   UpdateCompanyRequest,
+  OffboardingRecord,
+  OffboardingSummary,
+  InitiateOffboardingRequest,
+  UpdateOffboardingRequest,
+  CompleteOffboardingRequest,
 } from './api.models';
 
 type Query = Record<string, unknown>;
@@ -905,6 +910,31 @@ export class ApiService {
 
   updateSupportTicket(id: string, payload: any): Observable<SupportTicket> {
     return this.http.put<SupportTicket>(this.url(`/support/${id}`), payload);
+  }
+
+  // ── Offboarding (HR) ──
+  offboardings(params?: { status?: string; search?: string }): Observable<OffboardingRecord[]> {
+    return this.http.get<OffboardingRecord[]>(this.url('/offboarding'), { params: toParams(params || {}) });
+  }
+
+  offboardingSummary(): Observable<OffboardingSummary> {
+    return this.http.get<OffboardingSummary>(this.url('/offboarding/summary'));
+  }
+
+  offboarding(id: string): Observable<OffboardingRecord> {
+    return this.http.get<OffboardingRecord>(this.url(`/offboarding/${id}`));
+  }
+
+  initiateOffboarding(body: InitiateOffboardingRequest): Observable<OffboardingRecord> {
+    return this.http.post<OffboardingRecord>(this.url('/offboarding'), body);
+  }
+
+  updateOffboarding(id: string, body: UpdateOffboardingRequest): Observable<OffboardingRecord> {
+    return this.http.put<OffboardingRecord>(this.url(`/offboarding/${id}`), body);
+  }
+
+  completeOffboarding(id: string, body: CompleteOffboardingRequest): Observable<OffboardingRecord> {
+    return this.http.post<OffboardingRecord>(this.url(`/offboarding/${id}/complete`), body);
   }
 
   private url(path: string): string {

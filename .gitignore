@@ -11,6 +11,10 @@
 TestResults/
 *.pdb
 *.dll.config
+publish/
+[Pp]ublish/
+release_iis/
+*.zip
 
 # Visual Studio temporary files, user options & state
 .vs/
@@ -39,6 +43,8 @@ lerna-debug.log*
 # Angular build outputs & caches
 frontend/dist/
 dist/
+release_iis/
+*.zip
 tmp/
 out-tsc/
 bazel-out/
@@ -58,7 +64,13 @@ backend/src/Hrms.Api/wwwroot/uploads/tenants/*
 !backend/src/Hrms.Api/wwwroot/uploads/tenants/.gitkeep
 
 # ── Local Environment & Database Files ──
+.env
+.env.*
+*.env
+!.env.example
 appsettings.Local.json
+appsettings.Production.json
+appsettings.Staging.json
 *.mdf
 *.ldf
 *.ndf
@@ -89,6 +101,10 @@ appsettings.Local.json
 .commandcode/
 %DST%/
 .gemini/
+
+# ── Python Cache ──
+__pycache__/
+*.py[cod]
 
 # ── Operating System Junk ──
 .DS_Store

@@ -638,6 +638,13 @@ public sealed class AttendanceService : IAttendanceService
         return (maxHours, targetHours, lateGrace, shiftStart, isOvernight);
     }
 
+    private async Task<Guid?> ResolveSelfOrExplicitEmployeeIdOrNullAsync(Guid? explicitId, CancellationToken ct)
+    {
+        if (explicitId is { } id && id != Guid.Empty) return id;
+        if (_currentUser.EmployeeId is { } own && own != Guid.Empty) return own;
+        return null;
+    }
+
     private async Task<Guid> ResolveSelfOrExplicitEmployeeIdAsync(Guid? explicitId, CancellationToken ct)
     {
         if (explicitId is { } id && id != Guid.Empty) return id;
@@ -1042,7 +1049,14 @@ public sealed class AttendanceService : IAttendanceService
 
     public async Task<EmployeePunchStatusDto> GetPunchStatusAsync(Guid? employeeId, CancellationToken ct = default)
     {
-        var targetEmpId = await ResolveSelfOrExplicitEmployeeIdAsync(employeeId, ct);
+        var nullableId = await ResolveSelfOrExplicitEmployeeIdOrNullAsync(employeeId, ct);
+        if (nullableId is null)
+        {
+            // Admin/HR user with no linked employee — return a safe default
+            var (_, defaultTz, _) = await GetCompanyTimeZoneAsync(ct);
+            return new EmployeePunchStatusDto(false, null, DateTime.UtcNow, defaultTz, null, 0, 0, null, Array.Empty<EmployeePunchDto>(), false, null, null);
+        }
+        var targetEmpId = nullableId.Value;
         var employee = await _uow.Employees.GetWithDetailsAsync(targetEmpId, ct)
                        ?? await _uow.Employees.GetByIdAsync(targetEmpId, ct);
 
@@ -1241,7 +1255,10 @@ public sealed class AttendanceService : IAttendanceService
 
     public async Task<IReadOnlyList<EmployeePunchDto>> GetTodayPunchesAsync(Guid? employeeId, CancellationToken ct = default)
     {
-        var targetEmpId = await ResolveSelfOrExplicitEmployeeIdAsync(employeeId, ct);
+        var nullableId = await ResolveSelfOrExplicitEmployeeIdOrNullAsync(employeeId, ct);
+        if (nullableId is null)
+            return Array.Empty<EmployeePunchDto>();
+        var targetEmpId = nullableId.Value;
         var (tz, _, _) = await GetCompanyTimeZoneAsync(ct);
         var nowUtc = DateTime.UtcNow;
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);

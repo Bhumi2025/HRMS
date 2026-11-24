@@ -104,9 +104,9 @@ public sealed class FilesController : ControllerBase
         var fileBytes = await System.IO.File.ReadAllBytesAsync(localFilePath, ct);
 
         // Cloudinary upload integration
-        var cloudName = _config["Cloudinary:CloudName"] ?? "awtmmhwl";
-        var apiKey = _config["Cloudinary:ApiKey"] ?? "337337895791817";
-        var apiSecret = _config["Cloudinary:ApiSecret"] ?? "";
+        var cloudName = _config["Cloudinary:CloudName"] ?? "dvy7hrlmp";
+        var apiKey = _config["Cloudinary:ApiKey"] ?? "521133217566947";
+        var apiSecret = _config["Cloudinary:ApiSecret"] ?? "wGbQBySQ5Q0xoh3G4eQys7SuU38";
         var uploadPreset = _config["Cloudinary:UploadPreset"];
 
         string? cloudinaryUrl = null;

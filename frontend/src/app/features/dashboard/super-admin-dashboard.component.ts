@@ -221,6 +221,20 @@ import { ToastService } from '../../core/services/toast.service';
                         <span [appIcon]="'eye'"></span>
                         Details
                       </button>
+
+                      @if (!c.isDefault) {
+                        <button
+                          type="button"
+                          class="action-btn"
+                          style="color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);"
+                          (click)="confirmDeleteCompany(c)"
+                          data-tooltip="Delete Company & Drop Database"
+                          title="Delete {{ c.name }} & Drop Database"
+                        >
+                          <span [appIcon]="'trash'"></span>
+                          Delete
+                        </button>
+                      }
                     </div>
                   </td>
                 </tr>
@@ -302,6 +316,16 @@ import { ToastService } from '../../core/services/toast.service';
                 >
                   <span [appIcon]="'eye'"></span> Details
                 </button>
+                @if (!c.isDefault) {
+                  <button
+                    type="button"
+                    class="action-btn"
+                    style="color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);"
+                    (click)="confirmDeleteCompany(c)"
+                  >
+                    <span [appIcon]="'trash'"></span> Delete
+                  </button>
+                }
               </div>
             </div>
           } @empty {
@@ -524,8 +548,24 @@ import { ToastService } from '../../core/services/toast.service';
               }
             </div>
 
-            <!-- Modal Footer (Resend Invitation removed!) -->
-            <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end;">
+            <!-- Modal Footer -->
+            <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+              @if (selectedCompanyListItem(); as item) {
+                @if (!item.isDefault) {
+                  <button
+                    type="button"
+                    class="action-btn"
+                    style="color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); display: inline-flex; align-items: center; gap: 6px;"
+                    (click)="closeCompanyDetails(); confirmDeleteCompany(item)"
+                  >
+                    <span [appIcon]="'trash'"></span> Delete Organization & Drop Database
+                  </button>
+                } @else {
+                  <div></div>
+                }
+              } @else {
+                <div></div>
+              }
               <button class="btn-cancel" type="button" (click)="closeCompanyDetails()" style="min-width: 80px;">Close</button>
             </div>
           </div>
@@ -601,6 +641,45 @@ import { ToastService } from '../../core/services/toast.service';
             </div>
           </div>
         </div>
+      }
+
+      <!-- Delete Company & Drop Database Confirmation Modal -->
+      @if (showDeleteCompanyModal()) {
+        @if (companyToDelete(); as c) {
+          <div class="modal-overlay open" (click)="closeDeleteCompanyModal()">
+            <div class="modal" style="max-width: 480px;" (click)="$event.stopPropagation()">
+              <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 18px 24px;">
+                <div style="font-size: 1.15rem; font-weight: 700; color: #dc2626; display: flex; align-items: center; gap: 8px;">
+                  <span [appIcon]="'trash'"></span>
+                  <span>Delete Company & Drop Database</span>
+                </div>
+                <button class="btn-cancel" style="padding: 4px 8px; font-size: 14px;" (click)="closeDeleteCompanyModal()" [disabled]="isDeletingCompany()">
+                  <span [appIcon]="'x'"></span>
+                </button>
+              </div>
+              <div class="modal-body" style="padding: 20px 24px;">
+                <p style="font-size: 14px; margin-bottom: 12px; color: var(--text);">
+                  Are you sure you want to delete organization <strong>{{ c.name }}</strong> (<code>{{ c.code }}</code>)?
+                </p>
+                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 8px; padding: 12px 14px; font-size: 12.5px; color: #b91c1c; line-height: 1.45;">
+                  <strong>Database Drop Warning:</strong> This will permanently delete the tenant registry and <strong>drop</strong> the dedicated SQL database <code>{{ c.databaseName || 'associated' }}</code> from the SQL Server. All data inside will be permanently erased.
+                </div>
+              </div>
+              <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="btn-cancel" type="button" (click)="closeDeleteCompanyModal()" [disabled]="isDeletingCompany()">Cancel</button>
+                <button
+                  type="button"
+                  class="btn-submit"
+                  style="background: #dc2626; border-color: #dc2626; color: #fff;"
+                  (click)="deleteCompanyConfirmed()"
+                  [disabled]="isDeletingCompany()"
+                >
+                  {{ isDeletingCompany() ? 'Dropping Database & Deleting...' : 'Confirm & Delete Company' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        }
       }
     </div>
   `,
@@ -1588,6 +1667,9 @@ export class SuperAdminDashboardComponent implements OnInit, OnDestroy, AfterVie
   protected readonly isRefreshing = signal<boolean>(false);
   protected readonly showCreateOrgModal = signal<boolean>(false);
   protected readonly creatingOrg = signal<boolean>(false);
+  protected readonly showDeleteCompanyModal = signal<boolean>(false);
+  protected readonly companyToDelete = signal<CompanyListItem | null>(null);
+  protected readonly isDeletingCompany = signal<boolean>(false);
   protected createOrgForm: CreateCompanyRequest = {
     name: '',
     code: '',
@@ -1984,6 +2066,41 @@ export class SuperAdminDashboardComponent implements OnInit, OnDestroy, AfterVie
       },
       error: (err) => {
         this.toast.show(err?.error?.message || 'Failed to resend invitation', 'danger');
+      },
+    });
+  }
+
+  protected confirmDeleteCompany(company: CompanyListItem): void {
+    if (company.isDefault) {
+      this.toast.show('The primary default company cannot be deleted', 'danger');
+      return;
+    }
+    this.companyToDelete.set(company);
+    this.showDeleteCompanyModal.set(true);
+  }
+
+  protected closeDeleteCompanyModal(): void {
+    if (this.isDeletingCompany()) return;
+    this.showDeleteCompanyModal.set(false);
+    this.companyToDelete.set(null);
+  }
+
+  protected deleteCompanyConfirmed(): void {
+    const c = this.companyToDelete();
+    if (!c) return;
+
+    this.isDeletingCompany.set(true);
+    this.api.deleteTenantCompany(c.id).subscribe({
+      next: () => {
+        this.isDeletingCompany.set(false);
+        this.showDeleteCompanyModal.set(false);
+        this.companyToDelete.set(null);
+        this.toast.show(`Company '${c.name}' and its database were deleted successfully.`, 'success');
+        this.refreshAll();
+      },
+      error: (err) => {
+        this.isDeletingCompany.set(false);
+        this.toast.show(err?.error?.message || 'Failed to delete company and drop database', 'danger');
       },
     });
   }

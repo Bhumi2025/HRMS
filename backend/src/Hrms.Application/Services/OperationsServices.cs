@@ -15,17 +15,20 @@ public sealed class CompanyService : ICompanyService
     private readonly IMasterUnitOfWork _masterUow;
     private readonly ITenantContext _tenantContext;
     private readonly ITenantResolutionService _tenantResolver;
+    private readonly Microsoft.Extensions.Configuration.IConfiguration _config;
 
     public CompanyService(
         IUnitOfWork uow,
         IMasterUnitOfWork masterUow,
         ITenantContext tenantContext,
-        ITenantResolutionService tenantResolver)
+        ITenantResolutionService tenantResolver,
+        Microsoft.Extensions.Configuration.IConfiguration config)
     {
         _uow = uow;
         _masterUow = masterUow;
         _tenantContext = tenantContext;
         _tenantResolver = tenantResolver;
+        _config = config;
     }
 
     public async Task<CompanySettingsDto> GetAsync(CancellationToken ct = default)
@@ -154,7 +157,17 @@ public sealed class CompanyService : ICompanyService
         var targetPath = Path.Combine(targetFolder, savedFileName);
         await File.WriteAllBytesAsync(targetPath, bytes, ct);
 
-        var publicUrl = $"/uploads/tenants/{slug}/{savedFileName}";
+        // Upload to Cloudinary for global CDN distribution
+        var cloudName = _config["Cloudinary:CloudName"] ?? "dvy7hrlmp";
+        var apiKey = _config["Cloudinary:ApiKey"] ?? "521133217566947";
+        var apiSecret = _config["Cloudinary:ApiSecret"] ?? "wGbQBySQ5Q0xoh3G4eQys7SuU38";
+
+        var cloudinaryUrl = await Hrms.Application.Common.CloudinaryUploader.UploadAsync(
+            bytes, savedFileName, $"hrms-logos/{slug}", cloudName, apiKey, apiSecret, ct);
+
+        var publicUrl = !string.IsNullOrWhiteSpace(cloudinaryUrl)
+            ? cloudinaryUrl
+            : $"/uploads/tenants/{slug}/{savedFileName}";
 
         // Single write path: Update CompanySettings in tenant DB
         var settings = await _uow.CompanySettings.FirstOrDefaultAsync(

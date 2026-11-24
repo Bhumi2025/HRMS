@@ -1246,6 +1246,7 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly faceMatchScore = signal<number | null>(null);
   private currentDescriptor: number[] | null = null;
   private currentSnapshot: string | null = null;
+  private isDetectingFrame = false;
 
   // Operation flags
   protected readonly isEnrolling = signal<boolean>(false);
@@ -1439,8 +1440,14 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
       this.cameraError.set(null);
       await this.faceService.loadModels();
 
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+        video: {
+          width: { ideal: isMobile ? 480 : 640 },
+          height: { ideal: isMobile ? 360 : 480 },
+          frameRate: { ideal: 30, max: 30 },
+          facingMode: 'user',
+        },
       });
       this.videoStream = stream;
 
@@ -1471,6 +1478,9 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.scanInterval) clearInterval(this.scanInterval);
 
     this.scanInterval = setInterval(async () => {
+      // Guard against overlapping frame detections to prevent camera lag
+      if (this.isDetectingFrame) return;
+
       // 1. Maintain employee cooldown countdown
       if (this.lastPunchedEmployeeId) {
         const elapsed = Date.now() - this.lastPunchedTime;
@@ -1488,48 +1498,57 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
       const canvas = this.faceCanvasRef?.nativeElement;
       if (!video || !canvas || video.paused || video.ended || this.isCameraLoading()) return;
 
-      const scan: FaceScanResult = await this.faceService.detectFace(video, canvas);
-      this.hasFaceDetected.set(scan.hasFace);
+      this.isDetectingFrame = true;
+      try {
+        const scan: FaceScanResult = await this.faceService.detectFace(video, canvas, false);
+        this.hasFaceDetected.set(scan.hasFace);
 
-      if (scan.hasFace && scan.descriptor) {
-        this.currentDescriptor = scan.descriptor;
-        this.currentSnapshot = scan.snapshot || null;
+        if (scan.hasFace && scan.descriptor) {
+          this.currentDescriptor = scan.descriptor;
 
-        // Verify if employee is selected or auto-identify from enrolled faces
-        const emp = this.selectedEmployee();
-        if (emp) {
-          this.verifySelectedFace(scan.descriptor);
-        } else {
-          this.identifyFace(scan.descriptor);
-        }
-
-        // Auto-Punch when verified and eligible (ensuring same employee is not in cooldown)
-        const isCooldownActive =
-          this.lastPunchedEmployeeId === emp?.id && Date.now() - this.lastPunchedTime < this.COOLDOWN_MS;
-
-        if (
-          this.autoPunchEnabled() &&
-          this.canExecutePunch() &&
-          !this.isSubmitting() &&
-          !this.punchCooldown &&
-          !this.punchResult() &&
-          !isCooldownActive
-        ) {
-          this.consecutiveVerifiedFrames++;
-          if (this.consecutiveVerifiedFrames >= 2) {
-            this.punchCooldown = true;
-            this.submitCentralizedPunch(this.isClockedIn() ? 'ClockOut' : 'ClockIn');
+          // Verify if employee is selected or auto-identify from enrolled faces
+          const emp = this.selectedEmployee();
+          if (emp) {
+            this.verifySelectedFace(scan.descriptor);
+          } else {
+            this.identifyFace(scan.descriptor);
           }
-        } else if (this.faceStatus() !== 'verified') {
+
+          // Auto-Punch when verified and eligible (ensuring same employee is not in cooldown)
+          const isCooldownActive =
+            this.lastPunchedEmployeeId === emp?.id && Date.now() - this.lastPunchedTime < this.COOLDOWN_MS;
+
+          if (
+            this.autoPunchEnabled() &&
+            this.canExecutePunch() &&
+            !this.isSubmitting() &&
+            !this.punchCooldown &&
+            !this.punchResult() &&
+            !isCooldownActive
+          ) {
+            this.consecutiveVerifiedFrames++;
+            if (this.consecutiveVerifiedFrames >= 2) {
+              this.punchCooldown = true;
+              if (video && canvas) {
+                this.currentSnapshot = this.faceService.captureSnapshot(video, canvas) || null;
+              }
+              this.submitCentralizedPunch(this.isClockedIn() ? 'ClockOut' : 'ClockIn');
+            }
+          } else if (this.faceStatus() !== 'verified') {
+            this.consecutiveVerifiedFrames = 0;
+          }
+        } else {
+          this.currentDescriptor = null;
           this.consecutiveVerifiedFrames = 0;
+          if (!this.selectedEmployee() && this.faceStatus() !== 'idle') {
+            this.faceStatus.set('idle');
+            this.faceMatchScore.set(null);
+          }
         }
-      } else {
-        this.currentDescriptor = null;
-        this.consecutiveVerifiedFrames = 0;
-        if (!this.selectedEmployee() && this.faceStatus() !== 'idle') {
-          this.faceStatus.set('idle');
-          this.faceMatchScore.set(null);
-        }
+      } catch (e) {
+        console.warn('Frame detection tick error:', e);
+      } finally {
+        this.isDetectingFrame = false;
       }
     }, 700);
   }
@@ -1626,6 +1645,12 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    const video = this.faceVideoRef?.nativeElement;
+    const canvas = this.faceCanvasRef?.nativeElement;
+    if (video && canvas) {
+      this.currentSnapshot = this.faceService.captureSnapshot(video, canvas) || this.currentSnapshot;
+    }
+
     this.isEnrolling.set(true);
     this.api
       .enrollFace(emp.id, {
@@ -1662,6 +1687,12 @@ export class PunchInOutComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.faceStatus() !== 'verified') {
       this.toast.show('Face verification failed. Please verify face before recording attendance.', 'danger');
       return;
+    }
+
+    const video = this.faceVideoRef?.nativeElement;
+    const canvas = this.faceCanvasRef?.nativeElement;
+    if (!this.currentSnapshot && video && canvas) {
+      this.currentSnapshot = this.faceService.captureSnapshot(video, canvas) || null;
     }
 
     const lat = this.currentLat() ?? this.OFFICE_LAT;
