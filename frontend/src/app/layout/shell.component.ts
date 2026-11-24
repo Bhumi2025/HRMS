@@ -43,6 +43,7 @@ const MASTER_NAV_CATALOGUE: MasterNavItem[] = [
   { label: 'Payroll', section: 'HR Modules', icon: 'payroll', path: '/payroll', empPath: '/payroll' },
   { label: 'Payslips', section: 'HR Modules', icon: 'payslip', path: '/payslips', empPath: '/me/payslips' },
   { label: 'Onboarding', section: 'HR Modules', icon: 'onboarding', path: '/onboarding', empPath: '/onboarding' },
+  { label: 'Offboarding', section: 'HR Modules', icon: 'employees', path: '/offboarding', empPath: '/offboarding' },
   { label: 'Documents', section: 'HR Modules', icon: 'documents', path: '/documents', empPath: '/me/documents' },
   { label: 'Approvals', section: 'HR Modules', icon: 'approvals', path: '/approvals', empPath: '/approvals' },
   { label: 'Reports', section: 'HR Modules', icon: 'reports', path: '/reports', empPath: '/reports' },
@@ -521,7 +522,17 @@ export class ShellComponent implements OnInit, OnDestroy {
     this.sidebarOpen.set(false);
   }
 
+  protected readonly currentPwd = signal('');
+  protected readonly newPwd = signal('');
+  protected readonly confirmPwd = signal('');
+  protected readonly pwdError = signal('');
+  protected readonly isChangingPwd = signal(false);
+
   protected openChangePassword(): void {
+    this.currentPwd.set('');
+    this.newPwd.set('');
+    this.confirmPwd.set('');
+    this.pwdError.set('');
     this.ui.closePanel();
     this.ui.open('chgPwdModal');
   }
@@ -596,8 +607,46 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   protected savePassword(): void {
-    this.ui.close('chgPwdModal');
-    this.toast.show('Password updated successfully!');
+    const cur = this.currentPwd().trim();
+    const np = this.newPwd().trim();
+    const cp = this.confirmPwd().trim();
+
+    if (!cur) {
+      this.pwdError.set('Current password is required.');
+      return;
+    }
+    if (!np) {
+      this.pwdError.set('New password is required.');
+      return;
+    }
+    if (np.length < 6) {
+      this.pwdError.set('New password must be at least 6 characters.');
+      return;
+    }
+    if (np !== cp) {
+      this.pwdError.set('New password and confirm password do not match.');
+      return;
+    }
+
+    this.isChangingPwd.set(true);
+    this.pwdError.set('');
+
+    this.api.changePassword(cur, np).subscribe({
+      next: () => {
+        this.isChangingPwd.set(false);
+        this.ui.close('chgPwdModal');
+        this.toast.show('Password updated successfully! HR has been notified.', 'success');
+        this.currentPwd.set('');
+        this.newPwd.set('');
+        this.confirmPwd.set('');
+        this.notifState.refresh();
+      },
+      error: (err) => {
+        this.isChangingPwd.set(false);
+        const msg = err?.error?.message || err?.error?.title || 'Could not update password. Please check your current password.';
+        this.pwdError.set(msg);
+      },
+    });
   }
 
   @HostListener('document:click', ['$event'])

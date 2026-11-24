@@ -327,15 +327,40 @@ public sealed class PayrollService : IPayrollService
         await _uow.PayrollRuns.AddAsync(run, ct);
         await _uow.Payslips.AddRangeAsync(payslips, ct);
 
+        // HR Broadcast Notification
+        var monthDate = new DateTime(request.Year, request.Month, 1);
         await _uow.Notifications.AddAsync(new Notification
         {
             IconKey = "card",
             Title = "Payroll Run Processed",
-            Message = $"Payroll for {new DateTime(request.Year, request.Month, 1):MMMM yyyy} was processed for {payslips.Count} employees. Total Net: ${run.TotalNet:N0}.",
+            Message = $"Payroll for {monthDate:MMMM yyyy} was processed for {payslips.Count} employees. Total Net: ${run.TotalNet:N0}.",
             TimeLabel = "Just now",
             IsRead = false,
             CreatedAtUtc = DateTime.UtcNow,
         }, ct);
+
+        // Individual Employee In-App Notifications
+        var employeeIds = payslips.Select(p => p.EmployeeId).Distinct().ToList();
+        var empUsers = await _uow.Users.ToListAsync(
+            _uow.Users.Query().Where(u => u.EmployeeId.HasValue && employeeIds.Contains(u.EmployeeId.Value)), ct);
+
+        foreach (var p in payslips)
+        {
+            var u = empUsers.FirstOrDefault(usr => usr.EmployeeId == p.EmployeeId);
+            if (u != null)
+            {
+                await _uow.Notifications.AddAsync(new Notification
+                {
+                    UserId = u.Id,
+                    IconKey = "payroll",
+                    Title = $"Payslip Available: {monthDate:MMMM yyyy}",
+                    Message = $"Your payslip for {monthDate:MMMM yyyy} is now available in your portal. Net Salary: ₹{p.NetPay:N2}.",
+                    TimeLabel = "Payslip",
+                    IsRead = false,
+                    CreatedAtUtc = DateTime.UtcNow,
+                }, ct);
+            }
+        }
 
         await _uow.SaveChangesAsync(ct);
 
@@ -479,7 +504,25 @@ public sealed class PayrollService : IPayrollService
                 var res = await _emailSender.SendAsync(msg, ct);
                 if (res.Delivered || res.Simulated) sentCount++;
             }
+
+            var empUser = await _uow.Users.FirstOrDefaultAsync(
+                _uow.Users.Query().Where(u => u.EmployeeId == empId), ct);
+            if (empUser != null)
+            {
+                await _uow.Notifications.AddAsync(new Notification
+                {
+                    UserId = empUser.Id,
+                    IconKey = "payroll",
+                    Title = $"Payslip Delivered: {monthName}",
+                    Message = $"Your payslip for {monthName} has been distributed to your portal and email. Net Salary: ₹{netPay:N2}.",
+                    TimeLabel = "Payslip",
+                    IsRead = false,
+                    CreatedAtUtc = DateTime.UtcNow
+                }, ct);
+            }
         }
+
+        await _uow.SaveChangesAsync(ct);
 
         return new SendPayslipsResultDto(
             request.EmployeeIds.Count,

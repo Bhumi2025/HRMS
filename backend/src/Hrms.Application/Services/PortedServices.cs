@@ -351,7 +351,32 @@ public sealed class NavigationService : INavigationService
     public async Task<IReadOnlyList<NavigationItemDto>> GetUserNavigationAsync(Guid userId, CancellationToken ct = default)
     {
         var user = await _uow.Users.GetWithRoleAsync(userId, ct);
-        if (user == null) return Array.Empty<NavigationItemDto>();
+        if (user == null || !user.IsActive) return Array.Empty<NavigationItemDto>();
+
+        var empId = user.EmployeeId;
+        if (!empId.HasValue)
+        {
+            var matchedEmp = await _uow.Employees.FirstOrDefaultAsync(
+                _uow.Employees.Query().Where(e => e.Email.ToLower() == user.Email.ToLower()), ct);
+            empId = matchedEmp?.Id;
+        }
+
+        if (empId.HasValue)
+        {
+            var emp = await _uow.Employees.GetByIdAsync(empId.Value, ct);
+            if (emp != null && (emp.Status is EmploymentStatus.Offboarding or EmploymentStatus.Terminated or EmploymentStatus.Resigned))
+            {
+                return Array.Empty<NavigationItemDto>();
+            }
+
+            var isOffboarded = await _uow.OffboardingRecords.AnyAsync(
+                _uow.OffboardingRecords.Query().Where(o => o.EmployeeId == empId.Value && (o.Status == OffboardingStatus.Completed || o.AccessRevoked)),
+                ct);
+            if (isOffboarded)
+            {
+                return Array.Empty<NavigationItemDto>();
+            }
+        }
 
         var allItems = await _uow.NavigationItems.ToListAsync(
             _uow.NavigationItems.Query().Where(n => n.IsActive).OrderBy(n => n.OrderIndex), ct);

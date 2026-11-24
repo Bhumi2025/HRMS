@@ -538,7 +538,7 @@ export class SitecoreDashboardComponent implements OnInit {
         tile('employees', 'Employees', '/employees', 'ic-blue', 'All staff records'),
         tile('profile', 'Emp Profile', '/employee-profile', 'ic-indigo', 'View & edit info'),
         tile('onboarding', 'Onboarding', '/onboarding', 'ic-green', 'New hire setup'),
-        tile('offboarding', 'Offboarding', '/employees', 'ic-red', 'Exit process'),
+        tile('offboarding', 'Offboarding', '/offboarding', 'ic-red', 'Exit process'),
       ],
     },
     {

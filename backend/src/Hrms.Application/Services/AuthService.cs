@@ -4,6 +4,7 @@ using Hrms.Application.Abstractions.Services;
 using Hrms.Application.Abstractions.Tenancy;
 using Hrms.Application.Common;
 using Hrms.Application.DTOs;
+using Hrms.Domain.Entities;
 using Hrms.Domain.Enums;
 
 namespace Hrms.Application.Services;
@@ -69,14 +70,19 @@ public sealed class AuthService : IAuthService
 
         var user = await _tenantDb.FindUserByEmailAsync(tenant.DatabaseName, email, ct);
 
-        if (user is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
+        if (user is null)
         {
             throw new UnauthorizedException();
         }
 
-        if (!user.IsActive)
+        if (!user.IsActive || user.IsOffboarded || user.EmployeeStatus is EmploymentStatus.Offboarding or EmploymentStatus.Terminated or EmploymentStatus.Resigned)
         {
-            throw new ForbiddenException("This account has been deactivated. Contact your administrator.");
+            throw new ForbiddenException("Your account has been deactivated. Please contact HR.");
+        }
+
+        if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
+        {
+            throw new UnauthorizedException();
         }
 
         await _tenantDb.RecordLoginAsync(tenant.DatabaseName, user.Id, ct);
@@ -99,6 +105,36 @@ public sealed class AuthService : IAuthService
         var user = await _uow.Users.GetWithRoleAsync(userId, ct)
                    ?? throw NotFoundException.For("User", userId);
 
+        if (!user.IsActive)
+        {
+            throw new ForbiddenException("Your account has been deactivated. Please contact HR.");
+        }
+
+        var empId = user.EmployeeId;
+        if (!empId.HasValue)
+        {
+            var matchedEmp = await _uow.Employees.FirstOrDefaultAsync(
+                _uow.Employees.Query().Where(e => e.Email.ToLower() == user.Email.ToLower()), ct);
+            empId = matchedEmp?.Id;
+        }
+
+        if (empId.HasValue)
+        {
+            var emp = await _uow.Employees.GetByIdAsync(empId.Value, ct);
+            if (emp != null && (emp.Status is EmploymentStatus.Offboarding or EmploymentStatus.Terminated or EmploymentStatus.Resigned))
+            {
+                throw new ForbiddenException("Your account has been deactivated. Please contact HR.");
+            }
+
+            var isOffboarded = await _uow.OffboardingRecords.AnyAsync(
+                _uow.OffboardingRecords.Query().Where(o => o.EmployeeId == empId.Value && (o.Status == OffboardingStatus.Completed || o.AccessRevoked)),
+                ct);
+            if (isOffboarded)
+            {
+                throw new ForbiddenException("Your account has been deactivated. Please contact HR.");
+            }
+        }
+
         var tenant = _tenantContext.Tenant;
 
         return new UserDto(
@@ -108,7 +144,7 @@ public sealed class AuthService : IAuthService
             user.Initials,
             user.Role?.Name ?? "Employee",
             user.Role?.Code ?? "Employee",
-            user.EmployeeId,
+            user.EmployeeId ?? empId,
             tenant?.CompanyId,
             tenant?.Name,
             tenant?.Code,
@@ -132,6 +168,35 @@ public sealed class AuthService : IAuthService
 
         user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
         _uow.Users.Update(user);
+
+        // Fetch employee details if linked to an employee profile
+        string empName = user.FullName;
+        string empCode = "";
+        if (user.EmployeeId.HasValue)
+        {
+            var emp = await _uow.Employees.GetByIdAsync(user.EmployeeId.Value, ct);
+            if (emp != null)
+            {
+                empName = emp.FullName;
+                empCode = emp.EmployeeCode;
+            }
+        }
+
+        var timeStr = DateTime.UtcNow.ToString("MMM d, yyyy 'at' hh:mm tt");
+        var codePrefix = !string.IsNullOrEmpty(empCode) ? $" (ID: {empCode})" : "";
+
+        // Security notification for HR
+        await _uow.Notifications.AddAsync(new Notification
+        {
+            UserId = null, // Visible to all HR users
+            IconKey = "lock",
+            Title = "Employee Password Changed",
+            Message = $"Employee {empName}{codePrefix} successfully updated their account password on {timeStr} UTC.",
+            TimeLabel = "Security Alert",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow
+        }, ct);
+
         await _uow.SaveChangesAsync(ct);
     }
 
