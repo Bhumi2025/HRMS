@@ -345,8 +345,7 @@ END
                 RoleName = u.Role != null ? u.Role.Name : "Employee",
                 RoleCode = u.Role != null ? u.Role.Code.ToString() : "Employee",
                 EmployeeStatus = u.Employee != null ? (EmploymentStatus?)u.Employee.Status : null,
-                IsEmployeeOffboarded = (u.Employee != null && (u.Employee.Status == EmploymentStatus.Offboarding || u.Employee.Status == EmploymentStatus.Terminated || u.Employee.Status == EmploymentStatus.Resigned)) ||
-                                       (u.EmployeeId != null && db.OffboardingRecords.Any(o => o.EmployeeId == u.EmployeeId && (o.Status == OffboardingStatus.Completed || o.AccessRevoked)))
+                IsEmployeeOffboarded = (u.Employee != null && (u.Employee.Status == EmploymentStatus.Offboarding || u.Employee.Status == EmploymentStatus.Terminated || u.Employee.Status == EmploymentStatus.Resigned))
             })
             .FirstOrDefaultAsync(ct);
 
