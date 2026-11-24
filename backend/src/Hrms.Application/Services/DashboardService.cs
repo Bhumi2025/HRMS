@@ -88,6 +88,19 @@ public sealed class DashboardService : IDashboardService
         var employee = await _uow.Employees.GetWithDepartmentAsync(employeeId, ct)
                        ?? throw NotFoundException.For("Employee", employeeId);
 
+        if (employee.Status is EmploymentStatus.Offboarding or EmploymentStatus.Terminated or EmploymentStatus.Resigned)
+        {
+            throw new ForbiddenException("Your account has been deactivated. Please contact HR.");
+        }
+
+        var isOffboarded = await _uow.OffboardingRecords.AnyAsync(
+            _uow.OffboardingRecords.Query().Where(o => o.EmployeeId == employeeId && (o.Status == OffboardingStatus.Completed || o.AccessRevoked)),
+            ct);
+        if (isOffboarded)
+        {
+            throw new ForbiddenException("Your account has been deactivated. Please contact HR.");
+        }
+
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         // Only the columns this screen needs — the previous call eager-loaded six

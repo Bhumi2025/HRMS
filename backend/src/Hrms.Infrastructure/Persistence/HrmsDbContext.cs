@@ -102,6 +102,8 @@ public class HrmsDbContext : DbContext
 
     public DbSet<SupportRequest> SupportRequests => Set<SupportRequest>();
 
+    public DbSet<OffboardingRecord> OffboardingRecords => Set<OffboardingRecord>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Master-registry configurations (Companies, invitations, provisioning logs) live in

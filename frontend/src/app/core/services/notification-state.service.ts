@@ -90,7 +90,7 @@ export class NotificationStateService {
           } else if (full.includes('payroll') || full.includes('salary') || full.includes('payslip')) {
             category = 'Payroll';
             actionUrl = isEmp ? '/me/payslips' : '/payroll';
-            actionLabel = 'View Payroll';
+            actionLabel = isEmp ? 'View Payslip' : 'View Payroll';
           }
 
           return {
@@ -176,6 +176,23 @@ export class NotificationStateService {
                 m.includes('late');
               const isGenericAbsent = m.includes('recorded absent') || m.includes('window closed');
               return isReminderOrNote && !isGenericAbsent;
+            }
+
+            // 4. Payslip and Payroll notifications for this employee
+            if (
+              item.category === 'Payroll' ||
+              t.includes('payslip') ||
+              t.includes('salary') ||
+              m.includes('payslip') ||
+              m.includes('net pay')
+            ) {
+              if (item.userId && myId && item.userId === myId) {
+                return true;
+              }
+              if (myFirstName && (m.includes(myFirstName) || t.includes(myFirstName))) {
+                return true;
+              }
+              return t.includes('payslip') || m.includes('payslip');
             }
 
             // Filter out all other unrelated items for employees (birthdays of others, system alerts, approvals of others)

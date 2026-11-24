@@ -54,6 +54,7 @@ public sealed class UnitOfWork : IUnitOfWork
     private IRepository<AssetAssignment>? _assetAssignments;
     private IRepository<SupportType>? _supportTypes;
     private IRepository<SupportRequest>? _supportRequests;
+    private IRepository<OffboardingRecord>? _offboardingRecords;
 
     public UnitOfWork(HrmsDbContext db)
     {
@@ -153,6 +154,8 @@ public sealed class UnitOfWork : IUnitOfWork
     public IRepository<SupportType> SupportTypes => _supportTypes ??= new Repository<SupportType>(_db);
 
     public IRepository<SupportRequest> SupportRequests => _supportRequests ??= new Repository<SupportRequest>(_db);
+
+    public IRepository<OffboardingRecord> OffboardingRecords => _offboardingRecords ??= new Repository<OffboardingRecord>(_db);
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
 

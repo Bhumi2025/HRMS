@@ -30,7 +30,9 @@ public sealed record LeaveRequestDto(
     string Reason,
     string Status,
     DateTime SubmittedAtUtc,
-    string SubmittedLabel);
+    string SubmittedLabel,
+    string? DecisionNote = null,
+    DateTime? DecidedAtUtc = null);
 
 public sealed record CreateLeaveRequest(
     Guid? EmployeeId,

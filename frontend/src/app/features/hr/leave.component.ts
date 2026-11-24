@@ -22,6 +22,8 @@ interface LeaveRequest {
   d: number;
   r: string;
   s: 'Pending' | 'Approved' | 'Rejected';
+  decisionNote?: string | null;
+  decidedAtUtc?: string | null;
 }
 
 interface LeaveType {
@@ -185,7 +187,7 @@ interface LeaveType {
                     <button class="btn btn-ghost btn-sm" data-tooltip="View" (click)="view(r)"><span [appIcon]="'eye'"></span></button>
                     @if (r.s === 'Pending') {
                       <button class="tbl-btn success" data-tooltip="Approve" (click)="action(r, 'Approved')"><span [appIcon]="'check'"></span></button>
-                      <button class="tbl-btn danger" data-tooltip="Reject" (click)="action(r, 'Rejected')"><span [appIcon]="'x'"></span></button>
+                      <button class="tbl-btn danger" data-tooltip="Reject" (click)="promptReject(r)"><span [appIcon]="'x'"></span></button>
                     }
                   </div>
                 </td>
@@ -234,7 +236,7 @@ interface LeaveType {
           @if (viewTarget(); as r) {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
               @for (f of viewFields(r); track f[0]) {
-                <div style="background: var(--bg); border-radius: 8px; padding: 10px">
+                <div style="background: var(--bg); border-radius: 8px; padding: 10px" [style.grid-column]="f[0].includes('Reason') ? '1 / -1' : 'auto'">
                   <div style="font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px">
                     {{ f[0] }}
                   </div>
@@ -251,12 +253,67 @@ interface LeaveType {
                 <button class="btn btn-success" (click)="action(r, 'Approved'); ui.close('leaveViewModal')">
                   <span [appIcon]="'check'"></span> Approve
                 </button>
-                <button class="btn btn-danger" (click)="action(r, 'Rejected'); ui.close('leaveViewModal')">
+                <button class="btn btn-danger" (click)="promptReject(r); ui.close('leaveViewModal')">
                   <span [appIcon]="'x'"></span> Reject
                 </button>
               </div>
             }
           }
+        </div>
+      </div>
+    </div>
+
+    <!-- Reject Reason Modal -->
+    <div class="modal-overlay" [class.open]="ui.isOpen('leaveRejectModal')" (click)="ui.onOverlayClick($event, 'leaveRejectModal')">
+      <div class="modal" style="max-width: 480px; width: 100%">
+        <div class="modal-header">
+          <div>
+            <div class="card-title" style="font-size: 14px; color: var(--danger)">Reject Leave Request</div>
+            <div class="card-subtitle">
+              {{ rejectTarget()?.n }} · {{ rejectTarget()?.t }} ({{ rejectTarget()?.d }} day{{ rejectTarget()?.d === 1 ? '' : 's' }})
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" (click)="ui.close('leaveRejectModal')"><span [appIcon]="'x'"></span></button>
+        </div>
+        <div class="modal-body">
+          <div style="background: var(--bg); border-radius: 8px; padding: 12px; margin-bottom: 14px; font-size: 13px">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px">
+              <span style="color: var(--muted)">Dates:</span>
+              <span style="font-weight: 600">{{ rejectTarget()?.f }} – {{ rejectTarget()?.to }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between">
+              <span style="color: var(--muted)">Employee Reason:</span>
+              <span style="font-weight: 600">{{ rejectTarget()?.r }}</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">
+              Reason for Rejection <span style="color: var(--danger)">*</span>
+            </label>
+            <textarea
+              class="form-control"
+              [class.is-invalid]="!!rejectionReasonError()"
+              rows="3"
+              placeholder="State the mandatory reason for rejecting this leave request..."
+              [value]="rejectionReason()"
+              (input)="rejectionReason.set($any($event.target).value); rejectionReasonError.set('')"
+            ></textarea>
+            @if (rejectionReasonError()) {
+              <div style="font-size: 11px; color: var(--danger); margin-top: 4px; font-weight: 500">
+                {{ rejectionReasonError() }}
+              </div>
+            }
+            <div style="font-size: 11px; color: var(--muted); margin-top: 4px">
+              This rejection reason will be saved in the database and visible to the employee.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" [disabled]="isRejecting()" (click)="ui.close('leaveRejectModal')">Cancel</button>
+          <button class="btn btn-danger" [disabled]="isRejecting()" (click)="confirmReject()">
+            {{ isRejecting() ? 'Rejecting...' : 'Confirm Rejection' }}
+          </button>
         </div>
       </div>
     </div>
@@ -457,6 +514,10 @@ export class LeaveComponent implements OnInit, AfterViewInit {
 
   protected readonly typeForm = signal<LeaveType>({ id: '', name: '', days: 0, paid: true, color: '#2563eb', desc: '' });
   protected readonly viewTarget = signal<LeaveRequest | null>(null);
+  protected readonly rejectTarget = signal<LeaveRequest | null>(null);
+  protected readonly rejectionReason = signal('');
+  protected readonly rejectionReasonError = signal('');
+  protected readonly isRejecting = signal(false);
 
   protected readonly todayIso = new Date().toISOString().split('T')[0];
   protected readonly applyType = signal('Annual Leave');
@@ -606,6 +667,8 @@ export class LeaveComponent implements OnInit, AfterViewInit {
             d: r.days,
             r: r.reason,
             s: r.status as LeaveRequest['s'],
+            decisionNote: r.decisionNote,
+            decidedAtUtc: r.decidedAtUtc,
           })),
         ),
       error: () => {
@@ -658,7 +721,7 @@ export class LeaveComponent implements OnInit, AfterViewInit {
   }
 
   protected viewFields(r: LeaveRequest): [string, string][] {
-    return [
+    const list: [string, string][] = [
       ['Employee', r.n],
       ['Leave Type', r.t],
       ['From', r.f],
@@ -666,6 +729,60 @@ export class LeaveComponent implements OnInit, AfterViewInit {
       ['Days', `${r.d} day(s)`],
       ['Reason', r.r],
     ];
+    if (r.s === 'Rejected' && r.decisionNote) {
+      list.push(['HR Rejection Reason', r.decisionNote]);
+    }
+    return list;
+  }
+
+  protected promptReject(r: LeaveRequest): void {
+    this.rejectTarget.set(r);
+    this.rejectionReason.set('');
+    this.rejectionReasonError.set('');
+    this.ui.open('leaveRejectModal');
+  }
+
+  protected confirmReject(): void {
+    const r = this.rejectTarget();
+    if (!r) return;
+
+    const reason = this.rejectionReason().trim();
+    if (!reason) {
+      this.rejectionReasonError.set('Please enter a rejection reason.');
+      return;
+    }
+    if (reason.length < 3) {
+      this.rejectionReasonError.set('Rejection reason must be at least 3 characters.');
+      return;
+    }
+
+    this.isRejecting.set(true);
+    this.rejectionReasonError.set('');
+
+    if (!r.apiId) {
+      this.isRejecting.set(false);
+      this.requests.update((list) => list.map((x) => (x === r ? { ...x, s: 'Rejected', decisionNote: reason } : x)));
+      this.ui.close('leaveRejectModal');
+      this.toast.show('Leave rejected', 'danger');
+      return;
+    }
+
+    this.api.rejectLeave(r.apiId, reason).subscribe({
+      next: (updated) => {
+        this.isRejecting.set(false);
+        this.requests.update((list) =>
+          list.map((x) => (x === r ? { ...x, s: 'Rejected', decisionNote: reason } : x)),
+        );
+        this.ui.close('leaveRejectModal');
+        this.notifState.refresh();
+        this.toast.show('Leave rejected with reason recorded.', 'danger');
+      },
+      error: (error) => {
+        this.isRejecting.set(false);
+        const msg = error?.error?.detail || error?.error?.message || error?.error?.title || 'Could not reject the leave request.';
+        this.rejectionReasonError.set(msg);
+      },
+    });
   }
 
   protected view(r: LeaveRequest): void {

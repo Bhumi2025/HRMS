@@ -105,6 +105,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/hr/onboarding.component').then((m) => m.OnboardingComponent),
       },
       {
+        path: 'offboarding',
+        data: { title: 'Employee Offboarding' },
+        canActivate: [nonEmployeeGuard],
+        loadComponent: () => import('./features/hr/offboarding.component').then((m) => m.OffboardingComponent),
+      },
+      {
         path: 'leave',
         data: { title: 'Leave Management' },
         canActivate: [nonEmployeeGuard],

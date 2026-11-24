@@ -358,9 +358,32 @@ interface DocRow {
               <label class="form-label">Phone</label>
               <input class="form-control" [value]="contact().phone" (input)="patchContact('phone', $any($event.target).value)" />
             </div>
-            <div class="form-group">
-              <label class="form-label">Email</label>
-              <input class="form-control" type="email" [value]="contact().email" (input)="patchContact('email', $any($event.target).value)" />
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div class="form-group">
+                <label class="form-label">Email</label>
+                <input class="form-control" type="email" [value]="contact().email" (input)="patchContact('email', $any($event.target).value)" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Password</label>
+                <div class="profile-pwd-box">
+                  <span class="profile-pwd-icon" [appIcon]="'lock'"></span>
+                  <input
+                    class="form-control profile-pwd-input"
+                    [type]="showContactPassword() ? 'text' : 'password'"
+                    [value]="contact().password"
+                    (input)="patchContact('password', $any($event.target).value)"
+                    placeholder="Password"
+                  />
+                  <button
+                    type="button"
+                    class="profile-pwd-toggle"
+                    (click)="showContactPassword.set(!showContactPassword())"
+                    [title]="showContactPassword() ? 'Hide password' : 'Show password'"
+                  >
+                    <span [appIcon]="showContactPassword() ? 'eye_off' : 'eye'"></span>
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label">Emergency Contact</label>
@@ -975,6 +998,68 @@ interface DocRow {
         border-color: rgba(99, 102, 241, 0.35) !important;
         font-weight: 700 !important;
       }
+      .profile-pwd-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 100%;
+      }
+      .profile-pwd-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #2563eb;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 2;
+      }
+      .profile-pwd-icon svg {
+        width: 16px;
+        height: 16px;
+      }
+      .profile-pwd-input {
+        width: 100%;
+        padding-left: 36px !important;
+        padding-right: 38px !important;
+        background: #f8fafc;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        font-size: 14px;
+        color: var(--text);
+        transition: var(--t);
+      }
+      .profile-pwd-input:focus {
+        background: #fff;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+      }
+      .profile-pwd-toggle {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        padding: 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        z-index: 2;
+        transition: color 0.15s ease;
+      }
+      .profile-pwd-toggle:hover {
+        color: #2563eb;
+      }
+      .profile-pwd-toggle svg {
+        width: 16px;
+        height: 16px;
+      }
       @media (max-width: 768px) {
         .profile-banner {
           padding: 10px;
@@ -1373,6 +1458,7 @@ export class EmployeeProfileComponent implements OnInit {
     this.contact.set({
       phone: employee.phone ?? '',
       email: employee.email,
+      password: employee.password || 'Employee@123',
       emergency: employee.emergencyContactPhone
         ? (employee.emergencyContactName ? `${employee.emergencyContactName} (${employee.emergencyContactPhone})` : employee.emergencyContactPhone)
         : (employee.emergencyContactName ?? ''),
@@ -1503,6 +1589,7 @@ export class EmployeeProfileComponent implements OnInit {
       address: contact.address || null,
       city: contact.city || null,
       country: contact.country || null,
+      password: contact.password || null,
       emergencyContactName: contact.emergency?.includes('(') ? contact.emergency.split('(')[0].trim() : (contact.emergency?.trim() || null),
       emergencyContactPhone: contact.emergency?.includes('(') ? contact.emergency.split('(')[1]?.replace(')', '').trim() : null,
     };
@@ -1716,11 +1803,14 @@ export class EmployeeProfileComponent implements OnInit {
   protected readonly contact = signal({
     phone: '',
     email: EmployeeProfileComponent.readProfile().email || '',
+    password: '',
     emergency: '',
     address: '',
     city: '',
     country: '',
   });
+
+  protected readonly showContactPassword = signal(false);
 
   protected readonly identity = signal({
     passportNo: '',
@@ -1815,7 +1905,7 @@ export class EmployeeProfileComponent implements OnInit {
     this.job.update((j) => ({ ...j, [key]: value }));
   }
 
-  protected patchContact(key: 'phone' | 'email' | 'emergency' | 'address' | 'city' | 'country', value: string): void {
+  protected patchContact(key: 'phone' | 'email' | 'password' | 'emergency' | 'address' | 'city' | 'country', value: string): void {
     this.contact.update((c) => ({ ...c, [key]: value }));
   }
 

@@ -113,6 +113,7 @@ export interface EmployeeDetail {
   facePhotoUrl?: string | null;
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
+  password?: string | null;
 }
 
 export interface LeaveType {
@@ -137,6 +138,8 @@ export interface LeaveRequest {
   status: string;
   submittedAtUtc: string;
   submittedLabel: string;
+  decisionNote?: string | null;
+  decidedAtUtc?: string | null;
 }
 
 export interface LeaveBalance {
@@ -1139,4 +1142,55 @@ export interface ReorderKeyStoresRequest {
   keyGroupId: string;
   storeIds: string[];
 }
+
+export interface OffboardingRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  employeeCode: string;
+  department: string;
+  jobTitle: string;
+  resignationDate: string;
+  finalWorkingDate: string;
+  reason: string;
+  notes?: string | null;
+  status: 'Pending' | 'InProgress' | 'Completed' | 'Cancelled' | string;
+  isAssetReturned: boolean;
+  isAccessRevoked: boolean;
+  isFinalSettlementDone: boolean;
+  initiatedAtUtc: string;
+  completedAtUtc?: string | null;
+}
+
+export interface OffboardingSummary {
+  total: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
+  assetsPending: number;
+}
+
+export interface InitiateOffboardingRequest {
+  employeeId: string;
+  resignationDate: string;
+  finalWorkingDate: string;
+  reason: string;
+  notes?: string | null;
+}
+
+export interface UpdateOffboardingRequest {
+  status?: string | null;
+  notes?: string | null;
+  isAssetReturned?: boolean | null;
+  isAccessRevoked?: boolean | null;
+  isFinalSettlementDone?: boolean | null;
+}
+
+export interface CompleteOffboardingRequest {
+  notes?: string | null;
+  isAssetReturned?: boolean;
+  isAccessRevoked?: boolean;
+  isFinalSettlementDone?: boolean;
+}
+
 
