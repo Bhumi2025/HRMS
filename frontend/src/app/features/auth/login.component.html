@@ -28,12 +28,24 @@
         }
       </p>
 
-      <form (submit)="go($event)">
+      <form (submit)="go($event)" autocomplete="off">
+        <!-- Hidden trap inputs to prevent browser aggressive autofill -->
+        <input type="text" style="position:absolute;top:-9999px;left:-9999px;opacity:0" tabindex="-1" autocomplete="off" />
+        <input type="password" style="position:absolute;top:-9999px;left:-9999px;opacity:0" tabindex="-1" autocomplete="off" />
+
         <div class="fg">
           <label>Email Address</label>
           <div class="iw">
             <span style="color: var(--p)" [appIcon]="'mail'"></span>
-            <input type="email" name="email" placeholder="you@company.com" [(ngModel)]="email" />
+            <input
+              type="email"
+              name="email"
+              placeholder="you@company.com"
+              [(ngModel)]="email"
+              autocomplete="off"
+              [readOnly]="emailReadOnly()"
+              (focus)="emailReadOnly.set(false)"
+            />
           </div>
         </div>
         <div class="fg">
@@ -60,6 +72,9 @@
               id="pw"
               placeholder="Enter password"
               [(ngModel)]="password"
+              autocomplete="new-password"
+              [readOnly]="passwordReadOnly()"
+              (focus)="passwordReadOnly.set(false)"
             />
             <button type="button" class="eye" (click)="togglePassword()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

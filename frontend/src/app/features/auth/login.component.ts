@@ -58,16 +58,20 @@ export class LoginComponent implements OnInit, OnDestroy {
   ];
 
   protected selectDemo(acc: { email: string; password: string; companyCode?: string }): void {
+    this.emailReadOnly.set(false);
+    this.passwordReadOnly.set(false);
     this.email = acc.email;
     this.password = acc.password;
     this.companyCode = acc.companyCode ?? '';
     this.resolveTenant(this.companyCode);
   }
 
-  protected email = 'admin@hrnexus.com';
-  protected password = 'Admin@123';
+  protected email = '';
+  protected password = '';
   protected companyCode = '';
-  protected rememberMe = true;
+  protected rememberMe = false;
+  protected readonly emailReadOnly = signal(true);
+  protected readonly passwordReadOnly = signal(true);
   protected readonly showPassword = signal(false);
   protected readonly submitting = signal(false);
 
@@ -212,7 +216,14 @@ export class LoginComponent implements OnInit, OnDestroy {
   ];
 
   ngOnInit(): void {
+    this.email = '';
+    this.password = '';
+    this.rememberMe = false;
     this.resetTimer();
+    setTimeout(() => {
+      this.email = '';
+      this.password = '';
+    }, 150);
     const queryCode =
       this.route.snapshot.queryParamMap.get('code') ||
       this.route.snapshot.queryParamMap.get('company') ||
@@ -266,6 +277,10 @@ export class LoginComponent implements OnInit, OnDestroy {
   protected go(event: Event): void {
     event.preventDefault();
     if (this.submitting()) return;
+    if (!this.email?.trim() || !this.password?.trim()) {
+      this.toast.show('Please enter both email and password.', 'danger');
+      return;
+    }
     this.submitting.set(true);
 
     this.api.login(this.email.trim(), this.password?.trim(), this.companyCode).subscribe({

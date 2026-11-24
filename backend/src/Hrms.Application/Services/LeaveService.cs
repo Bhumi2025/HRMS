@@ -163,6 +163,10 @@ public sealed class LeaveService : ILeaveService
 
         var empName = leave.Employee != null ? $"{leave.Employee.FirstName} {leave.Employee.LastName}".Trim() : "Employee";
         var empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.EmployeeId == leave.EmployeeId), ct);
+        if (empUser == null && leave.Employee != null && !string.IsNullOrWhiteSpace(leave.Employee.Email))
+        {
+            empUser = await _uow.Users.FirstOrDefaultAsync(_uow.Users.Query().Where(u => u.Email == leave.Employee.Email), ct);
+        }
 
         var reasonSuffix = !approved && !string.IsNullOrWhiteSpace(leave.DecisionNote) ? $" Reason: {leave.DecisionNote}" : "";
         var notifMessage = approved
@@ -171,12 +175,12 @@ public sealed class LeaveService : ILeaveService
 
         await _uow.Notifications.AddAsync(new Notification
         {
+            UserId = empUser?.Id,
             IconKey = approved ? "check" : "x",
             Title = approved ? "Leave Approved" : "Leave Rejected",
             Message = notifMessage,
             TimeLabel = "Just now",
             IsRead = false,
-            UserId = empUser?.Id,
             CreatedAtUtc = DateTime.UtcNow,
         }, ct);
 

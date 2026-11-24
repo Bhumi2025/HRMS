@@ -1003,6 +1003,49 @@ tbody td > div:not(.table-avatar) {
   top: calc(100% + 6px);
 }
 
+/* Table first row — tooltip displays below/right so it never gets clipped by table header or overflow */
+table tbody tr:first-child [data-tooltip]::after,
+table tbody tr:first-of-type [data-tooltip]::after,
+.table-wrap tbody tr:first-child [data-tooltip]::after,
+.table-wrap tbody tr:first-of-type [data-tooltip]::after,
+.table-responsive tbody tr:first-child [data-tooltip]::after,
+.table-responsive tbody tr:first-of-type [data-tooltip]::after,
+.approvals-table tbody tr:first-child [data-tooltip]::after,
+.approvals-table tbody tr:first-of-type [data-tooltip]::after {
+  bottom: auto !important;
+  top: calc(100% + 6px) !important;
+  right: 0 !important;
+}
+
+/* Tooltip directions across whole frontend */
+[data-tooltip-pos="right"]::after,
+[data-tooltip-dir="right"]::after,
+.tooltip-right[data-tooltip]::after {
+  bottom: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  left: calc(100% + 6px) !important;
+  right: auto !important;
+}
+
+[data-tooltip-pos="left"]::after,
+[data-tooltip-dir="left"]::after,
+.tooltip-left[data-tooltip]::after {
+  bottom: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  right: calc(100% + 6px) !important;
+  left: auto !important;
+}
+
+[data-tooltip-pos="bottom"]::after,
+[data-tooltip-dir="bottom"]::after,
+.tooltip-bottom[data-tooltip]::after {
+  bottom: auto !important;
+  top: calc(100% + 6px) !important;
+  right: 0 !important;
+}
+
 /* RESPONSIVE */
 @media (max-width: 1024px) {
   .grid-4 {

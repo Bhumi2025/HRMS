@@ -39,7 +39,7 @@ public sealed record CreateLeaveRequest(
     [Required] Guid LeaveTypeId,
     DateOnly FromDate,
     DateOnly ToDate,
-    [Required, MaxLength(500)] string Reason);
+    [Required(ErrorMessage = "Enter the reason first"), MaxLength(500)] string Reason);
 
 public sealed record LeaveDecisionRequest(string? Note);
 
