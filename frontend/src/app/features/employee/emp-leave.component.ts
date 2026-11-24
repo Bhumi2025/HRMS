@@ -313,13 +313,23 @@ export class EmpLeaveComponent implements OnInit {
       return;
     }
 
+    if (!this.reason() || !this.reason().trim()) {
+      this.toast.show('Enter the reason first', 'danger');
+      return;
+    }
+
+    if (this.to() < this.from()) {
+      this.toast.show('End date cannot be earlier than start date.', 'danger');
+      return;
+    }
+
     this.api
       .createLeaveRequest({
         employeeId,
         leaveTypeId: this.type(),
         fromDate: this.from(),
         toDate: this.to(),
-        reason: this.reason(),
+        reason: this.reason().trim(),
       })
       .subscribe({
         next: () => {
@@ -328,7 +338,15 @@ export class EmpLeaveComponent implements OnInit {
           this.reason.set('');
           this.reload();
         },
-        error: (error) => this.toast.show(error?.error?.title ?? 'Could not submit the leave request.', 'danger'),
+        error: (error) => {
+          const reasonErr = error?.error?.errors?.Reason?.[0] || error?.error?.errors?.reason?.[0];
+          if (reasonErr || !this.reason()?.trim() || error?.error?.title === 'Enter the reason first' || error?.error?.detail === 'Enter the reason first') {
+            this.toast.show('Enter the reason first', 'danger');
+            return;
+          }
+          const msg = error?.error?.detail || error?.error?.message || error?.error?.title || 'Could not submit the leave request.';
+          this.toast.show(msg, 'danger');
+        },
       });
   }
 
