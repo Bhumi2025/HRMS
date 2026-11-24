@@ -8,6 +8,7 @@ import { CompanySettings, EmployeeDetail, EmployeeListItem, Payslip } from '../.
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
+import { CurrencyService } from '../../core/services/currency.service';
 import { amountInWords } from '../../core/utils/payroll-utils';
 
 interface MailRecipient {
@@ -419,6 +420,7 @@ interface MailRecipient {
 })
 export class PayslipComponent implements OnInit {
   protected readonly ui = inject(UiService);
+  protected readonly currencyService = inject(CurrencyService);
   private readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
@@ -815,11 +817,13 @@ export class PayslipComponent implements OnInit {
     const totalEarnVal = this.totalEarnings() || basicVal;
     const dedVal = payslip?.deductions ?? (this.totalDeductions() || 0);
 
+    const pdfSym = this.currencyService.currencyPdfSymbol();
+
     // Row 1
     doc.text('Basic Salary', 18, y);
-    doc.text(`Rs. ${basicVal.toLocaleString()}.00`, 101, y, { align: 'right' });
+    doc.text(`${pdfSym}${basicVal.toLocaleString()}.00`, 101, y, { align: 'right' });
     doc.text('Unpaid Leave (LOP) Deduction', 109, y);
-    doc.text(`Rs. ${dedVal.toLocaleString()}.00`, 192, y, { align: 'right' });
+    doc.text(`${pdfSym}${dedVal.toLocaleString()}.00`, 192, y, { align: 'right' });
 
     // Totals Box
     y += 14;
@@ -830,9 +834,9 @@ export class PayslipComponent implements OnInit {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(17, 24, 39);
     doc.text('Total Gross Earnings', 18, y + 5.5);
-    doc.text(`Rs. ${totalEarnVal.toLocaleString()}.00`, 101, y + 5.5, { align: 'right' });
+    doc.text(`${pdfSym}${totalEarnVal.toLocaleString()}.00`, 101, y + 5.5, { align: 'right' });
     doc.text('Total Deductions', 109, y + 5.5);
-    doc.text(`Rs. ${dedVal.toLocaleString()}.00`, 192, y + 5.5, { align: 'right' });
+    doc.text(`${pdfSym}${dedVal.toLocaleString()}.00`, 192, y + 5.5, { align: 'right' });
 
     // Net Pay Callout (Emerald Green)
     y += 18;
@@ -846,7 +850,7 @@ export class PayslipComponent implements OnInit {
     doc.setFontSize(10.5);
     doc.text('TOTAL NET PAYABLE:', 20, y + 8);
     doc.setFontSize(13);
-    doc.text(`Rs. ${netVal.toLocaleString()}.00`, 190, y + 8, { align: 'right' });
+    doc.text(`${pdfSym}${netVal.toLocaleString()}.00`, 190, y + 8, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);

@@ -5,6 +5,7 @@ import { EmployeeDetail } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
+import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { triggerDocumentDownload } from '../../core/utils/document-download.util';
@@ -278,7 +279,7 @@ interface DocRow {
           <div class="card-header"><div class="card-title">Salary Structure</div></div>
           <div class="card-body">
             <div style="margin-bottom: 14px">
-              <div style="font-size: 1.4rem; font-weight: 800; color: var(--p)">$5,200</div>
+              <div style="font-size: 1.4rem; font-weight: 800; color: var(--p)">{{ grossMonthlySalary() }}</div>
               <div style="font-size: 13px; color: var(--muted)">Gross Monthly Salary</div>
             </div>
             @for (s of salaryStructure(); track s[0]) {
@@ -584,6 +585,7 @@ export class EmpProfileComponent implements OnInit {
   protected readonly ui = inject(UiService);
   protected readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
+  protected readonly currencyService = inject(CurrencyService);
 
   protected readonly detail = signal<EmployeeDetail | null>(null);
   private readonly apiId = signal<string | null>(null);
@@ -1091,11 +1093,23 @@ export class EmpProfileComponent implements OnInit {
     wpsId: '',
   });
 
+  protected readonly grossMonthlySalary = computed<string>(() => {
+    const employee = this.detail();
+    if (!employee) return this.currencyService.format(0);
+    const gross =
+      employee.basicSalary +
+      employee.housingAllowance +
+      employee.transportAllowance +
+      employee.mobileAllowance +
+      employee.otherAllowances;
+    return this.currencyService.format(gross, employee.currency);
+  });
+
   protected readonly salaryStructure = computed<[string, string, string][]>(() => {
     const employee = this.detail();
     if (!employee) return [];
 
-    const money = (value: number) => `$${value.toLocaleString()}`;
+    const money = (value: number) => this.currencyService.format(value, employee.currency);
     const gross =
       employee.basicSalary +
       employee.housingAllowance +

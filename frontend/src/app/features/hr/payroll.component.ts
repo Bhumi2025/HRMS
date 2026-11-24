@@ -11,6 +11,7 @@ import { IconDirective } from '../../core/icons/icon.directive';
 import { PermissionService } from '../../core/services/permission.service';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
+import { CurrencyService } from '../../core/services/currency.service';
 import { amountInWords } from '../../core/utils/payroll-utils';
 
 export interface ComprehensivePayrollRow {
@@ -596,17 +597,17 @@ export interface ComprehensivePayrollRow {
                 <div style="border-right: 1.5px solid #e5e7eb;">
                   <div style="background: #f3f4f6; padding: 7px 14px; font-weight: 800; font-size: 12px; color: #111827; display: flex; justify-content: space-between;">
                     <span>Earnings</span>
-                    <span>Amount (₹)</span>
+                    <span>Amount ({{ currencySymbol() }})</span>
                   </div>
                   <div style="padding: 10px 14px; font-size: 12px; min-height: 85px;">
                     <div style="display: flex; justify-content: space-between; padding: 4px 0;">
                       <span>Basic Salary</span>
-                      <span style="font-weight: 600;">₹{{ selectedRow()?.basicSalary?.toLocaleString() ?? '0' }}.00</span>
+                      <span style="font-weight: 600;">{{ currencySymbol() }}{{ selectedRow()?.basicSalary?.toLocaleString() ?? '0' }}.00</span>
                     </div>
                   </div>
                   <div style="background: #f9fafb; padding: 8px 14px; border-top: 1px solid #e5e7eb; font-weight: 800; font-size: 12px; display: flex; justify-content: space-between;">
                     <span>Total Gross Earnings</span>
-                    <span style="color: #059669;">₹{{ selectedRow()?.grossEarnings?.toLocaleString() ?? '0' }}.00</span>
+                    <span style="color: #059669;">{{ currencySymbol() }}{{ selectedRow()?.grossEarnings?.toLocaleString() ?? '0' }}.00</span>
                   </div>
                 </div>
 
@@ -614,14 +615,14 @@ export interface ComprehensivePayrollRow {
                 <div>
                   <div style="background: #f3f4f6; padding: 7px 14px; font-weight: 800; font-size: 12px; color: #111827; display: flex; justify-content: space-between;">
                     <span>Deductions</span>
-                    <span>Amount (₹)</span>
+                    <span>Amount ({{ currencySymbol() }})</span>
                   </div>
                   <div style="padding: 10px 14px; font-size: 12px; min-height: 85px;">
                     @if (selectedRow()?.unpaidLeave && selectedRow()!.unpaidLeave > 0) {
                       <div style="display: flex; justify-content: space-between; padding: 4px 0;">
                         <span>Unpaid Leave (LOP) ({{ selectedRow()?.unpaidLeave }} days)</span>
                         <span style="font-weight: 600; color: #dc2626;">
-                          -₹{{ ((selectedRow()!.unpaidLeave * selectedRow()!.basicSalary) / (selectedRow()!.fullDay || 22)).toFixed(2) }}
+                          -{{ currencySymbol() }}{{ ((selectedRow()!.unpaidLeave * selectedRow()!.basicSalary) / (selectedRow()!.fullDay || 22)).toFixed(2) }}
                         </span>
                       </div>
                     }
@@ -629,21 +630,21 @@ export interface ComprehensivePayrollRow {
                       <div style="display: flex; justify-content: space-between; padding: 4px 0;">
                         <span>Salary Reduction ({{ selectedRow()?.reductionPercent }}%)</span>
                         <span style="font-weight: 600; color: #dc2626;">
-                          -₹{{ (selectedRow()!.deductions - ((selectedRow()?.unpaidLeave || 0) * selectedRow()!.basicSalary) / (selectedRow()!.fullDay || 22)).toFixed(2) }}
+                          -{{ currencySymbol() }}{{ (selectedRow()!.deductions - ((selectedRow()?.unpaidLeave || 0) * selectedRow()!.basicSalary) / (selectedRow()!.fullDay || 22)).toFixed(2) }}
                         </span>
                       </div>
                     }
                     @if (!selectedRow()?.unpaidLeave && (!selectedRow()?.reductionPercent || selectedRow()?.reductionPercent === 0)) {
                       <div style="display: flex; justify-content: space-between; padding: 4px 0; color: var(--muted);">
                         <span>No deductions applied</span>
-                        <span>₹0.00</span>
+                        <span>{{ currencySymbol() }}0.00</span>
                       </div>
                     }
                   </div>
                   <div style="background: #f9fafb; padding: 8px 14px; border-top: 1px solid #e5e7eb; font-weight: 800; font-size: 12px; display: flex; justify-content: space-between;">
                     <span>Total Deductions</span>
                     <span style="color: #dc2626;">
-                      -₹{{ selectedRow()?.deductions?.toLocaleString() ?? '0' }}.00
+                      -{{ currencySymbol() }}{{ selectedRow()?.deductions?.toLocaleString() ?? '0' }}.00
                       @if (selectedRow()?.reductionPercent && selectedRow()!.reductionPercent! > 0) {
                         <span style="font-size: 11px; margin-left: 3px;">({{ selectedRow()?.reductionPercent }}% cut)</span>
                       }
@@ -656,7 +657,7 @@ export interface ComprehensivePayrollRow {
               <div style="background: #ecfdf5; border: 1.5px solid #10b981; margin: 14px; border-radius: 8px; padding: 12px 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;">
                   <div style="font-size: 14px; font-weight: 800; color: #065f46;">
-                    Total Net Payable: <span style="font-size: 17px; font-weight: 900; color: #047857;">₹{{ selectedRow()?.netPay?.toLocaleString() ?? '0' }}.00</span>
+                    Total Net Payable: <span style="font-size: 17px; font-weight: 900; color: #047857;">{{ currencySymbol() }}{{ selectedRow()?.netPay?.toLocaleString() ?? '0' }}.00</span>
                   </div>
                   <div style="font-size: 11px; color: #059669; font-weight: 600;">
                     Total Net Payable = Gross Earnings - Total Deductions
@@ -786,6 +787,7 @@ export class PayrollComponent implements OnInit, AfterViewInit {
   protected readonly ui = inject(UiService);
   protected readonly toast = inject(ToastService);
   protected readonly perms = inject(PermissionService);
+  protected readonly currencyService = inject(CurrencyService);
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
 
@@ -839,22 +841,13 @@ export class PayrollComponent implements OnInit, AfterViewInit {
   });
 
   protected readonly currencySymbol = computed(() => {
-    const code = this.company()?.payrollCurrency || 'INR';
-    switch (code.toUpperCase()) {
-      case 'INR': return '₹';
-      case 'USD': return '$';
-      case 'EUR': return '€';
-      case 'GBP': return '£';
-      case 'AED': return 'AED ';
-      case 'SAR': return 'SAR ';
-      default: return '₹';
-    }
+    return this.currencyService.currencySymbol();
   });
 
   protected readonly kpis = signal([
-    { l: 'Gross Payroll', v: '₹0', c: 'var(--p)' },
-    { l: 'Total Deductions', v: '₹0', c: 'var(--danger)' },
-    { l: 'Net Payable', v: '₹0', c: 'var(--success)' },
+    { l: 'Gross Payroll', v: '0', c: 'var(--p)' },
+    { l: 'Total Deductions', v: '0', c: 'var(--danger)' },
+    { l: 'Net Payable', v: '0', c: 'var(--success)' },
   ]);
 
   protected readonly rows = signal<ComprehensivePayrollRow[]>([]);
@@ -1382,11 +1375,13 @@ export class PayrollComponent implements OnInit, AfterViewInit {
     doc.setFontSize(8.5);
     doc.setTextColor(75, 85, 99);
 
+    const pdfSym = this.currencyService.currencyPdfSymbol();
+
     // Row 1
     doc.text('Basic Salary', 18, y);
-    doc.text(`Rs. ${r.basicSalary.toLocaleString()}.00`, 101, y, { align: 'right' });
+    doc.text(`${pdfSym}${r.basicSalary.toLocaleString()}.00`, 101, y, { align: 'right' });
     doc.text('Unpaid Leave (LOP) Deduction', 109, y);
-    doc.text(`Rs. ${r.deductions.toLocaleString()}.00`, 192, y, { align: 'right' });
+    doc.text(`${pdfSym}${r.deductions.toLocaleString()}.00`, 192, y, { align: 'right' });
 
     // Totals Box
     y += 14;
@@ -1397,9 +1392,9 @@ export class PayrollComponent implements OnInit, AfterViewInit {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(17, 24, 39);
     doc.text('Total Gross Earnings', 18, y + 5.5);
-    doc.text(`Rs. ${r.grossEarnings.toLocaleString()}.00`, 101, y + 5.5, { align: 'right' });
+    doc.text(`${pdfSym}${r.grossEarnings.toLocaleString()}.00`, 101, y + 5.5, { align: 'right' });
     doc.text('Total Deductions', 109, y + 5.5);
-    doc.text(`Rs. ${r.deductions.toLocaleString()}.00`, 192, y + 5.5, { align: 'right' });
+    doc.text(`${pdfSym}${r.deductions.toLocaleString()}.00`, 192, y + 5.5, { align: 'right' });
 
     // Net Pay Callout (Emerald Green)
     y += 18;
@@ -1412,7 +1407,7 @@ export class PayrollComponent implements OnInit, AfterViewInit {
     doc.setFontSize(10.5);
     doc.text('TOTAL NET PAYABLE:', 20, y + 8);
     doc.setFontSize(13);
-    doc.text(`Rs. ${r.netPay.toLocaleString()}.00`, 190, y + 8, { align: 'right' });
+    doc.text(`${pdfSym}${r.netPay.toLocaleString()}.00`, 190, y + 8, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);

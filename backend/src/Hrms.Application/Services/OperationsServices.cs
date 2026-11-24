@@ -76,6 +76,25 @@ public sealed class CompanyService : ICompanyService
 
         await _uow.SaveChangesAsync(ct);
 
+        // Synchronize central currency to all existing employees in this tenant
+        if (!string.IsNullOrWhiteSpace(settings.PayrollCurrency))
+        {
+            try
+            {
+                var employees = await _uow.Employees.ListAsync(ct);
+                foreach (var emp in employees)
+                {
+                    emp.Currency = settings.PayrollCurrency;
+                    _uow.Employees.Update(emp);
+                }
+                await _uow.SaveChangesAsync(ct);
+            }
+            catch
+            {
+                // Non-fatal if employee sync fails
+            }
+        }
+
         // Single write path: Synchronize Master DB Company entity and invalidate cache
         var companyId = _tenantContext.CompanyId;
         var masterComp = companyId.HasValue
@@ -233,7 +252,7 @@ public sealed class CompanyService : ICompanyService
         settings.City = request.City?.Trim() ?? string.Empty;
         settings.Country = string.IsNullOrWhiteSpace(request.Country) ? "UAE" : request.Country.Trim();
         settings.Phone = request.Phone?.Trim() ?? string.Empty;
-        settings.PayrollCurrency = string.IsNullOrWhiteSpace(request.PayrollCurrency) ? "USD" : request.PayrollCurrency.Trim();
+        settings.PayrollCurrency = string.IsNullOrWhiteSpace(request.PayrollCurrency) ? "INR" : request.PayrollCurrency.Trim();
         settings.TaxNumberLabel = string.IsNullOrWhiteSpace(request.TaxNumberLabel) ? "TRN / Tax Number" : request.TaxNumberLabel.Trim();
         settings.RegistrationNumberLabel = string.IsNullOrWhiteSpace(request.RegistrationNumberLabel) ? "Trade License / Reg No" : request.RegistrationNumberLabel.Trim();
         settings.LogoUrl = string.IsNullOrWhiteSpace(request.LogoUrl) ? null : request.LogoUrl.Trim();

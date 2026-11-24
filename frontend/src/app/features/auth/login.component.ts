@@ -9,6 +9,7 @@ import { IconDirective } from '../../core/icons/icon.directive';
 import { Role } from '../../core/models';
 import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
+import { CurrencyService } from '../../core/services/currency.service';
 import { SafeHtmlPipe } from '../../shared/safe-html.pipe';
 import { environment } from '../../../environments/environment';
 import { FaceMatchEvaluation, FaceRecognitionService } from '../../core/services/face-recognition.service';
@@ -38,6 +39,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
   private readonly faceService = inject(FaceRecognitionService);
+  private readonly currencyService = inject(CurrencyService);
 
   /** Disable the demo account switcher on the login screen in production builds. */
   protected readonly showDemoAccounts = false;
@@ -715,6 +717,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   /** Completes the login flow — sets session and navigates. */
   private completeLogin(response: LoginResponse): void {
     const landing = this.session.setSession(response.accessToken, response.user);
+    this.currencyService.refreshCurrency();
     this.pendingToken = null;
     this.pendingLoginResponse = null;
     this.navigateForRole(response.user.role as Role, landing);

@@ -6,6 +6,7 @@ import { CompanySettings, EmployeeDetail, Payslip as ApiPayslip } from '../../co
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
+import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 
 interface PayslipRow {
@@ -130,6 +131,7 @@ export class EmpPayslipsComponent implements OnInit {
   protected readonly ui = inject(UiService);
   protected readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
+  protected readonly currencyService = inject(CurrencyService);
 
   protected readonly employee = signal<EmployeeDetail | null>(null);
   protected readonly company = signal<CompanySettings | null>(null);
@@ -330,14 +332,14 @@ export class EmpPayslipsComponent implements OnInit {
 
     // Row 1: Basic Salary
     doc.text('Basic Salary', 18, y);
-    doc.text(this.money(basicVal), 101, y, { align: 'right' });
+    doc.text(this.currencyService.formatForPdf(basicVal), 101, y, { align: 'right' });
     doc.text('Loss of Pay (LOP) / Deductions', 109, y);
-    doc.text(this.money(dedVal), 192, y, { align: 'right' });
+    doc.text(this.currencyService.formatForPdf(dedVal), 192, y, { align: 'right' });
 
     // Row 2: Allowances
     y += 8;
     doc.text('Allowances', 18, y);
-    doc.text(this.money(allowVal), 101, y, { align: 'right' });
+    doc.text(this.currencyService.formatForPdf(allowVal), 101, y, { align: 'right' });
 
     // Totals Box
     y += 10;
@@ -348,9 +350,9 @@ export class EmpPayslipsComponent implements OnInit {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(17, 24, 39);
     doc.text('Total Gross Earnings', 18, y + 5.5);
-    doc.text(this.money(grossVal), 101, y + 5.5, { align: 'right' });
+    doc.text(this.currencyService.formatForPdf(grossVal), 101, y + 5.5, { align: 'right' });
     doc.text('Total Deductions', 109, y + 5.5);
-    doc.text(this.money(dedVal), 192, y + 5.5, { align: 'right' });
+    doc.text(this.currencyService.formatForPdf(dedVal), 192, y + 5.5, { align: 'right' });
 
     // Net Pay Callout
     y += 18;
@@ -364,7 +366,7 @@ export class EmpPayslipsComponent implements OnInit {
     doc.setFontSize(10.5);
     doc.text('TOTAL NET PAYABLE:', 20, y + 8);
     doc.setFontSize(13);
-    doc.text(this.money(netVal), 190, y + 8, { align: 'right' });
+    doc.text(this.currencyService.formatForPdf(netVal), 190, y + 8, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
@@ -384,7 +386,7 @@ export class EmpPayslipsComponent implements OnInit {
   }
 
   private money(value: number): string {
-    return `$${value.toLocaleString()}`;
+    return this.currencyService.format(value);
   }
 
   private monthName(month: number): string {
