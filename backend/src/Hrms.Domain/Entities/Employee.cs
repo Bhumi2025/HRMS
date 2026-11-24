@@ -42,6 +42,8 @@ public class Employee : BaseEntity
 
     public string? Country { get; set; }
 
+    public string? Password { get; set; }
+
     // ── Job information ──
     public Guid DepartmentId { get; set; }
 

@@ -20,6 +20,7 @@ const hrModules = (approvalBadge?: string): NavSection => ({
     { icon: 'payroll', label: 'Payroll', path: '/payroll' },
     { icon: 'payslip', label: 'Payslips', path: '/payslips' },
     { icon: 'onboarding', label: 'Onboarding', path: '/onboarding' },
+    { icon: 'employees', label: 'Offboarding', path: '/offboarding' },
     { icon: 'documents', label: 'Documents', path: '/documents' },
     { icon: 'approvals', label: 'Approvals', path: '/approvals', badge: approvalBadge },
     { icon: 'reports', label: 'Reports', path: '/reports' },

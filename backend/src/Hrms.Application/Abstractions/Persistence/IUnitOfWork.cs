@@ -96,6 +96,8 @@ public interface IUnitOfWork
 
     IRepository<SupportRequest> SupportRequests { get; }
 
+    IRepository<OffboardingRecord> OffboardingRecords { get; }
+
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 
     Task<IAsyncDisposable?> TryAcquireAppLockAsync(string lockKey, TimeSpan timeout, CancellationToken ct = default);

@@ -65,6 +65,8 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Empl
     ALTER TABLE Employees ADD EmergencyContactName NVARCHAR(200) NULL;
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Employees' AND COLUMN_NAME = 'EmergencyContactPhone')
     ALTER TABLE Employees ADD EmergencyContactPhone NVARCHAR(50) NULL;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Employees' AND COLUMN_NAME = 'Password')
+    ALTER TABLE Employees ADD Password NVARCHAR(250) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'KeyGroups' AND COLUMN_NAME = 'IsGeneric')
     ALTER TABLE KeyGroups ADD IsGeneric BIT NOT NULL CONSTRAINT DF_KeyGroups_IsGeneric DEFAULT 0;
@@ -116,6 +118,31 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Shif
 -- 9. Ensure LeaveRequests.IsHalfDay
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'LeaveRequests' AND COLUMN_NAME = 'IsHalfDay')
     ALTER TABLE LeaveRequests ADD IsHalfDay BIT NOT NULL CONSTRAINT DF_LeaveRequests_IsHalfDay DEFAULT 0;
+
+-- 10. Ensure OffboardingRecords table
+IF OBJECT_ID('OffboardingRecords', 'U') IS NULL
+BEGIN
+    CREATE TABLE OffboardingRecords (
+        Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        EmployeeId UNIQUEIDENTIFIER NOT NULL,
+        ResignationDate DATE NOT NULL,
+        FinalWorkingDate DATE NOT NULL,
+        Reason NVARCHAR(250) NOT NULL,
+        ReasonDetails NVARCHAR(MAX) NULL,
+        Status INT NOT NULL DEFAULT 1,
+        HandoverNotes NVARCHAR(MAX) NULL,
+        CompanyAssetsReturned BIT NOT NULL DEFAULT 0,
+        AccessRevoked BIT NOT NULL DEFAULT 0,
+        FinalSettlementProcessed BIT NOT NULL DEFAULT 0,
+        Remarks NVARCHAR(MAX) NULL,
+        InitiatedByUserId UNIQUEIDENTIFIER NULL,
+        CompletedAtUtc DATETIME2 NULL,
+        CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAtUtc DATETIME2 NULL,
+        CONSTRAINT FK_OffboardingRecords_Employees FOREIGN KEY (EmployeeId) REFERENCES Employees(Id),
+        CONSTRAINT FK_OffboardingRecords_Users FOREIGN KEY (InitiatedByUserId) REFERENCES Users(Id)
+    );
+END
 
 -- 12. Clean up legacy ApprovalRequests with Type = 'Leave' so LeaveRequests is the single source of truth
 IF OBJECT_ID('ApprovalRequests', 'U') IS NOT NULL
@@ -313,21 +340,55 @@ END
                 u.EmployeeId,
                 RoleName = u.Role != null ? u.Role.Name : "Employee",
                 RoleCode = u.Role != null ? u.Role.Code.ToString() : "Employee",
+                EmployeeStatus = u.Employee != null ? (EmploymentStatus?)u.Employee.Status : null,
+                IsEmployeeOffboarded = (u.Employee != null && (u.Employee.Status == EmploymentStatus.Offboarding || u.Employee.Status == EmploymentStatus.Terminated || u.Employee.Status == EmploymentStatus.Resigned)) ||
+                                       (u.EmployeeId != null && db.OffboardingRecords.Any(o => o.EmployeeId == u.EmployeeId && (o.Status == OffboardingStatus.Completed || o.AccessRevoked)))
             })
             .FirstOrDefaultAsync(ct);
 
-        return record is null
-            ? null
-            : new TenantUserRecord(
-                record.Id,
-                record.Email,
-                record.FullName,
-                record.Initials,
-                record.PasswordHash,
-                record.IsActive,
-                record.EmployeeId,
-                record.RoleName,
-                record.RoleCode);
+        // Also check if there is an employee matching this email directly
+        var empRecord = await db.Employees
+            .AsNoTracking()
+            .Where(e => e.Email.Trim().ToUpper() == normalizedEmail)
+            .Select(e => new { e.Id, e.Status })
+            .FirstOrDefaultAsync(ct);
+
+        if (record is null)
+        {
+            if (empRecord is not null && (empRecord.Status == EmploymentStatus.Offboarding || empRecord.Status == EmploymentStatus.Terminated || empRecord.Status == EmploymentStatus.Resigned))
+            {
+                return new TenantUserRecord(
+                    Guid.Empty,
+                    email,
+                    "",
+                    "",
+                    "",
+                    false,
+                    empRecord.Id,
+                    "Employee",
+                    "Employee",
+                    empRecord.Status,
+                    true);
+            }
+            return null;
+        }
+
+        var empStatus = record.EmployeeStatus ?? empRecord?.Status;
+        var isOffboarded = record.IsEmployeeOffboarded ||
+                           (empRecord != null && (empRecord.Status == EmploymentStatus.Offboarding || empRecord.Status == EmploymentStatus.Terminated || empRecord.Status == EmploymentStatus.Resigned));
+
+        return new TenantUserRecord(
+            record.Id,
+            record.Email,
+            record.FullName,
+            record.Initials,
+            record.PasswordHash,
+            record.IsActive,
+            record.EmployeeId ?? empRecord?.Id,
+            record.RoleName,
+            record.RoleCode,
+            empStatus,
+            isOffboarded);
     }
 
     public async Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default)

@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<ISupportService, SupportService>();
         services.AddScoped<ICompanyManagementService, CompanyManagementService>();
         services.AddScoped<IAccountActivationService, AccountActivationService>();
+        services.AddScoped<IOffboardingService, OffboardingService>();
 
         return services;
     }

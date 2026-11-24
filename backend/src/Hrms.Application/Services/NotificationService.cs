@@ -242,6 +242,19 @@ public sealed class NotificationService : INotificationService
                     return false;
                 }
 
+                // 4. Payslip Notifications for this employee only
+                var isPayslip = icon is "payroll" or "card"
+                    || title.Contains("Payslip", StringComparison.OrdinalIgnoreCase)
+                    || title.Contains("Payroll", StringComparison.OrdinalIgnoreCase)
+                    || msg.Contains("payslip", StringComparison.OrdinalIgnoreCase);
+                if (isPayslip)
+                {
+                    if (n.UserId.HasValue && userId.HasValue && n.UserId == userId.Value) return true;
+                    if (!string.IsNullOrEmpty(myName) && (msg.Contains(myName, StringComparison.OrdinalIgnoreCase) || title.Contains(myName, StringComparison.OrdinalIgnoreCase))) return true;
+                    if (currentEmp != null && (msg.Contains(currentEmp.EmployeeCode, StringComparison.OrdinalIgnoreCase) || title.Contains(currentEmp.EmployeeCode, StringComparison.OrdinalIgnoreCase))) return true;
+                    return false;
+                }
+
                 // Strictly filter out all other unrelated notifications (other employees' birthdays, absent alerts, admin requests)
                 return false;
             }).ToList();

@@ -66,7 +66,9 @@ public sealed record TenantUserRecord(
     bool IsActive,
     Guid? EmployeeId,
     string RoleName,
-    string RoleCode);
+    string RoleCode,
+    EmploymentStatus? EmployeeStatus = null,
+    bool IsOffboarded = false);
 
 /// <summary>The minimal defaults written into a freshly provisioned tenant database.</summary>
 public sealed record TenantBootstrap(
