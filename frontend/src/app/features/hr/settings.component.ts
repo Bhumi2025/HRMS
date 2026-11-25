@@ -6,14 +6,12 @@ import { ApiService } from '../../core/api/api.service';
 import {
   NavigationItem,
   RoleItem,
-  RoleNavigationPermission,
   KeyGroup,
   KeyStore,
   SaveKeyGroupRequest,
   SaveKeyStoreRequest,
 } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
-import { PermissionService } from '../../core/services/permission.service';
 import { ToastService } from '../../core/services/toast.service';
 import { KeyGroupCacheService } from '../../core/services/key-group-cache.service';
 import { UiService } from '../../core/services/ui.service';
@@ -488,143 +486,6 @@ export interface FlatNavigationItem {
         </div>
       }
 
-      <!-- TAB 3: PERMISSION (DYNAMIC MATRIX) -->
-      @if (activeTab() === 'permission') {
-        <div class="permission-grid-layout">
-          <!-- Left Panel: Roles Selector -->
-          <div class="card p-0 roles-widget permission-roles-panel">
-            <div class="roles-panel-header" style="padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--bg); font-weight: 700; font-size: 13px; flex-shrink: 0;">
-              Roles
-            </div>
-
-            <div class="roles-list-scroll roles-list-container">
-              @for (role of permissionRoles(); track role.id) {
-                <div 
-                  class="role-select-item"
-                  (click)="selectRoleForPermissions(role)"
-                  [style.background]="selectedRole()?.id === role.id ? 'var(--p-soft)' : 'transparent'"
-                  [style.color]="selectedRole()?.id === role.id ? 'var(--p)' : 'var(--text)'"
-                >
-                  <div style="display: flex; align-items: center; gap: 10px;">
-                    <div class="avatar-placeholder avatar-sm" style="background: var(--surface); border: 1px solid var(--border); color: var(--p); font-weight: 700;">
-                      {{ role.code.charAt(0) }}
-                    </div>
-                    <div>
-                      <div style="font-weight: 700; font-size: 13px;">{{ role.name }}</div>
-                      <div style="font-size: 11px; color: var(--muted);">{{ role.userCount }} users</div>
-                    </div>
-                  </div>
-                  @if (role.isSystem) {
-                    <span class="badge" style="font-size: 10px; background: rgba(59,130,246,0.12); color: #2563eb;">Sys</span>
-                  }
-                </div>
-              } @empty {
-                <div style="padding: 16px; font-size: 12px; color: var(--muted); text-align: center;">
-                  No configurable roles found. System Admin roles have full access by default.
-                </div>
-              }
-            </div>
-          </div>
-
-          <!-- Right Panel: Permissions Matrix Table -->
-          <div class="card p-0 permissions-widget perm-matrix-card">
-            <div class="card-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; flex-wrap: wrap; gap: 8px; position: sticky; top: 0; z-index: 10;">
-              <div style="font-weight: 700; font-size: 14px; color: var(--text);">
-                Permissions for Role: 
-                <span style="color: var(--p);">{{ selectedRole()?.name }}</span>
-                @if (isProtectedAdminRole()) {
-                  <span class="badge" style="margin-left: 8px; background: rgba(16,185,129,0.15); color: #059669; font-size: 11px;">
-                    Lockout Protected
-                  </span>
-                }
-              </div>
-              <button class="btn btn-primary btn-sm" (click)="saveRolePermissions()" [disabled]="savingPermissions()" style="display: flex; align-items: center; gap: 6px;">
-                <span [appIcon]="'save'"></span> {{ savingPermissions() ? 'Saving...' : 'Save Permissions' }}
-              </button>
-            </div>
-
-            <div class="mobile-scroll-hint">
-              <span [appIcon]="'chevron-right'"></span> Swipe horizontally to configure all permissions (Full, View, Create, Edit, Delete)
-            </div>
-
-            <div class="table-wrap permissions-table-scroll perm-table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th class="perm-title-col">Module / Navigation Title</th>
-                    <th class="perm-route-col">Route</th>
-                    <th class="perm-check-col" style="width: 75px; text-align: center;">Full</th>
-                    <th class="perm-check-col" style="width: 75px; text-align: center;">View</th>
-                    <th class="perm-check-col" style="width: 75px; text-align: center;">Create</th>
-                    <th class="perm-check-col" style="width: 75px; text-align: center;">Edit</th>
-                    <th class="perm-check-col" style="width: 75px; text-align: center;">Delete</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (perm of rolePermissions(); track perm.navigationItemId) {
-                    <tr>
-                      <td class="perm-title-col" style="font-weight: 700; font-size: 13px;">
-                        <span>{{ perm.navigationTitle }}</span>
-                        @if (isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()) {
-                          <span style="margin-left: 6px; font-size: 11px; color: var(--muted); font-weight: normal;">(Admin Core - Protected)</span>
-                        }
-                      </td>
-                      <td class="perm-route-col" style="font-size: 12px; font-family: monospace; color: var(--muted);">{{ perm.navigationRoute }}</td>
-                      <td class="perm-check-col" style="text-align: center;">
-                        <input 
-                          type="checkbox" 
-                          [(ngModel)]="perm.isFull" 
-                          (change)="onToggleFull(perm)"
-                          [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
-                        />
-                      </td>
-                      <td class="perm-check-col" style="text-align: center;">
-                        <input 
-                          type="checkbox" 
-                          [(ngModel)]="perm.isView" 
-                          (change)="onCheckChild(perm)"
-                          [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
-                        />
-                      </td>
-                      <td class="perm-check-col" style="text-align: center;">
-                        <input 
-                          type="checkbox" 
-                          [(ngModel)]="perm.isCreate" 
-                          (change)="onCheckChild(perm)"
-                          [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
-                        />
-                      </td>
-                      <td class="perm-check-col" style="text-align: center;">
-                        <input 
-                          type="checkbox" 
-                          [(ngModel)]="perm.isEdit" 
-                          (change)="onCheckChild(perm)"
-                          [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
-                        />
-                      </td>
-                      <td class="perm-check-col" style="text-align: center;">
-                        <input 
-                          type="checkbox" 
-                          [(ngModel)]="perm.isDelete" 
-                          (change)="onCheckChild(perm)"
-                          [disabled]="isSettingsModule(perm.navigationTitle, perm.navigationRoute) && isProtectedAdminRole()"
-                        />
-                      </td>
-                    </tr>
-                  } @empty {
-                    <tr>
-                      <td colspan="7" style="text-align: center; padding: 24px; color: var(--muted);">
-                        No navigation permissions found for this role.
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      }
-
       <!-- TAB 4: ROLE (DYNAMIC CRUD) -->
       @if (activeTab() === 'role') {
         <div class="card p-0 settings-widget">
@@ -822,7 +683,6 @@ export interface FlatNavigationItem {
                 <option value="/settings">Settings</option>
                 <option value="/settings#keygroup">Settings - Key Group</option>
                 <option value="/settings#navigation">Settings - Navigation</option>
-                <option value="/settings#permission">Settings - Permission</option>
                 <option value="/settings#role">Settings - Role</option>
               </datalist>
             </div>
@@ -902,63 +762,7 @@ export interface FlatNavigationItem {
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
 
-    /* Permission Tab Grid */
-    .permission-grid-layout {
-      flex: 1;
-      min-height: 0;
-      height: 100%;
-      display: grid;
-      grid-template-columns: 240px 1fr;
-      gap: 16px;
-      overflow: hidden;
-    }
-
-    .roles-widget {
-      height: 100%;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
-
-    .roles-list-scroll {
-      flex: 1;
-      min-height: 0;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 8px;
-    }
-
-    .role-select-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.15s;
-      margin-bottom: 4px;
-    }
-
-    .permissions-widget {
-      height: 100%;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
-
-    .widget-table-scroll,
-    .permissions-table-scroll,
-    .perm-table-wrap {
+    .widget-table-scroll {
       flex: 1;
       min-height: 0;
       overflow-y: auto;
@@ -995,9 +799,7 @@ export interface FlatNavigationItem {
     }
 
     /* Sticky table headers inside widgets */
-    .widget-table-scroll thead,
-    .permissions-table-scroll thead,
-    .perm-table-wrap thead {
+    .widget-table-scroll thead {
       position: sticky;
       top: 0;
       z-index: 5;
@@ -1005,44 +807,30 @@ export interface FlatNavigationItem {
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     }
 
-    .mobile-scroll-hint {
-      display: none;
-    }
-
     /* Sleek custom scrollbars inside widgets */
-    .roles-list-scroll,
-    .permissions-table-scroll,
     .widget-table-scroll,
     .editor-scroll-body {
       scrollbar-width: thin;
       scrollbar-color: #cbd5e1 transparent;
     }
 
-    .roles-list-scroll::-webkit-scrollbar,
-    .permissions-table-scroll::-webkit-scrollbar,
     .widget-table-scroll::-webkit-scrollbar,
     .editor-scroll-body::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
 
-    .roles-list-scroll::-webkit-scrollbar-track,
-    .permissions-table-scroll::-webkit-scrollbar-track,
     .widget-table-scroll::-webkit-scrollbar-track,
     .editor-scroll-body::-webkit-scrollbar-track {
       background: transparent;
     }
 
-    .roles-list-scroll::-webkit-scrollbar-thumb,
-    .permissions-table-scroll::-webkit-scrollbar-thumb,
     .widget-table-scroll::-webkit-scrollbar-thumb,
     .editor-scroll-body::-webkit-scrollbar-thumb {
       background: #cbd5e1;
       border-radius: 4px;
     }
 
-    .roles-list-scroll::-webkit-scrollbar-thumb:hover,
-    .permissions-table-scroll::-webkit-scrollbar-thumb:hover,
     .widget-table-scroll::-webkit-scrollbar-thumb:hover,
     .editor-scroll-body::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
@@ -1058,81 +846,6 @@ export interface FlatNavigationItem {
         height: auto !important;
         overflow: visible !important;
       }
-      .permission-grid-layout {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 12px !important;
-        height: auto !important;
-        overflow: visible !important;
-      }
-      .roles-widget {
-        height: auto !important;
-        overflow: visible !important;
-      }
-      .roles-list-scroll,
-      .roles-list-container {
-        display: flex !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        gap: 8px !important;
-        padding: 8px 10px !important;
-        white-space: nowrap !important;
-        scrollbar-width: thin !important;
-      }
-      .role-select-item {
-        flex-shrink: 0 !important;
-        margin-bottom: 0 !important;
-        border: 1px solid var(--border) !important;
-        padding: 8px 12px !important;
-      }
-      .mobile-scroll-hint {
-        display: flex !important;
-        align-items: center;
-        gap: 6px;
-        font-size: 11px;
-        color: var(--p);
-        background: rgba(37, 99, 235, 0.07);
-        padding: 6px 12px;
-        border-bottom: 1px solid var(--border);
-        font-weight: 600;
-      }
-      .permissions-widget {
-        height: auto !important;
-        overflow: visible !important;
-      }
-      .permissions-table-scroll,
-      .perm-table-wrap {
-        max-height: calc(100vh - 280px) !important;
-        overflow-y: auto !important;
-        overflow-x: auto !important;
-
-        table {
-          min-width: 720px !important;
-        }
-
-        th.perm-title-col,
-        td.perm-title-col {
-          position: sticky !important;
-          left: 0 !important;
-          background: var(--surface) !important;
-          z-index: 2 !important;
-          box-shadow: 2px 0 6px rgba(0, 0, 0, 0.08) !important;
-          min-width: 125px !important;
-          max-width: 155px !important;
-          white-space: normal !important;
-          word-break: break-word !important;
-        }
-        thead th.perm-title-col {
-          background: var(--bg) !important;
-          z-index: 3 !important;
-        }
-        thead th {
-          position: sticky !important;
-          top: 0 !important;
-          background: var(--bg) !important;
-          z-index: 2 !important;
-        }
-      }
     }
     `,
   ],
@@ -1140,29 +853,25 @@ export interface FlatNavigationItem {
 export class SettingsComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
-  private readonly permService = inject(PermissionService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly ui = inject(UiService);
   private readonly session = inject(SessionService);
   protected readonly currentRole = computed(() => this.session.activeRole());
 
-  protected readonly tabs = computed<{ id: 'keygroup' | 'navigation' | 'permission' | 'role'; label: string }[]>(() => {
+  protected readonly tabs = computed<{ id: 'keygroup' | 'navigation' | 'role'; label: string }[]>(() => {
     const settingsChildren = this.flatNavigations().filter((n) => {
       const route = (n.route || '').toLowerCase();
       const code = (n.code || '').toUpperCase();
       return (
         code === 'KEYG' ||
         code === 'NAVM' ||
-        code === 'PERM' ||
         code === 'ROLE' ||
         route.includes('#keygroup') ||
         route.includes('#navigation') ||
-        route.includes('#permission') ||
         route.includes('#role') ||
         route.includes('tab=keygroup') ||
         route.includes('tab=navigation') ||
-        route.includes('tab=permission') ||
         route.includes('tab=role')
       );
     }).sort((a, b) => a.orderIndex - b.orderIndex);
@@ -1171,25 +880,23 @@ export class SettingsComponent implements OnInit {
       return [
         { id: 'keygroup', label: 'Key Group' },
         { id: 'navigation', label: 'Navigation' },
-        { id: 'permission', label: 'Permission' },
         { id: 'role', label: 'Role' },
       ];
     }
 
     const mapCodeOrRouteToTab = (
       n: FlatNavigationItem
-    ): { id: 'keygroup' | 'navigation' | 'permission' | 'role'; label: string } | null => {
+    ): { id: 'keygroup' | 'navigation' | 'role'; label: string } | null => {
       const code = (n.code || '').toUpperCase();
       const route = (n.route || '').toLowerCase();
       const title = n.title;
       if (code === 'KEYG' || route.includes('keygroup')) return { id: 'keygroup', label: title || 'Key Group' };
       if (code === 'NAVM' || route.includes('navigation')) return { id: 'navigation', label: title || 'Navigation' };
-      if (code === 'PERM' || route.includes('permission')) return { id: 'permission', label: title || 'Permission' };
       if (code === 'ROLE' || route.includes('role')) return { id: 'role', label: title || 'Role' };
       return null;
     };
 
-    const result: { id: 'keygroup' | 'navigation' | 'permission' | 'role'; label: string }[] = [];
+    const result: { id: 'keygroup' | 'navigation' | 'role'; label: string }[] = [];
     const seen = new Set<string>();
 
     for (const child of settingsChildren) {
@@ -1200,10 +907,9 @@ export class SettingsComponent implements OnInit {
       }
     }
 
-    const allDefaults: { id: 'keygroup' | 'navigation' | 'permission' | 'role'; label: string }[] = [
+    const allDefaults: { id: 'keygroup' | 'navigation' | 'role'; label: string }[] = [
       { id: 'keygroup', label: 'Key Group' },
       { id: 'navigation', label: 'Navigation' },
-      { id: 'permission', label: 'Permission' },
       { id: 'role', label: 'Role' },
     ];
     for (const def of allDefaults) {
@@ -1215,7 +921,7 @@ export class SettingsComponent implements OnInit {
     return result;
   });
 
-  protected readonly activeTab = signal<'keygroup' | 'navigation' | 'permission' | 'role'>('keygroup');
+  protected readonly activeTab = signal<'keygroup' | 'navigation' | 'role'>('keygroup');
 
   // Key Groups Backend State
   private readonly keyGroupCache = inject(KeyGroupCacheService);
@@ -1236,11 +942,6 @@ export class SettingsComponent implements OnInit {
 
   // Roles State (from backend)
   protected readonly roles = signal<RoleItem[]>([]);
-  protected readonly selectedRole = signal<RoleItem | null>(null);
-
-  // Permission Matrix State
-  protected readonly rolePermissions = signal<RoleNavigationPermission[]>([]);
-  protected readonly savingPermissions = signal(false);
 
   // Filters & Search
   protected readonly showFilterRow = signal(false);
@@ -1334,35 +1035,16 @@ export class SettingsComponent implements OnInit {
     );
   });
 
-  protected isAdminRole(role?: RoleItem | null): boolean {
-    if (!role) return false;
-    const name = (role.name || '').toLowerCase();
-    const code = (role.code || '').toLowerCase();
-    return (
-      name.includes('admin') ||
-      code.includes('admin') ||
-      name.includes('hr manager') ||
-      code.includes('hrmanager') ||
-      code === 'superadmin' ||
-      code === 'companyadmin'
-    );
-  }
-
-  protected readonly permissionRoles = computed(() => {
-    return this.roles().filter((r) => !this.isAdminRole(r));
-  });
-
   protected readonly availableParents = computed(() => {
     const editId = this.editingNavId();
     return this.flatNavigations().filter((n) => n.id !== editId && n.level < 2);
   });
 
-  private normalizeTab(val?: string | null): 'keygroup' | 'navigation' | 'permission' | 'role' | null {
+  private normalizeTab(val?: string | null): 'keygroup' | 'navigation' | 'role' | null {
     if (!val) return null;
     const lower = val.toLowerCase().replace(/[^a-z]/g, '');
     if (lower.startsWith('key')) return 'keygroup';
     if (lower.startsWith('nav')) return 'navigation';
-    if (lower.startsWith('perm')) return 'permission';
     if (lower.startsWith('role')) return 'role';
     return null;
   }
@@ -1393,7 +1075,7 @@ export class SettingsComponent implements OnInit {
     }
   }
 
-  protected selectTab(tab: 'keygroup' | 'navigation' | 'permission' | 'role', updateUrl = true): void {
+  protected selectTab(tab: 'keygroup' | 'navigation' | 'role', updateUrl = true): void {
     this.activeTab.set(tab);
     // Clear filter row and searches when switching tabs
     this.showFilterRow.set(false);
@@ -1413,13 +1095,6 @@ export class SettingsComponent implements OnInit {
       this.loadRoles();
     } else if (tab === 'navigation') {
       this.loadNavigations();
-    } else if (tab === 'permission') {
-      const configurable = this.permissionRoles();
-      if ((!this.selectedRole() || this.isAdminRole(this.selectedRole())) && configurable.length > 0) {
-        this.selectRoleForPermissions(configurable[0]);
-      } else if (this.selectedRole()) {
-        this.loadPermissionsForRole(this.selectedRole()!.id);
-      }
     }
   }
 
@@ -1439,14 +1114,6 @@ export class SettingsComponent implements OnInit {
     this.api.roles().subscribe({
       next: (list) => {
         this.roles.set(list);
-        if (!this.selectedRole() || this.isAdminRole(this.selectedRole())) {
-          const configurable = list.filter((r) => !this.isAdminRole(r));
-          if (configurable.length > 0) {
-            this.selectedRole.set(configurable[0]);
-          } else if (list.length > 0) {
-            this.selectedRole.set(list[0]);
-          }
-        }
       },
       error: (err) => {
         this.toast.show(err?.error?.message || 'Failed to load roles from server', 'danger');
@@ -1764,78 +1431,6 @@ export class SettingsComponent implements OnInit {
       },
       error: (err) => {
         this.toast.show(err?.error?.message || 'Failed to delete navigation item', 'danger');
-      },
-    });
-  }
-
-  // ── Permissions Matrix Backend Integration ──
-  protected selectRoleForPermissions(role: RoleItem): void {
-    this.selectedRole.set(role);
-    this.loadPermissionsForRole(role.id);
-  }
-
-  protected loadPermissionsForRole(roleId: string): void {
-    this.api.rolePermissions(roleId).subscribe({
-      next: (perms) => {
-        this.rolePermissions.set(perms);
-      },
-      error: (err) => {
-        this.toast.show(err?.error?.message || 'Failed to load permissions for role', 'danger');
-      },
-    });
-  }
-
-  protected isProtectedAdminRole(): boolean {
-    const role = this.selectedRole();
-    if (!role) return false;
-    const name = role.name.toLowerCase();
-    const code = role.code.toLowerCase();
-    return name.includes('admin') || code.includes('admin');
-  }
-
-  protected isSettingsModule(title: string, route: string): boolean {
-    const t = (title || '').toLowerCase();
-    const r = (route || '').toLowerCase();
-    return t.includes('setting') || r.includes('setting');
-  }
-
-  protected onToggleFull(perm: RoleNavigationPermission): void {
-    perm.isView = perm.isFull;
-    perm.isCreate = perm.isFull;
-    perm.isEdit = perm.isFull;
-    perm.isDelete = perm.isFull;
-  }
-
-  protected onCheckChild(perm: RoleNavigationPermission): void {
-    perm.isFull = perm.isView && perm.isCreate && perm.isEdit && perm.isDelete;
-  }
-
-  protected saveRolePermissions(): void {
-    const role = this.selectedRole();
-    if (!role) return;
-
-    this.savingPermissions.set(true);
-
-    const payload = {
-      roleId: role.id,
-      permissions: this.rolePermissions().map((p) => ({
-        navigationItemId: p.navigationItemId,
-        isFull: p.isFull,
-        isView: p.isView,
-        isCreate: p.isCreate,
-        isEdit: p.isEdit,
-        isDelete: p.isDelete,
-      })),
-    };
-
-    this.api.saveRolePermissions(payload).subscribe({
-      next: () => {
-        this.toast.show(`Permissions for '${role.name}' saved successfully!`, 'success');
-        this.savingPermissions.set(false);
-      },
-      error: (err) => {
-        this.toast.show(err?.error?.message || 'Failed to save permissions', 'danger');
-        this.savingPermissions.set(false);
       },
     });
   }
