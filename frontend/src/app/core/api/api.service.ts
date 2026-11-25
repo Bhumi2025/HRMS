@@ -738,9 +738,9 @@ export class ApiService {
     return this.http.get<EmployeePunch[]>(this.url('/attendance/punches/today'), { params: toParams({ employeeId }) });
   }
 
-  todayAttendanceOverview(date?: string): Observable<TodayAttendanceOverview> {
+  todayAttendanceOverview(date?: string, search?: string): Observable<TodayAttendanceOverview> {
     return this.http.get<TodayAttendanceOverview>(this.url('/attendance/overview/today'), {
-      params: toParams({ date }),
+      params: toParams({ date, search }),
     });
   }
 

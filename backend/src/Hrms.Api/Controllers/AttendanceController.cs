@@ -115,8 +115,9 @@ public sealed class AttendanceController : ControllerBase
     [ProducesResponseType(typeof(TodayAttendanceOverviewDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<TodayAttendanceOverviewDto>> TodayOverview(
         [FromQuery] DateOnly? date,
+        [FromQuery] string? search,
         CancellationToken ct) =>
-        Ok(await _attendance.GetTodayOverviewAsync(date, ct));
+        Ok(await _attendance.GetTodayOverviewAsync(date, search, ct));
 
     /// <summary>Lists enrolled employee face descriptors for real-time Kiosk matching.</summary>
     [HttpGet("enrolled-faces")]
