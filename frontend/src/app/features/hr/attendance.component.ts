@@ -175,6 +175,9 @@ interface MusterDay {
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <!-- Instant Search Input with Icon and Clear Button -->
             <div style="position: relative; display: flex; align-items: center;">
+              <!-- Dummy hidden inputs to prevent browser autofill/credential managers -->
+              <input type="text" style="display: none;" aria-hidden="true" tabindex="-1" autocomplete="off" />
+              <input type="password" style="display: none;" aria-hidden="true" tabindex="-1" autocomplete="off" />
               <span style="position: absolute; left: 10px; color: var(--muted); pointer-events: none; display: flex;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
               </span>
@@ -186,11 +189,10 @@ interface MusterDay {
                 class="form-control" 
                 placeholder="Search employee, ID, dept..." 
                 style="width: 220px; font-size: 12px; padding: 6px 28px 6px 30px;"
-                [value]="searchKeyword()"
-                (input)="onSearchInput($any($event.target).value)"
-                (change)="onSearchInput($any($event.target).value)"
+                [ngModel]="searchKeyword()"
+                (ngModelChange)="onSearchInput($event)"
                 (search)="onSearchInput($any($event.target).value)"
-                autocomplete="off"
+                autocomplete="new-password"
                 autocorrect="off"
                 autocapitalize="off"
                 spellcheck="false"
@@ -265,7 +267,6 @@ interface MusterDay {
                 <th style="min-width: 90px;">Check Out</th>
                 <th style="min-width: 95px;">Work Hours</th>
                 <th style="min-width: 90px;">Status</th>
-                <th style="min-width: 130px;">Device/Method</th>
                 <th style="min-width: 130px; text-align: center; padding-right: 16px;">Action</th>
               </tr>
             </thead>
@@ -304,12 +305,6 @@ interface MusterDay {
                       {{ row.status }}
                     </span>
                   </td>
-                  <td>
-                    <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); background: var(--bg); padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border);">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--p)" stroke-width="2"><path d="M12 12c0-3 2.5-5.5 5.5-5.5.7 0 1.4.1 2 .4"/><path d="M12 12c0 3-2.5 5.5-5.5 5.5-.7 0-1.4-.1-2-.4"/><path d="M12 7c-2.8 0-5 2.2-5 5 0 3.9 3.1 7 7 7 1.9 0 3.7-.8 5-2.1"/><path d="M12 2C6.5 2 2 6.5 2 12c0 3.3 1.6 6.2 4.1 8"/><path d="M22 12c0-5.5-4.5-10-10-10"/></svg>
-                      {{ row.device || 'Face Terminal' }}
-                    </span>
-                  </td>
                   <td style="text-align: center; padding: 8px 16px; white-space: nowrap;">
                     <button class="btn-view-muster" (click)="viewEmployeeMuster(row.id)">
                       View Muster ›
@@ -318,7 +313,7 @@ interface MusterDay {
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="10" style="text-align: center; padding: 36px 20px; color: var(--muted);">
+                  <td colspan="9" style="text-align: center; padding: 36px 20px; color: var(--muted);">
                     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
                       <div style="font-size: 13px; font-weight: 500;">
                         @if (searchKeyword() || filterStatus()) {
@@ -2676,6 +2671,10 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.searchKeyword.set('');
+    if (this.searchInputRef?.nativeElement) {
+      this.searchInputRef.nativeElement.value = '';
+    }
     this.route.queryParams.subscribe((params) => {
       if (params['tab'] === 'muster') {
         this.tab.set('muster');
@@ -2783,7 +2782,8 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected loadDailyAttendance(silent: boolean = false): void {
     const curDate = this.filterDate();
-    this.api.todayAttendanceOverview(curDate).subscribe({
+    const search = this.searchKeyword()?.trim() || undefined;
+    this.api.todayAttendanceOverview(curDate, search).subscribe({
       next: (res: TodayAttendanceOverview) => {
         if (res) {
           const presentCount = res.presentCount ?? 0;

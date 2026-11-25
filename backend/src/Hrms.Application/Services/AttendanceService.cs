@@ -1310,7 +1310,7 @@ public sealed class AttendanceService : IAttendanceService
             p.Device)).ToList();
     }
 
-    public async Task<TodayAttendanceOverviewDto> GetTodayOverviewAsync(DateOnly? targetDate = null, CancellationToken ct = default)
+    public async Task<TodayAttendanceOverviewDto> GetTodayOverviewAsync(DateOnly? targetDate = null, string? search = null, CancellationToken ct = default)
     {
         var (tz, _, _) = await GetCompanyTimeZoneAsync(ct);
         var nowUtc = DateTime.UtcNow;
@@ -1458,12 +1458,41 @@ public sealed class AttendanceService : IAttendanceService
         }
 
         var totalActiveTracked = presentList.Count + absentList.Count + onLeaveList.Count;
+        var totalPresentCount = presentList.Count;
+        var totalAbsentCount = absentList.Count;
+        var totalOnLeaveCount = onLeaveList.Count;
+        var totalLateCount = lateList.Count;
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var q = search.Trim();
+            presentList = presentList.Where(p =>
+                (p.EmployeeName != null && p.EmployeeName.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                (p.EmployeeCode != null && p.EmployeeCode.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                (p.Department != null && p.Department.Contains(q, StringComparison.OrdinalIgnoreCase))).ToList();
+
+            absentList = absentList.Where(p =>
+                (p.EmployeeName != null && p.EmployeeName.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                (p.EmployeeCode != null && p.EmployeeCode.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                (p.Department != null && p.Department.Contains(q, StringComparison.OrdinalIgnoreCase))).ToList();
+
+            onLeaveList = onLeaveList.Where(p =>
+                (p.EmployeeName != null && p.EmployeeName.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                (p.EmployeeCode != null && p.EmployeeCode.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                (p.Department != null && p.Department.Contains(q, StringComparison.OrdinalIgnoreCase))).ToList();
+
+            lateList = lateList.Where(p =>
+                (p.EmployeeName != null && p.EmployeeName.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                (p.EmployeeCode != null && p.EmployeeCode.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                (p.Department != null && p.Department.Contains(q, StringComparison.OrdinalIgnoreCase))).ToList();
+        }
+
         return new TodayAttendanceOverviewDto(
             totalActiveTracked,
-            presentList.Count,
-            absentList.Count,
-            onLeaveList.Count,
-            lateList.Count,
+            totalPresentCount,
+            totalAbsentCount,
+            totalOnLeaveCount,
+            totalLateCount,
             presentList,
             absentList,
             onLeaveList,

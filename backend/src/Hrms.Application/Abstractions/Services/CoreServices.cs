@@ -107,7 +107,7 @@ public interface IAttendanceService
 
     Task<IReadOnlyList<EmployeePunchDto>> GetTodayPunchesAsync(Guid? employeeId, CancellationToken ct = default);
 
-    Task<TodayAttendanceOverviewDto> GetTodayOverviewAsync(DateOnly? targetDate = null, CancellationToken ct = default);
+    Task<TodayAttendanceOverviewDto> GetTodayOverviewAsync(DateOnly? targetDate = null, string? search = null, CancellationToken ct = default);
 
     Task<IReadOnlyList<EnrolledFaceDto>> GetEnrolledFacesAsync(CancellationToken ct = default);
 
