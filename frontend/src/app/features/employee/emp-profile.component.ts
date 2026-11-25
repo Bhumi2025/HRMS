@@ -183,7 +183,7 @@ interface DocRow {
                   [type]="showContactPassword() ? 'text' : 'password'"
                   [value]="personal().password"
                   disabled
-                  placeholder="Password"
+                  [placeholder]="hasStoredPassword() && !personal().password ? 'Password set (change password to sync)' : 'Password'"
                 />
                 <button
                   type="button"
@@ -791,6 +791,7 @@ export class EmpProfileComponent implements OnInit {
       next: (employee) => {
         this.detail.set(employee);
         this.apiId.set(employee.id);
+        this.hasStoredPassword.set(!!employee.password || !!employee.hasPassword);
         if (employee.facePhotoUrl) {
           this.avatarUrl.set(employee.facePhotoUrl);
         }
@@ -801,7 +802,7 @@ export class EmpProfileComponent implements OnInit {
           middleName: employee.middleName || '',
           lastName: employee.lastName || '',
           email: employee.email || '',
-          password: employee.password || 'Employee@123',
+          password: employee.password ?? '',
           phone: employee.phone || '',
           dob: employee.dateOfBirth ?? '',
           gender: employee.gender,
@@ -1043,6 +1044,7 @@ export class EmpProfileComponent implements OnInit {
   protected readonly tab = signal<'personal' | 'contact' | 'bank' | 'docs'>('personal');
 
   protected readonly showContactPassword = signal(false);
+  protected readonly hasStoredPassword = signal(false);
 
   protected readonly personal = signal({
     salutation: 'Mr',

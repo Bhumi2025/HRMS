@@ -121,7 +121,7 @@ interface Loan {
           <div class="grid-2">
             <div class="form-group">
               <label class="form-label">Amount</label>
-              <input class="form-control" placeholder="$0.00" [value]="form().amount" (input)="patch('amount', $any($event.target).value)" />
+              <input class="form-control" [placeholder]="currencyService.currencySymbol() + '0.00'" [value]="form().amount" (input)="patch('amount', $any($event.target).value)" />
             </div>
             <div class="form-group">
               <label class="form-label">Repayment Months</label>

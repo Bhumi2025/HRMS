@@ -855,10 +855,16 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
                         changed = true;
                     }
 
-                    // Always guarantee password hash verifies with employee.Password
-                    if (!hasher.Verify(rawPassword, matchedUser.PasswordHash))
+                    // Backfill Employee.Password only when the existing User hash actually verifies against the default password
+                    if (string.IsNullOrWhiteSpace(emp.Password) && hasher.Verify("Employee@123", matchedUser.PasswordHash))
                     {
-                        matchedUser.PasswordHash = hasher.Hash(rawPassword);
+                        emp.Password = "Employee@123";
+                        changed = true;
+                    }
+                    // Sync password hash only when an explicit Employee.Password is stored
+                    else if (!string.IsNullOrWhiteSpace(emp.Password) && !hasher.Verify(emp.Password.Trim(), matchedUser.PasswordHash))
+                    {
+                        matchedUser.PasswordHash = hasher.Hash(emp.Password.Trim());
                         changed = true;
                     }
 

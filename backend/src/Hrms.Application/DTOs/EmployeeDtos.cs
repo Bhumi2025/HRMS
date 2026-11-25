@@ -76,7 +76,8 @@ public sealed record EmployeeDetailDto(
     string? FacePhotoUrl = null,
     string? EmergencyContactName = null,
     string? EmergencyContactPhone = null,
-    string? Password = null);
+    string? Password = null,
+    bool HasPassword = false);
 
 public sealed record CreateEmployeeRequest(
     string? Salutation,
@@ -117,7 +118,8 @@ public sealed record CreateEmployeeRequest(
     string? Password = null,
     string? RoleCode = null,
     string? EmergencyContactName = null,
-    string? EmergencyContactPhone = null);
+    string? EmergencyContactPhone = null,
+    bool SendWelcomeEmail = false);
 
 public sealed record UpdateEmployeeRequest(
     string? Salutation,

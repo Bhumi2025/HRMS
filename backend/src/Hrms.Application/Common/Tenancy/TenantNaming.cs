@@ -8,8 +8,8 @@ namespace Hrms.Application.Common.Tenancy;
 /// </summary>
 public static partial class TenantNaming
 {
-    private const string DatabasePrefix = "hrms_t_";
-    private const int MaxSlugLength = 32;
+    private const string DatabasePrefix = "HRMS";
+    private const int MaxSlugLength = 48;
     private const int MaxCodeLength = 24;
 
     [GeneratedRegex("^[A-Za-z0-9_]{1,64}$")]
@@ -49,23 +49,34 @@ public static partial class TenantNaming
         return slug.Length > MaxCodeLength ? slug[..MaxCodeLength] : slug;
     }
 
-    /// <summary>Builds a unique, sanitized database name for a company.</summary>
+    /// <summary>Formats a company name into PascalCase alphanumeric words without underscores.</summary>
+    public static string ToPascalName(string value)
+    {
+        var parts = Regex.Split((value ?? string.Empty).Trim(), "[^A-Za-z0-9]+")
+            .Where(p => p.Length > 0)
+            .Select(p => char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p[1..].ToLowerInvariant() : string.Empty));
+
+        var combined = string.Concat(parts);
+        return combined.Length > MaxSlugLength ? combined[..MaxSlugLength] : combined;
+    }
+
+    /// <summary>Builds a unique, sanitized PascalCase database name for a company (no underscores).</summary>
     public static string GenerateDatabaseName(string companyName, Guid companyId, Func<string, bool> isTaken)
     {
-        var slug = Slugify(companyName);
-        if (slug.Length == 0)
+        var pascal = ToPascalName(companyName);
+        if (pascal.Length == 0)
         {
-            slug = "company";
+            pascal = "Company";
         }
 
-        var baseName = DatabasePrefix + slug;
+        var baseName = DatabasePrefix + pascal;
         if (!isTaken(baseName))
         {
             return baseName;
         }
 
-        var suffix = companyId.ToString("N")[..8];
-        var withSuffix = $"{baseName}_{suffix}";
+        var suffix = companyId.ToString("N")[..8].ToUpperInvariant();
+        var withSuffix = $"{baseName}{suffix}";
         if (!isTaken(withSuffix))
         {
             return withSuffix;
@@ -73,7 +84,7 @@ public static partial class TenantNaming
 
         for (var i = 2; i < 1000; i++)
         {
-            var candidate = $"{baseName}_{suffix}_{i}";
+            var candidate = $"{baseName}{suffix}{i}";
             if (!isTaken(candidate))
             {
                 return candidate;

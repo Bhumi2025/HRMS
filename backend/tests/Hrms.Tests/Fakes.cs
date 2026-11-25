@@ -61,10 +61,10 @@ internal sealed class FakeTenantDatabaseService : ITenantDatabaseService
     public Task<TenantUserRecord?> FindUserByEmailAsync(string databaseName, string email, CancellationToken ct = default) =>
         Task.FromResult(Users.TryGetValue(Key(databaseName, email), out var user) ? user : null);
 
-    public Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default) =>
+    public Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default, string? verifiedPlainPassword = null) =>
         Task.CompletedTask;
 
-    public Task SetUserPasswordAsync(string databaseName, string email, string passwordHash, CancellationToken ct = default)
+    public Task SetUserPasswordAsync(string databaseName, string email, string passwordHash, CancellationToken ct = default, string? plainPassword = null)
     {
         var key = Key(databaseName, email);
         if (Users.TryGetValue(key, out var user))
@@ -134,11 +134,31 @@ internal sealed class FakeEmailSender : IEmailSender
 
 internal sealed class FakeJwtTokenService : IJwtTokenService
 {
+    private static readonly Dictionary<string, SetPasswordTokenPayload> SetPasswordTokens = new(StringComparer.Ordinal);
+
     public AuthToken CreateToken(User user, string roleName, Guid? companyId = null, string? companyCode = null) =>
         new("token", DateTime.UtcNow.AddHours(1));
 
     public AuthToken CreateToken(TokenSubject subject) =>
         new("token:" + subject.Email + ":" + subject.CompanyCode, DateTime.UtcNow.AddHours(1));
+
+    public string CreateSetPasswordToken(SetPasswordTokenSubject subject, TimeSpan lifetime)
+    {
+        var token = $"sp-{Guid.NewGuid():N}";
+        SetPasswordTokens[token] = new SetPasswordTokenPayload(
+            subject.UserId,
+            subject.EmployeeId,
+            subject.Email,
+            subject.EmployeeCode,
+            subject.EmployeeName,
+            subject.CompanyId,
+            subject.CompanyCode,
+            subject.CompanyName);
+        return token;
+    }
+
+    public Task<SetPasswordTokenPayload?> ValidateSetPasswordTokenAsync(string token, CancellationToken ct = default) =>
+        Task.FromResult(SetPasswordTokens.TryGetValue(token, out var payload) ? payload : null);
 }
 
 internal sealed class FakeTenantConnectionFactory : ITenantConnectionFactory

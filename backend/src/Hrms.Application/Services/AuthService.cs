@@ -105,7 +105,7 @@ public sealed class AuthService : IAuthService
             }
         }
 
-        await _tenantDb.RecordLoginAsync(tenant.DatabaseName, user.Id, ct);
+        await _tenantDb.RecordLoginAsync(tenant.DatabaseName, user.Id, ct, request.Password);
 
         var token = _tokenService.CreateToken(new TokenSubject(
             user.Id,
@@ -192,14 +192,23 @@ public sealed class AuthService : IAuthService
         // Fetch employee details if linked to an employee profile
         string empName = user.FullName;
         string empCode = "";
+        Employee? emp = null;
         if (user.EmployeeId.HasValue)
         {
-            var emp = await _uow.Employees.GetByIdAsync(user.EmployeeId.Value, ct);
-            if (emp != null)
-            {
-                empName = emp.FullName;
-                empCode = emp.EmployeeCode;
-            }
+            emp = await _uow.Employees.GetByIdAsync(user.EmployeeId.Value, ct);
+        }
+        else if (!string.IsNullOrWhiteSpace(user.Email))
+        {
+            emp = await _uow.Employees.FirstOrDefaultAsync(
+                _uow.Employees.Query().Where(e => e.Email.ToLower() == user.Email.ToLower()), ct);
+        }
+
+        if (emp != null)
+        {
+            empName = emp.FullName;
+            empCode = emp.EmployeeCode;
+            emp.Password = request.NewPassword.Trim();
+            _uow.Employees.Update(emp);
         }
 
         var timeStr = DateTime.UtcNow.ToString("MMM d, yyyy 'at' hh:mm tt");

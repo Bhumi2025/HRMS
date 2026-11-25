@@ -5,6 +5,7 @@ import { ApiService } from '../../core/api/api.service';
 import { EnrolledFace } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
+import { CurrencyService } from '../../core/services/currency.service';
 import { ToastService } from '../../core/services/toast.service';
 import { ACCEPT_DOC_TYPES, ACCEPT_IMG_TYPES, validateDocumentFile, validateImageFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
@@ -54,7 +55,7 @@ interface AccountItem {
       <div class="ob-card-body">
         <!-- STEP 0: PERSONAL -->
         @if (step() === 0) {
-          <div class="photo-banner">
+          <div class="photo-banner" [style.border-color]="fieldError('facePhoto') ? '#ef4444' : ''">
             <div class="photo-avatar" style="overflow: hidden;">
               @if (enrolledFacePhoto()) {
                 <img [src]="enrolledFacePhoto()" style="width: 100%; height: 100%; object-fit: cover;" alt="Employee Face Photo" />
@@ -66,7 +67,7 @@ interface AccountItem {
               }
             </div>
             <div>
-              <div style="font-weight: 700; color: var(--text); margin-bottom: 2px">Profile Photo &amp; Face Biometrics</div>
+              <div style="font-weight: 700; color: var(--text); margin-bottom: 2px">Profile Photo &amp; Face Biometrics<span class="req">*</span></div>
               <div style="color: #6b7280; margin-bottom: 10px">
                 {{ isFaceEnrolled() ? '✅ Face Biometrics Captured (Ready for instant Clock In & Login)' : 'Register facial biometric identity now for automated face recognition & attendance.' }}
               </div>
@@ -90,6 +91,9 @@ interface AccountItem {
                   </button>
                 }
               </div>
+              @if (fieldError('facePhoto')) {
+                <div class="field-error-msg" style="margin-top: 8px">{{ fieldError('facePhoto') }}</div>
+              }
             </div>
           </div>
 
@@ -276,7 +280,7 @@ interface AccountItem {
               <input 
                 class="form-control" 
                 [class.is-invalid]="!!fieldError('basicSalary')"
-                placeholder="$0.00" 
+                [placeholder]="currencyService.currencySymbol() + '0.00'" 
                 [value]="salary().basicSalary" 
                 (input)="patchS('basicSalary', $any($event.target).value); clearError('basicSalary')" 
               />
@@ -359,10 +363,10 @@ interface AccountItem {
                 <span [appIcon]="'lock'" style="color: var(--p)"></span> Employee Portal Login Credentials
               </div>
               <div style="font-size: 13px; color: var(--muted); margin-bottom: 16px">
-                Configure login access so the employee can immediately log in to their dedicated portal.
+                Configure portal access role. Upon onboarding, the employee will receive an email with a <strong>Set Password</strong> button to create their own password.
               </div>
 
-              <div class="ob-grid ob-grid-3">
+              <div class="ob-grid ob-grid-2">
                 <div class="form-group">
                   <label class="form-label">Login Email<span class="req">*</span></label>
                   <input
@@ -373,49 +377,6 @@ interface AccountItem {
                     placeholder="email@company.com"
                   />
                   <div style="font-size: 11px; color: var(--muted); margin-top: 4px">Auto-filled from personal details</div>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Account Password<span class="req">*</span></label>
-                  <div style="position: relative; display: flex; align-items: center">
-                    <input
-                      class="form-control"
-                      [class.is-invalid]="!!fieldError('password')"
-                      [type]="showPassword() ? 'text' : 'password'"
-                      placeholder="Enter minimum 6 characters"
-                      [value]="accountForm().password"
-                      (input)="patchAccount('password', $any($event.target).value); clearError('password')"
-                      style="padding-right: 40px"
-                    />
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-sm"
-                      style="position: absolute; right: 4px; padding: 4px 6px; color: var(--muted); height: 28px"
-                      (click)="showPassword.set(!showPassword())"
-                      [title]="showPassword() ? 'Hide password' : 'Show password'"
-                    >
-                      <span [appIcon]="showPassword() ? 'eye' : 'lock'"></span>
-                    </button>
-                  </div>
-                  @if (fieldError('password')) {
-                    <div class="field-error-msg">{{ fieldError('password') }}</div>
-                  }
-                  <!-- Inline Spotify Volume Password Strength Bar -->
-                  @if (accountForm().password.length > 0) {
-                    <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
-                      <div style="flex: 1; height: 5px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
-                        <div
-                          [style.width.%]="passwordStrength().score"
-                          [style.background]="passwordStrength().color"
-                          style="height: 100%; border-radius: 999px; transition: width 0.3s ease, background-color 0.3s ease;"
-                        ></div>
-                      </div>
-                      <span [style.color]="passwordStrength().color" style="font-size: 11px; font-weight: 700; min-width: 60px; text-align: right;">
-                        {{ passwordStrength().label }}
-                      </span>
-                    </div>
-                  }
-                  <div style="font-size: 11px; color: var(--muted); margin-top: 4px">Employee will use this password to sign in</div>
                 </div>
 
                 <div class="form-group">
@@ -519,25 +480,21 @@ interface AccountItem {
                 <span class="badge badge-success" style="display: flex; align-items: center; gap: 4px">✓ Ready</span>
               </div>
 
-              <div class="sys-row" [class.done]="systemAccessDone()">
+              <div class="sys-row done">
                 <div style="display: flex; align-items: center; gap: 10px">
                   <div
-                    style="width: 32px; height: 32px; min-width: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center"
-                    [style.background]="systemAccessDone() ? 'rgba(5,150,105,.1)' : 'var(--p-soft)'"
-                    [style.color]="systemAccessDone() ? 'var(--success)' : 'var(--p)'"
+                    style="width: 32px; height: 32px; min-width: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(5,150,105,.1); color: var(--success)"
                   >
-                    <span [appIcon]="systemAccessDone() ? 'check' : 'lock'"></span>
+                    <span [appIcon]="'mail'"></span>
                   </div>
                   <div>
                     <div class="sys-label" style="font-weight: 600">HRMS Portal Access</div>
                     <div class="sys-label" style="color: var(--muted)">
-                      {{ systemAccessDone() ? 'Password configured (' + accountForm().role + ' role)' : 'Password required to enable login' }}
+                      Set Password invite will be emailed to employee ({{ accountForm().role }} role)
                     </div>
                   </div>
                 </div>
-                <span class="badge" [class]="systemAccessDone() ? 'badge-success' : 'badge-warning'" style="display: flex; align-items: center; gap: 4px">
-                  {{ systemAccessDone() ? '✓ Ready' : 'Password Needed' }}
-                </span>
+                <span class="badge badge-success" style="display: flex; align-items: center; gap: 4px">✓ Invite Ready</span>
               </div>
 
               <div class="sys-row" [class.done]="isFaceEnrolled()">
@@ -594,7 +551,7 @@ interface AccountItem {
                 Login Account Active: <span style="color: var(--p)">{{ reviewEmail() }}</span>
               </div>
               <div style="color: var(--muted); font-size: 13px; margin-bottom: 28px">
-                The employee can now immediately sign in at the login page using their email and the configured password.
+                A welcome email with a <strong>Set Password</strong> button has been sent so the employee can set their own password and sign in.
               </div>
               <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap">
                 <button class="btn btn-outline" (click)="restart()">Onboard Another</button>
@@ -695,10 +652,8 @@ interface AccountItem {
                     <div style="font-size: 13px; font-weight: 600; color: var(--text)">{{ value(personal().email) }}</div>
                   </div>
                   <div>
-                    <div style="font-size: 13px; color: var(--muted); margin-bottom: 2px">Initial Password</div>
-                    <div style="font-size: 13px; font-weight: 600; color: var(--text)">
-                      {{ accountForm().password ? '•••••••• (' + accountForm().password.length + ' chars)' : 'Not set' }}
-                    </div>
+                    <div style="font-size: 13px; color: var(--muted); margin-bottom: 2px">Password Setup</div>
+                    <div style="font-size: 13px; font-weight: 600; color: var(--p)">Set Password link via email</div>
                   </div>
                   <div>
                     <div style="font-size: 13px; color: var(--muted); margin-bottom: 2px">System Role</div>
@@ -984,8 +939,16 @@ interface AccountItem {
         display: grid;
         gap: 12px;
       }
+      .ob-grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
       .ob-grid-3 {
         grid-template-columns: repeat(3, 1fr);
+      }
+      @media (max-width: 768px) {
+        .ob-grid-2 {
+          grid-template-columns: 1fr;
+        }
       }
       .ob-grid-4 {
         grid-template-columns: repeat(4, 1fr);
@@ -1289,6 +1252,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   protected readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
   protected readonly faceService = inject(FaceRecognitionService);
+  protected readonly currencyService = inject(CurrencyService);
 
   @ViewChild('obFaceVideo') private obFaceVideoRef?: ElementRef<HTMLVideoElement>;
   @ViewChild('obFaceCanvas') private obFaceCanvasRef?: ElementRef<HTMLCanvasElement>;
@@ -1447,19 +1411,15 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   });
 
   protected readonly accountForm = signal({
-    password: '',
     role: 'Employee',
   });
-  protected readonly showPassword = signal(false);
 
   protected readonly roleOptions: SelectOption[] = [
     { v: 'Employee', l: 'Employee (Self-Service Portal)' },
     { v: 'HrManager', l: 'HR Manager' },
   ];
 
-  protected readonly systemAccessDone = computed(() => this.accountForm().password.trim().length >= 6);
-
-  protected patchAccount(key: 'password' | 'role', value: string): void {
+  protected patchAccount(key: 'role', value: string): void {
     this.accountForm.update((a) => ({ ...a, [key]: value }));
   }
 
@@ -1526,56 +1486,6 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   protected readonly isPhoneValid = computed(() => {
     const phone = this.personal().phone.trim().replace(/[\s\-]/g, '');
     return phone.length === 0 || /^(?:\+91|91|0)?[6-9]\d{9}$/.test(phone);
-  });
-
-  // Password strength computation for Spotify Volume Slider UI
-  protected readonly passwordStrength = computed(() => {
-    const pwd = this.accountForm().password || '';
-    if (!pwd) {
-      return {
-        score: 0,
-        label: 'No Password',
-        color: '#94a3b8',
-      };
-    }
-
-    const hasMinLength = pwd.length >= 8;
-    const hasMixedCase = /[a-z]/.test(pwd) && /[A-Z]/.test(pwd);
-    const hasNumber = /\d/.test(pwd);
-    const hasSymbol = /[^A-Za-z0-9]/.test(pwd);
-
-    let score = 0;
-    if (pwd.length > 0) score += 10;
-    if (hasMinLength) score += 25;
-    if (pwd.length >= 12) score += 15;
-    if (hasMixedCase) score += 20;
-    if (hasNumber) score += 15;
-    if (hasSymbol) score += 15;
-
-    score = Math.min(100, score);
-
-    let label = 'Very Weak';
-    let color = '#ef4444'; // Red
-
-    if (score >= 80) {
-      label = 'Strong';
-      color = '#1db954'; // Spotify Green
-    } else if (score >= 60) {
-      label = 'Good';
-      color = '#22c55e'; // Green
-    } else if (score >= 40) {
-      label = 'Fair';
-      color = '#f59e0b'; // Amber
-    } else if (score >= 20) {
-      label = 'Weak';
-      color = '#f97316'; // Orange
-    }
-
-    return {
-      score,
-      label,
-      color,
-    };
   });
 
   private readonly uploadedDocs = new Map<string, string>();
@@ -1698,10 +1608,15 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     const errs: Record<string, string> = { ...this.errors() };
 
     if (stepIndex === 0) {
+      delete errs['facePhoto'];
       delete errs['firstName'];
       delete errs['lastName'];
       delete errs['email'];
       delete errs['phone'];
+
+      if (!this.isFaceEnrolled() || !this.enrolledFacePhoto()) {
+        errs['facePhoto'] = 'Profile photo and Face Biometrics are required before proceeding.';
+      }
 
       const p = this.personal();
       if (!p.firstName.trim()) {
@@ -1728,9 +1643,14 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       }
 
       this.errors.set(errs);
-      const isValid = !errs['firstName'] && !errs['lastName'] && !errs['email'] && !errs['phone'];
+      const isValid = !errs['facePhoto'] && !errs['firstName'] && !errs['lastName'] && !errs['email'] && !errs['phone'];
       if (!isValid) {
-        this.toast.show('Please complete all required personal details.', 'danger');
+        this.toast.show(
+          errs['facePhoto'] && !errs['firstName'] && !errs['lastName'] && !errs['email'] && !errs['phone']
+            ? 'Please upload Profile Photo or scan Face Biometrics before continuing.'
+            : 'Please complete all required personal details (including Profile Photo & Face Biometrics).',
+          'danger',
+        );
       }
       return isValid;
     }
@@ -1794,19 +1714,16 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     }
 
     if (stepIndex === 4) {
-      delete errs['password'];
+      delete errs['facePhoto'];
 
-      const pw = this.accountForm().password.trim();
-      if (!pw) {
-        errs['password'] = 'Account password is required for employee login access.';
-      } else if (pw.length < 6) {
-        errs['password'] = 'Password must be at least 6 characters.';
+      if (!this.isFaceEnrolled() || !this.enrolledFacePhoto()) {
+        errs['facePhoto'] = 'Profile photo and Face Biometrics are required before saving onboarding.';
       }
 
       this.errors.set(errs);
-      const isValid = !errs['password'];
+      const isValid = !errs['facePhoto'];
       if (!isValid) {
-        this.toast.show('Please enter a valid password (minimum 6 characters).', 'danger');
+        this.toast.show('Please register Profile Photo & Face Biometrics before continuing.', 'danger');
       }
       return isValid;
     }
@@ -1923,7 +1840,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       transportAllowance: 0,
       mobileAllowance: 0,
       otherAllowances: 0,
-      currency: 'INR',
+      currency: this.currencyService.currencyCode(),
       dateOfBirth: this.toIso(personal.dob),
       gender: this.mapGender(personal.gender),
       maritalStatus: personal.maritalStatus,
@@ -1938,8 +1855,8 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       iban: salary.ifscCode.trim() || null,
       ifscCode: salary.ifscCode.trim() || null,
       paymentMode: this.paymentMode(salary.paymentMode),
-      password: account.password.trim() || 'Emp@12345',
       roleCode: account.role || 'Employee',
+      sendWelcomeEmail: true,
     };
 
     this.api.createEmployee(body).subscribe({
@@ -2055,7 +1972,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     this.step.set(0);
     this.submitted.set(false);
     this.uploaded.set(new Set());
-    this.accountForm.set({ password: '', role: 'Employee' });
+    this.enrolledFaceDescriptor.set(null);
+    this.enrolledFacePhoto.set(null);
+    this.errors.set({});
+    this.accountForm.set({ role: 'Employee' });
   }
 
   protected goEmployees(): void {
@@ -2101,6 +2021,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       if (!dataUrl) return;
 
       this.enrolledFacePhoto.set(dataUrl);
+      this.clearError('facePhoto');
 
       // Attempt AI face detection and feature descriptor extraction
       const img = new Image();
@@ -2229,6 +2150,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
 
     this.enrolledFaceDescriptor.set(finalDescriptor);
     if (snapshot) this.enrolledFacePhoto.set(snapshot);
+    this.clearError('facePhoto');
 
     this.faceModalMsg.set('✅ Face Biometrics Captured (128D Deep Neural Embedding)!');
     this.toast.show('Face biometrics registered for onboarding!', 'success');

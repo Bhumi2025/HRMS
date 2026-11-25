@@ -85,6 +85,7 @@ import {
   Asset,
   SupportTicket,
   ActivationInfo,
+  SetPasswordInfo,
   CompanyDetail,
   CompanyListItem,
   CompanyProvisioningResult,
@@ -153,6 +154,16 @@ export class ApiService {
   /** Sets the company admin password from an activation token and signs them in. */
   activateAccount(token: string, newPassword: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(this.url('/auth/activate'), { token, newPassword });
+  }
+
+  /** Validates an onboarded employee's set-password email token. */
+  validateSetPassword(token: string): Observable<SetPasswordInfo> {
+    return this.http.get<SetPasswordInfo>(this.url('/auth/set-password'), { params: toParams({ token }) });
+  }
+
+  /** Sets an onboarded employee's password from their email token and signs them in. */
+  setPassword(token: string, newPassword: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(this.url('/auth/set-password'), { token, newPassword });
   }
 
   // ── Platform: company management (Super Admin only) ──

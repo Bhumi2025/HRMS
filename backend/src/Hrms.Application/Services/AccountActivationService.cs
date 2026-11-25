@@ -128,6 +128,110 @@ public sealed class AccountActivationService : IAccountActivationService
         return new LoginResponse(token.AccessToken, token.ExpiresAtUtc, dto);
     }
 
+    public async Task<SetPasswordInfoResponse> ValidateSetPasswordAsync(string token, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return new SetPasswordInfoResponse(false, null, null, null, null, null, "This set-password link is missing its token.");
+        }
+
+        var payload = await _tokenService.ValidateSetPasswordTokenAsync(token, ct);
+        if (payload is null)
+        {
+            return new SetPasswordInfoResponse(false, null, null, null, null, null, "This set-password link is invalid or has expired.");
+        }
+
+        var company = await ResolveCompanyForTokenAsync(payload, ct);
+        if (company is null)
+        {
+            return new SetPasswordInfoResponse(false, payload.CompanyName, payload.CompanyCode, payload.EmployeeCode, payload.EmployeeName, payload.Email, "The company for this account no longer exists.");
+        }
+
+        if (company.Status == CompanyStatus.Suspended)
+        {
+            return new SetPasswordInfoResponse(false, company.Name, company.Code, payload.EmployeeCode, payload.EmployeeName, payload.Email, "This company has been suspended.");
+        }
+
+        return new SetPasswordInfoResponse(
+            true,
+            string.IsNullOrWhiteSpace(payload.CompanyName) ? company.Name : payload.CompanyName,
+            company.Code,
+            payload.EmployeeCode,
+            payload.EmployeeName,
+            payload.Email,
+            null);
+    }
+
+    public async Task<LoginResponse> SetPasswordAsync(SetPasswordRequest request, CancellationToken ct = default)
+    {
+        var payload = await _tokenService.ValidateSetPasswordTokenAsync(request.Token, ct)
+                      ?? throw new ValidationException("This set-password link is invalid or has expired.");
+
+        var company = await ResolveCompanyForTokenAsync(payload, ct)
+                      ?? throw new NotFoundException("The company for this account no longer exists.");
+
+        if (company.Status == CompanyStatus.Suspended)
+        {
+            throw new ForbiddenException("This company has been suspended.");
+        }
+
+        var dbName = company.DatabaseName ?? string.Empty;
+        var email = payload.Email.Trim().ToLowerInvariant();
+        await _tenantDb.SetUserPasswordAsync(dbName, email, _passwordHasher.Hash(request.NewPassword), ct, request.NewPassword);
+
+        var user = await _tenantDb.FindUserByEmailAsync(dbName, email, ct)
+                   ?? throw new NotFoundException("The employee account was not found.");
+
+        if (!user.IsActive || user.IsOffboarded || user.EmployeeStatus is EmploymentStatus.Offboarding or EmploymentStatus.Terminated or EmploymentStatus.Resigned)
+        {
+            throw new ForbiddenException("Your account has been deactivated. Please contact HR.");
+        }
+
+        await _tenantDb.RecordLoginAsync(dbName, user.Id, ct);
+
+        var authToken = _tokenService.CreateToken(new TokenSubject(
+            user.Id,
+            user.FullName,
+            user.Initials,
+            user.Email,
+            user.RoleName,
+            user.EmployeeId,
+            company.Id,
+            company.Code));
+
+        var dto = new UserDto(
+            user.Id,
+            user.FullName,
+            user.Email,
+            user.Initials,
+            user.RoleName,
+            user.RoleCode,
+            user.EmployeeId,
+            company.Id,
+            company.Name,
+            company.Code,
+            company.LogoUrl);
+
+        return new LoginResponse(authToken.AccessToken, authToken.ExpiresAtUtc, dto);
+    }
+
+    private async Task<Company?> ResolveCompanyForTokenAsync(SetPasswordTokenPayload payload, CancellationToken ct)
+    {
+        if (payload.CompanyId is { } companyId)
+        {
+            var byId = await _master.Companies.GetByIdAsync(companyId, ct);
+            if (byId is not null) return byId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(payload.CompanyCode))
+        {
+            var byCode = await _master.Companies.GetByCodeAsync(payload.CompanyCode, ct);
+            if (byCode is not null) return byCode;
+        }
+
+        return await _master.Companies.GetDefaultAsync(ct);
+    }
+
     private static ActivationInfoResponse Describe(CompanyInvitation invitation, Company? company)
     {
         var name = company?.Name;

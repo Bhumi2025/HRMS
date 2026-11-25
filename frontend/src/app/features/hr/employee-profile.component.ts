@@ -373,7 +373,7 @@ interface DocRow {
                     [type]="showContactPassword() ? 'text' : 'password'"
                     [value]="contact().password"
                     (input)="patchContact('password', $any($event.target).value)"
-                    placeholder="Password"
+                    [placeholder]="hasStoredPassword() && !contact().password ? 'Password set (re-enter to show/update)' : 'Password'"
                   />
                   <button
                     type="button"
@@ -1456,10 +1456,12 @@ export class EmployeeProfileComponent implements OnInit {
     });
     this.selectedDesignationId.set(employee.designationId ?? '');
 
+    this.hasStoredPassword.set(!!employee.password || !!employee.hasPassword);
+
     this.contact.set({
       phone: employee.phone ?? '',
       email: employee.email,
-      password: employee.password || 'Employee@123',
+      password: employee.password ?? '',
       emergency: employee.emergencyContactPhone
         ? (employee.emergencyContactName ? `${employee.emergencyContactName} (${employee.emergencyContactPhone})` : employee.emergencyContactPhone)
         : (employee.emergencyContactName ?? ''),
@@ -1812,6 +1814,8 @@ export class EmployeeProfileComponent implements OnInit {
   });
 
   protected readonly showContactPassword = signal(false);
+  protected readonly hasStoredPassword = signal(false);
+  protected readonly contactPasswordFocused = signal(false);
 
   protected readonly identity = signal({
     passportNo: '',

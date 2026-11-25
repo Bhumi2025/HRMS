@@ -45,3 +45,16 @@ public sealed record ActivationInfoResponse(
     string? CompanyCode,
     string? AdminEmail,
     string? Reason);
+
+public sealed record SetPasswordInfoResponse(
+    bool Valid,
+    string? CompanyName,
+    string? CompanyCode,
+    string? EmployeeCode,
+    string? EmployeeName,
+    string? Email,
+    string? Reason);
+
+public sealed record SetPasswordRequest(
+    [Required] string Token,
+    [Required, MinLength(6)] string NewPassword);

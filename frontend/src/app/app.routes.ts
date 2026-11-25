@@ -29,6 +29,14 @@ export const routes: Routes = [
       import('./features/auth/activate.component').then((m) => m.ActivateComponent),
   },
 
+  // Onboarded employee password setup from onboarding email (public, rendered without the app shell).
+  {
+    path: 'set-password',
+    title: 'Set Password',
+    loadComponent: () =>
+      import('./features/auth/set-password.component').then((m) => m.SetPasswordComponent),
+  },
+
   // Standalone first-run onboarding (rendered without the app shell).
   {
     path: 'me/onboarding',

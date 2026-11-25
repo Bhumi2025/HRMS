@@ -24,10 +24,14 @@ public interface ICompanyManagementService
     Task DeleteAsync(Guid id, CancellationToken ct = default);
 }
 
-/// <summary>Validates and consumes company admin account-activation invitations.</summary>
+/// <summary>Validates and consumes company admin activation invitations and employee set-password links.</summary>
 public interface IAccountActivationService
 {
     Task<ActivationInfoResponse> ValidateAsync(string token, CancellationToken ct = default);
 
     Task<LoginResponse> ActivateAsync(ActivateAccountRequest request, CancellationToken ct = default);
+
+    Task<SetPasswordInfoResponse> ValidateSetPasswordAsync(string token, CancellationToken ct = default);
+
+    Task<LoginResponse> SetPasswordAsync(SetPasswordRequest request, CancellationToken ct = default);
 }

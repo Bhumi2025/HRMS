@@ -38,7 +38,7 @@ public sealed class TenantConnectionFactory : ITenantConnectionFactory
         _defaultCatalog = new SqlConnectionStringBuilder(fallback).InitialCatalog;
         if (string.IsNullOrWhiteSpace(_defaultCatalog))
         {
-            _defaultCatalog = "HRMS";
+            _defaultCatalog = "HRMSNewDefault";
         }
 
         var options = configuration.GetSection(TenancyOptions.SectionName).Get<TenancyOptions>() ?? new TenancyOptions();

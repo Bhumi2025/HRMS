@@ -10,7 +10,7 @@ namespace Hrms.Infrastructure.Persistence;
 public sealed class HrmsDbContextFactory : IDesignTimeDbContextFactory<HrmsDbContext>
 {
     private const string DesignTimeConnection =
-        "Server=.\\SQLEXPRESS;Database=HRMS;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
+        "Server=.\\SQLEXPRESS;Database=HRMSNewDefault;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
 
     public HrmsDbContext CreateDbContext(string[] args)
     {

@@ -444,7 +444,7 @@ interface Employee {
             </div>
             <div class="form-group" style="grid-column: 1/-1">
               <label class="form-label">Basic Salary</label>
-              <input class="form-control" placeholder="$0.00" [value]="newEmp().salary" (input)="patchNew('salary', $any($event.target).value)" />
+              <input class="form-control" [placeholder]="currencyService.currencySymbol() + '0.00'" [value]="newEmp().salary" (input)="patchNew('salary', $any($event.target).value)" />
             </div>
           </div>
         </div>
@@ -1191,7 +1191,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
       transportAllowance: 0,
       mobileAllowance: 0,
       otherAllowances: 0,
-      currency: 'INR',
+      currency: this.currencyService.currencyCode(),
     };
 
     this.api.createEmployee(body).subscribe({

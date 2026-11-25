@@ -138,4 +138,23 @@ public sealed class AuthController : ControllerBase
         [FromBody] ActivateAccountRequest request,
         CancellationToken ct) =>
         Ok(await _activation.ActivateAsync(request, ct));
+
+    /// <summary>Validates an onboarded employee set-password token so the set-password screen can render.</summary>
+    [HttpGet("set-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(SetPasswordInfoResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<SetPasswordInfoResponse>> ValidateSetPassword(
+        [FromQuery] string token,
+        CancellationToken ct) =>
+        Ok(await _activation.ValidateSetPasswordAsync(token, ct));
+
+    /// <summary>Sets the onboarded employee's password from their email link token and signs them in.</summary>
+    [HttpPost("set-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<LoginResponse>> SetPassword(
+        [FromBody] SetPasswordRequest request,
+        CancellationToken ct) =>
+        Ok(await _activation.SetPasswordAsync(request, ct));
 }

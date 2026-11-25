@@ -15,32 +15,36 @@ public sealed class TenantNamingTests
     }
 
     [Fact]
-    public void GenerateDatabaseName_UsesPrefixAndIsSafe()
+    public void GenerateDatabaseName_UsesPascalPrefixWithoutUnderscores()
     {
-        var name = TenantNaming.GenerateDatabaseName("Acme Widgets", Guid.NewGuid(), _ => false);
+        var single = TenantNaming.GenerateDatabaseName("siddharth", Guid.NewGuid(), _ => false);
+        Assert.Equal("HRMSSiddharth", single);
 
-        Assert.StartsWith("hrms_t_", name);
+        var name = TenantNaming.GenerateDatabaseName("Acme Widgets", Guid.NewGuid(), _ => false);
+        Assert.Equal("HRMSAcmeWidgets", name);
+        Assert.StartsWith("HRMS", name);
         Assert.True(TenantNaming.IsValidDatabaseName(name));
+        Assert.DoesNotContain("_", name);
         Assert.DoesNotContain(" ", name);
-        Assert.Equal(name.ToLowerInvariant(), name);
     }
 
     [Fact]
-    public void GenerateDatabaseName_AppendsSuffixOnCollision()
+    public void GenerateDatabaseName_AppendsSuffixOnCollisionWithoutUnderscores()
     {
         var companyId = Guid.NewGuid();
 
-        var name = TenantNaming.GenerateDatabaseName("Acme", companyId, candidate => candidate == "hrms_t_acme");
+        var name = TenantNaming.GenerateDatabaseName("Acme", companyId, candidate => candidate == "HRMSAcme");
 
-        Assert.NotEqual("hrms_t_acme", name);
-        Assert.StartsWith("hrms_t_acme_", name);
+        Assert.NotEqual("HRMSAcme", name);
+        Assert.StartsWith("HRMSAcme", name);
+        Assert.DoesNotContain("_", name);
         Assert.True(TenantNaming.IsValidDatabaseName(name));
     }
 
     [Theory]
-    [InlineData("HRMS")]                    // the default database name (uppercase is allowed)
-    [InlineData("hrms_t_acme")]
-    [InlineData("a1_b2")]
+    [InlineData("HRMSDefault")]             // default database name
+    [InlineData("HRMSSiddharth")]
+    [InlineData("hrms_t_acme")]             // legacy tenant DB names remain valid
     public void IsValidDatabaseName_AcceptsSafeNames(string value)
     {
         Assert.True(TenantNaming.IsValidDatabaseName(value));

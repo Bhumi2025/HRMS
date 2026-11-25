@@ -23,9 +23,9 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
 
-        // The master registry lives in its own database on the same server unless configured.
+        // The master registry defaults to HRMSNewMaster on the same server unless configured.
         var masterConnection = configuration.GetConnectionString("MasterConnection")
-            ?? new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "HRMS_Master" }.ConnectionString;
+            ?? new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "HRMSNewMaster" }.ConnectionString;
 
         services.AddDbContext<HrmsMasterDbContext>(options =>
         {

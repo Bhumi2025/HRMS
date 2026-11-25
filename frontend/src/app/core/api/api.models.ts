@@ -114,6 +114,7 @@ export interface EmployeeDetail {
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
   password?: string | null;
+  hasPassword?: boolean;
 }
 
 export interface LeaveType {
@@ -1035,6 +1036,16 @@ export interface ActivationInfo {
   companyName?: string | null;
   companyCode?: string | null;
   adminEmail?: string | null;
+  reason?: string | null;
+}
+
+export interface SetPasswordInfo {
+  valid: boolean;
+  companyName?: string | null;
+  companyCode?: string | null;
+  employeeCode?: string | null;
+  employeeName?: string | null;
+  email?: string | null;
   reason?: string | null;
 }
 

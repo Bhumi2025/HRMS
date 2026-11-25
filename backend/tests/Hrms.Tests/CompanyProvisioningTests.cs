@@ -31,7 +31,8 @@ public sealed class CompanyProvisioningTests
         Assert.True(result.AdminCreated);
         Assert.Equal("Sent", result.InvitationStatus);
         Assert.False(string.IsNullOrWhiteSpace(result.ActivationUrl));
-        Assert.StartsWith("hrms_t_", result.DatabaseName);
+        Assert.Equal("HRMSAcmeWidgets", result.DatabaseName);
+        Assert.DoesNotContain("_", result.DatabaseName);
         Assert.Single(tenant.Databases);
         Assert.Single(tenant.Users);
         Assert.Single(email.Sent);

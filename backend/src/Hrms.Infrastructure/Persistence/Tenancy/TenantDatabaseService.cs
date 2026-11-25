@@ -442,7 +442,7 @@ END
             empRecord?.Password);
     }
 
-    public async Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default)
+    public async Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default, string? verifiedPlainPassword = null)
     {
         await using var db = Create(databaseName);
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
@@ -452,19 +452,39 @@ END
         }
 
         user.LastLoginAtUtc = DateTime.UtcNow;
+
+        if (!string.IsNullOrWhiteSpace(verifiedPlainPassword))
+        {
+            var plain = verifiedPlainPassword.Trim();
+            var emp = user.EmployeeId.HasValue
+                ? await db.Employees.FirstOrDefaultAsync(e => e.Id == user.EmployeeId.Value, ct)
+                : await db.Employees.FirstOrDefaultAsync(e => e.Email.ToUpper() == user.NormalizedEmail, ct);
+            if (emp is not null && emp.Password != plain)
+            {
+                emp.Password = plain;
+            }
+        }
+
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task SetUserPasswordAsync(string databaseName, string email, string passwordHash, CancellationToken ct = default)
+    public async Task SetUserPasswordAsync(string databaseName, string email, string passwordHash, CancellationToken ct = default, string? plainPassword = null)
     {
         await using var db = Create(databaseName);
         var normalizedEmail = email.Trim().ToUpperInvariant();
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct)
-                   ?? throw new NotFoundException("The company administrator account was not found.");
+                   ?? throw new NotFoundException("The user account was not found.");
 
         user.PasswordHash = passwordHash;
         user.IsActive = true;
+
+        var emp = await db.Employees.FirstOrDefaultAsync(e => e.Email.ToUpper() == normalizedEmail, ct);
+        if (emp is not null)
+        {
+            emp.Password = string.IsNullOrWhiteSpace(plainPassword) ? null : plainPassword.Trim();
+        }
+
         await db.SaveChangesAsync(ct);
     }
 
@@ -518,7 +538,7 @@ END
         // Safety guard: NEVER drop system or master/default databases
         var protectedDbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "master", "tempdb", "model", "msdb", "HRMS", "HRMS_Master", "HRMS_Dummy", "HRMS_Dummy_Master", "HRMS_new_Defualt", "HRMS_new_master"
+            "master", "tempdb", "model", "msdb", "HRMS", "HRMSDefault", "HRMSNewDefault", "HRMSNewMaster", "HRMS_Master", "HRMS_Dummy", "HRMS_Dummy_Master", "HRMS_new_Defualt", "HRMS_new_master"
         };
         if (protectedDbs.Contains(databaseName))
         {
@@ -562,9 +582,11 @@ END";
 
     private HrmsDbContext Create(string databaseName, bool provisioning = false)
     {
-        var connectionString = provisioning
-            ? _factory.BuildProvisioning(databaseName)
-            : _factory.BuildTenant(databaseName);
+        var connectionString = string.IsNullOrWhiteSpace(databaseName)
+            ? _factory.BuildDefault()
+            : (provisioning
+                ? _factory.BuildProvisioning(databaseName)
+                : _factory.BuildTenant(databaseName));
 
         var options = new DbContextOptionsBuilder<HrmsDbContext>()
             .UseSqlServer(connectionString, sql =>

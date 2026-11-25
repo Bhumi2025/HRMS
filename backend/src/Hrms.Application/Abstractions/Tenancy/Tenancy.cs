@@ -93,9 +93,9 @@ public interface ITenantDatabaseService
 
     Task<TenantUserRecord?> FindUserByEmailAsync(string databaseName, string email, CancellationToken ct = default);
 
-    Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default);
+    Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default, string? verifiedPlainPassword = null);
 
-    Task SetUserPasswordAsync(string databaseName, string email, string passwordHash, CancellationToken ct = default);
+    Task SetUserPasswordAsync(string databaseName, string email, string passwordHash, CancellationToken ct = default, string? plainPassword = null);
 
     Task<int> CountUsersAsync(string databaseName, CancellationToken ct = default);
 

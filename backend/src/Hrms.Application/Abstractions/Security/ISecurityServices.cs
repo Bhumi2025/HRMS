@@ -8,6 +8,10 @@ public interface IJwtTokenService
     AuthToken CreateToken(User user, string roleName, Guid? companyId = null, string? companyCode = null);
 
     AuthToken CreateToken(TokenSubject subject);
+
+    string CreateSetPasswordToken(SetPasswordTokenSubject subject, TimeSpan lifetime);
+
+    Task<SetPasswordTokenPayload?> ValidateSetPasswordTokenAsync(string token, CancellationToken ct = default);
 }
 
 public sealed record AuthToken(string AccessToken, DateTime ExpiresAtUtc);
@@ -22,6 +26,26 @@ public sealed record TokenSubject(
     Guid? EmployeeId,
     Guid? CompanyId,
     string? CompanyCode);
+
+public sealed record SetPasswordTokenSubject(
+    Guid UserId,
+    Guid EmployeeId,
+    string Email,
+    string EmployeeCode,
+    string EmployeeName,
+    Guid? CompanyId,
+    string? CompanyCode,
+    string CompanyName);
+
+public sealed record SetPasswordTokenPayload(
+    Guid UserId,
+    Guid EmployeeId,
+    string Email,
+    string EmployeeCode,
+    string EmployeeName,
+    Guid? CompanyId,
+    string? CompanyCode,
+    string CompanyName);
 
 /// <summary>Hashes and verifies passwords (implemented with ASP.NET Core Identity's hasher).</summary>
 public interface IPasswordHasher

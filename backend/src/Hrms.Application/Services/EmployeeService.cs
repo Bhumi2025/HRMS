@@ -1,10 +1,16 @@
+using System.Net;
+using System.Security.Cryptography;
+using Hrms.Application.Abstractions.Notifications;
 using Hrms.Application.Abstractions.Persistence;
 using Hrms.Application.Abstractions.Security;
 using Hrms.Application.Abstractions.Services;
+using Hrms.Application.Abstractions.Tenancy;
 using Hrms.Application.Common;
 using Hrms.Application.DTOs;
 using Hrms.Domain.Entities;
 using Hrms.Domain.Enums;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Hrms.Application.Services;
 
@@ -13,12 +19,30 @@ public sealed class EmployeeService : IEmployeeService
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUser _currentUser;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IEmailSender? _emailSender;
+    private readonly ITenantContext? _tenantContext;
+    private readonly ILogger<EmployeeService>? _logger;
+    private readonly IJwtTokenService? _tokenService;
+    private readonly AppOptions _appOptions;
 
-    public EmployeeService(IUnitOfWork uow, ICurrentUser currentUser, IPasswordHasher passwordHasher)
+    public EmployeeService(
+        IUnitOfWork uow,
+        ICurrentUser currentUser,
+        IPasswordHasher passwordHasher,
+        IEmailSender? emailSender = null,
+        ITenantContext? tenantContext = null,
+        ILogger<EmployeeService>? logger = null,
+        IJwtTokenService? tokenService = null,
+        IOptions<AppOptions>? appOptions = null)
     {
         _uow = uow;
         _currentUser = currentUser;
         _passwordHasher = passwordHasher;
+        _emailSender = emailSender;
+        _tenantContext = tenantContext;
+        _logger = logger;
+        _tokenService = tokenService;
+        _appOptions = appOptions?.Value ?? new AppOptions();
     }
 
     public async Task<PagedResult<EmployeeListItemDto>> SearchAsync(EmployeeQuery query, CancellationToken ct = default)
@@ -44,7 +68,9 @@ public sealed class EmployeeService : IEmployeeService
             roleName = role?.Name;
         }
 
-        return ToDetailDto(employee, roleCode, roleName);
+        var hasPassword = !string.IsNullOrWhiteSpace(employee.Password) || !string.IsNullOrWhiteSpace(linkedUser?.PasswordHash);
+
+        return ToDetailDto(employee, roleCode, roleName, hasPassword);
     }
 
     public async Task<EmployeeDetailDto> CreateAsync(CreateEmployeeRequest request, CancellationToken ct = default)
@@ -151,58 +177,66 @@ public sealed class EmployeeService : IEmployeeService
             Iban = string.IsNullOrWhiteSpace(request.Iban) ? request.IfscCode?.Trim() : request.Iban.Trim(),
             IfscCode = string.IsNullOrWhiteSpace(request.IfscCode) ? request.Iban?.Trim() : request.IfscCode.Trim(),
             PaymentMode = request.PaymentMode ?? PaymentMode.BankTransfer,
-            Password = !string.IsNullOrWhiteSpace(request.Password) ? request.Password.Trim() : "Employee@123",
+            Password = string.IsNullOrWhiteSpace(request.Password) ? null : request.Password.Trim(),
         };
 
         await _uow.Employees.AddAsync(employee, ct);
         await _uow.SaveChangesAsync(ct);
 
-        if (!string.IsNullOrWhiteSpace(request.Password))
+        var rawPassword = string.IsNullOrWhiteSpace(request.Password) ? null : request.Password.Trim();
+        var passwordToHash = rawPassword ?? Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+        var roles = await _uow.Roles.ListAsync(ct);
+        var reqCode = request.RoleCode?.Trim() ?? string.Empty;
+        var role = roles.FirstOrDefault(r => r.Code.Equals(reqCode, StringComparison.OrdinalIgnoreCase) || r.Name.Equals(reqCode, StringComparison.OrdinalIgnoreCase));
+
+        if (role is null && (request.JobTitle.Contains("HR", StringComparison.OrdinalIgnoreCase) || department.Name.Contains("HR", StringComparison.OrdinalIgnoreCase)))
         {
-            var roles = await _uow.Roles.ListAsync(ct);
-            var reqCode = request.RoleCode?.Trim() ?? string.Empty;
-            var role = roles.FirstOrDefault(r => r.Code.Equals(reqCode, StringComparison.OrdinalIgnoreCase) || r.Name.Equals(reqCode, StringComparison.OrdinalIgnoreCase));
-
-            if (role is null && (request.JobTitle.Contains("HR", StringComparison.OrdinalIgnoreCase) || department.Name.Contains("HR", StringComparison.OrdinalIgnoreCase)))
-            {
-                role = roles.FirstOrDefault(r => r.Code.Equals("HrManager", StringComparison.OrdinalIgnoreCase));
-            }
-
-            role ??= roles.FirstOrDefault(r => r.Code.Equals("Employee", StringComparison.OrdinalIgnoreCase)) ?? roles.First();
-
-            var existingUser = await _uow.Users.GetByEmailAsync(email, ct);
-            if (existingUser is not null)
-            {
-                existingUser.PasswordHash = _passwordHasher.Hash(request.Password);
-                existingUser.EmployeeId = employee.Id;
-                existingUser.RoleId = role.Id;
-                existingUser.IsActive = true;
-            }
-            else
-            {
-                var firstInitial = request.FirstName.Trim().Length > 0 ? request.FirstName.Trim()[0] : 'E';
-                var lastInitial = request.LastName.Trim().Length > 0 ? request.LastName.Trim()[0] : 'M';
-                var initials = $"{firstInitial}{lastInitial}".Trim().ToUpperInvariant();
-
-                var user = new User
-                {
-                    Email = email,
-                    NormalizedEmail = email.ToUpperInvariant(),
-                    PasswordHash = _passwordHasher.Hash(request.Password),
-                    FullName = $"{request.FirstName.Trim()} {request.LastName.Trim()}".Trim(),
-                    Initials = string.IsNullOrWhiteSpace(initials) ? "EM" : initials,
-                    RoleId = role.Id,
-                    EmployeeId = employee.Id,
-                    IsActive = true,
-                };
-                await _uow.Users.AddAsync(user, ct);
-                }
-
-                await _uow.SaveChangesAsync(ct);
-            }
-
-            return await GetAsync(employee.Id, ct);
+            role = roles.FirstOrDefault(r => r.Code.Equals("HrManager", StringComparison.OrdinalIgnoreCase));
         }
+
+        role ??= roles.FirstOrDefault(r => r.Code.Equals("Employee", StringComparison.OrdinalIgnoreCase)) ?? roles.First();
+
+        Guid linkedUserId;
+        var existingUser = await _uow.Users.GetByEmailAsync(email, ct);
+        if (existingUser is not null)
+        {
+            existingUser.PasswordHash = _passwordHasher.Hash(passwordToHash);
+            existingUser.EmployeeId = employee.Id;
+            existingUser.RoleId = role.Id;
+            existingUser.IsActive = true;
+            linkedUserId = existingUser.Id;
+        }
+        else
+        {
+            var firstInitial = request.FirstName.Trim().Length > 0 ? request.FirstName.Trim()[0] : 'E';
+            var lastInitial = request.LastName.Trim().Length > 0 ? request.LastName.Trim()[0] : 'M';
+            var initials = $"{firstInitial}{lastInitial}".Trim().ToUpperInvariant();
+
+            var user = new User
+            {
+                Email = email,
+                NormalizedEmail = email.ToUpperInvariant(),
+                PasswordHash = _passwordHasher.Hash(passwordToHash),
+                FullName = $"{request.FirstName.Trim()} {request.LastName.Trim()}".Trim(),
+                Initials = string.IsNullOrWhiteSpace(initials) ? "EM" : initials,
+                RoleId = role.Id,
+                EmployeeId = employee.Id,
+                IsActive = true,
+            };
+            await _uow.Users.AddAsync(user, ct);
+            linkedUserId = user.Id;
+        }
+
+        await _uow.SaveChangesAsync(ct);
+
+        if (request.SendWelcomeEmail)
+        {
+            await SendOnboardingWelcomeEmailAsync(employee, linkedUserId, ct);
+        }
+
+        return await GetAsync(employee.Id, ct);
+    }
 
         public async Task<EmployeeDetailDto> UpdateAsync(Guid id, UpdateEmployeeRequest request, CancellationToken ct = default)
         {
@@ -503,7 +537,7 @@ public sealed class EmployeeService : IEmployeeService
         e.IsFaceEnrolled,
         e.FacePhotoUrl);
 
-    private static EmployeeDetailDto ToDetailDto(Employee e, string? roleCode = null, string? roleName = null) => new(
+    private static EmployeeDetailDto ToDetailDto(Employee e, string? roleCode = null, string? roleName = null, bool hasPassword = false) => new(
         e.Id,
         e.EmployeeCode,
         e.Salutation,
@@ -561,8 +595,113 @@ public sealed class EmployeeService : IEmployeeService
         e.FacePhotoUrl,
         e.EmergencyContactName,
         e.EmergencyContactPhone,
-        e.Password ?? "Employee@123");
+        e.Password,
+        hasPassword || !string.IsNullOrWhiteSpace(e.Password));
 
     private static decimal Gross(Employee e) =>
         e.BasicSalary + e.HousingAllowance + e.TransportAllowance + e.MobileAllowance + e.OtherAllowances;
+
+    private async Task SendOnboardingWelcomeEmailAsync(Employee employee, Guid userId, CancellationToken ct)
+    {
+        if (_emailSender is null || string.IsNullOrWhiteSpace(employee.Email))
+        {
+            return;
+        }
+
+        try
+        {
+            var companySettings = await _uow.CompanySettings.FirstOrDefaultAsync(
+                _uow.CompanySettings.Query().OrderBy(c => c.CreatedAtUtc), ct);
+            var companyName = !string.IsNullOrWhiteSpace(companySettings?.CompanyName)
+                ? companySettings.CompanyName
+                : (!string.IsNullOrWhiteSpace(_tenantContext?.Tenant?.Name) ? _tenantContext.Tenant.Name : "HRMS Portal");
+
+            var employeeName = string.Join(" ", new[] { employee.FirstName, employee.MiddleName, employee.LastName }
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+
+            var expiryHours = _appOptions.InvitationExpiryHours > 0 ? _appOptions.InvitationExpiryHours : 72;
+            var baseUrl = string.IsNullOrWhiteSpace(_appOptions.FrontendBaseUrl)
+                ? "http://localhost:4200"
+                : _appOptions.FrontendBaseUrl.TrimEnd('/');
+
+            var token = _tokenService?.CreateSetPasswordToken(
+                new SetPasswordTokenSubject(
+                    userId,
+                    employee.Id,
+                    employee.Email,
+                    employee.EmployeeCode,
+                    employeeName,
+                    _tenantContext?.CompanyId,
+                    _tenantContext?.Tenant?.Code,
+                    companyName),
+                TimeSpan.FromHours(expiryHours)) ?? string.Empty;
+
+            var setPasswordUrl = string.IsNullOrEmpty(token)
+                ? $"{baseUrl}/set-password"
+                : $"{baseUrl}/set-password?token={Uri.EscapeDataString(token)}";
+
+            var safeCompany = WebUtility.HtmlEncode(companyName);
+            var safeCode = WebUtility.HtmlEncode(employee.EmployeeCode);
+            var safeName = WebUtility.HtmlEncode(employeeName);
+            var safeEmail = WebUtility.HtmlEncode(employee.Email);
+            var safeUrl = WebUtility.HtmlEncode(setPasswordUrl);
+
+            var htmlBody = $"""
+                <div style="font-family: Arial, Helvetica, sans-serif; color: #1e293b; max-width: 560px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;">
+                  <div style="background: #1e40af; color: #ffffff; padding: 18px 24px;">
+                    <h2 style="margin: 0; font-size: 18px;">Welcome to {safeCompany}</h2>
+                  </div>
+                  <div style="padding: 20px 24px; background: #ffffff;">
+                    <p style="margin: 0 0 16px; font-size: 14px;">Hello <strong>{safeName}</strong>, your onboarding is complete. Here are your account details:</p>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 22px;">
+                      <tr>
+                        <td style="padding: 8px 12px; border: 1px solid #e2e8f0; background: #f8fafc; font-weight: 600; width: 40%;">Company Name</td>
+                        <td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{safeCompany}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 12px; border: 1px solid #e2e8f0; background: #f8fafc; font-weight: 600;">Employee Code</td>
+                        <td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{safeCode}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 12px; border: 1px solid #e2e8f0; background: #f8fafc; font-weight: 600;">Employee Name</td>
+                        <td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{safeName}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 12px; border: 1px solid #e2e8f0; background: #f8fafc; font-weight: 600;">Email</td>
+                        <td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{safeEmail}</td>
+                      </tr>
+                    </table>
+                    <div style="text-align: center; margin-top: 8px;">
+                      <a href="{safeUrl}" style="display: inline-block; padding: 12px 28px; background: #1e40af; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px;">Set Password</a>
+                    </div>
+                  </div>
+                </div>
+                """;
+
+            var textBody =
+                $"Welcome to {companyName}\n\n" +
+                $"Company Name: {companyName}\n" +
+                $"Employee Code: {employee.EmployeeCode}\n" +
+                $"Employee Name: {employeeName}\n" +
+                $"Email: {employee.Email}\n\n" +
+                $"Set Password: {setPasswordUrl}";
+
+            var result = await _emailSender.SendAsync(
+                new EmailMessage(
+                    employee.Email,
+                    $"Welcome to {companyName} - Onboarding Details",
+                    htmlBody,
+                    textBody),
+                ct);
+
+            if (!result.Delivered && !result.Simulated)
+            {
+                _logger?.LogWarning("Onboarding email delivery failed for {EmployeeCode}: {Error}", employee.EmployeeCode, result.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Unexpected error sending onboarding email for {EmployeeCode}.", employee.EmployeeCode);
+        }
+    }
 }
