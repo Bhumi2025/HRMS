@@ -686,22 +686,53 @@ public sealed class DashboardService : IDashboardService
         // Fetch real pending leave requests
         var (pendingLeaves, _) = await _uow.LeaveRequests.SearchAsync(null, LeaveStatus.Pending, 1, count, ct);
 
-        var list = new List<PendingApprovalDto>();
-        list.AddRange(pendingApprovals.Select(a => new PendingApprovalDto(
-            a.Id,
-            a.EmployeeName is null ? "—" : a.EmployeeName.Trim(),
-            a.Title,
-            a.Details,
-            a.Priority)));
+        // Fetch real pending regularization requests
+        var pendingRegs = await _uow.Regularizations.ToListAsync(
+            _uow.Regularizations.Query()
+                .Where(r => r.Status == ApprovalStatus.Pending)
+                .OrderByDescending(r => r.SubmittedAtUtc)
+                .Take(count)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.Date,
+                    r.InTime,
+                    r.OutTime,
+                    r.Reason,
+                    EmployeeName = r.Employee != null ? r.Employee.FirstName + " " + r.Employee.LastName : null,
+                    r.SubmittedAtUtc,
+                }),
+            ct);
 
-        list.AddRange(pendingLeaves.Select(l => new PendingApprovalDto(
-            l.Id,
-            l.Employee != null ? $"{l.Employee.FirstName} {l.Employee.LastName}".Trim() : "—",
-            l.LeaveType?.Name ?? "Leave Request",
-            $"{l.Days} day(s) · {l.FromDate:dd/MM} - {l.ToDate:dd/MM}",
-            "Medium")));
+        var list = new List<(DateTime submitted, PendingApprovalDto dto)>();
+        list.AddRange(pendingApprovals.Select(a => (
+            a.SubmittedAtUtc,
+            new PendingApprovalDto(
+                a.Id,
+                a.EmployeeName is null ? "—" : a.EmployeeName.Trim(),
+                a.Title,
+                a.Details,
+                a.Priority))));
 
-        return list.Take(count).ToList();
+        list.AddRange(pendingLeaves.Select(l => (
+            l.SubmittedAtUtc,
+            new PendingApprovalDto(
+                l.Id,
+                l.Employee != null ? $"{l.Employee.FirstName} {l.Employee.LastName}".Trim() : "—",
+                l.LeaveType?.Name ?? "Leave Request",
+                $"{l.Days} day(s) · {l.FromDate:dd/MM} - {l.ToDate:dd/MM}",
+                "Medium"))));
+
+        list.AddRange(pendingRegs.Select(r => (
+            r.SubmittedAtUtc,
+            new PendingApprovalDto(
+                r.Id,
+                r.EmployeeName is null ? "—" : r.EmployeeName.Trim(),
+                "Attendance Regularization",
+                $"{r.Date:dd/MM} ({r.InTime:hh\\:mm} - {r.OutTime:hh\\:mm}) · {r.Reason}",
+                "Medium"))));
+
+        return list.OrderByDescending(x => x.submitted).Select(x => x.dto).Take(count).ToList();
     }
 
     public async Task<IReadOnlyList<RecentLeaveDto>> GetRecentLeavesAsync(int take, CancellationToken ct = default)

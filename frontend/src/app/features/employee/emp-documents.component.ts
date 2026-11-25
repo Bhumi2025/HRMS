@@ -35,21 +35,21 @@ interface CompanyDoc {
   selector: 'app-emp-documents',
   imports: [CommonModule, IconDirective, SelectComponent],
   template: `
-    <div class="flex justify-end items-center" style="margin-bottom: 15px">
+    <div class="flex justify-end items-center top-bar" style="margin-bottom: 15px">
       <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="openUploadModal()">
         <span [appIcon]="'upload2'"></span> Upload
       </button>
     </div>
 
-    <div style="margin-bottom: 14px">
-      <div class="tabs mb-4">
+    <div class="emp-docs-container">
+      <div class="tabs mb-4 flex-shrink-0">
         <button class="tab-btn" [class.active]="tab() === 'my'" (click)="tab.set('my')">My Documents</button>
         <button class="tab-btn" [class.active]="tab() === 'company'" (click)="tab.set('company')">Company Documents</button>
       </div>
 
       @if (tab() === 'my') {
-        <div class="card">
-          <div class="table-wrap">
+        <div class="card emp-docs-card">
+          <div class="table-wrap emp-docs-table-wrap">
             <table>
               <thead>
                 <tr>
@@ -92,8 +92,8 @@ interface CompanyDoc {
       }
 
       @if (tab() === 'company') {
-        <div class="card">
-          <div class="card-body">
+        <div class="card emp-docs-card">
+          <div class="card-body emp-company-docs-scroll">
             @for (d of companyDocs(); track d.name) {
               <div style="display: flex; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border)">
                 <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--p-soft); display: flex; align-items: center; justify-content: center; color: var(--p)">
@@ -224,6 +224,96 @@ interface CompanyDoc {
   `,
   styles: [
     `
+      :host {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        height: calc(100vh - var(--header-h, 52px) - 32px);
+        max-height: calc(100vh - var(--header-h, 52px) - 32px);
+        min-height: 0;
+        overflow: hidden;
+        box-sizing: border-box;
+        width: 100%;
+      }
+
+      .top-bar {
+        flex-shrink: 0;
+      }
+
+      .emp-docs-container {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .emp-docs-card {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin-bottom: 0;
+      }
+
+      .emp-docs-table-wrap {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: auto;
+      }
+
+      .emp-docs-table-wrap::-webkit-scrollbar,
+      .emp-company-docs-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .emp-docs-table-wrap::-webkit-scrollbar-track,
+      .emp-company-docs-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .emp-docs-table-wrap::-webkit-scrollbar-thumb,
+      .emp-company-docs-scroll::-webkit-scrollbar-thumb {
+        background: var(--border, #cbd5e1);
+        border-radius: 4px;
+      }
+      .emp-docs-table-wrap::-webkit-scrollbar-thumb:hover,
+      .emp-company-docs-scroll::-webkit-scrollbar-thumb:hover {
+        background: var(--muted, #94a3b8);
+      }
+
+      .emp-docs-table-wrap thead th {
+        position: sticky;
+        top: 0;
+        background: var(--surface);
+        z-index: 2;
+        white-space: nowrap;
+      }
+
+      .emp-company-docs-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+      }
+
+      @media (max-width: 1024px) {
+        :host {
+          height: auto !important;
+          max-height: none !important;
+          overflow: visible !important;
+        }
+        .emp-docs-card {
+          height: auto !important;
+          overflow: visible !important;
+        }
+        .emp-docs-table-wrap,
+        .emp-company-docs-scroll {
+          max-height: 520px;
+          overflow-y: auto;
+        }
+      }
+
       @media (max-width: 480px) {
         .col-hide {
           display: none;

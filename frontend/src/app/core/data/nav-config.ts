@@ -12,7 +12,6 @@ const hrModules = (approvalBadge?: string): NavSection => ({
   items: [
     { icon: 'company', label: 'Company', path: '/company' },
     { icon: 'employees', label: 'Employees', path: '/employees' },
-    { icon: 'camera', label: 'Punch In/Out', path: '/punch-in-out' },
     { icon: 'user', label: 'Profile', path: '/employee-profile' },
     { icon: 'clock', label: 'Shift', path: '/shift' },
     { icon: 'attendance', label: 'Attendance', path: '/attendance' },
@@ -28,7 +27,7 @@ const hrModules = (approvalBadge?: string): NavSection => ({
   ],
 });
 
-/** Sidebar navigation per role — dynamically filtered by PermissionService. */
+/** Sidebar navigation per role â€” dynamically filtered by PermissionService. */
 export const NAV_CONFIG: Record<Role, NavSection[]> = {
   'Super Admin': [
     {
@@ -86,7 +85,7 @@ export const NAV_CONFIG: Record<Role, NavSection[]> = {
   ],
 };
 
-/** Where each role lands after signing in — mirrors the map in index.html's `go()`. */
+/** Where each role lands after signing in â€” mirrors the map in index.html's `go()`. */
 export const ROLE_LANDING: Record<Role, string> = {
   'Super Admin': '/dashboard',
   'Company Admin': '/dashboard',
@@ -94,3 +93,4 @@ export const ROLE_LANDING: Record<Role, string> = {
   Manager: '/dashboard',
   Employee: '/me/dashboard',
 };
+

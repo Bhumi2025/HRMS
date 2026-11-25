@@ -46,6 +46,14 @@ export const routes: Routes = [
       import('./features/attendance/kiosk.component').then((m) => m.KioskComponent),
   },
 
+  // Standalone Public QR Attendance Punch Page (No authentication required)
+  {
+    path: 'punch',
+    title: 'Attendance Punch',
+    loadComponent: () =>
+      import('./features/attendance/public-punch.component').then((m) => m.PublicPunchComponent),
+  },
+
   {
     path: '',
     pathMatch: 'full',
@@ -83,13 +91,6 @@ export const routes: Routes = [
         data: { title: 'Employees' },
         canActivate: [nonEmployeeGuard],
         loadComponent: () => import('./features/hr/employees.component').then((m) => m.EmployeesComponent),
-      },
-      {
-        path: 'punch-in-out',
-        data: { title: 'Punch-In / Punch-Out' },
-        canActivate: [nonEmployeeGuard],
-        loadComponent: () =>
-          import('./features/hr/punch-in-out.component').then((m) => m.PunchInOutComponent),
       },
       {
         path: 'employee-profile',
@@ -285,3 +286,4 @@ export const routes: Routes = [
   },
   { path: '**', redirectTo: 'login' },
 ];
+

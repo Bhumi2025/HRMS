@@ -44,7 +44,7 @@ interface DocumentRow {
       }
     </div>
 
-    <div class="card">
+    <div class="card docs-card">
       <div class="card-header">
         <div class="card-title">All Documents</div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap">
@@ -53,7 +53,7 @@ interface DocumentRow {
           <app-select [options]="statusOptions" [value]="status()" (valueChange)="status.set($event)" width="120px" />
         </div>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap docs-table-wrap">
         <table class="docs-table">
           <thead>
             <tr>
@@ -237,12 +237,92 @@ interface DocumentRow {
   `,
   styles: [
     `
+      :host {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        height: calc(100vh - var(--header-h, 52px) - 32px);
+        max-height: calc(100vh - var(--header-h, 52px) - 32px);
+        min-height: 0;
+        overflow: hidden;
+        box-sizing: border-box;
+        width: 100%;
+      }
+
+      .page-header-row {
+        flex-shrink: 0;
+      }
+
+      .grid-4 {
+        flex-shrink: 0;
+      }
+
+      .docs-card {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin-bottom: 0;
+      }
+
+      .docs-card .card-header {
+        flex-shrink: 0;
+      }
+
+      .docs-table-wrap {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: auto;
+      }
+
+      .docs-table-wrap::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .docs-table-wrap::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .docs-table-wrap::-webkit-scrollbar-thumb {
+        background: var(--border, #cbd5e1);
+        border-radius: 4px;
+      }
+      .docs-table-wrap::-webkit-scrollbar-thumb:hover {
+        background: var(--muted, #94a3b8);
+      }
+
+      .docs-table-wrap thead th {
+        position: sticky;
+        top: 0;
+        background: var(--surface);
+        z-index: 2;
+        white-space: nowrap;
+      }
+
       thead th,
       .docs-table td,
       .docs-table .table-avatar span,
       .docs-table .badge {
         white-space: nowrap;
       }
+
+      @media (max-width: 1024px) {
+        :host {
+          height: auto !important;
+          max-height: none !important;
+          overflow: visible !important;
+        }
+        .docs-card {
+          height: auto !important;
+          overflow: visible !important;
+        }
+        .docs-table-wrap {
+          max-height: 520px;
+          overflow-y: auto;
+        }
+      }
+
       @media (max-width: 768px) {
         .docs-table th:nth-child(3),
         .docs-table td:nth-child(3),

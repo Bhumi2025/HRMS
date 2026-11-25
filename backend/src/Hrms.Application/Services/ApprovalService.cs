@@ -12,11 +12,13 @@ public sealed class ApprovalService : IApprovalService
 {
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUser _currentUser;
+    private readonly IAttendanceService _attendance;
 
-    public ApprovalService(IUnitOfWork uow, ICurrentUser currentUser)
+    public ApprovalService(IUnitOfWork uow, ICurrentUser currentUser, IAttendanceService attendance)
     {
         _uow = uow;
         _currentUser = currentUser;
+        _attendance = attendance;
     }
 
     public async Task<ApprovalSummaryDto> GetSummaryAsync(CancellationToken ct = default)
@@ -59,15 +61,23 @@ public sealed class ApprovalService : IApprovalService
             return leaves.Select(ToDto).ToList();
         }
 
+        if (type == ApprovalType.Regularization)
+        {
+            var regQuery = _uow.Regularizations.Query();
+            if (status.HasValue) regQuery = regQuery.Where(r => r.Status == status.Value);
+            var regList = await _uow.Regularizations.ToListAsync(regQuery.OrderByDescending(r => r.SubmittedAtUtc), ct);
+            return regList.Select(ToDto).ToList();
+        }
+
         if (type != null)
         {
             var items = await _uow.Approvals.ListWithEmployeeAsync(status, type, ct);
             return items.Where(a => a.Type != ApprovalType.Leave).Select(ToDto).ToList();
         }
 
-        // type is null -> all approvals (combine non-leave Approvals + LeaveRequests)
+        // type is null -> all approvals (combine non-leave Approvals + LeaveRequests + Regularizations)
         var approvalItems = await _uow.Approvals.ListWithEmployeeAsync(status, null, ct);
-        result.AddRange(approvalItems.Where(a => a.Type != ApprovalType.Leave).Select(ToDto));
+        result.AddRange(approvalItems.Where(a => a.Type != ApprovalType.Leave && a.Type != ApprovalType.Regularization).Select(ToDto));
 
         var mappedLeaveStatus = status switch
         {
@@ -78,6 +88,11 @@ public sealed class ApprovalService : IApprovalService
         };
         var (allLeaves, _) = await _uow.LeaveRequests.SearchAsync(null, mappedLeaveStatus, 1, 100, ct);
         result.AddRange(allLeaves.Select(ToDto));
+
+        var allRegQuery = _uow.Regularizations.Query();
+        if (status.HasValue) allRegQuery = allRegQuery.Where(r => r.Status == status.Value);
+        var allRegs = await _uow.Regularizations.ToListAsync(allRegQuery.OrderByDescending(r => r.SubmittedAtUtc), ct);
+        result.AddRange(allRegs.Select(ToDto));
 
         return result.OrderByDescending(x => x.SubmittedAtUtc).ToList();
     }
@@ -161,6 +176,13 @@ public sealed class ApprovalService : IApprovalService
 
             await _uow.SaveChangesAsync(ct);
             return ToDto(leave);
+        }
+
+        var reg = await _uow.Regularizations.GetWithEmployeeAsync(id, ct);
+        if (reg != null)
+        {
+            var decided = await _attendance.DecideRegularizationAsync(id, approved, ct);
+            return ToDto(reg, decided.Status);
         }
 
         var approval = await _uow.Approvals.GetWithEmployeeAsync(id, ct)
@@ -249,7 +271,15 @@ public sealed class ApprovalService : IApprovalService
             }, ct);
         }
 
-        var total = pendingApprovals.Count(a => a.Type != ApprovalType.Leave) + pendingLeaves.Count;
+        var pendingRegs = await _uow.Regularizations.ToListAsync(
+            _uow.Regularizations.Query().Where(r => r.Status == ApprovalStatus.Pending),
+            ct);
+        foreach (var regItem in pendingRegs)
+        {
+            await _attendance.DecideRegularizationAsync(regItem.Id, true, ct);
+        }
+
+        var total = pendingApprovals.Count(a => a.Type != ApprovalType.Leave) + pendingLeaves.Count + pendingRegs.Count;
         if (total > 0)
         {
             await _uow.SaveChangesAsync(ct);
@@ -305,5 +335,25 @@ public sealed class ApprovalService : IApprovalService
             Formatting.Relative(l.SubmittedAtUtc),
             "Medium",
             l.Status.ToString());
+    }
+
+    private static ApprovalDto ToDto(RegularizationRequest r) => ToDto(r, null);
+
+    private static ApprovalDto ToDto(RegularizationRequest r, string? overrideStatus)
+    {
+        var name = r.Employee is null ? "—" : $"{r.Employee.FirstName} {r.Employee.LastName}".Trim();
+        var details = $"{r.Date:dd/MM/yyyy} ({r.InTime:hh\\:mm} - {r.OutTime:hh\\:mm}) · {r.Reason}";
+        return new ApprovalDto(
+            r.Id,
+            r.EmployeeId,
+            name,
+            Formatting.Initials(name),
+            "Regularization",
+            "Attendance Regularization",
+            details,
+            r.SubmittedAtUtc,
+            Formatting.Relative(r.SubmittedAtUtc),
+            "Medium",
+            overrideStatus ?? r.Status.ToString());
     }
 }

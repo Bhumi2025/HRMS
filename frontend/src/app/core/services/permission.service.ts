@@ -159,7 +159,7 @@ export class PermissionService {
   hasModuleAccess(moduleName: string): boolean {
     const role = this.session.activeRole();
     const key = this.normKey(moduleName);
-    if (role === 'Employee' && (key === 'punch in/out' || (moduleName || '').toLowerCase().includes('punch'))) {
+    if (key === 'punch in/out' || (moduleName || '').toLowerCase().includes('punch')) {
       return false;
     }
     if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
