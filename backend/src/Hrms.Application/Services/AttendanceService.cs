@@ -1646,7 +1646,11 @@ public sealed class AttendanceService : IAttendanceService
                 PunchType = punchType,
                 Note = note,
                 Device = deviceName,
-                IsOpen = (punchType != PunchType.ClockOut)
+                IsOpen = (punchType != PunchType.ClockOut),
+                Latitude = entry.Item.Latitude,
+                Longitude = entry.Item.Longitude,
+                DistanceMeters = entry.Item.DistanceMeters,
+                VerificationStatus = entry.Item.VerificationStatus
             };
             await _uow.Punches.AddAsync(punch, ct);
             if (punch.IsOpen)
@@ -1820,6 +1824,50 @@ public sealed class AttendanceService : IAttendanceService
             );
         }
 
+        const double OfficeLatitude = 21.2385574033792;
+        const double OfficeLongitude = 72.89013466219234;
+        const double AllowedRadiusMeters = 100.0;
+
+        double? validatedLat = request.Latitude;
+        double? validatedLon = request.Longitude;
+        double? validatedDistance = null;
+        string? verificationStatus = null;
+
+        var isQrTerminal = string.Equals(request.Device, "QR Attendance Terminal", StringComparison.OrdinalIgnoreCase);
+
+        if (validatedLat.HasValue && validatedLon.HasValue)
+        {
+            var dist = CalculateHaversineDistance(validatedLat.Value, validatedLon.Value, OfficeLatitude, OfficeLongitude);
+            if (dist > AllowedRadiusMeters)
+            {
+                return new FacePunchResultDto(
+                    Success: false,
+                    EmployeeId: employee.Id,
+                    EmployeeCode: employee.EmployeeCode,
+                    EmployeeName: employee.FullName,
+                    PunchType: request.PunchType ?? "ClockIn",
+                    PunchTime: DateTime.UtcNow,
+                    Status: "OutsideGeofence",
+                    Message: $"Outside allowed office zone ({dist:F0}m away). Please move within {AllowedRadiusMeters:F0}m of the office to punch."
+                );
+            }
+            validatedDistance = Math.Round(dist, 1);
+            verificationStatus = "Face & Geofence (100m) Verified";
+        }
+        else if (isQrTerminal)
+        {
+            return new FacePunchResultDto(
+                Success: false,
+                EmployeeId: employee.Id,
+                EmployeeCode: employee.EmployeeCode,
+                EmployeeName: employee.FullName,
+                PunchType: request.PunchType ?? "ClockIn",
+                PunchTime: DateTime.UtcNow,
+                Status: "LocationRequired",
+                Message: $"Location access is required. Please enable GPS and move within {AllowedRadiusMeters:F0}m of the office to punch."
+            );
+        }
+
         var confidencePct = request.Confidence.HasValue ? $"{(int)(request.Confidence.Value * 100)}%" : "verified";
         var deviceName = !string.IsNullOrWhiteSpace(request.Device) ? request.Device : "Face Attendance Kiosk";
 
@@ -1833,7 +1881,13 @@ public sealed class AttendanceService : IAttendanceService
                     PunchTime: DateTime.UtcNow,
                     PunchType: request.PunchType,
                     DeviceName: deviceName,
-                    Note: $"Face Recognition scan ({confidencePct} match)"
+                    Note: validatedDistance.HasValue
+                        ? $"Face scan ({confidencePct} match | GPS Dist: {validatedDistance.Value:F1}m)"
+                        : $"Face Recognition scan ({confidencePct} match)",
+                    Latitude: validatedLat,
+                    Longitude: validatedLon,
+                    DistanceMeters: validatedDistance,
+                    VerificationStatus: verificationStatus
                 )
             }
         );
