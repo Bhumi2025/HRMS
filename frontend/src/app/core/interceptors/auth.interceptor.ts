@@ -13,7 +13,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const companyId = session.user()?.companyId;
 
   const setHeaders: Record<string, string> = {};
-  if (token) {
+  if (token && !request.headers.has('Authorization')) {
     setHeaders['Authorization'] = `Bearer ${token}`;
   }
   const isPlatformOrSelfAuth = request.url.includes('/auth/change-password') ||

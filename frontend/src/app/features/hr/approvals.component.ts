@@ -403,8 +403,9 @@ export class ApprovalsComponent implements OnInit {
   }
 
   protected readonly kpis = computed(() => {
+    const nonRegCount = this.allData().filter((r) => r.type !== 'reg').length;
     const base = [
-      { l: 'Total Pending', v: `${this.allData().length + (this.canReg() ? this.regData().length : 0)}`, c: '#F59E0B' },
+      { l: 'Total Pending', v: `${nonRegCount + (this.canReg() ? this.regData().length : 0)}`, c: '#F59E0B' },
       { l: 'Leave Requests', v: `${this.leaveData().length}`, c: '#2563eb' },
       { l: 'Overtime', v: `${this.overtimeData().length}`, c: '#0D9488' },
     ];
@@ -414,7 +415,7 @@ export class ApprovalsComponent implements OnInit {
 
   /** Leave and overtime from ApprovalRequests, plus pending regularizations. */
   protected readonly combined = computed(() =>
-    this.canReg() ? [...this.allData(), ...this.regData()] : [...this.allData()],
+    this.canReg() ? [...this.allData().filter((r) => r.type !== 'reg'), ...this.regData()] : [...this.allData()],
   );
 
   protected readonly currentRows = computed(() => {

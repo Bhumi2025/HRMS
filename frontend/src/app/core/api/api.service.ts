@@ -744,12 +744,12 @@ export class ApiService {
     });
   }
 
-  enrolledFaces(token?: string): Observable<EnrolledFace[]> {
-    return this.http.get<EnrolledFace[]>(this.url('/attendance/enrolled-faces'), this.withToken(token));
+  enrolledFaces(token?: string, companyCode?: string): Observable<EnrolledFace[]> {
+    return this.http.get<EnrolledFace[]>(this.url('/attendance/enrolled-faces'), this.withToken(token, companyCode));
   }
 
-  facePunch(payload: FacePunchRequest, token?: string): Observable<FacePunchResult> {
-    return this.http.post<FacePunchResult>(this.url('/attendance/face-punch'), payload, this.withToken(token));
+  facePunch(payload: FacePunchRequest, token?: string, companyCode?: string): Observable<FacePunchResult> {
+    return this.http.post<FacePunchResult>(this.url('/attendance/face-punch'), payload, this.withToken(token, companyCode));
   }
 
   centralizedPunch(payload: CentralizedPunchRequest): Observable<CentralizedPunchResult> {
@@ -771,9 +771,12 @@ export class ApiService {
     );
   }
 
-  /** Adds an explicit bearer token (used before the session is established at login). */
-  private withToken(token?: string): { headers?: Record<string, string> } {
-    return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  /** Adds an explicit bearer token and/or tenant code (used before or without a session). */
+  private withToken(token?: string, companyCode?: string): { headers?: Record<string, string> } {
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (companyCode) headers['X-Company-Code'] = companyCode;
+    return Object.keys(headers).length > 0 ? { headers } : {};
   }
 
   dashboardTemplateData(employeeId?: string): Observable<DashboardTemplateData> {
