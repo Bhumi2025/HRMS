@@ -59,6 +59,8 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Empl
     ALTER TABLE Employees ADD EmergencyContactName NVARCHAR(200) NULL;
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Employees' AND COLUMN_NAME = 'EmergencyContactPhone')
     ALTER TABLE Employees ADD EmergencyContactPhone NVARCHAR(50) NULL;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Employees' AND COLUMN_NAME = 'Password')
+    ALTER TABLE Employees ADD Password NVARCHAR(256) NULL;
 
 -- 5. Ensure KeyGroups.IsGeneric and KeyStores.SubValue / DisplayOrder / IsActive
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'KeyGroups' AND COLUMN_NAME = 'IsGeneric')
@@ -237,6 +239,8 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
         await EnsureShiftTemplatesSeededAsync(tenant, logger, ct);
         await EnsureHolidayTemplatesSeededAsync(tenant, logger, ct);
         await EnsureNavigationItemsSeededAsync(tenant, logger, ct);
+        await EnsureDefaultSystemUsersAsync(tenant, hasher, logger, ct);
+        await EnsureEmployeeUsersSynchronizedAsync(tenant, hasher, logger, ct);
 
         // In production, ensure initial SuperAdmin user if configured via environment
         if (isProduction)
@@ -292,6 +296,8 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
                         await EnsureShiftTemplatesSeededAsync(tenantDb, logger, ct);
                         await EnsureHolidayTemplatesSeededAsync(tenantDb, logger, ct);
                         await EnsureNavigationItemsSeededAsync(tenantDb, logger, ct);
+                        await EnsureDefaultSystemUsersAsync(tenantDb, hasher, logger, ct);
+                        await EnsureEmployeeUsersSynchronizedAsync(tenantDb, hasher, logger, ct);
                         logger.LogInformation("Successfully updated schema on existing tenant database '{DatabaseName}'", company.DatabaseName);
                     }
                 }
@@ -614,6 +620,285 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to run punch and tenant settings migration for tenant '{CompanyCode}' ({DatabaseName})", companyCode, databaseName);
+        }
+    }
+
+    private static async Task EnsureDefaultSystemUsersAsync(
+        HrmsDbContext db,
+        IPasswordHasher hasher,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var superAdminRole = await db.Roles.FirstOrDefaultAsync(r => r.Code == "SuperAdmin", ct);
+            var companyAdminRole = await db.Roles.FirstOrDefaultAsync(r => r.Code == "CompanyAdmin", ct);
+            var hrRole = await db.Roles.FirstOrDefaultAsync(r => r.Code == "HrManager", ct);
+
+            // 1. Ensure SuperAdmin: admin@hrnexus.com / Admin@123
+            if (superAdminRole != null)
+            {
+                var admin = await db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == "ADMIN@HRNEXUS.COM", ct);
+                if (admin == null)
+                {
+                    admin = new User
+                    {
+                        Email = "admin@hrnexus.com",
+                        NormalizedEmail = "ADMIN@HRNEXUS.COM",
+                        FullName = "Alex Johnson",
+                        Initials = "SA",
+                        RoleId = superAdminRole.Id,
+                        IsActive = true,
+                        PasswordHash = hasher.Hash("Admin@123")
+                    };
+                    db.Users.Add(admin);
+                }
+                else
+                {
+                    admin.IsActive = true;
+                    admin.RoleId = superAdminRole.Id;
+                    if (!hasher.Verify("Admin@123", admin.PasswordHash))
+                    {
+                        admin.PasswordHash = hasher.Hash("Admin@123");
+                    }
+                }
+            }
+
+            // 2. Ensure CompanyAdmin: companyadmin@hrnexus.com / Admin@123
+            if (companyAdminRole != null)
+            {
+                var ca = await db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == "COMPANYADMIN@HRNEXUS.COM", ct);
+                if (ca == null)
+                {
+                    ca = new User
+                    {
+                        Email = "companyadmin@hrnexus.com",
+                        NormalizedEmail = "COMPANYADMIN@HRNEXUS.COM",
+                        FullName = "David Vance",
+                        Initials = "CA",
+                        RoleId = companyAdminRole.Id,
+                        IsActive = true,
+                        PasswordHash = hasher.Hash("Admin@123")
+                    };
+                    db.Users.Add(ca);
+                }
+                else
+                {
+                    ca.IsActive = true;
+                    ca.RoleId = companyAdminRole.Id;
+                    if (!hasher.Verify("Admin@123", ca.PasswordHash))
+                    {
+                        ca.PasswordHash = hasher.Hash("Admin@123");
+                    }
+                }
+            }
+
+            // 3. Ensure HR Manager: hr@hrnexus.com / Hr@12345
+            if (hrRole != null)
+            {
+                var hr = await db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == "HR@HRNEXUS.COM", ct);
+                if (hr == null)
+                {
+                    hr = new User
+                    {
+                        Email = "hr@hrnexus.com",
+                        NormalizedEmail = "HR@HRNEXUS.COM",
+                        FullName = "HR Manager",
+                        Initials = "HR",
+                        RoleId = hrRole.Id,
+                        IsActive = true,
+                        PasswordHash = hasher.Hash("Hr@12345")
+                    };
+                    db.Users.Add(hr);
+                }
+                else
+                {
+                    hr.IsActive = true;
+                    hr.RoleId = hrRole.Id;
+                    if (!hasher.Verify("Hr@12345", hr.PasswordHash) && !hasher.Verify("Admin@123", hr.PasswordHash))
+                    {
+                        hr.PasswordHash = hasher.Hash("Hr@12345");
+                    }
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to ensure default system users.");
+        }
+    }
+
+    private static async Task EnsureEmployeeUsersSynchronizedAsync(
+        HrmsDbContext db,
+        IPasswordHasher hasher,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var employeeRole = await db.Roles.FirstOrDefaultAsync(r => r.Code == "Employee", ct);
+            var hrRole = await db.Roles.FirstOrDefaultAsync(r => r.Code == "HrManager", ct);
+            if (employeeRole == null) return;
+
+            var employees = await db.Employees.ToListAsync(ct);
+            var users = await db.Users.ToListAsync(ct);
+
+            var systemEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "admin@hrnexus.com",
+                "companyadmin@hrnexus.com",
+                "hr@hrnexus.com"
+            };
+
+            // Step 1: Deduplicate multiple users pointing to the same EmployeeId
+            foreach (var emp in employees)
+            {
+                if (string.IsNullOrWhiteSpace(emp.Email)) continue;
+                var empEmail = emp.Email.Trim().ToLowerInvariant();
+                var normEmail = empEmail.ToUpperInvariant();
+
+                var usersForEmp = users.Where(u => u.EmployeeId == emp.Id && !systemEmails.Contains(u.Email) && !systemEmails.Contains(u.NormalizedEmail)).ToList();
+                if (usersForEmp.Count > 1)
+                {
+                    var canonical = usersForEmp.FirstOrDefault(u => u.NormalizedEmail == normEmail || string.Equals(u.Email?.Trim(), empEmail, StringComparison.OrdinalIgnoreCase))
+                                 ?? usersForEmp.First();
+
+                    foreach (var extra in usersForEmp.Where(u => u.Id != canonical.Id).ToList())
+                    {
+                        var belongsToOther = employees.Any(e => e.Id != emp.Id && string.Equals(e.Email?.Trim(), extra.Email?.Trim(), StringComparison.OrdinalIgnoreCase));
+                        if (!belongsToOther)
+                        {
+                            var extraNotifs = await db.Notifications.Where(n => n.UserId == extra.Id).ToListAsync(ct);
+                            foreach (var n in extraNotifs)
+                            {
+                                n.UserId = canonical.Id;
+                            }
+                            db.Users.Remove(extra);
+                            users.Remove(extra);
+                            logger.LogInformation("Removed duplicate user {Email} for employee {EmpEmail}", extra.Email, empEmail);
+                        }
+                        else
+                        {
+                            extra.EmployeeId = null;
+                        }
+                    }
+                }
+            }
+
+            var updatedCount = 0;
+            var createdCount = 0;
+
+            foreach (var emp in employees)
+            {
+                if (string.IsNullOrWhiteSpace(emp.Email)) continue;
+
+                var empEmail = emp.Email.Trim().ToLowerInvariant();
+                var normEmail = empEmail.ToUpperInvariant();
+                var rawPassword = !string.IsNullOrWhiteSpace(emp.Password) ? emp.Password.Trim() : "Employee@123";
+
+                // Match by NormalizedEmail FIRST to prevent duplicate key conflicts
+                var matchedUser = users.FirstOrDefault(u => u.NormalizedEmail == normEmail || string.Equals(u.Email?.Trim(), empEmail, StringComparison.OrdinalIgnoreCase));
+
+                if (matchedUser is null)
+                {
+                    var userByEmp = users.FirstOrDefault(u => u.EmployeeId == emp.Id && !systemEmails.Contains(u.Email) && !systemEmails.Contains(u.NormalizedEmail));
+                    if (userByEmp != null && !users.Any(u => u.NormalizedEmail == normEmail))
+                    {
+                        matchedUser = userByEmp;
+                    }
+                }
+
+                if (matchedUser is null)
+                {
+                    var firstInitial = emp.FirstName.Trim().Length > 0 ? emp.FirstName.Trim()[0] : 'E';
+                    var lastInitial = emp.LastName.Trim().Length > 0 ? emp.LastName.Trim()[0] : 'M';
+                    var initials = $"{firstInitial}{lastInitial}".Trim().ToUpperInvariant();
+
+                    var isHr = emp.JobTitle != null && emp.JobTitle.Contains("HR", StringComparison.OrdinalIgnoreCase);
+                    var roleId = isHr && hrRole != null ? hrRole.Id : employeeRole.Id;
+
+                    var newUser = new User
+                    {
+                        Email = empEmail,
+                        NormalizedEmail = normEmail,
+                        PasswordHash = hasher.Hash(rawPassword),
+                        FullName = $"{emp.FirstName.Trim()} {emp.LastName.Trim()}".Trim(),
+                        Initials = string.IsNullOrWhiteSpace(initials) ? "EM" : initials,
+                        RoleId = roleId,
+                        EmployeeId = emp.Id,
+                        IsActive = emp.Status == EmploymentStatus.Active,
+                    };
+                    db.Users.Add(newUser);
+                    users.Add(newUser);
+                    createdCount++;
+                }
+                else
+                {
+                    var changed = false;
+
+                    if (matchedUser.EmployeeId != emp.Id && !systemEmails.Contains(matchedUser.Email) && !systemEmails.Contains(matchedUser.NormalizedEmail))
+                    {
+                        matchedUser.EmployeeId = emp.Id;
+                        changed = true;
+                    }
+
+                    if (emp.Status != EmploymentStatus.Active && matchedUser.IsActive)
+                    {
+                        matchedUser.IsActive = false;
+                        changed = true;
+                    }
+                    else if (emp.Status == EmploymentStatus.Active && !matchedUser.IsActive)
+                    {
+                        matchedUser.IsActive = true;
+                        changed = true;
+                    }
+
+                    // Always guarantee password hash verifies with employee.Password
+                    if (!hasher.Verify(rawPassword, matchedUser.PasswordHash))
+                    {
+                        matchedUser.PasswordHash = hasher.Hash(rawPassword);
+                        changed = true;
+                    }
+
+                    if (!systemEmails.Contains(matchedUser.Email) && !systemEmails.Contains(matchedUser.NormalizedEmail))
+                    {
+                        if (string.IsNullOrWhiteSpace(matchedUser.NormalizedEmail) || matchedUser.NormalizedEmail != normEmail)
+                        {
+                            matchedUser.NormalizedEmail = normEmail;
+                            changed = true;
+                        }
+                        if (string.IsNullOrWhiteSpace(matchedUser.Email) || !string.Equals(matchedUser.Email, empEmail, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchedUser.Email = empEmail;
+                            changed = true;
+                        }
+
+                        var expectedName = $"{emp.FirstName.Trim()} {emp.LastName.Trim()}".Trim();
+                        if (!string.IsNullOrWhiteSpace(expectedName) && matchedUser.FullName != expectedName)
+                        {
+                            matchedUser.FullName = expectedName;
+                            changed = true;
+                        }
+                    }
+
+                    if (changed)
+                    {
+                        updatedCount++;
+                    }
+                }
+            }
+
+            if (createdCount > 0 || updatedCount > 0)
+            {
+                await db.SaveChangesAsync(ct);
+                logger.LogInformation("Employee-User credentials sync completed: {Created} accounts provisioned, {Updated} accounts updated.", createdCount, updatedCount);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to synchronize Employee user accounts in database bootstrap.");
         }
     }
 

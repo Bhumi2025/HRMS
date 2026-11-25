@@ -160,6 +160,12 @@ public sealed class AttendanceService : IAttendanceService
                                 if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
                                 bOpen = null;
                             }
+                            else if (lastClockOutUtc.HasValue)
+                            {
+                                var diff = p.PunchTime - lastClockOutUtc.Value;
+                                if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
+                                lastClockOutUtc = null;
+                            }
                             wOpen = p.PunchTime;
                         }
                         else if (p.PunchType == "BreakIn")
@@ -196,6 +202,7 @@ public sealed class AttendanceService : IAttendanceService
                                 if (diff.TotalSeconds > 0) totalBreakSec += (long)diff.TotalSeconds;
                                 bOpen = null;
                             }
+                            lastClockOutUtc = p.PunchTime;
                         }
                     }
 
@@ -227,7 +234,7 @@ public sealed class AttendanceService : IAttendanceService
                     else if (record != null && record.WorkHours > 0)
                     {
                         workHours = record.WorkHours;
-                        breakMins = record.BreakMinutes;
+                        breakMins = record.BreakMinutes > 0 ? record.BreakMinutes : calcBreak;
                     }
                     else
                     {
@@ -830,6 +837,12 @@ public sealed class AttendanceService : IAttendanceService
                     if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
                     breakIntervalOpen = null;
                 }
+                else if (lastClockOutUtc.HasValue)
+                {
+                    var diff = p.PunchTime - lastClockOutUtc.Value;
+                    if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+                    lastClockOutUtc = null;
+                }
                 workIntervalOpen = p.PunchTime;
             }
             else if (p.PunchType == PunchType.BreakIn)
@@ -867,6 +880,7 @@ public sealed class AttendanceService : IAttendanceService
                     if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
                     breakIntervalOpen = null;
                 }
+                lastClockOutUtc = p.PunchTime;
             }
         }
 
@@ -1140,6 +1154,12 @@ public sealed class AttendanceService : IAttendanceService
                     var diff = p.PunchTime - activeBreakOpen.Value;
                     if (diff.TotalSeconds > 0) breakSeconds += (long)diff.TotalSeconds;
                     activeBreakOpen = null;
+                }
+                else if (lastClockOutUtc.HasValue)
+                {
+                    var diff = p.PunchTime - lastClockOutUtc.Value;
+                    if (diff.TotalSeconds > 0) breakSeconds += (long)diff.TotalSeconds;
+                    lastClockOutUtc = null;
                 }
                 activeCalcOpen = p.PunchTime;
             }
@@ -2278,6 +2298,7 @@ public sealed class AttendanceService : IAttendanceService
         long totalBreakSeconds = 0;
         DateTime? workIntervalOpen = null;
         DateTime? breakIntervalOpen = null;
+        DateTime? lastClockOutUtc = null;
 
         foreach (var p in allPunches)
         {
@@ -2292,6 +2313,12 @@ public sealed class AttendanceService : IAttendanceService
                     var diff = p.PunchTime - breakIntervalOpen.Value;
                     if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
                     breakIntervalOpen = null;
+                }
+                else if (lastClockOutUtc.HasValue)
+                {
+                    var diff = p.PunchTime - lastClockOutUtc.Value;
+                    if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
+                    lastClockOutUtc = null;
                 }
                 workIntervalOpen = p.PunchTime;
             }
@@ -2330,6 +2357,7 @@ public sealed class AttendanceService : IAttendanceService
                     if (diff.TotalSeconds > 0) totalBreakSeconds += (long)diff.TotalSeconds;
                     breakIntervalOpen = null;
                 }
+                lastClockOutUtc = p.PunchTime;
             }
         }
 

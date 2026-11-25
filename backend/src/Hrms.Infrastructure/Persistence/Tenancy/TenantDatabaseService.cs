@@ -353,7 +353,7 @@ END
         var empRecord = await db.Employees
             .AsNoTracking()
             .Where(e => e.Email.Trim().ToUpper() == normalizedEmail)
-            .Select(e => new { e.Id, e.Status })
+            .Select(e => new { e.Id, e.Status, e.Password, e.FirstName, e.LastName, e.JobTitle })
             .FirstOrDefaultAsync(ct);
 
         if (record is null)
@@ -371,8 +371,55 @@ END
                     "Employee",
                     "Employee",
                     empRecord.Status,
-                    true);
+                    true,
+                    empRecord.Password);
             }
+
+            if (empRecord is not null && empRecord.Status == EmploymentStatus.Active)
+            {
+                var employeeRole = await db.Roles.FirstOrDefaultAsync(r => r.Code == "Employee", ct);
+                var hrRole = await db.Roles.FirstOrDefaultAsync(r => r.Code == "HrManager", ct);
+                var isHr = empRecord.JobTitle != null && empRecord.JobTitle.Contains("HR", StringComparison.OrdinalIgnoreCase);
+                var roleId = isHr && hrRole != null ? hrRole.Id : (employeeRole?.Id ?? Guid.Empty);
+                var roleName = isHr ? "HR Manager" : "Employee";
+                var roleCode = isHr ? "HrManager" : "Employee";
+
+                var rawPwd = !string.IsNullOrWhiteSpace(empRecord.Password) ? empRecord.Password.Trim() : "Employee@123";
+                var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
+                var pwdHash = hasher.HashPassword(new User(), rawPwd);
+
+                var firstInit = empRecord.FirstName.Length > 0 ? empRecord.FirstName[0] : 'E';
+                var lastInit = empRecord.LastName.Length > 0 ? empRecord.LastName[0] : 'M';
+
+                var newUser = new User
+                {
+                    Email = email.Trim().ToLowerInvariant(),
+                    NormalizedEmail = normalizedEmail,
+                    PasswordHash = pwdHash,
+                    FullName = $"{empRecord.FirstName} {empRecord.LastName}".Trim(),
+                    Initials = $"{firstInit}{lastInit}".Trim().ToUpperInvariant(),
+                    RoleId = roleId,
+                    EmployeeId = empRecord.Id,
+                    IsActive = true
+                };
+                db.Users.Add(newUser);
+                await db.SaveChangesAsync(ct);
+
+                return new TenantUserRecord(
+                    newUser.Id,
+                    newUser.Email,
+                    newUser.FullName,
+                    newUser.Initials,
+                    newUser.PasswordHash,
+                    newUser.IsActive,
+                    empRecord.Id,
+                    roleName,
+                    roleCode,
+                    empRecord.Status,
+                    false,
+                    empRecord.Password);
+            }
+
             return null;
         }
 
@@ -391,7 +438,8 @@ END
             record.RoleName,
             record.RoleCode,
             empStatus,
-            isOffboarded);
+            isOffboarded,
+            empRecord?.Password);
     }
 
     public async Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default)

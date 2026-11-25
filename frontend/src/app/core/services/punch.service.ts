@@ -412,6 +412,7 @@ export class PunchService {
     const sorted = [...punches].sort((a, b) => safeParseDate(a.punchTime).getTime() - safeParseDate(b.punchTime).getTime());
     let breakSec = 0;
     let breakStartMs: number | null = null;
+    let lastClockOutMs: number | null = null;
     const now = Date.now();
 
     for (const p of sorted) {
@@ -420,6 +421,9 @@ export class PunchService {
         if (breakStartMs !== null && !isNaN(breakStartMs) && t >= breakStartMs) {
           breakSec += Math.floor((t - breakStartMs) / 1000);
           breakStartMs = null;
+        } else if (lastClockOutMs !== null && !isNaN(lastClockOutMs) && t >= lastClockOutMs) {
+          breakSec += Math.floor((t - lastClockOutMs) / 1000);
+          lastClockOutMs = null;
         }
       } else if (p.punchType === 'BreakIn') {
         breakStartMs = t;
@@ -428,6 +432,7 @@ export class PunchService {
           breakSec += Math.floor((t - breakStartMs) / 1000);
           breakStartMs = null;
         }
+        lastClockOutMs = t;
       }
     }
 
