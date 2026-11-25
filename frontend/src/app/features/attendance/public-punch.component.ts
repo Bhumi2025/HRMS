@@ -1269,7 +1269,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
     try {
       const saved = localStorage.getItem(PUNCH_THEME_KEY);
       if (saved === 'light') return false;
-    } catch {}
+    } catch { }
     return true;
   }
 
@@ -1278,7 +1278,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isDarkMode.set(next);
     try {
       localStorage.setItem(PUNCH_THEME_KEY, next ? 'dark' : 'light');
-    } catch {}
+    } catch { }
   }
 
   private isAllowedHrRole(role?: string | null): boolean {
@@ -1330,7 +1330,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected unlockWithHrCredentials(): void {
     const email = this.hrEmail.trim();
-    const password = this.hrPassword;
+    const password = this.hrPassword.trim();
 
     if (!email || !password) {
       this.authError.set('Please enter your HR email address and password.');
@@ -1375,9 +1375,9 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
         this.isAuthenticating.set(false);
         this.authError.set(
           err?.error?.detail ||
-            err?.error?.title ||
-            err?.error?.message ||
-            'Invalid HR credentials. Please check your email and password.',
+          err?.error?.title ||
+          err?.error?.message ||
+          'Invalid HR credentials. Please check your email and password.',
         );
       },
     });
@@ -1414,7 +1414,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
         this.currentLat = pos.coords.latitude;
         this.currentLon = pos.coords.longitude;
       },
-      () => {},
+      () => { },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
     );
   }
@@ -1453,7 +1453,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
 
     try {
       localStorage.removeItem(TERMINAL_AUTH_KEY);
-    } catch {}
+    } catch { }
 
     this.activeToken = undefined;
     this.activeCompanyCode = undefined;

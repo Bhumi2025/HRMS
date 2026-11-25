@@ -8,10 +8,11 @@ import { SessionService } from '../../core/services/session.service';
 import { CompanyListItem, CompanyDetail, CreateCompanyRequest, STANDARD_TIMEZONES } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 @Component({
   selector: 'app-super-admin-dashboard',
-  imports: [CommonModule, FormsModule, IconDirective, DatePipe],
+  imports: [CommonModule, FormsModule, IconDirective, DatePipe, TablePaginationComponent],
   template: `
     <div class="super-admin-dashboard">
       <!-- 4 Top KPI Cards for Super Admin Platform -->
@@ -165,7 +166,7 @@ import { ToastService } from '../../core/services/toast.service';
               </tr>
             </thead>
             <tbody>
-              @for (c of filteredCompanies(); track c.id) {
+              @for (c of paginatedCompanies(); track c.id) {
                 <tr class="table-row">
                   <td>
                     <div class="org-cell">
@@ -253,7 +254,7 @@ import { ToastService } from '../../core/services/toast.service';
 
         <!-- Mobile Tenant Cards View (visible <= 768px) -->
         <div class="mobile-tenant-cards">
-          @for (c of filteredCompanies(); track c.id) {
+          @for (c of paginatedCompanies(); track c.id) {
             <div class="m-tenant-card">
               <div class="m-card-header">
                 <div class="org-cell">
@@ -336,6 +337,7 @@ import { ToastService } from '../../core/services/toast.service';
             </div>
           }
         </div>
+        <app-table-pagination [total]="filteredCompanies().length" [page]="companyPage()" (pageChange)="companyPage.set($event)" />
       </div>
 
       <!-- Company Details & Employees Modal (matching Image 2) -->
@@ -1692,7 +1694,7 @@ export class SuperAdminDashboardComponent implements OnInit, OnDestroy, AfterVie
 
   // Modal Employee Pagination
   protected readonly empModalPage = signal<number>(1);
-  protected readonly empModalPageSize = signal<number>(5);
+  protected readonly empModalPageSize = signal<number>(8);
   protected readonly empModalSearch = signal<string>('');
 
   protected readonly filteredModalEmployees = computed(() => {
@@ -1806,6 +1808,11 @@ export class SuperAdminDashboardComponent implements OnInit, OnDestroy, AfterVie
     );
   });
 
+  protected readonly companyPage = signal<number>(1);
+  protected readonly paginatedCompanies = computed(() =>
+    paginateSlice(this.filteredCompanies(), this.companyPage()),
+  );
+
   ngOnInit(): void {
     sessionStorage.removeItem('current_tenant');
     if (this.session.user()?.companyCode) {
@@ -1849,6 +1856,7 @@ export class SuperAdminDashboardComponent implements OnInit, OnDestroy, AfterVie
 
   protected setStatusFilter(filter: 'all' | 'Active' | 'Suspended'): void {
     this.statusFilter.set(filter);
+    this.companyPage.set(1);
   }
 
   protected clearTenantFilter(): void {
@@ -1883,10 +1891,12 @@ export class SuperAdminDashboardComponent implements OnInit, OnDestroy, AfterVie
   protected onSearchInput(event: Event): void {
     const val = (event.target as HTMLInputElement).value || '';
     this.searchQuery.set(val);
+    this.companyPage.set(1);
   }
 
   protected clearSearch(): void {
     this.searchQuery.set('');
+    this.companyPage.set(1);
     const el = document.getElementById('tenantFilterSearchBox') as HTMLInputElement | null;
     if (el) {
       el.value = '';

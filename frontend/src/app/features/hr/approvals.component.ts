@@ -7,6 +7,7 @@ import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { NotificationStateService } from '../../core/services/notification-state.service';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface Approval {
   apiId?: string;
@@ -25,7 +26,7 @@ interface Approval {
 /** HR Approvals — ported from pages/approvals.html. */
 @Component({
   selector: 'app-approvals',
-  imports: [CommonModule, IconDirective],
+  imports: [CommonModule, IconDirective, TablePaginationComponent],
   template: `
     <div class="flex justify-between items-center" style="margin-bottom: 15px">
       <div>
@@ -51,11 +52,11 @@ interface Approval {
 
     <div>
       <div class="tabs">
-        <button class="tab-btn" [class.active]="tab() === 'all'" (click)="tab.set('all')">All ({{ combined().length }})</button>
-        <button class="tab-btn" [class.active]="tab() === 'leave'" (click)="tab.set('leave')">Leave ({{ leaveData().length }})</button>
-        <button class="tab-btn" [class.active]="tab() === 'ot'" (click)="tab.set('ot')">Overtime ({{ overtimeData().length }})</button>
+        <button class="tab-btn" [class.active]="tab() === 'all'" (click)="tab.set('all'); page.set(1)">All ({{ combined().length }})</button>
+        <button class="tab-btn" [class.active]="tab() === 'leave'" (click)="tab.set('leave'); page.set(1)">Leave ({{ leaveData().length }})</button>
+        <button class="tab-btn" [class.active]="tab() === 'ot'" (click)="tab.set('ot'); page.set(1)">Overtime ({{ overtimeData().length }})</button>
         @if (canReg()) {
-          <button class="tab-btn" [class.active]="tab() === 'reg'" (click)="tab.set('reg')">Regularization ({{ regData().length }})</button>
+          <button class="tab-btn" [class.active]="tab() === 'reg'" (click)="tab.set('reg'); regPage.set(1)">Regularization ({{ regData().length }})</button>
         }
       </div>
 
@@ -87,7 +88,7 @@ interface Approval {
                       </td>
                     </tr>
                   }
-                  @for (r of regData(); track r.apiId ?? r.n + r.date) {
+                  @for (r of paginatedRegData(); track r.apiId ?? r.n + r.date) {
                     <tr>
                       <td>
                         <div class="table-avatar">
@@ -112,6 +113,7 @@ interface Approval {
                 </tbody>
               </table>
             </div>
+            <app-table-pagination [total]="regData().length" [page]="regPage()" (pageChange)="regPage.set($event)" />
           </div>
         } @else {
           <div class="card">
@@ -149,7 +151,7 @@ interface Approval {
                       </td>
                     </tr>
                   }
-                  @for (r of currentRows(); track r.apiId ?? r.n + r.t + r.d) {
+                  @for (r of paginatedCurrentRows(); track r.apiId ?? r.n + r.t + r.d) {
                     <tr>
                       <td>
                         <div class="table-avatar">
@@ -173,6 +175,7 @@ interface Approval {
                 </tbody>
               </table>
             </div>
+            <app-table-pagination [total]="currentRows().length" [page]="page()" (pageChange)="page.set($event)" />
           </div>
         }
       </div>
@@ -344,6 +347,10 @@ export class ApprovalsComponent implements OnInit {
   protected readonly allData = signal<Approval[]>([]);
 
   protected readonly regData = signal<Approval[]>([]);
+  protected readonly page = signal(1);
+  protected readonly regPage = signal(1);
+  protected readonly paginatedRegData = computed(() => paginateSlice(this.regData(), this.regPage()));
+  protected readonly paginatedCurrentRows = computed(() => paginateSlice(this.currentRows(), this.page()));
 
   protected readonly leaveData = computed(() => this.allData().filter((r) => r.type === 'leave'));
 

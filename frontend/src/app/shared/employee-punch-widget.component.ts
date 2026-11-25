@@ -4,11 +4,12 @@ import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api/api.service';
 import { SessionService } from '../core/services/session.service';
 import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
+import { TablePaginationComponent, paginateSlice } from './table-pagination.component';
 
 @Component({
   selector: 'app-employee-punch-widget',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, TablePaginationComponent],
   template: `
     @if (hasEmployeeRecord()) {
       <div class="punch-widget-card" [class.checked-in]="isCheckedIn()">
@@ -174,7 +175,7 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
                     </tr>
                   </thead>
                   <tbody>
-                    @for (p of todayPunches(); track p.id) {
+                    @for (p of paginatedTodayPunches(); track p.id) {
                       <tr>
                         <td>
                           <span class="type-pill" 
@@ -191,6 +192,7 @@ import { EmployeePunchStatus, EmployeePunch } from '../core/api/api.models';
                     }
                   </tbody>
                 </table>
+                <app-table-pagination [total]="todayPunches().length" [page]="punchPage()" (pageChange)="punchPage.set($event)" />
               }
             </div>
           }
@@ -709,6 +711,8 @@ export class EmployeePunchWidgetComponent implements OnInit, OnDestroy {
   protected readonly isOnBreak = computed(() => this.status()?.isOnBreak ?? false);
   protected readonly companyTz = computed(() => this.status()?.companyTimeZone ?? 'Asia/Kolkata');
   protected readonly todayPunches = computed(() => this.status()?.todayPunches ?? []);
+  protected readonly punchPage = signal(1);
+  protected readonly paginatedTodayPunches = computed(() => paginateSlice(this.todayPunches(), this.punchPage()));
 
   protected readonly regularizeRoute = computed(() => {
     const role = this.session.activeRole();

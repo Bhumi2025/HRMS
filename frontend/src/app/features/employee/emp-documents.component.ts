@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ApiService } from '../../core/api/api.service';
 import { DocumentDto } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
@@ -8,6 +8,7 @@ import { UiService } from '../../core/services/ui.service';
 import { triggerDocumentDownload } from '../../core/utils/document-download.util';
 import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface DocRow {
   id: string;
@@ -33,7 +34,7 @@ interface CompanyDoc {
 /** My Documents — ported from pages/emp-documents.html. */
 @Component({
   selector: 'app-emp-documents',
-  imports: [CommonModule, IconDirective, SelectComponent],
+  imports: [CommonModule, IconDirective, SelectComponent, TablePaginationComponent],
   template: `
     <div class="flex justify-end items-center top-bar" style="margin-bottom: 15px">
       <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="openUploadModal()">
@@ -69,7 +70,7 @@ interface CompanyDoc {
                     </td>
                   </tr>
                 }
-                @for (r of docs(); track r.doc + r.num) {
+                @for (r of paginatedDocs(); track r.doc + r.num) {
                   <tr>
                     <td style="font-weight: 600; white-space: nowrap">{{ r.doc }}</td>
                     <td class="col-hide"><span class="badge badge-info">{{ r.type }}</span></td>
@@ -88,6 +89,7 @@ interface CompanyDoc {
               </tbody>
             </table>
           </div>
+          <app-table-pagination [total]="docs().length" [page]="docsPage()" (pageChange)="docsPage.set($event)" />
         </div>
       }
 
@@ -331,6 +333,8 @@ export class EmpDocumentsComponent implements OnInit {
   protected readonly viewTarget = signal<DocRow | null>(null);
 
   protected readonly docs = signal<DocRow[]>([]);
+  protected readonly docsPage = signal(1);
+  protected readonly paginatedDocs = computed(() => paginateSlice(this.docs(), this.docsPage()));
   protected readonly companyDocs = signal<CompanyDoc[]>([]);
 
   protected readonly currentEmpId = signal<string | null>(null);

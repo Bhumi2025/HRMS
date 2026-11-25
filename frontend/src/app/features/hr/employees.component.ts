@@ -208,24 +208,12 @@ interface Employee {
         </table>
       </div>
 
-      <!-- Dynamic Pagination Row with Rows Per Page & < > navigation -->
+      <!-- Dynamic Pagination Row with < > navigation -->
       <div
         class="pagination-row"
         style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 12px;"
       >
         <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted);">
-          <span>Rows per page:</span>
-          <select 
-            class="form-control" 
-            [value]="pageSize()" 
-            (change)="onPageSizeChange(+$any($event.target).value)" 
-            style="width: 70px; padding: 4px 8px; font-size: 12px;"
-          >
-            <option [value]="5">5</option>
-            <option [value]="10">10</option>
-            <option [value]="25">25</option>
-            <option [value]="50">50</option>
-          </select>
           <span>
             Showing {{ filtered().length === 0 ? 0 : currentStartIndex() + 1 }} - {{ currentEndIndex() }} of {{ filtered().length }}
           </span>
@@ -643,7 +631,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
 
   private departmentIds = new Map<string, string>();
 
-  protected readonly pageSize = signal(10);
+  protected readonly pageSize = signal(8);
   protected readonly currentPage = signal(1);
 
   protected readonly departmentOptions = signal<SelectOption[]>([

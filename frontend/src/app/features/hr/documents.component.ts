@@ -7,6 +7,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface DocumentRow {
   id?: string;
@@ -24,7 +25,7 @@ interface DocumentRow {
 /** Document Management — ported from pages/documents.html. */
 @Component({
   selector: 'app-documents',
-  imports: [CommonModule, IconDirective, SelectComponent],
+  imports: [CommonModule, IconDirective, SelectComponent, TablePaginationComponent],
   template: `
     <div class="page-header-row">
       <div>
@@ -48,9 +49,9 @@ interface DocumentRow {
       <div class="card-header">
         <div class="card-title">All Documents</div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap">
-          <input class="form-control" placeholder="Search..." style="width: 200px" [value]="search()" (input)="search.set($any($event.target).value)" />
-          <app-select [options]="typeOptions" [value]="type()" (valueChange)="type.set($event)" width="140px" />
-          <app-select [options]="statusOptions" [value]="status()" (valueChange)="status.set($event)" width="120px" />
+          <input class="form-control" placeholder="Search..." style="width: 200px" [value]="search()" (input)="search.set($any($event.target).value); page.set(1)" />
+          <app-select [options]="typeOptions" [value]="type()" (valueChange)="type.set($event); page.set(1)" width="140px" />
+          <app-select [options]="statusOptions" [value]="status()" (valueChange)="status.set($event); page.set(1)" width="120px" />
         </div>
       </div>
       <div class="table-wrap docs-table-wrap">
@@ -68,7 +69,7 @@ interface DocumentRow {
             </tr>
           </thead>
           <tbody>
-            @for (r of filtered(); track r.n + r.doc) {
+            @for (r of paginatedDocs(); track r.n + r.doc) {
               <tr>
                 <td>
                   <div class="table-avatar">
@@ -100,6 +101,7 @@ interface DocumentRow {
           </tbody>
         </table>
       </div>
+      <app-table-pagination [total]="filtered().length" [page]="page()" (pageChange)="page.set($event)" />
     </div>
 
     <!-- Doc View Modal -->
@@ -407,6 +409,8 @@ export class DocumentsComponent implements OnInit {
       (r) => (!q || r.n.toLowerCase().includes(q) || r.doc.toLowerCase().includes(q)) && (!t || r.t === t) && (!s || r.s === s),
     );
   });
+  protected readonly page = signal(1);
+  protected readonly paginatedDocs = computed(() => paginateSlice(this.filtered(), this.page()));
 
   protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
 

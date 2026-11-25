@@ -474,7 +474,7 @@ export class EmpAnnouncementsComponent implements OnInit {
 
   // Pagination state for announcements
   protected readonly currentPage = signal(1);
-  protected readonly pageSize = signal(5);
+  protected readonly pageSize = signal(8);
 
   protected formTitle = '';
   protected formTag = 'HR Update';

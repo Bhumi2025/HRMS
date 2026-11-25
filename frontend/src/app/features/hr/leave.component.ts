@@ -12,6 +12,7 @@ import { UiService } from '../../core/services/ui.service';
 import { NotificationStateService } from '../../core/services/notification-state.service';
 import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface LeaveRequest {
   apiId?: string;
@@ -38,7 +39,7 @@ interface LeaveType {
 /** Leave Management — ported from pages/leave.html. */
 @Component({
   selector: 'app-leave',
-  imports: [CommonModule, FormsModule, IconDirective, SelectComponent],
+  imports: [CommonModule, FormsModule, IconDirective, SelectComponent, TablePaginationComponent],
   template: `
     @if (isAdmin()) {
       <div class="card" style="margin-bottom: 16px; overflow: hidden; display: flex; flex-direction: column;">
@@ -60,7 +61,7 @@ interface LeaveType {
               </tr>
             </thead>
             <tbody>
-              @for (lt of leaveTypes(); track lt.id) {
+              @for (lt of paginatedLeaveTypes(); track lt.id) {
                 <tr>
                   <td>
                     <div style="display: flex; align-items: center; gap: 8px">
@@ -94,6 +95,7 @@ interface LeaveType {
             </tbody>
           </table>
         </div>
+        <app-table-pagination [total]="leaveTypes().length" [page]="typesPage()" (pageChange)="typesPage.set($event)" />
       </div>
     }
 
@@ -140,8 +142,8 @@ interface LeaveType {
             }
           </div>
 
-          <app-select [options]="typeOptions()" [value]="typeFilter()" (valueChange)="typeFilter.set($event)" width="150px" />
-          <app-select [options]="statusFilterOptions" [value]="statusFilter()" (valueChange)="statusFilter.set($event)" width="125px" />
+          <app-select [options]="typeOptions()" [value]="typeFilter()" (valueChange)="typeFilter.set($event); requestsPage.set(1)" width="150px" />
+          <app-select [options]="statusFilterOptions" [value]="statusFilter()" (valueChange)="statusFilter.set($event); requestsPage.set(1)" width="125px" />
 
           @if (search() || typeFilter() || statusFilter()) {
             <button class="btn btn-ghost btn-sm" (click)="clearAllFilters()" style="font-size: 12px; color: var(--muted); text-decoration: underline;">
@@ -168,7 +170,7 @@ interface LeaveType {
             </tr>
           </thead>
           <tbody>
-            @for (r of filtered(); track r.apiId || ($index + '-' + r.n + '-' + r.f)) {
+            @for (r of paginatedRequests(); track r.apiId || ($index + '-' + r.n + '-' + r.f)) {
               <tr>
                 <td>
                   <div class="table-avatar">
@@ -220,6 +222,7 @@ interface LeaveType {
           </tbody>
         </table>
       </div>
+      <app-table-pagination [total]="filtered().length" [page]="requestsPage()" (pageChange)="requestsPage.set($event)" />
     </div>
 
     <!-- View Modal -->
@@ -500,6 +503,8 @@ export class LeaveComponent implements OnInit, AfterViewInit {
 
   protected readonly requests = signal<LeaveRequest[]>([]);
   protected readonly leaveTypes = signal<LeaveType[]>([]);
+  protected readonly typesPage = signal(1);
+  protected readonly paginatedLeaveTypes = computed(() => paginateSlice(this.leaveTypes(), this.typesPage()));
   protected readonly employees = signal<EmployeeListItem[]>([]);
 
   // Dynamically populated options from live leave types
@@ -572,6 +577,8 @@ export class LeaveComponent implements OnInit, AfterViewInit {
       return matchSearch && matchType && matchStatus;
     });
   });
+  protected readonly requestsPage = signal(1);
+  protected readonly paginatedRequests = computed(() => paginateSlice(this.filtered(), this.requestsPage()));
 
   ngOnInit(): void {
     this.loadTypes();

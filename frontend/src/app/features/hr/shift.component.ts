@@ -1,10 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { PermissionService } from '../../core/services/permission.service';
 import { ToastService } from '../../core/services/toast.service';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 export interface ShiftTemplateItem {
   id: string;
@@ -21,7 +22,7 @@ export interface ShiftTemplateItem {
 
 @Component({
   selector: 'app-shift',
-  imports: [CommonModule, FormsModule, IconDirective],
+  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent],
   template: `
     <!-- SHIFT TEMPLATES CARD -->
     <div class="card">
@@ -51,7 +52,7 @@ export interface ShiftTemplateItem {
             </tr>
           </thead>
           <tbody>
-            @for (s of templates(); track s.id) {
+            @for (s of paginatedTemplates(); track s.id) {
               <tr>
                 <td>
                   <div style="font-weight: 700; font-size: 14px; color: var(--text);">{{ s.name }}</div>
@@ -99,6 +100,7 @@ export interface ShiftTemplateItem {
           </tbody>
         </table>
       </div>
+      <app-table-pagination [total]="templates().length" [page]="page()" (pageChange)="page.set($event)" />
     </div>
 
     <!-- Modal: Add / Edit Shift Template -->
@@ -164,6 +166,8 @@ export class ShiftComponent implements OnInit {
   protected readonly showShiftModal = signal(false);
   protected readonly editingShiftId = signal<string | null>(null);
   protected readonly templates = signal<ShiftTemplateItem[]>([]);
+  protected readonly page = signal(1);
+  protected readonly paginatedTemplates = computed(() => paginateSlice(this.templates(), this.page()));
 
   protected shiftForm = {
     name: '',

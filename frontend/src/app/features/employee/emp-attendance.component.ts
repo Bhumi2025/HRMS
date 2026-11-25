@@ -5,6 +5,7 @@ import { ApiService } from '../../core/api/api.service';
 import { AttendanceRecord, EmployeeDashboard, MonthlyMusterDay } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface LogRow {
   d: string;
@@ -30,7 +31,7 @@ interface CalendarDay {
 /** My Attendance — ported from pages/emp-attendance.html. */
 @Component({
   selector: 'app-emp-attendance',
-  imports: [CommonModule, IconDirective],
+  imports: [CommonModule, IconDirective, TablePaginationComponent],
   template: `
     <div class="grid-2" style="margin-bottom: 15px">
       <!-- 1. Left Card: Attendance Trend Graph & Bottom Weekly 2D Tracker -->
@@ -142,7 +143,7 @@ interface CalendarDay {
             </tr>
           </thead>
           <tbody>
-            @for (r of log(); track r.d) {
+            @for (r of paginatedLog(); track r.d) {
               <tr>
                 <td style="font-weight: 600">{{ r.d }}</td>
                 <td style="color: var(--text)">{{ r.day }}</td>
@@ -162,6 +163,7 @@ interface CalendarDay {
           </tbody>
         </table>
       </div>
+      <app-table-pagination [total]="log().length" [page]="logPage()" (pageChange)="logPage.set($event)" />
     </div>
   `,
   styles: [
@@ -266,6 +268,8 @@ export class EmpAttendanceComponent implements OnInit, AfterViewInit {
   protected readonly dashboard = signal<EmployeeDashboard | null>(null);
   protected readonly muster = signal<MonthlyMusterDay[]>([]);
   protected readonly log = signal<LogRow[]>([]);
+  protected readonly logPage = signal(1);
+  protected readonly paginatedLog = computed(() => paginateSlice(this.log(), this.logPage()));
   protected readonly trendViewMode = signal<'month' | 'week'>('month');
 
   protected setViewMode(mode: 'month' | 'week'): void {

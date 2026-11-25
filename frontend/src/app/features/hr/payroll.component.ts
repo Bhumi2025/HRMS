@@ -13,6 +13,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { amountInWords } from '../../core/utils/payroll-utils';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 export interface ComprehensivePayrollRow {
   empId: string;
@@ -41,7 +42,7 @@ export interface ComprehensivePayrollRow {
 
 @Component({
   selector: 'app-payroll',
-  imports: [CommonModule, FormsModule, IconDirective],
+  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent],
   template: `
     <div class="flex justify-end items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div class="flex gap-2">
@@ -152,7 +153,7 @@ export interface ComprehensivePayrollRow {
             class="form-control" 
             style="width: 140px; font-size: 12px; padding: 6px 10px;"
             [value]="selectedDept()"
-            (change)="selectedDept.set($any($event.target).value)"
+            (change)="selectedDept.set($any($event.target).value); payrollPage.set(1)"
           >
             <option value="">All Departments</option>
             <option value="Engineering">Engineering</option>
@@ -172,7 +173,7 @@ export interface ComprehensivePayrollRow {
         </div>
       </div>
 
-      <div class="table-wrap payroll-scroll-container" style="max-height: 380px; overflow-y: auto; overflow-x: auto;">
+      <div class="table-wrap payroll-scroll-container" style="overflow-x: auto;">
         <table style="min-width: 1000px; width: 100%;">
           <thead style="position: sticky; top: 0; z-index: 5; background: var(--card-bg, #ffffff);">
             <tr>
@@ -191,7 +192,7 @@ export interface ComprehensivePayrollRow {
             </tr>
           </thead>
           <tbody>
-            @for (r of filteredRows(); track (r.empId + '_' + r.name + '_' + $index)) {
+            @for (r of paginatedRows(); track (r.empId + '_' + r.name + '_' + $index)) {
               <tr>
                 <td>
                   <div class="table-avatar">
@@ -244,6 +245,7 @@ export interface ComprehensivePayrollRow {
           </tbody>
         </table>
       </div>
+      <app-table-pagination [total]="filteredRows().length" [page]="payrollPage()" (pageChange)="payrollPage.set($event)" />
 
       <!-- Table Footer Actions: View Payslips for Month button behind the table -->
       <div style="display: flex; justify-content: flex-end; align-items: center; padding: 14px 20px; border-top: 1px solid var(--border); background: #fafafa;">
@@ -271,7 +273,7 @@ export interface ComprehensivePayrollRow {
     
         </div>
 
-        <div class="table-responsive payroll-scroll-container" style="max-height: 380px; overflow-y: auto; overflow-x: auto;">
+        <div class="table-responsive payroll-scroll-container" style="overflow-x: auto;">
           <table class="table" style="width: 100%;">
             <thead style="position: sticky; top: 0; z-index: 5; background: var(--card-bg, #ffffff);">
               <tr>
@@ -286,7 +288,7 @@ export interface ComprehensivePayrollRow {
               </tr>
             </thead>
             <tbody>
-              @for (r of payrollRuns(); track r.id) {
+              @for (r of paginatedRuns(); track r.id) {
                 <tr>
                   <td style="font-weight: 700; color: var(--p);">
                     {{ formatRunMonth(r) }}
@@ -324,6 +326,7 @@ export interface ComprehensivePayrollRow {
             </tbody>
           </table>
         </div>
+        <app-table-pagination [total]="payrollRuns().length" [page]="historyPage()" (pageChange)="historyPage.set($event)" />
       </div>
     }
 
@@ -904,6 +907,11 @@ export class PayrollComponent implements OnInit, AfterViewInit {
     });
   });
 
+  protected readonly payrollPage = signal(1);
+  protected readonly historyPage = signal(1);
+  protected readonly paginatedRows = computed(() => paginateSlice(this.filteredRows(), this.payrollPage()));
+  protected readonly paginatedRuns = computed(() => paginateSlice(this.payrollRuns(), this.historyPage()));
+
   protected enableSearchEdit(): void {
     this.isSearchReadonly.set(false);
     this.userInteracted = true;
@@ -925,10 +933,12 @@ export class PayrollComponent implements OnInit, AfterViewInit {
     }
     this.userInteracted = true;
     this.searchKeyword.set(val || '');
+    this.payrollPage.set(1);
   }
 
   protected clearSearch(): void {
     this.searchKeyword.set('');
+    this.payrollPage.set(1);
     if (this.searchInputRef?.nativeElement) {
       this.searchInputRef.nativeElement.value = '';
     }
@@ -958,6 +968,7 @@ export class PayrollComponent implements OnInit, AfterViewInit {
 
   protected onMonthChange(newMonth: string): void {
     this.selectedMonth.set(newMonth);
+    this.payrollPage.set(1);
     this.loadBackendPayroll();
     this.toast.show(`Loaded payroll register for ${this.activeMonthLabel()}`);
   }

@@ -6,6 +6,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface Loan {
   apiId?: string;
@@ -22,7 +23,7 @@ interface Loan {
 /** Loans & Advances — ported from pages/loans.html. */
 @Component({
   selector: 'app-loans',
-  imports: [CommonModule, IconDirective, SelectComponent],
+  imports: [CommonModule, IconDirective, SelectComponent, TablePaginationComponent],
   template: `
     <div class="flex justify-end items-center" style="margin-bottom: 24px">
       <button class="btn btn-primary btn-sm" (click)="openModal()">+ New Request</button>
@@ -42,7 +43,7 @@ interface Loan {
       <div class="card-header" style="margin-bottom: 12px">
         <div class="card-title">Loan Register</div>
         <div style="display: flex; gap: 8px">
-          <app-select [options]="statusOptions" [value]="status()" (valueChange)="status.set($event)" width="140px" />
+          <app-select [options]="statusOptions" [value]="status()" (valueChange)="status.set($event); page.set(1)" width="140px" />
         </div>
       </div>
       <div class="table-wrap">
@@ -61,7 +62,7 @@ interface Loan {
             </tr>
           </thead>
           <tbody>
-            @for (r of filtered(); track r.n + r.t) {
+            @for (r of paginatedLoans(); track r.n + r.t) {
               <tr>
                 <td class="loan-emp-cell">
                   <div class="table-avatar">
@@ -101,6 +102,7 @@ interface Loan {
           </tbody>
         </table>
       </div>
+      <app-table-pagination [total]="filtered().length" [page]="page()" (pageChange)="page.set($event)" />
     </div>
 
     <div class="modal-overlay" [class.open]="ui.isOpen('loanModal')" (click)="ui.onOverlayClick($event, 'loanModal')">
@@ -203,6 +205,8 @@ export class LoansComponent implements OnInit {
     const s = this.status();
     return this.loans().filter((l) => !s || l.s === s);
   });
+  protected readonly page = signal(1);
+  protected readonly paginatedLoans = computed(() => paginateSlice(this.filtered(), this.page()));
 
   ngOnInit(): void {
     this.loadSummary();

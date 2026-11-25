@@ -8,11 +8,12 @@ import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { NotificationStateService } from '../../core/services/notification-state.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 @Component({
   selector: 'app-offboarding',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconDirective, SelectComponent],
+  imports: [CommonModule, FormsModule, IconDirective, SelectComponent, TablePaginationComponent],
   template: `
     <!-- KPI Summary Row -->
     <div class="grid-5" style="margin-bottom: 20px;">
@@ -92,7 +93,7 @@ import { SelectComponent, SelectOption } from '../../shared/select.component';
               placeholder="Search employee, reason..." 
               style="width: 240px; font-size: 12px; padding: 6px 28px 6px 30px;"
               [value]="searchQuery()"
-              (input)="searchQuery.set($any($event.target).value)"
+              (input)="searchQuery.set($any($event.target).value); page.set(1)"
             />
           </div>
 
@@ -101,7 +102,7 @@ import { SelectComponent, SelectOption } from '../../shared/select.component';
             <app-select 
               [options]="statusFilterOptions" 
               [value]="statusFilter()" 
-              (valueChange)="statusFilter.set($event)" 
+              (valueChange)="statusFilter.set($event); page.set(1)" 
               width="100%" 
             />
           </div>
@@ -129,7 +130,7 @@ import { SelectComponent, SelectOption } from '../../shared/select.component';
             </tr>
           </thead>
           <tbody>
-            @for (rec of filteredRecords(); track rec.id) {
+            @for (rec of paginatedRecords(); track rec.id) {
               <tr>
                 <td>
                   <div class="table-avatar">
@@ -193,6 +194,7 @@ import { SelectComponent, SelectOption } from '../../shared/select.component';
           </tbody>
         </table>
       </div>
+      <app-table-pagination [total]="filteredRecords().length" [page]="page()" (pageChange)="page.set($event)" />
     </div>
 
     <!-- Modal: Initiate Offboarding -->
@@ -482,6 +484,8 @@ export class OffboardingComponent implements OnInit {
       return matchSearch && matchStatus;
     });
   });
+  protected readonly page = signal(1);
+  protected readonly paginatedRecords = computed(() => paginateSlice(this.filteredRecords(), this.page()));
 
   ngOnInit(): void {
     this.loadData();

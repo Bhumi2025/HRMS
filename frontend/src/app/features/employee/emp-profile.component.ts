@@ -8,6 +8,7 @@ import { UiService } from '../../core/services/ui.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 import { triggerDocumentDownload } from '../../core/utils/document-download.util';
 import { ACCEPT_DOC_TYPES, ACCEPT_IMG_TYPES, validateDocumentFile, validateImageFile } from '../../core/utils/file-validator';
 
@@ -28,7 +29,7 @@ interface DocRow {
  */
 @Component({
   selector: 'app-emp-profile',
-  imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent],
+  imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent, TablePaginationComponent],
   template: `
     <!-- Banner -->
     <div
@@ -313,7 +314,7 @@ interface DocRow {
               </tr>
             </thead>
             <tbody>
-              @for (r of docs(); track r.doc) {
+              @for (r of paginatedDocs(); track r.doc) {
                 <tr>
                   <td style="font-weight: 600">{{ r.doc }}</td>
                   <td><span class="badge badge-info">{{ r.type }}</span></td>
@@ -331,6 +332,7 @@ interface DocRow {
             </tbody>
           </table>
         </div>
+        <app-table-pagination [total]="docs().length" [page]="docsPage()" (pageChange)="docsPage.set($event)" />
       </div>
     }
 
@@ -1130,6 +1132,8 @@ export class EmpProfileComponent implements OnInit {
   });
 
   protected readonly docs = signal<DocRow[]>([]);
+  protected readonly docsPage = signal(1);
+  protected readonly paginatedDocs = computed(() => paginateSlice(this.docs(), this.docsPage()));
   protected readonly selectedDocView = signal<DocRow | null>(null);
 
   protected viewDoc(r: DocRow): void {

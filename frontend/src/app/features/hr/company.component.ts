@@ -19,6 +19,7 @@ import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 export type CompanyTab = 'directory' | 'profile' | 'departments' | 'designations' | 'holiday';
 
@@ -86,7 +87,7 @@ function emptyTenantForm(): CreateCompanyRequest {
 @Component({
   selector: 'app-company',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconDirective],
+  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent],
   template: `
     <div class="company-page">
       @if (!isSuperAdmin()) {
@@ -342,7 +343,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                       role="searchbox"
                       style="padding-right: 28px;"
                       [ngModel]="tenantSearch()" 
-                      (ngModelChange)="tenantSearch.set($event)" 
+                      (ngModelChange)="tenantSearch.set($event); tenantPage.set(1)" 
                     />
                     @if (tenantSearch()) {
                       <button 
@@ -410,7 +411,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                     <td colspan="5" style="text-align: center; padding: 32px; color: var(--muted);">No companies yet. Create one to provision its dedicated database.</td>
                   </tr>
                 } @else {
-                  @for (c of filteredTenantCompanies(); track c.id) {
+                  @for (c of paginatedTenantCompanies(); track c.id) {
                     <tr style="border-bottom: 1px solid var(--border);">
                       <td style="padding: 14px 16px;">
                         <div style="display: flex; align-items: center; gap: 12px;">
@@ -503,7 +504,7 @@ function emptyTenantForm(): CreateCompanyRequest {
             } @else if (tenantCompanies().length === 0) {
               <div style="text-align: center; padding: 32px; color: var(--muted);">No companies yet. Create one to provision its dedicated database.</div>
             } @else {
-              @for (c of filteredTenantCompanies(); track c.id) {
+              @for (c of paginatedTenantCompanies(); track c.id) {
                 <div class="m-sa-company-card">
                   <div class="m-sa-card-header">
                     <div style="display: flex; align-items: center; gap: 10px;">
@@ -572,6 +573,7 @@ function emptyTenantForm(): CreateCompanyRequest {
               }
             }
           </div>
+          <app-table-pagination [total]="filteredTenantCompanies().length" [page]="tenantPage()" (pageChange)="tenantPage.set($event)" />
         }
 
 
@@ -884,65 +886,7 @@ function emptyTenantForm(): CreateCompanyRequest {
 
         <!-- Table Footer / Pagination (Tabs 2, 3, 4 only) -->
         @if (activeTab() === 'departments' || activeTab() === 'designations' || activeTab() === 'holiday') {
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--surface); flex-wrap: wrap; gap: 12px;">
-            <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted);">
-              <span>Rows per page:</span>
-              <select 
-                class="form-control" 
-                [value]="pageSize()" 
-                (change)="onPageSizeChange(+$any($event.target).value)" 
-                style="width: 70px; padding: 4px 8px; font-size: 12px;"
-              >
-                <option [value]="5">5</option>
-                <option [value]="10">10</option>
-                <option [value]="25">25</option>
-                <option [value]="50">50</option>
-              </select>
-              <span>Showing {{ currentTotalCount() === 0 ? 0 : currentStartIndex() + 1 }} - {{ currentEndIndex() }} of {{ currentTotalCount() }}</span>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <!-- Previous Button (<) -->
-              <button 
-                type="button"
-                class="pg-btn" 
-                [disabled]="currentPage() <= 1" 
-                (click)="currentPage.set(currentPage() - 1)"
-                data-tooltip="Previous"
-                aria-label="Previous page"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </button>
-
-              <!-- Dynamic Page Numbers -->
-              @for (p of pageNumbers(); track p) {
-                <button
-                  type="button"
-                  class="pg-btn"
-                  [class.active]="p === currentPage()"
-                  (click)="currentPage.set(p)"
-                >
-                  {{ p }}
-                </button>
-              }
-
-              <!-- Next Button (>) -->
-              <button 
-                type="button"
-                class="pg-btn" 
-                [disabled]="currentEndIndex() >= currentTotalCount() || currentPage() >= totalPages()" 
-                (click)="currentPage.set(currentPage() + 1)"
-                data-tooltip="Next"
-                aria-label="Next page"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          <app-table-pagination [total]="currentTotalCount()" [page]="currentPage()" (pageChange)="currentPage.set($event)" />
         }
           </div>
         }
@@ -1958,7 +1902,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
   };
 
   // Pagination state (for non-SuperAdmin directory & tabs 2, 3, 4)
-  protected readonly pageSize = signal<number>(10);
+  protected readonly pageSize = signal<number>(8);
   protected readonly currentPage = signal(1);
 
   // Filter models as reactive signals
@@ -1994,10 +1938,12 @@ export class CompanyComponent implements OnInit, OnDestroy {
 
   protected clearTenantSearch(): void {
     this.tenantSearch.set('');
+    this.tenantPage.set(1);
     if (this.tenantSearchRef?.nativeElement) {
       this.tenantSearchRef.nativeElement.value = '';
     }
   }
+  protected readonly tenantPage = signal<number>(1);
   protected readonly filteredTenantCompanies = computed(() => {
     const list = this.tenantCompanies();
     const q = this.tenantSearch().trim().toLowerCase();
@@ -2011,6 +1957,9 @@ export class CompanyComponent implements OnInit, OnDestroy {
         (c.databaseName && c.databaseName.toLowerCase().includes(q))
     );
   });
+  protected readonly paginatedTenantCompanies = computed(() =>
+    paginateSlice(this.filteredTenantCompanies(), this.tenantPage()),
+  );
   protected readonly showCreateTenant = signal(false);
   protected readonly showEditTenant = signal(false);
   protected readonly showDeleteTenantConfirm = signal(false);
@@ -2027,7 +1976,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
 
   // Tenant Company Employees Pagination in Modal
   protected readonly tenantEmpPage = signal<number>(1);
-  protected readonly tenantEmpPageSize = signal<number>(5);
+  protected readonly tenantEmpPageSize = signal<number>(8);
   protected readonly tenantEmpSearch = signal<string>('');
 
   protected readonly tenantFilteredEmployees = computed(() => {

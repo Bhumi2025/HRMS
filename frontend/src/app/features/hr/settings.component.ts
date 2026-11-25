@@ -16,6 +16,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { KeyGroupCacheService } from '../../core/services/key-group-cache.service';
 import { UiService } from '../../core/services/ui.service';
 import { SessionService } from '../../core/services/session.service';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 export interface FlatKeyGroupItem {
   id: string;
@@ -45,7 +46,7 @@ export interface FlatNavigationItem {
 
 @Component({
   selector: 'app-settings',
-  imports: [CommonModule, FormsModule, IconDirective],
+  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent],
   template: `
     <div class="settings-page">
       <!-- Settings Top Tabs Navigation -->
@@ -271,13 +272,13 @@ export interface FlatNavigationItem {
                           class="form-control" 
                           placeholder="Search Name..." 
                           [ngModel]="keyGroupSearch()" 
-                          (ngModelChange)="keyGroupSearch.set($event)"
+                          (ngModelChange)="keyGroupSearch.set($event); keyGroupPage.set(1)"
                           style="width: 100%; font-size: 12px; padding: 4px 8px;"
                         />
                       </th>
                       <th style="padding: 6px 12px;" colspan="3"></th>
                       <th style="padding: 6px 12px; text-align: right;">
-                        <button class="btn btn-ghost btn-sm" (click)="keyGroupSearch.set('')" data-tooltip="Clear">
+                        <button class="btn btn-ghost btn-sm" (click)="keyGroupSearch.set(''); keyGroupPage.set(1)" data-tooltip="Clear">
                           <span [appIcon]="'x'"></span>
                         </button>
                       </th>
@@ -285,7 +286,7 @@ export interface FlatNavigationItem {
                   }
                 </thead>
                 <tbody>
-                  @for (kg of filteredKeyGroups(); track kg.id) {
+                  @for (kg of paginatedKeyGroups(); track kg.id) {
                     <tr>
                       <td style="font-weight: 600; color: var(--muted);">{{ kg.srNo }}</td>
                       <td style="font-weight: 700;">{{ kg.name }}</td>
@@ -346,6 +347,7 @@ export interface FlatNavigationItem {
                 </tbody>
               </table>
             </div>
+            <app-table-pagination [total]="filteredKeyGroups().length" [page]="keyGroupPage()" (pageChange)="keyGroupPage.set($event)" />
           </div>
         }
       }
@@ -392,13 +394,13 @@ export interface FlatNavigationItem {
                         class="form-control" 
                         placeholder="Search Title..." 
                         [ngModel]="navSearch()" 
-                        (ngModelChange)="navSearch.set($event)"
+                        (ngModelChange)="navSearch.set($event); navPage.set(1)"
                         style="width: 100%; font-size: 12px; padding: 4px 8px;"
                       />
                     </th>
                     <th style="padding: 6px 12px;" colspan="5"></th>
                     <th style="padding: 6px 12px; text-align: right;">
-                      <button class="btn btn-ghost btn-sm" (click)="navSearch.set('')" data-tooltip="Clear">
+                      <button class="btn btn-ghost btn-sm" (click)="navSearch.set(''); navPage.set(1)" data-tooltip="Clear">
                         <span [appIcon]="'x'"></span>
                       </button>
                     </th>
@@ -406,7 +408,7 @@ export interface FlatNavigationItem {
                 }
               </thead>
               <tbody>
-                @for (item of filteredNavigations(); track item.id) {
+                @for (item of paginatedNavigations(); track item.id) {
                   <tr>
                     <td style="font-weight: 600; color: var(--muted);">{{ item.srNo }}</td>
                     <td>
@@ -483,6 +485,7 @@ export interface FlatNavigationItem {
               </tbody>
             </table>
           </div>
+          <app-table-pagination [total]="filteredNavigations().length" [page]="navPage()" (pageChange)="navPage.set($event)" />
         </div>
       }
 
@@ -525,13 +528,13 @@ export interface FlatNavigationItem {
                         class="form-control" 
                         placeholder="Search Role..." 
                         [ngModel]="roleSearch()" 
-                        (ngModelChange)="roleSearch.set($event)"
+                        (ngModelChange)="roleSearch.set($event); rolePage.set(1)"
                         style="width: 100%; font-size: 12px; padding: 4px 8px;"
                       />
                     </th>
                     <th style="padding: 6px 12px;" colspan="4"></th>
                     <th style="padding: 6px 12px; text-align: right;">
-                      <button class="btn btn-ghost btn-sm" (click)="roleSearch.set('')" data-tooltip="Clear">
+                      <button class="btn btn-ghost btn-sm" (click)="roleSearch.set(''); rolePage.set(1)" data-tooltip="Clear">
                         <span [appIcon]="'x'"></span>
                       </button>
                     </th>
@@ -539,9 +542,9 @@ export interface FlatNavigationItem {
                 }
               </thead>
               <tbody>
-                @for (role of filteredRoles(); track role.id; let idx = $index) {
+                @for (role of paginatedRoles(); track role.id; let idx = $index) {
                   <tr>
-                    <td style="font-weight: 600; color: var(--muted);">{{ idx + 1 }}</td>
+                    <td style="font-weight: 600; color: var(--muted);">{{ (rolePage() - 1) * 8 + idx + 1 }}</td>
                     <td style="font-weight: 700;">{{ role.name }}</td>
                     <td>
                       <span class="badge" style="background: var(--p-soft); color: var(--p); font-weight: 700;">{{ role.code }}</span>
@@ -573,6 +576,7 @@ export interface FlatNavigationItem {
               </tbody>
             </table>
           </div>
+          <app-table-pagination [total]="filteredRoles().length" [page]="rolePage()" (pageChange)="rolePage.set($event)" />
         </div>
       }
     </div>
@@ -1034,6 +1038,13 @@ export class SettingsComponent implements OnInit {
       !this.roleSearch() || r.name.toLowerCase().includes(this.roleSearch().toLowerCase()) || r.code.toLowerCase().includes(this.roleSearch().toLowerCase())
     );
   });
+
+  protected readonly keyGroupPage = signal(1);
+  protected readonly navPage = signal(1);
+  protected readonly rolePage = signal(1);
+  protected readonly paginatedKeyGroups = computed(() => paginateSlice(this.filteredKeyGroups(), this.keyGroupPage()));
+  protected readonly paginatedNavigations = computed(() => paginateSlice(this.filteredNavigations(), this.navPage()));
+  protected readonly paginatedRoles = computed(() => paginateSlice(this.filteredRoles(), this.rolePage()));
 
   protected readonly availableParents = computed(() => {
     const editId = this.editingNavId();

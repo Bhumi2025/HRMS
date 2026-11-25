@@ -13,6 +13,7 @@ import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { triggerDocumentDownload } from '../../core/utils/document-download.util';
 import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface ProfileData {
   id: string;
@@ -39,7 +40,7 @@ interface DocRow {
 /** Employee Profile — ported from pages/employee-profile.html. */
 @Component({
   selector: 'app-employee-profile',
-  imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent, RouterModule],
+  imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent, RouterModule, TablePaginationComponent],
   template: `
     @if (viewMode() === 'admin') {
       <!-- ADMINISTRATOR BANNER -->
@@ -544,7 +545,7 @@ interface DocRow {
               </tr>
             </thead>
             <tbody>
-              @for (r of docs(); track r.doc) {
+              @for (r of paginatedDocs(); track r.doc) {
                 <tr>
                   <td style="font-weight: 600">{{ r.doc }}</td>
                   <td><span class="badge badge-info">{{ r.type }}</span></td>
@@ -563,6 +564,7 @@ interface DocRow {
             </tbody>
           </table>
         </div>
+        <app-table-pagination [total]="docs().length" [page]="docsPage()" (pageChange)="docsPage.set($event)" />
       </div>
 
       <div class="tab-action-bar">
@@ -1840,6 +1842,8 @@ export class EmployeeProfileComponent implements OnInit {
   protected salaryStructure: [string, string, string][] = [];
 
   protected readonly docs = signal<DocRow[]>([]);
+  protected readonly docsPage = signal(1);
+  protected readonly paginatedDocs = computed(() => paginateSlice(this.docs(), this.docsPage()));
 
   protected readonly uploadType = signal('Passport');
 

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 function emptyForm(): CreateCompanyRequest {
   return {
@@ -31,7 +32,7 @@ function emptyForm(): CreateCompanyRequest {
  */
 @Component({
   selector: 'app-companies',
-  imports: [CommonModule, FormsModule, IconDirective],
+  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent],
   templateUrl: './companies.component.html',
 })
 export class CompaniesComponent implements OnInit, OnDestroy {
@@ -39,6 +40,8 @@ export class CompaniesComponent implements OnInit, OnDestroy {
   private readonly toast = inject(ToastService);
 
   protected readonly companies = signal<CompanyListItem[]>([]);
+  protected readonly page = signal(1);
+  protected readonly paginatedCompanies = computed(() => paginateSlice(this.companies(), this.page()));
   protected readonly loading = signal(false);
   protected search = '';
 

@@ -55,7 +55,7 @@
             <td colspan="6" style="text-align: center; color: var(--muted);">No companies yet. Create one to provision its database.</td>
           </tr>
         } @else {
-          @for (c of companies(); track c.id) {
+          @for (c of paginatedCompanies(); track c.id) {
             <tr>
               <td>
                 <div style="font-weight: 700; font-size: 14px;">{{ c.name }}</div>
@@ -119,6 +119,7 @@
       </tbody>
     </table>
   </div>
+  <app-table-pagination [total]="companies().length" [page]="page()" (pageChange)="page.set($event)" />
 </div>
 
 <!-- Create company modal -->

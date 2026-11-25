@@ -8,6 +8,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface PayslipRow {
   id: string;
@@ -23,7 +24,7 @@ interface PayslipRow {
 /** My Payslips — ported from pages/emp-payslips.html. */
 @Component({
   selector: 'app-emp-payslips',
-  imports: [CommonModule, IconDirective, SelectComponent],
+  imports: [CommonModule, IconDirective, SelectComponent, TablePaginationComponent],
   template: `
     <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px">
       <button class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 6px" (click)="downloadLatest()">
@@ -34,7 +35,7 @@ interface PayslipRow {
     <div class="card">
       <div class="card-header" style="margin-bottom: 12px">
         <div class="card-title">Payslip History</div>
-        <app-select [options]="yearOptions()" [value]="year()" (valueChange)="year.set($event)" width="130px" />
+        <app-select [options]="yearOptions()" [value]="year()" (valueChange)="year.set($event); page.set(1)" width="130px" />
       </div>
       <div class="table-wrap">
         <table>
@@ -51,7 +52,7 @@ interface PayslipRow {
             </tr>
           </thead>
           <tbody>
-            @for (p of filtered(); track p.id) {
+            @for (p of paginatedPayslips(); track p.id) {
               <tr>
                 <td style="font-weight: 600">{{ p.m }}</td>
                 <td style="color: var(--muted)">{{ p.date }}</td>
@@ -73,6 +74,7 @@ interface PayslipRow {
           </tbody>
         </table>
       </div>
+      <app-table-pagination [total]="filtered().length" [page]="page()" (pageChange)="page.set($event)" />
     </div>
 
     <div class="modal-overlay" [class.open]="ui.isOpen('viewModal')" (click)="ui.onOverlayClick($event, 'viewModal')">
@@ -160,6 +162,8 @@ export class EmpPayslipsComponent implements OnInit {
     const rows = this.allPayslips();
     return y ? rows.filter((p) => p.m.includes(y)) : rows;
   });
+  protected readonly page = signal(1);
+  protected readonly paginatedPayslips = computed(() => paginateSlice(this.filtered(), this.page()));
 
   ngOnInit(): void {
     this.api.myPayslips().subscribe({

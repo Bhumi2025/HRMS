@@ -9,6 +9,7 @@ import { PermissionService } from '../../core/services/permission.service';
 import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface Regularization {
   id: string;
@@ -89,7 +90,7 @@ interface MusterDay {
 
 @Component({
   selector: 'app-attendance',
-  imports: [CommonModule, FormsModule, IconDirective, RouterModule],
+  imports: [CommonModule, FormsModule, IconDirective, RouterModule, TablePaginationComponent],
   template: `
     <!-- Top Action Header (only shown in Daily Punch Log & Regularization) -->
     @if (tab() !== 'muster') {
@@ -271,7 +272,7 @@ interface MusterDay {
               </tr>
             </thead>
             <tbody>
-              @for (row of filteredDailyRows(); track row.id) {
+              @for (row of paginatedDailyRows(); track row.id) {
                 <tr>
                   <td>
                     <div class="table-avatar" style="cursor: pointer;" (click)="viewEmployeeMuster(row.id)">
@@ -339,6 +340,7 @@ interface MusterDay {
             </tbody>
           </table>
         </div>
+        <app-table-pagination [total]="filteredDailyRows().length" [page]="dailyPage()" (pageChange)="dailyPage.set($event)" />
       </div>
     }
 
@@ -553,15 +555,15 @@ interface MusterDay {
                     type="text" 
                     placeholder="Search day..." 
                     [ngModel]="timelineSearch()" 
-                    (ngModelChange)="timelineSearch.set($event)"
+                    (ngModelChange)="timelineSearch.set($event); musterPage.set(1)"
                   />
                   @if (timelineSearch()) {
-                    <button type="button" class="search-clear-mini" (click)="timelineSearch.set('')" title="Clear search">✕</button>
+                    <button type="button" class="search-clear-mini" (click)="timelineSearch.set(''); musterPage.set(1)" title="Clear search">✕</button>
                   }
                 </div>
 
                 <!-- Status select filter -->
-                <select class="status-dropdown-pill" [ngModel]="timelineStatusFilter()" (ngModelChange)="timelineStatusFilter.set($event)">
+                <select class="status-dropdown-pill" [ngModel]="timelineStatusFilter()" (ngModelChange)="timelineStatusFilter.set($event); musterPage.set(1)">
                   <option value="">All Status</option>
                   <option value="present">Present</option>
                   <option value="late">Late</option>
@@ -733,7 +735,7 @@ interface MusterDay {
                       </tr>
                     </thead>
                     <tbody>
-                      @for (day of filteredMusterDays(); track day.dateStr) {
+                      @for (day of paginatedMusterDays(); track day.dateStr) {
                         <tr [class.row-weekend]="day.isWeekend" [class.row-today]="day.isToday">
                           <td class="cell-date">{{ day.dateFormatted }}</td>
                           <td class="cell-name"><span class="name-text">{{ selectedEmployee()?.fullName || '—' }}</span></td>
@@ -801,6 +803,7 @@ interface MusterDay {
                     </tbody>
                   </table>
                 </div>
+                <app-table-pagination [total]="filteredMusterDays().length" [page]="musterPage()" (pageChange)="musterPage.set($event)" />
               }
             </div>
           </div>
@@ -829,7 +832,7 @@ interface MusterDay {
               </tr>
             </thead>
             <tbody>
-              @for (r of regData(); track r.id) {
+              @for (r of paginatedRegData(); track r.id) {
                 <tr>
                   <td>
                     <div class="table-avatar">
@@ -867,6 +870,7 @@ interface MusterDay {
             </tbody>
           </table>
         </div>
+        <app-table-pagination [total]="regData().length" [page]="regPage()" (pageChange)="regPage.set($event)" />
       </div>
     }
 
@@ -2507,6 +2511,9 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   ]);
 
   protected readonly regData = signal<Regularization[]>([]);
+  protected readonly dailyPage = signal(1);
+  protected readonly musterPage = signal(1);
+  protected readonly regPage = signal(1);
   protected readonly pendingCount = computed(() => this.regData().filter((r) => r.status === 'Pending').length);
 
   // Selected Employee object computed
@@ -2666,8 +2673,13 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   });
 
+  protected readonly paginatedDailyRows = computed(() => paginateSlice(this.filteredDailyRows(), this.dailyPage()));
+  protected readonly paginatedMusterDays = computed(() => paginateSlice(this.filteredMusterDays(), this.musterPage()));
+  protected readonly paginatedRegData = computed(() => paginateSlice(this.regData(), this.regPage()));
+
   protected onFilterStatusChange(st: string): void {
     this.filterStatus.set(st || '');
+    this.dailyPage.set(1);
   }
 
   ngOnInit(): void {
@@ -2738,14 +2750,17 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected onSearchInput(val: string): void {
     this.searchKeyword.set(val || '');
+    this.dailyPage.set(1);
   }
 
   protected onSearchChange(val: string): void {
     this.searchKeyword.set(val || '');
+    this.dailyPage.set(1);
   }
 
   protected clearSearch(): void {
     this.searchKeyword.set('');
+    this.dailyPage.set(1);
     if (this.searchInputRef?.nativeElement) {
       this.searchInputRef.nativeElement.value = '';
     }
@@ -2754,6 +2769,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected clearFilters(): void {
     this.searchKeyword.set('');
     this.filterStatus.set('');
+    this.dailyPage.set(1);
     if (this.searchInputRef?.nativeElement) {
       this.searchInputRef.nativeElement.value = '';
     }
@@ -2874,17 +2890,20 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     if (newDate) {
       this.filterDate.set(newDate);
     }
+    this.dailyPage.set(1);
     this.loadDailyAttendance();
   }
 
   protected viewEmployeeMuster(employeeId: string): void {
     this.selectedMusterEmpId.set(employeeId);
     this.tab.set('muster');
+    this.musterPage.set(1);
     this.generateMuster();
   }
 
   protected selectEmployeeFromSidebar(id: string): void {
     this.selectedMusterEmpId.set(id);
+    this.musterPage.set(1);
     const emp = this.selectedEmployee();
     if (emp) {
       this.newReg.employeeId = emp.id;
@@ -2971,6 +2990,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected onMusterMonthChange(val: string): void {
     if (val) {
       this.selectedMusterMonth.set(val);
+      this.musterPage.set(1);
       this.generateMuster();
     }
   }

@@ -4,6 +4,7 @@ import { ApiService } from '../../core/api/api.service';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface PayrollReport {
   m: string;
@@ -45,7 +46,7 @@ interface OtReport {
 /** Reports — ported from pages/reports.html. */
 @Component({
   selector: 'app-reports',
-  imports: [CommonModule, IconDirective, SelectComponent],
+  imports: [CommonModule, IconDirective, SelectComponent, TablePaginationComponent],
   template: `
     <div class="flex justify-between items-center" style="margin-bottom: 15px">
       <div>
@@ -65,7 +66,7 @@ interface OtReport {
     <div style="margin-bottom: 20px">
       <div class="tabs mb-4">
         @for (t of tabs; track t.id) {
-          <button class="tab-btn" [class.active]="tab() === t.id" (click)="tab.set(t.id)" style="display: flex; align-items: center; gap: 8px">
+          <button class="tab-btn" [class.active]="tab() === t.id" (click)="tab.set(t.id); payrollPage.set(1); attendPage.set(1); leavePage.set(1); otPage.set(1)" style="display: flex; align-items: center; gap: 8px">
             <span [appIcon]="t.icon"></span> {{ t.label }}
           </button>
         }
@@ -76,7 +77,7 @@ interface OtReport {
           <div class="card-header">
             <div class="card-title">Payroll Summary Report</div>
             <div>
-              <app-select [options]="yearOptions()" [value]="year()" (valueChange)="year.set($event)" width="150px" />
+              <app-select [options]="yearOptions()" [value]="year()" (valueChange)="year.set($event); payrollPage.set(1)" width="150px" />
             </div>
           </div>
           <div class="mobile-scroll-hint">
@@ -96,7 +97,7 @@ interface OtReport {
                 </tr>
               </thead>
               <tbody>
-                @for (r of filteredPayrollRows(); track r.m) {
+                @for (r of paginatedPayrollRows(); track r.m) {
                   <tr>
                     <td style="font-weight: 700">{{ r.m }}</td>
                     <td>{{ r.emp }}</td>
@@ -116,6 +117,7 @@ interface OtReport {
               </tbody>
             </table>
           </div>
+          <app-table-pagination [total]="filteredPayrollRows().length" [page]="payrollPage()" (pageChange)="payrollPage.set($event)" />
         </div>
       }
 
@@ -141,7 +143,7 @@ interface OtReport {
                 </tr>
               </thead>
               <tbody>
-                @for (r of attendRows(); track r.n) {
+                @for (r of paginatedAttendRows(); track r.n) {
                   <tr>
                     <td style="font-weight: 600">{{ r.n }}</td>
                     <td class="rpt-col-hide"><span class="badge badge-info">{{ r.dept }}</span></td>
@@ -161,6 +163,7 @@ interface OtReport {
               </tbody>
             </table>
           </div>
+          <app-table-pagination [total]="attendRows().length" [page]="attendPage()" (pageChange)="attendPage.set($event)" />
         </div>
       }
 
@@ -185,7 +188,7 @@ interface OtReport {
                 </tr>
               </thead>
               <tbody>
-                @for (r of leaveRows(); track r.n) {
+                @for (r of paginatedLeaveRows(); track r.n) {
                   <tr>
                     <td style="font-weight: 600">{{ r.n }}</td>
                     <td class="rpt-col-hide">{{ r.annual }}</td>
@@ -204,6 +207,7 @@ interface OtReport {
               </tbody>
             </table>
           </div>
+          <app-table-pagination [total]="leaveRows().length" [page]="leavePage()" (pageChange)="leavePage.set($event)" />
         </div>
       }
 
@@ -227,7 +231,7 @@ interface OtReport {
                 </tr>
               </thead>
               <tbody>
-                @for (r of otRows(); track r.n) {
+                @for (r of paginatedOtRows(); track r.n) {
                   <tr>
                     <td style="font-weight: 600">{{ r.n }}</td>
                     <td>{{ r.hours }}</td>
@@ -245,6 +249,7 @@ interface OtReport {
               </tbody>
             </table>
           </div>
+          <app-table-pagination [total]="otRows().length" [page]="otPage()" (pageChange)="otPage.set($event)" />
         </div>
       }
     </div>
@@ -360,6 +365,16 @@ export class ReportsComponent implements OnInit {
   protected readonly leaveRows = signal<LeaveReport[]>([]);
 
   protected readonly otRows = signal<OtReport[]>([]);
+
+  protected readonly payrollPage = signal(1);
+  protected readonly attendPage = signal(1);
+  protected readonly leavePage = signal(1);
+  protected readonly otPage = signal(1);
+
+  protected readonly paginatedPayrollRows = computed(() => paginateSlice(this.filteredPayrollRows(), this.payrollPage()));
+  protected readonly paginatedAttendRows = computed(() => paginateSlice(this.attendRows(), this.attendPage()));
+  protected readonly paginatedLeaveRows = computed(() => paginateSlice(this.leaveRows(), this.leavePage()));
+  protected readonly paginatedOtRows = computed(() => paginateSlice(this.otRows(), this.otPage()));
 
   ngOnInit(): void {
     this.api.reportsPayroll().subscribe({
