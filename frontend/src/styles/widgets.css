@@ -273,3 +273,152 @@
     height: 8px !important;
   }
 }
+
+/* ---------- DASHBOARD WIDGET SPOTLIGHT POP-OUT ---------- */
+.dash-spotlight-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  background: rgba(15, 23, 42, 0.34);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  animation: dashSpotlightFadeIn 0.22s ease both;
+  cursor: pointer;
+}
+
+[data-theme="dark"] .dash-spotlight-backdrop {
+  background: rgba(0, 0, 0, 0.58);
+}
+
+@keyframes dashSpotlightFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.dash-widget {
+  cursor: pointer;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease;
+}
+
+.dash-widget:not(.widget-popped):hover {
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+}
+
+.dash-widget.widget-popped {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: min(760px, calc(100vw - 40px)) !important;
+  max-width: 760px !important;
+  height: auto !important;
+  min-height: 280px !important;
+  max-height: min(82vh, 680px) !important;
+  z-index: 1510 !important;
+  margin: 0 !important;
+  padding: 18px 20px !important;
+  border-radius: 20px !important;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  cursor: default !important;
+  animation: dashWidgetPopOut 0.28s cubic-bezier(0.34, 1.45, 0.64, 1) both !important;
+}
+
+.dash-widget.widget-popped.attendance-widget,
+.dash-widget.widget-popped.hours-widget {
+  width: min(860px, calc(100vw - 40px)) !important;
+  max-width: 860px !important;
+}
+
+.dash-widget.widget-popped .widget-header,
+.dash-widget.widget-popped .punch-header {
+  padding-right: 36px !important;
+}
+
+.dash-widget.widget-popped .widget-scroll-list {
+  flex: 1 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.dash-widget.widget-popped .chart-body {
+  min-height: 300px !important;
+  height: 320px !important;
+}
+
+.dash-widget.widget-popped .attendance-graph-content {
+  min-height: 250px !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.dash-widget.widget-popped .timelog-chart-wrapper {
+  min-height: 230px !important;
+  height: 250px !important;
+}
+
+@keyframes dashWidgetPopOut {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -47%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.widget-popout-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--bg, #f8fafc);
+  color: var(--muted, #64748b);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.widget-popout-close:hover {
+  background: var(--danger-soft, #fee2e2);
+  color: var(--danger, #dc2626);
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+@media (max-width: 768px) {
+  .dash-widget.widget-popped,
+  .dash-widget.widget-popped.attendance-widget,
+  .dash-widget.widget-popped.hours-widget {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: 82dvh !important;
+    padding: 14px 14px !important;
+    border-radius: 18px !important;
+  }
+
+  .dash-widget.widget-popped .chart-body {
+    min-height: 240px !important;
+    height: 240px !important;
+  }
+
+  .dash-widget.widget-popped .widget-scroll-list {
+    max-height: none !important;
+  }
+}

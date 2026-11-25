@@ -51,4 +51,10 @@ export class UiService {
   isPanel(panel: Exclude<Panel, null>): boolean {
     return this._panel() === panel;
   }
+
+  /** Returns true when a click originated from an interactive control inside a dashboard card. */
+  isInteractiveTarget(event: Event): boolean {
+    const el = event.target as HTMLElement | null;
+    return !!el?.closest('button, a, input, select, textarea, option, .bar-hover-zone, .tab-btn, .holiday-card');
+  }
 }

@@ -1,10 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import Chart from 'chart.js/auto';
 import { ApiService } from '../../core/api/api.service';
 import { EmployeeDashboard } from '../../core/api/api.models';
 import { PunchService } from '../../core/services/punch.service';
+import { UiService } from '../../core/services/ui.service';
 
 interface Holiday {
   mon: string;
@@ -38,6 +39,37 @@ interface Announcement {
 export class EmpDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly api = inject(ApiService);
   protected readonly punchService = inject(PunchService);
+  protected readonly ui = inject(UiService);
+
+  protected readonly poppedWidget = signal<string | null>(null);
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.poppedWidget()) {
+      this.closePopout();
+    }
+  }
+
+  protected openPopout(key: string, event: Event): void {
+    if (this.poppedWidget() === key || this.ui.isInteractiveTarget(event)) {
+      return;
+    }
+    this.poppedWidget.set(key);
+    this.resizeChartsAfterTransition();
+  }
+
+  protected closePopout(event?: Event): void {
+    event?.stopPropagation();
+    this.poppedWidget.set(null);
+    this.resizeChartsAfterTransition();
+  }
+
+  private resizeChartsAfterTransition(): void {
+    setTimeout(() => {
+      this.attChart?.resize();
+      this.hoursChart?.resize();
+    }, 60);
+  }
 
   private readonly attCanvas = viewChild<ElementRef<HTMLCanvasElement>>('attChart');
   private readonly hoursCanvas = viewChild<ElementRef<HTMLCanvasElement>>('hoursChart');

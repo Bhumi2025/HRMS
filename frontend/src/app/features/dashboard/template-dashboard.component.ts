@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, NgZone, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, NgZone, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
 import { PermissionService } from '../../core/services/permission.service';
 import { SessionService } from '../../core/services/session.service';
 import { PunchService } from '../../core/services/punch.service';
 import { NotificationStateService } from '../../core/services/notification-state.service';
+import { UiService } from '../../core/services/ui.service';
 import {
   DashboardTemplateData,
   NoticeBoardItem,
@@ -61,8 +62,30 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
   protected readonly punchService = inject(PunchService);
   protected readonly perms = inject(PermissionService);
   protected readonly notifState = inject(NotificationStateService);
+  protected readonly ui = inject(UiService);
   private readonly api = inject(ApiService);
   private readonly zone = inject(NgZone);
+
+  protected readonly poppedWidget = signal<string | null>(null);
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.poppedWidget()) {
+      this.closePopout();
+    }
+  }
+
+  protected openPopout(key: string, event: Event): void {
+    if (this.poppedWidget() === key || this.ui.isInteractiveTarget(event)) {
+      return;
+    }
+    this.poppedWidget.set(key);
+  }
+
+  protected closePopout(event?: Event): void {
+    event?.stopPropagation();
+    this.poppedWidget.set(null);
+  }
 
   private clockInterval: ReturnType<typeof setInterval> | null = null;
   private refreshInterval: ReturnType<typeof setInterval> | null = null;

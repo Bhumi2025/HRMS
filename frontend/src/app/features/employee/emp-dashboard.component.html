@@ -1,4 +1,7 @@
 <div class="dash-container">
+  @if (poppedWidget()) {
+    <div class="dash-spotlight-backdrop" (click)="closePopout()"></div>
+  }
   <!-- Mobile Category Filter Tabs (Visible only on mobile screens <= 768px) -->
   <div class="mobile-section-tabs">
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'all'" (click)="setMobileSection('all')">
@@ -96,7 +99,15 @@
       <!-- ROW 1: Leave Balance (No Apply Button) + Attendance Overview -->
       <div class="center-row">
         <!-- 1. Leave Balance Card -->
-        <div class="dash-widget leave-widget" [class.mobile-hidden]="activeMobileSection() !== 'all'">
+        <div
+          class="dash-widget leave-widget"
+          [class.mobile-hidden]="activeMobileSection() !== 'all'"
+          [class.widget-popped]="poppedWidget() === 'leave'"
+          (click)="openPopout('leave', $event)"
+        >
+          @if (poppedWidget() === 'leave') {
+            <button type="button" class="widget-popout-close" (click)="closePopout($event)" aria-label="Close">✕</button>
+          }
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator amber"></span>
@@ -144,7 +155,15 @@
         </div>
 
         <!-- 2. Attendance Overview Card -->
-        <div class="dash-widget attendance-widget" [class.mobile-hidden]="activeMobileSection() !== 'all'">
+        <div
+          class="dash-widget attendance-widget"
+          [class.mobile-hidden]="activeMobileSection() !== 'all'"
+          [class.widget-popped]="poppedWidget() === 'attendance'"
+          (click)="openPopout('attendance', $event)"
+        >
+          @if (poppedWidget() === 'attendance') {
+            <button type="button" class="widget-popout-close" (click)="closePopout($event)" aria-label="Close">✕</button>
+          }
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator green"></span>
@@ -170,7 +189,15 @@
       <!-- ROW 2: Working Hours + Notice Board -->
       <div class="center-row">
         <!-- 3. Working Hours Card -->
-        <div class="dash-widget hours-widget" [class.mobile-hidden]="activeMobileSection() !== 'all'">
+        <div
+          class="dash-widget hours-widget"
+          [class.mobile-hidden]="activeMobileSection() !== 'all'"
+          [class.widget-popped]="poppedWidget() === 'hours'"
+          (click)="openPopout('hours', $event)"
+        >
+          @if (poppedWidget() === 'hours') {
+            <button type="button" class="widget-popout-close" (click)="closePopout($event)" aria-label="Close">✕</button>
+          }
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator purple"></span>
@@ -188,7 +215,15 @@
         </div>
 
         <!-- 4. Notice Board Card -->
-        <div class="dash-widget notice-widget" [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'notices'">
+        <div
+          class="dash-widget notice-widget"
+          [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'notices'"
+          [class.widget-popped]="poppedWidget() === 'notice'"
+          (click)="openPopout('notice', $event)"
+        >
+          @if (poppedWidget() === 'notice') {
+            <button type="button" class="widget-popout-close" (click)="closePopout($event)" aria-label="Close">✕</button>
+          }
           <div class="widget-header">
             <div class="header-left">
               <span class="widget-indicator blue"></span>
@@ -229,7 +264,15 @@
     <!-- RIGHT COLUMN: Time Tracker & Holiday Calendar -->
     <div class="dash-right-col">
       <!-- 1. Time Tracker & Attendance Punch Card -->
-      <div class="dash-widget punch-widget" [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'clock'">
+      <div
+        class="dash-widget punch-widget"
+        [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'clock'"
+        [class.widget-popped]="poppedWidget() === 'punch'"
+        (click)="openPopout('punch', $event)"
+      >
+        @if (poppedWidget() === 'punch') {
+          <button type="button" class="widget-popout-close" (click)="closePopout($event)" aria-label="Close">✕</button>
+        }
         <!-- Punch Header -->
         <div class="punch-header">
           <div class="punch-date">{{ currentTime() | date:'EEEE, MMM d, y' }}</div>
@@ -321,7 +364,15 @@
       </div>
 
       <!-- 2. Upcoming Holidays / Holiday Calendar Card -->
-      <div class="dash-widget holiday-widget" [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'holidays'">
+      <div
+        class="dash-widget holiday-widget"
+        [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'holidays'"
+        [class.widget-popped]="poppedWidget() === 'holiday'"
+        (click)="openPopout('holiday', $event)"
+      >
+        @if (poppedWidget() === 'holiday') {
+          <button type="button" class="widget-popout-close" (click)="closePopout($event)" aria-label="Close">✕</button>
+        }
         <div class="widget-header">
           <div class="header-left">
             <span class="widget-indicator orange"></span>
