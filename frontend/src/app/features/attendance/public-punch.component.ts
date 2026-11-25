@@ -1617,7 +1617,10 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
     this.popupTimer = setInterval(() => {
       const rem = this.popupCountdown() - 1;
       this.popupCountdown.set(rem);
-      if (rem <= 0) this.dismissPopup();
+      if (rem <= 0) {
+        this.dismissPopup();
+        window.location.reload();
+      }
     }, 1000);
   }
 

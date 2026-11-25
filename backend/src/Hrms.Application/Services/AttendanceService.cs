@@ -1527,21 +1527,30 @@ public sealed class AttendanceService : IAttendanceService
                 $"Synced 0 punch(es) from {request.DeviceSerial}. 0 duplicate(s) ignored.");
         }
 
+        var (compTz, _, _) = await GetCompanyTimeZoneAsync(ct);
+
         var codes = items.Select(x => x.Code.ToUpperInvariant()).Distinct().ToList();
 
         // One query for every referenced employee.
         var employees = (await _uow.Employees.ToListAsync(
-            _uow.Employees.Query().Where(e => codes.Contains(e.EmployeeCode.ToUpper())), ct)).ToList();
+            _uow.Employees.Query().Where(e => codes.Contains(e.EmployeeCode.Trim().ToUpper())), ct)).ToList();
 
         var employeeByCode = employees
-            .GroupBy(e => e.EmployeeCode.ToUpperInvariant())
+            .GroupBy(e => e.EmployeeCode.Trim().ToUpperInvariant())
             .ToDictionary(g => g.Key, g => g.First());
 
         var employeeIds = employees.Select(e => e.Id).Distinct().ToList();
 
-        // One query for the punches needed by duplicate detection and same-day toggle parity.
-        var windowFrom = items.Min(x => x.Utc).Date.AddMinutes(-2);
-        var windowTo = items.Max(x => x.Utc).Date.AddDays(1).AddMinutes(2);
+        var localDates = items
+            .Select(x => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(x.Utc, compTz)))
+            .Distinct()
+            .ToList();
+
+        // Expand query window using company-local day bounds so timezone offsets don't split a shift day.
+        var minLocalDayStartUtc = TimeZoneInfo.ConvertTimeToUtc(localDates.Min().ToDateTime(TimeOnly.MinValue), compTz);
+        var maxLocalDayEndUtc = TimeZoneInfo.ConvertTimeToUtc(localDates.Max().AddDays(1).ToDateTime(TimeOnly.MinValue), compTz);
+        var windowFrom = minLocalDayStartUtc.AddMinutes(-5);
+        var windowTo = maxLocalDayEndUtc.AddMinutes(5);
 
         var punchesByEmployee = (await _uow.Punches.ToListAsync(
                 _uow.Punches.Query().Where(p => employeeIds.Contains(p.EmployeeId)
@@ -1550,13 +1559,20 @@ public sealed class AttendanceService : IAttendanceService
             .GroupBy(p => p.EmployeeId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        // One query for the attendance records covering the affected employee/date pairs.
-        var dates = items.Select(x => DateOnly.FromDateTime(x.Utc)).Distinct().ToList();
-
-        var recordByKey = (await _uow.Attendance.ToListAsync(
-                _uow.Attendance.Query().Where(a => employeeIds.Contains(a.EmployeeId) && dates.Contains(a.Date)),
+        // Load ALL open punches across all dates for these employees so IX_EmployeePunches_EmployeeId_IsOpen never fails
+        // when an employee has an unclosed punch from a previous day.
+        var openPunchesByEmployee = (await _uow.Punches.ToListAsync(
+                _uow.Punches.Query().Where(p => employeeIds.Contains(p.EmployeeId) && p.IsOpen),
                 ct))
-            .ToDictionary(a => (a.EmployeeId, a.Date));
+            .GroupBy(p => p.EmployeeId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        // One query for the attendance records covering the affected employee/local-date pairs.
+        var recordByKey = (await _uow.Attendance.ToListAsync(
+                _uow.Attendance.Query().Where(a => employeeIds.Contains(a.EmployeeId) && localDates.Contains(a.Date)),
+                ct))
+            .GroupBy(a => (a.EmployeeId, a.Date))
+            .ToDictionary(g => g.Key, g => g.First());
 
         var acceptedTimes = new Dictionary<Guid, List<DateTime>>();
         var newlyAdded = new HashSet<(Guid EmployeeId, DateOnly Date)>();
@@ -1573,15 +1589,19 @@ public sealed class AttendanceService : IAttendanceService
             }
 
             var itemUtc = entry.Utc;
+            var localItem = TimeZoneInfo.ConvertTimeFromUtc(itemUtc, compTz);
+            var dateOnly = DateOnly.FromDateTime(localItem);
+            var timeOnly = TimeOnly.FromDateTime(localItem);
+
             var knownPunches = punchesByEmployee.TryGetValue(employee.Id, out var known) ? known : new List<EmployeePunch>();
             var accepted = acceptedTimes.TryGetValue(employee.Id, out var times) ? times : new List<DateTime>();
 
-            // Determine punch type
+            // Determine punch type using company-local day bounds
             if (!Enum.TryParse<PunchType>(entry.Item.PunchType, true, out var punchType))
             {
-                var startOfDay = itemUtc.Date;
-                var endOfDay = startOfDay.AddDays(1);
-                var todayCount = knownPunches.Count(p => p.PunchTime >= startOfDay && p.PunchTime < endOfDay);
+                var startOfDayUtc = TimeZoneInfo.ConvertTimeToUtc(dateOnly.ToDateTime(TimeOnly.MinValue), compTz);
+                var endOfDayUtc = TimeZoneInfo.ConvertTimeToUtc(dateOnly.AddDays(1).ToDateTime(TimeOnly.MinValue), compTz);
+                var todayCount = knownPunches.Count(p => p.PunchTime >= startOfDayUtc && p.PunchTime < endOfDayUtc);
                 punchType = (todayCount % 2 == 0) ? PunchType.ClockIn : PunchType.ClockOut;
             }
 
@@ -1600,31 +1620,52 @@ public sealed class AttendanceService : IAttendanceService
             accepted.Add(itemUtc);
             acceptedTimes[employee.Id] = accepted;
 
-            // Close any previous open punches for this employee when recording punch
-            var previousOpenPunches = knownPunches.Where(p => p.IsOpen).ToList();
-            foreach (var op in previousOpenPunches)
+            // Close any previous open punches (across all prior days) for this employee before adding the new punch
+            if (openPunchesByEmployee.TryGetValue(employee.Id, out var previousOpenPunches))
             {
-                op.IsOpen = false;
-                _uow.Punches.Update(op);
+                foreach (var op in previousOpenPunches)
+                {
+                    if (op.IsOpen)
+                    {
+                        op.IsOpen = false;
+                        _uow.Punches.Update(op);
+                    }
+                }
+                previousOpenPunches.Clear();
             }
 
-            var deviceName = entry.Item.DeviceName ?? (!string.IsNullOrWhiteSpace(request.DeviceSerial) ? request.DeviceSerial : "Face Terminal");
+            var rawDevice = entry.Item.DeviceName ?? (!string.IsNullOrWhiteSpace(request.DeviceSerial) ? request.DeviceSerial : "Face Terminal");
+            var deviceName = rawDevice.Length > 80 ? rawDevice[..80] : rawDevice;
+            var rawNote = entry.Item.Note ?? $"Face scan ({request.DeviceSerial})";
+            var note = rawNote.Length > 250 ? rawNote[..250] : rawNote;
+
             var punch = new EmployeePunch
             {
                 EmployeeId = employee.Id,
                 PunchTime = itemUtc,
                 PunchType = punchType,
-                Note = entry.Item.Note ?? $"Face scan ({request.DeviceSerial})",
+                Note = note,
                 Device = deviceName,
                 IsOpen = (punchType != PunchType.ClockOut)
             };
             await _uow.Punches.AddAsync(punch, ct);
+            if (punch.IsOpen)
+            {
+                if (!openPunchesByEmployee.TryGetValue(employee.Id, out var openList))
+                {
+                    openList = new List<EmployeePunch>();
+                    openPunchesByEmployee[employee.Id] = openList;
+                }
+                openList.Add(punch);
+            }
+            if (!punchesByEmployee.TryGetValue(employee.Id, out var empKnownList))
+            {
+                empKnownList = new List<EmployeePunch>();
+                punchesByEmployee[employee.Id] = empKnownList;
+            }
+            empKnownList.Add(punch);
 
             // Synchronise with AttendanceRecord using company timezone
-            var (compTz, _, _) = await GetCompanyTimeZoneAsync(ct);
-            var localItem = TimeZoneInfo.ConvertTimeFromUtc(itemUtc, compTz);
-            var dateOnly = DateOnly.FromDateTime(localItem);
-            var timeOnly = TimeOnly.FromDateTime(localItem);
             var key = (employee.Id, dateOnly);
 
             if (!recordByKey.TryGetValue(key, out var todayRecord))
@@ -1798,10 +1839,15 @@ public sealed class AttendanceService : IAttendanceService
         );
 
         var syncResult = await ProcessPunchBatchAsync(syncRequest, ct);
-        var todayRecord = await _uow.Attendance.GetForEmployeeDateAsync(employee.Id, DateOnly.FromDateTime(DateTime.UtcNow), ct);
+        var (compTz, _, _) = await GetCompanyTimeZoneAsync(ct);
+        var localToday = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, compTz));
+        var todayRecord = await _uow.Attendance.GetForEmployeeDateAsync(employee.Id, localToday, ct);
+        var latestPunch = await _uow.Punches.FirstOrDefaultAsync(
+            _uow.Punches.Query().Where(p => p.EmployeeId == employee.Id).OrderByDescending(p => p.PunchTime),
+            ct);
 
-        var isClockOut = string.Equals(request.PunchType, "ClockOut", StringComparison.OrdinalIgnoreCase) || 
-            (string.IsNullOrWhiteSpace(request.PunchType) && todayRecord?.CheckOut != null);
+        var isClockOut = string.Equals(request.PunchType, "ClockOut", StringComparison.OrdinalIgnoreCase) ||
+            (string.IsNullOrWhiteSpace(request.PunchType) && (latestPunch?.PunchType == PunchType.ClockOut || (latestPunch == null && todayRecord?.CheckOut != null)));
 
         var msg = syncResult.ProcessedCount > 0
             ? (isClockOut ? $"Successfully Punched Out: Goodbye {employee.FullName}!" : $"Successfully Punched In: Welcome {employee.FullName}!")
