@@ -138,8 +138,6 @@ export class ShellComponent implements OnInit, OnDestroy {
     }).format(new Date());
   });
 
-  protected readonly currentYear = new Date().getFullYear();
-
   protected readonly backendNavItems = signal<any[]>([]);
 
   /** Sidebar sections dynamically generated per role */
