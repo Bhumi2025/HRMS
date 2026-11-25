@@ -1180,6 +1180,11 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('faceVideo') private faceVideoRef?: ElementRef<HTMLVideoElement>;
   @ViewChild('faceCanvas') private faceCanvasRef?: ElementRef<HTMLCanvasElement>;
 
+  // Silent background GPS coordinates sent to backend for 100m validation
+  private currentLat: number | null = null;
+  private currentLon: number | null = null;
+  private geoWatchId: number | null = null;
+
   // Page-only theme state (defaults to dark mode)
   protected readonly isDarkMode = signal<boolean>(this.readInitialTheme());
 
@@ -1253,6 +1258,10 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.clockInterval) clearInterval(this.clockInterval);
     if (this.scanInterval) clearInterval(this.scanInterval);
     if (this.popupTimer) clearInterval(this.popupTimer);
+    if (this.geoWatchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(this.geoWatchId);
+      this.geoWatchId = null;
+    }
     this.stopCamera();
   }
 
@@ -1381,12 +1390,63 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
     this.companyLogoUrl.set(auth.companyLogoUrl ?? null);
     this.isUnlocked.set(true);
     this.loadEnrolledFaces();
+    this.startGpsTracking();
+  }
+
+  private startGpsTracking(): void {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        this.currentLat = pos.coords.latitude;
+        this.currentLon = pos.coords.longitude;
+      },
+      () => {
+        this.currentLat = null;
+        this.currentLon = null;
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+    if (this.geoWatchId !== null) {
+      navigator.geolocation.clearWatch(this.geoWatchId);
+    }
+    this.geoWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        this.currentLat = pos.coords.latitude;
+        this.currentLon = pos.coords.longitude;
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+    );
+  }
+
+  private getCurrentCoords(): Promise<{ lat: number | null; lon: number | null }> {
+    if (this.currentLat !== null && this.currentLon !== null) {
+      return Promise.resolve({ lat: this.currentLat, lon: this.currentLon });
+    }
+    if (!navigator.geolocation) {
+      return Promise.resolve({ lat: null, lon: null });
+    }
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          this.currentLat = pos.coords.latitude;
+          this.currentLon = pos.coords.longitude;
+          resolve({ lat: this.currentLat, lon: this.currentLon });
+        },
+        () => resolve({ lat: null, lon: null }),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 5000 },
+      );
+    });
   }
 
   protected lockTerminal(errorMsg?: string): void {
     if (this.scanInterval) {
       clearInterval(this.scanInterval);
       this.scanInterval = null;
+    }
+    if (this.geoWatchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(this.geoWatchId);
+      this.geoWatchId = null;
     }
     this.stopCamera();
     this.dismissPopup();
@@ -1403,6 +1463,8 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
     this.faceStatus.set('idle');
     this.faceMatchScore.set(null);
     this.matchedFace.set(null);
+    this.currentLat = null;
+    this.currentLon = null;
     this.isCamLoading.set(true);
     this.cameraError.set(null);
     this.authError.set(errorMsg ?? null);
@@ -1545,7 +1607,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
 
       if (!inCooldown && this.consecutiveVerifiedFrames >= 2) {
         const snapshot = this.faceService.captureSnapshot(video, canvas) || undefined;
-        this.submitFacePunch(bestMatch, score, snapshot);
+        void this.submitFacePunch(bestMatch, score, snapshot);
       }
     } else {
       this.faceStatus.set('mismatched');
@@ -1555,9 +1617,10 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private submitFacePunch(emp: EnrolledFace, matchScore: number, snapshotBase64?: string): void {
+  private async submitFacePunch(emp: EnrolledFace, matchScore: number, snapshotBase64?: string): Promise<void> {
     this.isSubmitting.set(true);
     this.consecutiveVerifiedFrames = 0;
+    const coords = await this.getCurrentCoords();
 
     this.api
       .facePunch(
@@ -1568,6 +1631,8 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
           confidence: Math.min(1, Math.max(0, matchScore / 100)),
           device: 'QR Attendance Terminal',
           snapshotBase64,
+          latitude: coords.lat,
+          longitude: coords.lon,
         },
         this.activeToken,
         this.activeCompanyCode,

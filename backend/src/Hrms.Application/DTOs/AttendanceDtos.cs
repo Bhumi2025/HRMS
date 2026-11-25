@@ -143,7 +143,11 @@ public sealed record PunchBatchItem(
     DateTime PunchTime,
     string? PunchType,
     string? DeviceName,
-    string? Note);
+    string? Note,
+    double? Latitude = null,
+    double? Longitude = null,
+    double? DistanceMeters = null,
+    string? VerificationStatus = null);
 
 /// <summary>A batch of punches captured by a device/source and pushed to the API.</summary>
 public sealed record PunchBatchRequest(
@@ -178,7 +182,9 @@ public sealed record FacePunchRequest(
     string? PunchType,
     double? Confidence,
     string? Device,
-    string? SnapshotBase64);
+    string? SnapshotBase64,
+    double? Latitude = null,
+    double? Longitude = null);
 
 public sealed record FacePunchResultDto(
     bool Success,
