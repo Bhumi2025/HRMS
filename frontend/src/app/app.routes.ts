@@ -61,6 +61,16 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/attendance/public-punch.component').then((m) => m.PublicPunchComponent),
   },
+  {
+    path: 'punch-in-out',
+    redirectTo: 'punch',
+    pathMatch: 'full',
+  },
+  {
+    path: 'me/punch',
+    redirectTo: 'me/dashboard',
+    pathMatch: 'full',
+  },
 
   {
     path: '',

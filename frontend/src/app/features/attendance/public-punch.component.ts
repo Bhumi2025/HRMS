@@ -1196,8 +1196,8 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly isAuthenticating = signal(false);
   protected readonly authError = signal<string | null>(null);
   protected readonly showPassword = signal(false);
-  protected hrEmail = '';
-  protected hrPassword = '';
+  protected hrEmail = 'hr@hrnexus.com';
+  protected hrPassword = 'Admin@123';
 
   // Terminal & company state
   protected readonly liveTime = signal<Date>(new Date());
