@@ -1,32 +1,18 @@
 <div class="auth-page">
-  <!-- Animated background layers -->
-  <div class="bg-dots"></div>
-  <div class="bg-orb o1"></div>
-  <div class="bg-orb o2"></div>
-
-  <!-- Floating particles -->
-  <div class="bg-particle" style="width:8px;height:8px;background:#3b82f6;left:10%;animation-duration:14s;animation-delay:0s"></div>
-  <div class="bg-particle" style="width:5px;height:5px;background:#7c3aed;left:25%;animation-duration:18s;animation-delay:-4s"></div>
-  <div class="bg-particle" style="width:10px;height:10px;background:#06b6d4;left:40%;animation-duration:12s;animation-delay:-8s"></div>
-  <div class="bg-particle" style="width:6px;height:6px;background:#10b981;left:60%;animation-duration:16s;animation-delay:-2s"></div>
-  <div class="bg-particle" style="width:9px;height:9px;background:#f59e0b;left:75%;animation-duration:20s;animation-delay:-6s"></div>
-  <div class="bg-particle" style="width:5px;height:5px;background:#2563eb;left:88%;animation-duration:15s;animation-delay:-10s"></div>
-  <div class="bg-particle" style="width:7px;height:7px;background:#6d28d9;left:50%;animation-duration:22s;animation-delay:-3s"></div>
-
   <div class="wrap">
     <!-- LEFT FORM -->
     <div class="left">
       <div class="logo">
-        <img [src]="resolvedTenantLogo() || 'assets/images/main-logo.png'" alt="Logo" style="max-width: 150px; max-height: 56px; object-fit: contain;" />
+        <img [src]="resolvedTenantLogo() || 'assets/images/main-logo.png'" alt="Logo" style="max-width: 140px; max-height: 48px; object-fit: contain;" />
       </div>
-      <h1 class="text-align-center">Welcome 👋</h1>
-      <p class="sub text-align-center">
+      <h1 class="text-align-center">
         @if (resolvedTenantLogo()) {
           Sign in to {{ resolvedTenantName() }}
         } @else {
-          Please enter your login details below
+          Sign in to HRMS
         }
-      </p>
+      </h1>
+      <p class="sub text-align-center">Enter your workspace credentials to continue</p>
 
       <form (submit)="go($event)" autocomplete="off">
         <!-- Hidden trap inputs to prevent browser aggressive autofill -->
@@ -100,30 +86,6 @@
     <!-- RIGHT SLIDER -->
     <div class="right">
       <div class="grid-bg"></div>
-
-      <!-- Floating shapes -->
-      <div class="fe gem">
-        <svg width="44" height="44" viewBox="0 0 52 52">
-          <polygon points="26,4 48,20 48,36 26,50 4,36 4,20" fill="none" stroke="rgba(96,165,250,.7)" stroke-width="1.5" />
-          <polygon points="26,12 40,22 40,34 26,44 12,34 12,22" fill="rgba(37,99,235,.2)" stroke="rgba(96,165,250,.35)" stroke-width="1" />
-        </svg>
-      </div>
-      <div class="fe ring">
-        <svg width="40" height="40" viewBox="0 0 46 46">
-          <circle cx="23" cy="23" r="19" fill="rgba(13,148,136,.2)" stroke="rgba(13,148,136,.7)" stroke-width="2" />
-          <circle cx="23" cy="23" r="10" fill="rgba(13,148,136,.1)" stroke="rgba(13,148,136,.4)" stroke-width="1.5" />
-        </svg>
-      </div>
-      <div class="fe tri">
-        <svg width="34" height="34" viewBox="0 0 38 38">
-          <polygon points="19,2 36,34 2,34" fill="rgba(245,158,11,.15)" stroke="rgba(245,158,11,.7)" stroke-width="1.5" />
-        </svg>
-      </div>
-      <div class="fe star">
-        <svg width="26" height="26" viewBox="0 0 28 28">
-          <polygon points="14,2 17,10 26,10 19,16 22,24 14,19 6,24 9,16 2,10 11,10" fill="rgba(96,165,250,.3)" stroke="rgba(96,165,250,.7)" stroke-width="1" />
-        </svg>
-      </div>
 
       <!-- Slider -->
       <div class="slider-wrap">

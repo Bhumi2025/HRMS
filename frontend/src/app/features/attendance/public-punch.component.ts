@@ -149,10 +149,10 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
             <div class="auth-logo-wrap">
               <img src="assets/images/shape-logo.png" alt="HRMS" class="auth-logo" />
             </div>
-            <div class="punch-badge">Attendance Terminal Setup</div>
-            <h1 class="auth-title">HR Authentication Required</h1>
+            <div class="punch-badge">Attendance terminal setup</div>
+            <h1 class="auth-title">HR authentication required</h1>
             <p class="auth-subtitle">
-              Sign in with your company HR Manager or Company Admin credentials to unlock this attendance terminal.
+              Sign in with company HR Manager or Company Admin credentials to open this terminal
             </p>
           </div>
 
@@ -212,9 +212,9 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
             <button type="submit" class="btn-unlock" [disabled]="isAuthenticating()">
               @if (isAuthenticating()) {
                 <span class="btn-spin"></span>
-                <span>Verifying HR Credentials...</span>
+                <span>Verifying credentials...</span>
               } @else {
-                <span>Unlock Attendance Terminal</span>
+                <span>Open attendance terminal</span>
               }
             </button>
           </form>
@@ -393,19 +393,19 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
     :host {
       --p: #3b82f6;
       --p-dark: #2563eb;
-      --bg: #090d16;
-      --surface: #131a27;
-      --border: #253045;
-      --text: #f1f5f9;
-      --muted: #94a3b8;
-      --light: #64748b;
+      --bg: #0b0d14;
+      --surface: #11141c;
+      --border: rgba(238, 240, 245, 0.1);
+      --text: #eef0f5;
+      --muted: #a3a9b8;
+      --light: #7a8296;
       display: flex;
       flex-direction: column;
       height: 100vh;
       height: 100dvh;
       width: 100%;
       overflow: hidden;
-      background: radial-gradient(circle at 50% 0%, #111c33 0%, #090d16 65%);
+      background: var(--bg);
       color: var(--text);
       color-scheme: dark;
       box-sizing: border-box;
@@ -414,12 +414,12 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
     :host(.light-theme) {
       --p: #2563eb;
       --p-dark: #1d4ed8;
-      --bg: #f1f5f9;
+      --bg: #f5f7fa;
       --surface: #ffffff;
-      --border: #e2e8f0;
-      --text: #0f172a;
-      --muted: #64748b;
-      --light: #94a3b8;
+      --border: rgba(17, 24, 39, 0.1);
+      --text: #111827;
+      --muted: #4b5565;
+      --light: #6b7487;
       background: var(--bg);
       color: var(--text);
       color-scheme: light;
@@ -434,21 +434,21 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
       align-items: center;
       justify-content: center;
       padding: 20px;
-      overflow: hidden;
+      overflow-y: auto;
     }
     .btn-theme-toggle {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 7px 12px;
-      border-radius: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 500;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: border-color 0.16s cubic-bezier(0.22, 1, 0.36, 1), color 0.16s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .btn-theme-toggle:hover {
       border-color: var(--p);
@@ -456,7 +456,7 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
     }
     .auth-theme-btn {
       position: absolute;
-      top: 18px;
+      top: 20px;
       right: 20px;
     }
     .auth-card {
@@ -465,12 +465,12 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 28px 26px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      padding: 28px 24px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
       box-sizing: border-box;
     }
     :host(.light-theme) .auth-card {
-      box-shadow: 0 12px 36px rgba(15, 23, 42, 0.08);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
     }
     .auth-brand {
       text-align: center;
@@ -481,7 +481,7 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
       height: 48px;
       margin: 0 auto 12px;
       border-radius: 12px;
-      background: var(--bg);
+      background: #ffffff;
       border: 1px solid var(--border);
       display: flex;
       align-items: center;
@@ -493,10 +493,11 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
       object-fit: contain;
     }
     .auth-title {
-      font-size: 1.3rem;
-      font-weight: 800;
+      font-size: 1.35rem;
+      font-weight: 600;
       color: var(--text);
       margin: 8px 0 6px;
+      letter-spacing: -0.015em;
     }
     .auth-subtitle {
       font-size: 12.5px;
@@ -653,14 +654,16 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
     }
     .punch-badge {
       display: inline-block;
-      padding: 3px 10px;
-      background: rgba(56, 189, 248, 0.14);
-      color: #38bdf8;
-      font-size: 11px;
-      font-weight: 700;
+      padding: 4px 10px;
+      background: rgba(59, 130, 246, 0.12);
+      color: #60a5fa;
+      font-size: 12px;
+      font-weight: 500;
       border-radius: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    }
+    :host(.light-theme) .punch-badge {
+      background: #eff6ff;
+      color: #1d4ed8;
     }
     .punch-title {
       font-size: 1.4rem;

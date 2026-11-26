@@ -49,7 +49,7 @@ interface LeaveType {
             <button class="btn btn-primary btn-sm" (click)="openType(null)">+ Add Leave Type</button>
           }
         </div>
-        <div class="table-wrap" style="max-height: 260px; overflow-y: auto; overflow-x: auto;">
+        <div class="table-wrap" style="overflow-x: auto;">
           <table>
             <thead style="position: sticky; top: 0; z-index: 2; background: var(--surface, #fff);">
               <tr>
@@ -155,7 +155,7 @@ interface LeaveType {
           }
         </div>
       </div>
-      <div class="table-wrap" style="position: relative; z-index: 1; max-height: 360px; overflow-y: auto; overflow-x: auto;">
+      <div class="table-wrap" style="position: relative; z-index: 1; overflow-x: auto;">
         <table>
           <thead style="position: sticky; top: 0; z-index: 2; background: var(--surface, #fff);">
             <tr>

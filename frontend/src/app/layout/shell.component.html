@@ -50,8 +50,8 @@
         <div class="header-greeting"
           style="margin-left: 14px; display: flex; flex-direction: column; justify-content: center; min-width: 0;">
           <span
-            style="font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.25; white-space: nowrap;">{{
-            greeting() }}, {{ userDisplayName() }}! 👋</span>
+            style="font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.25; white-space: nowrap;">{{
+            greeting() }}, {{ userDisplayName() }}</span>
         </div>
       </div>
       <div class="header-right" style="display: flex; align-items: center; gap: 8px;">
@@ -110,16 +110,11 @@
   <div style="max-height: 360px; overflow-y: auto">
     @for (n of notifications(); track n.id) {
     <div
-      style="display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: .15s"
-      [style.background]="n.unread ? 'rgba(37,99,235,.06)' : 'var(--surface)'" (click)="markRead(n)">
-      <span style="font-size: 15px; margin-top: 2px; flex-shrink: 0">
-        @if (n.category === 'Approval') { 📋 }
-        @else if (n.category === 'Attendance') { ⏰ }
-        @else if (n.category === 'Policy') { 📢 }
-        @else if (n.category === 'Birthday') { 🎂 }
-        @else if (n.category === 'Document') { 📄 }
-        @else if (n.category === 'Payroll') { 💳 }
-        @else { 🔔 }
+      style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background-color .15s"
+      [style.background]="n.unread ? 'var(--p-soft)' : 'var(--surface)'" (click)="markRead(n)">
+      <span
+        style="width: 24px; height: 24px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; margin-top: 2px; flex-shrink: 0"
+        [appIcon]="n.category === 'Approval' ? 'approvals' : n.category === 'Attendance' ? 'clock' : n.category === 'Document' ? 'documents' : n.category === 'Payroll' ? 'payroll' : n.category === 'Birthday' ? 'user' : 'bell'">
       </span>
       <div style="flex: 1; min-width: 0">
         <div

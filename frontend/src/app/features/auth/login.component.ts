@@ -109,111 +109,76 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   protected readonly slides: Slide[] = [
     {
-      svg: `<svg viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="110" cy="110" r="90" fill="rgba(37,99,235,.15)"/>
-        <rect x="45" y="100" width="130" height="82" rx="8" fill="#1e3a8a"/>
-        <rect x="49" y="104" width="122" height="70" rx="5" fill="#0f172a"/>
-        <rect x="53" y="108" width="114" height="62" rx="3" fill="url(#g1)"/>
-        <rect x="62" y="116" width="50" height="4" rx="2" fill="rgba(96,165,250,.9)"/>
-        <rect x="62" y="124" width="80" height="3" rx="1.5" fill="rgba(255,255,255,.3)"/>
-        <rect x="62" y="131" width="65" height="3" rx="1.5" fill="rgba(255,255,255,.2)"/>
-        <rect x="62" y="138" width="72" height="3" rx="1.5" fill="rgba(255,255,255,.15)"/>
-        <rect x="130" y="148" width="10" height="16" rx="2" fill="rgba(96,165,250,.6)"/>
-        <rect x="144" y="138" width="10" height="26" rx="2" fill="rgba(96,165,250,.8)"/>
-        <rect x="158" y="128" width="10" height="36" rx="2" fill="rgba(96,165,250,1)"/>
-        <rect x="30" y="182" width="160" height="8" rx="4" fill="#334155"/>
-        <ellipse cx="110" cy="72" rx="28" ry="30" fill="#FBBF24"/>
-        <path d="M82 62 Q86 38 110 36 Q134 38 138 62 Q130 46 110 44 Q90 46 82 62Z" fill="#1e40af"/>
-        <ellipse cx="100" cy="70" rx="5" ry="6" fill="#fff"/>
-        <ellipse cx="120" cy="70" rx="5" ry="6" fill="#fff"/>
-        <ellipse cx="101" cy="71" rx="3" ry="4" fill="#1e293b"/>
-        <ellipse cx="121" cy="71" rx="3" ry="4" fill="#1e293b"/>
-        <path d="M104 82 Q110 88 116 82" stroke="#e07b39" stroke-width="2" stroke-linecap="round" fill="none"/>
-        <ellipse cx="82" cy="74" rx="6" ry="8" fill="#F59E0B"/>
-        <ellipse cx="138" cy="74" rx="6" ry="8" fill="#F59E0B"/>
-        <rect x="88" y="94" width="44" height="14" rx="7" fill="#FBBF24"/>
-        <rect x="48" y="100" width="30" height="12" rx="6" fill="#FBBF24" transform="rotate(-20 48 100)"/>
-        <rect x="142" y="100" width="30" height="12" rx="6" fill="#FBBF24" transform="rotate(20 142 100)"/>
-        <defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1e3a8a"/><stop offset="100%" stop-color="#2563eb"/></linearGradient></defs>
+      svg: `<svg viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="16" y="16" width="248" height="168" rx="12" fill="#11141c" stroke="rgba(238,240,245,0.12)"/>
+        <rect x="16" y="16" width="248" height="36" rx="12" fill="#161b26"/>
+        <circle cx="34" cy="34" r="4" fill="#2563eb"/>
+        <rect x="46" y="30" width="96" height="7" rx="3.5" fill="rgba(238,240,245,0.85)"/>
+        <rect x="202" y="28" width="46" height="12" rx="4" fill="rgba(76,195,138,0.18)" stroke="rgba(76,195,138,0.4)"/>
+        <rect x="32" y="68" width="64" height="44" rx="8" fill="#1a1e28" stroke="rgba(238,240,245,0.08)"/>
+        <rect x="42" y="78" width="28" height="5" rx="2.5" fill="#7a8296"/>
+        <rect x="42" y="90" width="38" height="10" rx="3" fill="#eef0f5"/>
+        <rect x="108" y="68" width="64" height="44" rx="8" fill="#1a1e28" stroke="rgba(238,240,245,0.08)"/>
+        <rect x="118" y="78" width="32" height="5" rx="2.5" fill="#7a8296"/>
+        <rect x="118" y="90" width="34" height="10" rx="3" fill="#3b82f6"/>
+        <rect x="184" y="68" width="64" height="44" rx="8" fill="#1a1e28" stroke="rgba(238,240,245,0.08)"/>
+        <rect x="194" y="78" width="24" height="5" rx="2.5" fill="#7a8296"/>
+        <rect x="194" y="90" width="40" height="10" rx="3" fill="#4cc38a"/>
+        <rect x="32" y="126" width="216" height="1" fill="rgba(238,240,245,0.08)"/>
+        <rect x="32" y="138" width="110" height="6" rx="3" fill="rgba(238,240,245,0.5)"/>
+        <rect x="196" y="138" width="52" height="6" rx="3" fill="#3b82f6"/>
+        <rect x="32" y="156" width="84" height="6" rx="3" fill="rgba(238,240,245,0.35)"/>
+        <rect x="208" y="156" width="40" height="6" rx="3" fill="rgba(238,240,245,0.5)"/>
       </svg>`,
-      title: 'Manage Your Team Anywhere',
-      text: 'Complete HR operations on the go with HRMS — your enterprise workforce platform.',
-      pills: ['👥 Team Management', '📅 Attendance', '✅ Approvals'],
+      title: 'Workforce operations in one ledger',
+      text: 'Manage employee rosters, shift attendance, and multi-stage approvals across departments',
+      pills: ['Team Roster', 'Shift Attendance', 'Approvals'],
     },
     {
-      svg: `<svg viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="110" cy="110" r="90" fill="rgba(37,99,235,.15)"/>
-        <rect x="30" y="50" width="160" height="120" rx="14" fill="#1e3a8a" stroke="rgba(96,165,250,.3)" stroke-width="1"/>
-        <rect x="38" y="58" width="144" height="104" rx="10" fill="#0f172a"/>
-        <rect x="38" y="58" width="144" height="22" rx="10" fill="#1e3a8a"/>
-        <rect x="38" y="68" width="144" height="12" fill="#1e3a8a"/>
-        <circle cx="52" cy="69" r="5" fill="rgba(255,255,255,.2)"/>
-        <rect x="62" y="66" width="40" height="5" rx="2" fill="rgba(255,255,255,.3)"/>
-        <rect x="44" y="86" width="58" height="32" rx="6" fill="rgba(37,99,235,.4)"/>
-        <rect x="108" y="86" width="58" height="32" rx="6" fill="rgba(16,185,129,.25)"/>
-        <rect x="44" y="90" width="25" height="4" rx="2" fill="rgba(255,255,255,.4)"/>
-        <rect x="44" y="98" width="35" height="7" rx="2" fill="#fff"/>
-        <rect x="108" y="90" width="25" height="4" rx="2" fill="rgba(255,255,255,.4)"/>
-        <rect x="108" y="98" width="35" height="7" rx="2" fill="#34d399"/>
-        <rect x="44" y="126" width="122" height="28" rx="6" fill="rgba(255,255,255,.05)"/>
-        <rect x="50" y="144" width="8" height="6" rx="2" fill="rgba(96,165,250,.5)"/>
-        <rect x="62" y="138" width="8" height="12" rx="2" fill="rgba(96,165,250,.7)"/>
-        <rect x="74" y="132" width="8" height="18" rx="2" fill="rgba(96,165,250,.9)"/>
-        <rect x="86" y="136" width="8" height="14" rx="2" fill="rgba(96,165,250,.7)"/>
-        <rect x="98" y="130" width="8" height="20" rx="2" fill="#60a5fa"/>
-        <rect x="110" y="134" width="8" height="16" rx="2" fill="rgba(96,165,250,.8)"/>
-        <rect x="122" y="128" width="8" height="22" rx="2" fill="#93c5fd"/>
-        <rect x="134" y="133" width="8" height="17" rx="2" fill="rgba(96,165,250,.7)"/>
-        <circle cx="172" cy="160" r="22" fill="#FBBF24" stroke="#F59E0B" stroke-width="2"/>
-        <circle cx="172" cy="160" r="16" fill="#FCD34D"/>
-        <text x="172" y="165" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" font-weight="900" fill="#92400e">$</text>
+      svg: `<svg viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="16" y="16" width="248" height="168" rx="12" fill="#11141c" stroke="rgba(238,240,245,0.12)"/>
+        <rect x="32" y="34" width="80" height="8" rx="4" fill="rgba(238,240,245,0.85)"/>
+        <rect x="32" y="48" width="52" height="5" rx="2.5" fill="#7a8296"/>
+        <rect x="184" y="34" width="64" height="18" rx="6" fill="#2563eb"/>
+        <rect x="32" y="78" width="16" height="80" rx="4" fill="#1a1e28"/>
+        <rect x="32" y="114" width="16" height="44" rx="4" fill="#3b82f6"/>
+        <rect x="64" y="78" width="16" height="80" rx="4" fill="#1a1e28"/>
+        <rect x="64" y="102" width="16" height="56" rx="4" fill="#3b82f6"/>
+        <rect x="96" y="78" width="16" height="80" rx="4" fill="#1a1e28"/>
+        <rect x="96" y="92" width="16" height="66" rx="4" fill="#2563eb"/>
+        <rect x="128" y="78" width="16" height="80" rx="4" fill="#1a1e28"/>
+        <rect x="128" y="106" width="16" height="52" rx="4" fill="#3b82f6"/>
+        <rect x="160" y="78" width="16" height="80" rx="4" fill="#1a1e28"/>
+        <rect x="160" y="88" width="16" height="70" rx="4" fill="#4cc38a"/>
+        <rect x="196" y="88" width="52" height="28" rx="6" fill="#1a1e28" stroke="rgba(238,240,245,0.08)"/>
+        <rect x="204" y="98" width="36" height="8" rx="3" fill="#eef0f5"/>
+        <rect x="196" y="124" width="52" height="28" rx="6" fill="#1a1e28" stroke="rgba(238,240,245,0.08)"/>
+        <rect x="204" y="134" width="30" height="8" rx="3" fill="#4cc38a"/>
       </svg>`,
-      title: 'Smart Payroll & Insights',
-      text: 'Process payroll in one click. Get real-time insights on salary, deductions, and workforce costs.',
-      pills: ['💰 Auto Payroll', '📊 Insights', '🧾 Payslips'],
+      title: 'Accurate monthly payroll runs',
+      text: 'Verify worked hours, paid leave, and deductions before publishing payslips',
+      pills: ['Payroll Register', 'Deductions', 'Payslips'],
     },
     {
-      svg: `<svg viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="110" cy="110" r="90" fill="rgba(37,99,235,.15)"/>
-        <rect x="35" y="55" width="150" height="130" rx="14" fill="#1e3a8a" stroke="rgba(96,165,250,.3)" stroke-width="1"/>
-        <rect x="35" y="55" width="150" height="36" rx="14" fill="#2563eb"/>
-        <rect x="35" y="73" width="150" height="18" fill="#2563eb"/>
-        <rect x="55" y="65" width="60" height="6" rx="3" fill="rgba(255,255,255,.8)"/>
-        <rect x="55" y="74" width="40" height="4" rx="2" fill="rgba(255,255,255,.4)"/>
-        <rect x="43" y="98" width="16" height="4" rx="2" fill="rgba(255,255,255,.3)"/>
-        <rect x="64" y="98" width="16" height="4" rx="2" fill="rgba(255,255,255,.3)"/>
-        <rect x="85" y="98" width="16" height="4" rx="2" fill="rgba(255,255,255,.3)"/>
-        <rect x="106" y="98" width="16" height="4" rx="2" fill="rgba(255,255,255,.3)"/>
-        <rect x="127" y="98" width="16" height="4" rx="2" fill="rgba(255,255,255,.3)"/>
-        <rect x="148" y="98" width="16" height="4" rx="2" fill="rgba(255,255,255,.3)"/>
-        <rect x="43" y="108" width="16" height="14" rx="4" fill="rgba(255,255,255,.08)"/>
-        <rect x="64" y="108" width="16" height="14" rx="4" fill="rgba(255,255,255,.08)"/>
-        <rect x="85" y="108" width="16" height="14" rx="4" fill="rgba(37,99,235,.6)"/>
-        <rect x="106" y="108" width="16" height="14" rx="4" fill="rgba(255,255,255,.08)"/>
-        <rect x="127" y="108" width="16" height="14" rx="4" fill="rgba(16,185,129,.5)"/>
-        <rect x="148" y="108" width="16" height="14" rx="4" fill="rgba(255,255,255,.08)"/>
-        <rect x="43" y="127" width="16" height="14" rx="4" fill="rgba(255,255,255,.08)"/>
-        <rect x="64" y="127" width="16" height="14" rx="4" fill="rgba(239,68,68,.5)"/>
-        <rect x="85" y="127" width="16" height="14" rx="4" fill="rgba(255,255,255,.08)"/>
-        <rect x="106" y="127" width="16" height="14" rx="4" fill="rgba(37,99,235,.6)"/>
-        <rect x="127" y="127" width="16" height="14" rx="4" fill="rgba(255,255,255,.08)"/>
-        <rect x="148" y="127" width="16" height="14" rx="4" fill="rgba(16,185,129,.5)"/>
-        <rect x="43" y="146" width="16" height="14" rx="4" fill="rgba(16,185,129,.5)"/>
-        <rect x="64" y="146" width="16" height="14" rx="4" fill="rgba(255,255,255,.08)"/>
-        <rect x="85" y="146" width="16" height="14" rx="4" fill="rgba(255,255,255,.08)"/>
-        <rect x="106" y="146" width="16" height="14" rx="4" fill="rgba(239,68,68,.5)"/>
-        <rect x="127" y="146" width="16" height="14" rx="4" fill="rgba(255,255,255,.08)"/>
-        <rect x="148" y="146" width="16" height="14" rx="4" fill="rgba(37,99,235,.6)"/>
-        <circle cx="48" cy="175" r="5" fill="rgba(37,99,235,.8)"/>
-        <rect x="57" y="172" width="28" height="4" rx="2" fill="rgba(255,255,255,.4)"/>
-        <circle cx="100" cy="175" r="5" fill="rgba(16,185,129,.8)"/>
-        <rect x="109" y="172" width="28" height="4" rx="2" fill="rgba(255,255,255,.4)"/>
-        <circle cx="152" cy="175" r="5" fill="rgba(239,68,68,.8)"/>
-        <rect x="161" y="172" width="20" height="4" rx="2" fill="rgba(255,255,255,.4)"/>
+      svg: `<svg viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="16" y="16" width="248" height="168" rx="12" fill="#11141c" stroke="rgba(238,240,245,0.12)"/>
+        <rect x="32" y="34" width="96" height="8" rx="4" fill="rgba(238,240,245,0.85)"/>
+        <rect x="32" y="60" width="216" height="28" rx="6" fill="#1a1e28" stroke="rgba(238,240,245,0.08)"/>
+        <circle cx="48" cy="74" r="5" fill="#4cc38a"/>
+        <rect x="62" y="71" width="76" height="6" rx="3" fill="#eef0f5"/>
+        <rect x="196" y="71" width="38" height="6" rx="3" fill="#7a8296"/>
+        <rect x="32" y="98" width="216" height="28" rx="6" fill="#1a1e28" stroke="rgba(238,240,245,0.08)"/>
+        <circle cx="48" cy="112" r="5" fill="#3b82f6"/>
+        <rect x="62" y="109" width="92" height="6" rx="3" fill="#eef0f5"/>
+        <rect x="196" y="109" width="38" height="6" rx="3" fill="#7a8296"/>
+        <rect x="32" y="136" width="216" height="28" rx="6" fill="#1a1e28" stroke="rgba(238,240,245,0.08)"/>
+        <circle cx="48" cy="150" r="5" fill="#f59e0b"/>
+        <rect x="62" y="147" width="68" height="6" rx="3" fill="#eef0f5"/>
+        <rect x="196" y="147" width="38" height="6" rx="3" fill="#7a8296"/>
       </svg>`,
-      title: 'Leave & Attendance Tracking',
-      text: 'Track attendance, manage leave requests, and get instant approvals — all in one place.',
-      pills: ['📅 Leave Calendar', '⏰ Time Tracking', '📋 Reports'],
+      title: 'Attendance & leave tracking',
+      text: 'Synchronized punch timelines, leave balances, and shift muster registers',
+      pills: ['Muster Log', 'Leave Balances', 'Reports'],
     },
   ];
 

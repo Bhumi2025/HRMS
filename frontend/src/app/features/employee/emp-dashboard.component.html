@@ -5,16 +5,16 @@
   <!-- Mobile Category Filter Tabs (Visible only on mobile screens <= 768px) -->
   <div class="mobile-section-tabs">
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'all'" (click)="setMobileSection('all')">
-      <span>✨ All</span>
+      <span>All</span>
     </button>
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'clock'" (click)="setMobileSection('clock')">
-      <span>⏱️ Time Tracker</span>
+      <span>Time Tracker</span>
     </button>
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'notices'" (click)="setMobileSection('notices')">
-      <span>📢 Notices</span>
+      <span>Notices</span>
     </button>
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'holidays'" (click)="setMobileSection('holidays')">
-      <span>🏖️ Holidays</span>
+      <span>Holidays</span>
     </button>
   </div>
 

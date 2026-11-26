@@ -5,22 +5,22 @@
   <!-- Mobile Category Filter Tabs (Visible only on mobile screens <= 768px) -->
   <div class="mobile-section-tabs">
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'all'" (click)="setMobileSection('all')">
-      <span>✨ All</span>
+      <span>All</span>
     </button>
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'approvals'" (click)="setMobileSection('approvals')">
-      <span>📋 Approvals ({{ pendingApprovals().length }})</span>
+      <span>Approvals ({{ pendingApprovals().length }})</span>
     </button>
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'clock'" (click)="setMobileSection('clock')">
-      <span>⏱️ Time Tracker</span>
+      <span>Time Tracker</span>
     </button>
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'notices'" (click)="setMobileSection('notices')">
-      <span>📢 Notices ({{ notices().length }})</span>
+      <span>Notices ({{ notices().length }})</span>
     </button>
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'highlights'" (click)="setMobileSection('highlights')">
-      <span>🎂 Celebrations</span>
+      <span>Highlights</span>
     </button>
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'holidays'" (click)="setMobileSection('holidays')">
-      <span>🏖️ Holidays</span>
+      <span>Holidays</span>
     </button>
   </div>
 
@@ -220,8 +220,8 @@
               <svg class="timelog-bar-chart-svg" viewBox="0 0 760 185" preserveAspectRatio="none">
                 <!-- Subtle Horizontal Grid Lines & Y-Axis Scale Values -->
                 @for (val of chartYScaleSteps(); track val) {
-                <line x1="36" [attr.y1]="getYCoord(val)" x2="745" [attr.y2]="getYCoord(val)" stroke="#f1f5f9"
-                  stroke-width="1.2" />
+                <line x1="36" [attr.y1]="getYCoord(val)" x2="745" [attr.y2]="getYCoord(val)" stroke="rgba(17, 24, 39, 0.06)"
+                  stroke-width="1" />
                 <text x="28" [attr.y]="getYCoord(val) + 3.5" text-anchor="end" class="y-axis-scale-text">
                   {{ val }}
                 </text>
@@ -238,25 +238,25 @@
                   <!-- 1. Before Break (Bottom Segment) -->
                   @if (b.hBefore > 0) {
                   <rect [attr.x]="b.barX" [attr.y]="b.yBefore" [attr.width]="b.barWidth" [attr.height]="b.hBefore"
-                    rx="2" fill="#22c55e" class="bar-segment seg-before" />
+                    rx="2" fill="#2563eb" class="bar-segment seg-before" />
                   }
 
                   <!-- 2. Break -->
                   @if (b.hBreak > 0) {
                   <rect [attr.x]="b.barX" [attr.y]="b.yBreak" [attr.width]="b.barWidth" [attr.height]="b.hBreak" rx="2"
-                    fill="#f59e0b" class="bar-segment seg-break" />
+                    fill="#cbd5e1" class="bar-segment seg-break" />
                   }
 
                   <!-- 3. After Break -->
                   @if (b.hAfter > 0) {
                   <rect [attr.x]="b.barX" [attr.y]="b.yAfter" [attr.width]="b.barWidth" [attr.height]="b.hAfter" rx="2"
-                    fill="#16a34a" class="bar-segment seg-after" />
+                    fill="#1e40af" class="bar-segment seg-after" />
                   }
 
-                  <!-- 4. Missing (Solid rounded coral bar on missing/absent day) -->
+                  <!-- 4. Missing (Muted crimson bar on missing/absent day) -->
                   @if (b.hMissing > 0) {
                   <rect [attr.x]="b.barX" [attr.y]="b.yMissing" [attr.width]="b.barWidth" [attr.height]="b.hMissing"
-                    rx="3" fill="#f87171" class="bar-segment seg-missing" />
+                    rx="2" fill="#e11d48" opacity="0.72" class="bar-segment seg-missing" />
                   }
 
                   <!-- X-Axis Day Number Centered Below Column -->
@@ -290,7 +290,7 @@
                     @if (hov.isToday) {
                     @if (punchService.todayPunchBreakdown().phase === 'on_break' || (hov.breakHrs > 0 && hov.afterBreak
                     === 0)) {
-                    Status: On Break ☕
+                    Status: On Break
                     } @else if (punchService.todayPunchBreakdown().phase === 'clocked_out') {
                     Status: Completed (Clocked Out)
                     } @else if (hov.late > 0) {
@@ -351,8 +351,8 @@
               </div>
               } @empty {
               <div class="empty-state">
-                <span class="empty-icon">🎉</span>
-                <span>All scheduled staff present today!</span>
+                <span class="empty-icon">✓</span>
+                <span>All scheduled staff present today</span>
               </div>
               }
             </div>
@@ -371,21 +371,21 @@
           }
           <div class="widget-header">
             <div class="header-left">
-              <span class="widget-indicator purple"></span>
+              <span class="widget-indicator blue"></span>
               <h3>Workforce Highlights</h3>
             </div>
             <div class="tab-pills">
               <button class="tab-btn" [class.active]="activeCelebrationTab() === 'Birthday'"
                 (click)="activeCelebrationTab.set('Birthday')" title="Birthdays">
-                🎂 ({{ countForTab('Birthday') }})
+                Birthdays ({{ countForTab('Birthday') }})
               </button>
               <button class="tab-btn" [class.active]="activeCelebrationTab() === 'WorkAnniversary'"
                 (click)="activeCelebrationTab.set('WorkAnniversary')" title="Anniversaries">
-                🎖️ ({{ countForTab('WorkAnniversary') }})
+                Tenure ({{ countForTab('WorkAnniversary') }})
               </button>
               <button class="tab-btn" [class.active]="activeCelebrationTab() === 'NewJoinee'"
                 (click)="activeCelebrationTab.set('NewJoinee')" title="New Joinees">
-                👋 ({{ countForTab('NewJoinee') }})
+                New ({{ countForTab('NewJoinee') }})
               </button>
             </div>
           </div>
@@ -403,8 +403,8 @@
               </div>
               } @empty {
               <div class="empty-state">
-                <span class="empty-icon">📅</span>
-                <span>No {{ activeCelebrationTab() }}s in this period.</span>
+                <span class="empty-icon">—</span>
+                <span>No highlights in this period</span>
               </div>
               }
             </div>
@@ -447,8 +447,8 @@
               </div>
               } @empty {
               <div class="empty-state">
-                <span class="empty-icon">📢</span>
-                <span>No announcements published yet.</span>
+                <span class="empty-icon">—</span>
+                <span>No announcements published yet</span>
               </div>
               }
             </div>
@@ -572,8 +572,7 @@
               <div class="timeline-break-row">
                 <div class="break-line"></div>
                 <div class="break-pill">
-                  <span class="coffee-icon">☕</span>
-                  <span class="break-text">{{ item.durationStr }}</span>
+                  <span class="break-text">Break · {{ item.durationStr }}</span>
                 </div>
               </div>
               }
@@ -630,7 +629,7 @@
             </a>
             } @empty {
             <div class="empty-state">
-              <span class="empty-icon">🏖️</span>
+              <span class="empty-icon">—</span>
               <span>No upcoming holidays scheduled</span>
             </div>
             }
