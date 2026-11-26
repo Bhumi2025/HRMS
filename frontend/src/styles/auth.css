@@ -114,7 +114,8 @@
 .auth-page .wrap {
   position: relative;
   z-index: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   width: 100%;
   max-width: 1040px;
   min-height: 620px;
@@ -125,10 +126,11 @@
   background: var(--surface, #ffffff);
 }
 
-/* LEFT */
+/* FORM PANEL (positioned on Right) */
 .auth-page .left {
-  flex: 1;
-  padding: 56px 35px;
+  order: 2;
+  min-width: 0;
+  padding: 48px 40px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -387,26 +389,26 @@
   text-align: center;
 }
 
-/* RIGHT */
+/* SHOWCASE PANEL (positioned on Left, original blue theme) */
 .auth-page .right {
-  width: 50%;
-  background: #0b0d14;
-  border-left: 1px solid rgba(238, 240, 245, 0.08);
+  order: 1;
+  width: 100%;
+  min-width: 0;
+  background: linear-gradient(145deg, #1e3a8a, #2563eb 50%, #1e40af);
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  flex-shrink: 0;
 }
 
 .auth-page .grid-bg {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(238, 240, 245, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(238, 240, 245, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
@@ -530,17 +532,17 @@
 }
 
 .auth-page .slide-text h2 {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  color: #eef0f5;
+  color: #ffffff;
   margin-bottom: 8px;
   line-height: 1.3;
   letter-spacing: -0.015em;
 }
 
 .auth-page .slide-text p {
-  font-size: 0.84rem;
-  color: #a3a9b8;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.82);
   line-height: 1.6;
   max-width: 330px;
 }
@@ -554,9 +556,9 @@
 }
 
 .auth-page .slide-pill {
-  background: #1a1e28;
-  border: 1px solid rgba(238, 240, 245, 0.1);
-  color: #eef0f5;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #ffffff;
   font-size: 12px;
   font-weight: 500;
   padding: 4px 10px;
@@ -611,6 +613,10 @@
 }
 
 @media (max-width: 768px) {
+  .auth-page .wrap {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
   .auth-page .logo img {
     max-width: 100px !important;
   }
@@ -618,6 +624,7 @@
     display: none;
   }
   .auth-page .left {
+    order: 1;
     padding: 36px 28px;
   }
 }

@@ -24,9 +24,13 @@ if (envDict.Count > 0)
     builder.Configuration.AddInMemoryCollection(envDict);
 }
 
-// Ensure listening on all interfaces (0.0.0.0) so LAN devices can access directly
-var configuredUrls = builder.Configuration["Urls"] ?? "http://0.0.0.0:5096";
-builder.WebHost.UseUrls(configuredUrls);
+// Ensure listening on all interfaces (0.0.0.0) when running standalone (not inside IIS)
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_IIS_HTTPAUTH")) &&
+    string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_PORT")))
+{
+    var configuredUrls = builder.Configuration["Urls"] ?? "http://0.0.0.0:5096";
+    builder.WebHost.UseUrls(configuredUrls);
+}
 
 // ── Controllers / JSON ──
 builder.Services.AddControllers(options =>

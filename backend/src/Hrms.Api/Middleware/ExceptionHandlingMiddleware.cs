@@ -79,7 +79,18 @@ public sealed class ExceptionHandlingMiddleware
             problem.Detail = exception.ToString();
         }
 
+        var corsHeaders = context.Response.Headers
+            .Where(h => h.Key.StartsWith("Access-Control-", StringComparison.OrdinalIgnoreCase) ||
+                        h.Key.Equals("Vary", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
         context.Response.Clear();
+
+        foreach (var header in corsHeaders)
+        {
+            context.Response.Headers[header.Key] = header.Value;
+        }
+
         context.Response.StatusCode = status;
         context.Response.ContentType = "application/problem+json";
         await context.Response.WriteAsJsonAsync(problem);
