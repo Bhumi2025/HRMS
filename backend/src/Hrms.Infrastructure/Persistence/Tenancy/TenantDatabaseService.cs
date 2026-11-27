@@ -193,6 +193,19 @@ IF OBJECT_ID('Employees', 'U') IS NOT NULL
 BEGIN
     UPDATE Employees SET Gender = 'Other' WHERE Gender IN ('PreferNotToSay', 'Prefer not to say', '4');
     UPDATE Employees SET MaritalStatus = 'Single' WHERE MaritalStatus IN ('Divorced', 'Widowed', '3', '4');
+    IF COL_LENGTH('Employees', 'FaceDescriptor') IS NOT NULL
+       AND COL_LENGTH('Employees', 'FacePhotoUrl') IS NOT NULL
+       AND COL_LENGTH('Employees', 'FaceEnrolledAtUtc') IS NOT NULL
+    BEGIN
+        EXEC(N'
+            UPDATE Employees
+            SET FaceDescriptor = NULL,
+                FaceEnrolledAtUtc = NULL
+            WHERE FaceDescriptor IS NOT NULL
+              AND FacePhotoUrl LIKE ''https://images.unsplash.com/%''
+              AND LEN(FaceDescriptor) < 1000;
+        ');
+    END
 END
 
 IF OBJECT_ID('KeyStores', 'U') IS NOT NULL AND OBJECT_ID('KeyGroups', 'U') IS NOT NULL
@@ -528,6 +541,102 @@ END
             empStatus,
             isOffboarded,
             empRecord?.Password);
+    }
+
+    public async Task<IReadOnlyList<TenantFaceCandidate>> GetFaceLoginCandidatesAsync(string databaseName, CancellationToken ct = default)
+    {
+        await using var db = Create(databaseName);
+
+        var employees = await db.Employees
+            .AsNoTracking()
+            .Where(e => !string.IsNullOrEmpty(e.FaceDescriptor))
+            .Select(e => new
+            {
+                e.Id,
+                e.EmployeeCode,
+                e.FirstName,
+                e.LastName,
+                e.Email,
+                e.Status,
+                e.FaceDescriptor,
+                e.FacePhotoUrl,
+                e.FaceEnrolledAtUtc
+            })
+            .ToListAsync(ct);
+
+        if (employees.Count == 0)
+        {
+            return Array.Empty<TenantFaceCandidate>();
+        }
+
+        var revokedEmployeeIds = (await db.OffboardingRecords
+                .AsNoTracking()
+                .Where(o => o.Status == OffboardingStatus.Completed || o.AccessRevoked)
+                .Select(o => o.EmployeeId)
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        var users = await db.Users
+            .AsNoTracking()
+            .Where(u => u.EmployeeId != null || !string.IsNullOrEmpty(u.NormalizedEmail))
+            .Select(u => new
+            {
+                u.Id,
+                u.EmployeeId,
+                u.Email,
+                u.NormalizedEmail,
+                u.FullName,
+                u.Initials,
+                u.IsActive,
+                RoleName = u.Role != null ? u.Role.Name : "Employee",
+                RoleCode = u.Role != null ? u.Role.Code : "Employee"
+            })
+            .ToListAsync(ct);
+
+        var usersByEmpId = users
+            .Where(u => u.EmployeeId.HasValue)
+            .GroupBy(u => u.EmployeeId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.IsActive).First());
+
+        var usersByEmail = users
+            .Where(u => !string.IsNullOrWhiteSpace(u.NormalizedEmail))
+            .GroupBy(u => u.NormalizedEmail, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.IsActive).First(), StringComparer.OrdinalIgnoreCase);
+
+        var result = new List<TenantFaceCandidate>(employees.Count);
+        foreach (var e in employees)
+        {
+            var fullName = string.Join(' ', new[] { e.FirstName, e.LastName }.Where(x => !string.IsNullOrWhiteSpace(x)));
+            var empNormEmail = e.Email.Trim().ToUpperInvariant();
+
+            if (!usersByEmpId.TryGetValue(e.Id, out var user) && !string.IsNullOrWhiteSpace(empNormEmail))
+            {
+                usersByEmail.TryGetValue(empNormEmail, out user);
+            }
+
+            var isOffboarded = e.Status is EmploymentStatus.Offboarding or EmploymentStatus.Terminated or EmploymentStatus.Resigned
+                               || revokedEmployeeIds.Contains(e.Id);
+
+            result.Add(new TenantFaceCandidate(
+                EmployeeId: e.Id,
+                EmployeeCode: e.EmployeeCode,
+                FullName: fullName,
+                Email: e.Email,
+                EmployeeStatus: e.Status,
+                IsOffboarded: isOffboarded,
+                FaceDescriptor: e.FaceDescriptor!,
+                FacePhotoUrl: e.FacePhotoUrl,
+                FaceEnrolledAtUtc: e.FaceEnrolledAtUtc,
+                UserId: user?.Id,
+                UserEmail: user?.Email,
+                UserFullName: user?.FullName,
+                UserInitials: user?.Initials,
+                UserIsActive: user?.IsActive ?? false,
+                RoleName: user?.RoleName ?? "Employee",
+                RoleCode: user?.RoleCode ?? "Employee"));
+        }
+
+        return result;
     }
 
     public async Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default, string? verifiedPlainPassword = null)

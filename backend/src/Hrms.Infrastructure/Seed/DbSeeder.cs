@@ -208,10 +208,8 @@ public static class DbSeeder
         for (var i = 0; i < employees.Length; i++)
         {
             employees[i].FacePhotoUrl = photos[i % photos.Length];
-            employees[i].FaceEnrolledAtUtc = DateTime.UtcNow;
-            var rand = new Random(employees[i].EmployeeCode.GetHashCode());
-            var descriptor = Enumerable.Range(0, 128).Select(_ => Math.Round(rand.NextDouble() * 0.4 - 0.2, 4)).ToArray();
-            employees[i].FaceDescriptor = System.Text.Json.JsonSerializer.Serialize(descriptor);
+            employees[i].FaceEnrolledAtUtc = null;
+            employees[i].FaceDescriptor = null;
         }
 
         db.Employees.AddRange(employees);

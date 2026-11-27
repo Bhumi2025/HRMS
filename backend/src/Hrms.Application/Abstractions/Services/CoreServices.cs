@@ -15,6 +15,15 @@ public interface IAuthService
     Task<UserDto> UpdateProfileAsync(Guid userId, UpdateProfileRequest request, CancellationToken ct = default);
 }
 
+public interface IFaceRecognitionService
+{
+    Task<FaceLoginResponse> FaceLoginAsync(FaceLoginRequest request, CancellationToken ct = default);
+
+    Task<FaceMatchResultDto> VerifyFaceAsync(FaceVerifyRequest request, CancellationToken ct = default);
+
+    Task<FaceEnrollmentStatusDto> GetEnrollmentStatusAsync(Guid? employeeId, CancellationToken ct = default);
+}
+
 public interface IEmployeeService
 {
     Task<PagedResult<EmployeeListItemDto>> SearchAsync(EmployeeQuery query, CancellationToken ct = default);

@@ -80,6 +80,25 @@ public sealed record TenantBootstrap(
     string Currency = "USD",
     string? LogoUrl = null);
 
+/// <summary>An enrolled employee face projection loaded from a resolved tenant database for biometric login.</summary>
+public sealed record TenantFaceCandidate(
+    Guid EmployeeId,
+    string EmployeeCode,
+    string FullName,
+    string Email,
+    EmploymentStatus EmployeeStatus,
+    bool IsOffboarded,
+    string FaceDescriptor,
+    string? FacePhotoUrl,
+    DateTime? FaceEnrolledAtUtc,
+    Guid? UserId,
+    string? UserEmail,
+    string? UserFullName,
+    string? UserInitials,
+    bool UserIsActive,
+    string RoleName,
+    string RoleCode);
+
 /// <summary>Performs the EF Core work required to create and initialize a tenant database.</summary>
 public interface ITenantDatabaseService
 {
@@ -92,6 +111,8 @@ public interface ITenantDatabaseService
     Task BootstrapAsync(string databaseName, TenantBootstrap bootstrap, CancellationToken ct = default);
 
     Task<TenantUserRecord?> FindUserByEmailAsync(string databaseName, string email, CancellationToken ct = default);
+
+    Task<IReadOnlyList<TenantFaceCandidate>> GetFaceLoginCandidatesAsync(string databaseName, CancellationToken ct = default);
 
     Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default, string? verifiedPlainPassword = null);
 
