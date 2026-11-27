@@ -54,7 +54,6 @@ export class LoginComponent implements OnInit, OnDestroy {
     { role: 'Super Admin', label: 'Super Admin', email: 'admin@hrnexus.com', password: 'Admin@123' },
     { role: 'Company Admin', label: 'Company Admin', email: 'companyadmin@hrnexus.com', password: 'Admin@123' },
     { role: 'HR Manager', label: 'HR Manager', email: 'hr@hrnexus.com', password: 'Hr@12345' },
-    { role: 'Manager', label: 'Manager', email: 'manager@hrnexus.com', password: 'Manager@123' },
     { role: 'Employee', label: 'James Okafor', email: 'james@hrnexus.com', password: 'Employee@123' },
     { role: 'Employee', label: 'Sarah Mitchell', email: 'sarah@hrnexus.com', password: 'Employee@123' },
   ];
@@ -482,7 +481,7 @@ export class LoginComponent implements OnInit, OnDestroy {
 
     this.faceVerifying.set(true);
     this.faceStatus.set('scanning');
-    this.faceStatusMessage.set('AI detecting face and computing 128D biometric descriptor…');
+    this.faceStatusMessage.set('Detecting face…');
 
     const video = this.faceVideoRef.nativeElement;
     const canvas = this.faceCanvasRef?.nativeElement;
@@ -491,7 +490,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     const sampleDescriptors: number[][] = [];
     let snapshot = '';
     for (let i = 0; i < 3; i++) {
-      const scan = await this.faceService.detectFace(video, canvas);
+      const scan = await this.faceService.detectFace(video, canvas, true);
       if (scan.hasFace && scan.descriptor) {
         sampleDescriptors.push(scan.descriptor);
         if (scan.snapshot) snapshot = scan.snapshot;
@@ -502,8 +501,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (sampleDescriptors.length === 0) {
       this.faceVerifying.set(false);
       this.faceStatus.set('failed');
-      this.faceStatusMessage.set('No face detected by AI model. Please position your face clearly in the camera frame.');
-      this.toast.show('No face detected by AI neural network. Look directly at camera.', 'danger');
+      this.faceStatusMessage.set('No face detected. Please position your face clearly in the camera frame.');
+      this.toast.show('No face detected. Look directly at the camera.', 'danger');
       return;
     }
 
@@ -547,13 +546,28 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.api.enrollFace(empId, {
       faceDescriptor: JSON.stringify(finalDescriptor),
       facePhotoUrl: snapshot,
-    }, this.pendingToken ?? undefined).subscribe({ next: () => {}, error: () => {} });
-
-    this.faceVerifying.set(false);
-    this.faceStatus.set('idle');
-    this.faceMatchScore.set(null);
-    this.faceStatusMessage.set(`✅ Face registered with AI library! Now click "Scan & Verify Face".`);
-    this.toast.show(`Face profile registered for ${empName}!`, 'success');
+    }, this.pendingToken ?? undefined).subscribe({
+      next: () => {
+        this.faceVerifying.set(false);
+        this.faceStatus.set('idle');
+        this.faceMatchScore.set(null);
+        this.faceStatusMessage.set(`✅ Face registered! Now click "Scan & Verify Face".`);
+        this.toast.show(`Face profile registered for ${empName}!`, 'success');
+      },
+      error: (err) => {
+        this.faceVerifying.set(false);
+        this.faceStatus.set('idle');
+        this.isFaceEnrolled.set(false);
+        this.referenceFaceFeatures = null;
+        try {
+          localStorage.removeItem('hrms_face_' + empId);
+          localStorage.removeItem('hrms_face_' + empName.toLowerCase());
+        } catch {}
+        const msg = err?.error?.title ?? err?.error?.detail ?? err?.error?.message ?? 'Could not enroll Face ID.';
+        this.faceStatusMessage.set(`❌ ${msg}`);
+        this.toast.show(msg, 'danger');
+      },
+    });
   }
 
   /**
@@ -573,14 +587,14 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.isFaceEnrolled.set(false);
       this.referenceFaceFeatures = null;
       this.faceStatus.set('idle');
-      this.faceStatusMessage.set('Saved profile needs upgrade to deep AI descriptor. Click "Register My Face" once.');
-      this.toast.show('Upgraded to AI face model — please register your face once.', 'info');
+      this.faceStatusMessage.set('Saved face profile needs to be re-registered. Click "Register My Face" once.');
+      this.toast.show('Please register your face once to continue.', 'info');
       return;
     }
 
     this.faceVerifying.set(true);
     this.faceStatus.set('scanning');
-    this.faceStatusMessage.set('AI neural network comparing face embedding…');
+    this.faceStatusMessage.set('Comparing face profile…');
     this.faceCheckAttempts++;
 
     const video = this.faceVideoRef.nativeElement;
@@ -612,7 +626,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (!anyFaceFound || !bestEvaluation) {
       this.faceStatus.set('failed');
       this.faceMatchScore.set(0);
-      this.faceStatusMessage.set('❌ No face detected by AI model. Look straight at the camera.');
+      this.faceStatusMessage.set('❌ No face detected. Please look straight at the camera.');
       this.toast.show('No face detected in the camera frame.', 'warning');
       return;
     }

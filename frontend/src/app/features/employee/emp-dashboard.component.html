@@ -273,11 +273,6 @@
         @if (poppedWidget() === 'punch') {
           <button type="button" class="widget-popout-close" (click)="closePopout($event)" aria-label="Close">✕</button>
         }
-        <!-- Punch Header -->
-        <div class="punch-header">
-          <div class="punch-date">{{ currentTime() | date:'EEEE, MMM d, y' }}</div>
-          <div class="punch-live-clock">{{ currentTime() | date:'hh:mm:ss a' }}</div>
-        </div>
 
         <!-- Shift & Status Badge -->
         <div class="punch-status-badge" [class.active]="punchService.state() === 'active'"
@@ -290,13 +285,13 @@
           }
         </div>
 
-        <!-- Timers: Production Time & Break Time -->
+        <!-- Timers: Work Time (Full-Width Block Focus) & Break Time -->
         <div class="punch-timers">
-          <div class="timer-box">
+          <div class="timer-box work-hero">
             <div class="timer-label">Work Time</div>
             <div class="timer-value">{{ punchService.workTime() }}</div>
           </div>
-          <div class="timer-box">
+          <div class="timer-box break-secondary">
             <div class="timer-label">Break Time</div>
             <div class="timer-value break">{{ punchService.breakTime() }}</div>
           </div>

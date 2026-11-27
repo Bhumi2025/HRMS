@@ -228,6 +228,12 @@ export class ApiService {
     return this.http.delete<void>(this.url(`/employees/${id}`));
   }
 
+  checkEmployeeEmailAvailable(email: string, excludeEmployeeId?: string): Observable<{ available: boolean; message?: string | null }> {
+    return this.http.get<{ available: boolean; message?: string | null }>(this.url('/employees/email-available'), {
+      params: toParams({ email, excludeEmployeeId }),
+    });
+  }
+
   // ── Leave ──
   leaveTypes(): Observable<LeaveType[]> {
     return this.http.get<LeaveType[]>(this.url('/leave/types'));

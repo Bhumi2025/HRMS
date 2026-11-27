@@ -15,7 +15,7 @@ public sealed record DesignationDto(Guid Id, string Name, string Grade, Guid? De
 
 public sealed record SaveDesignationRequest(
     [Required, MaxLength(80)] string Name,
-    [Required, MaxLength(10)] string Grade,
+    [MaxLength(10)] string? Grade,
     Guid? DepartmentId,
     string? Description);
 

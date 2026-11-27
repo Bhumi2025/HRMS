@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { map, shareReplay, tap } from 'rxjs/operators';
+import { Observable } from 'rxjs';
+import { map, shareReplay } from 'rxjs/operators';
 import { ApiService } from '../api/api.service';
 import { KeyStoreItem } from '../api/api.models';
 
@@ -9,45 +9,27 @@ import { KeyStoreItem } from '../api/api.models';
 })
 export class KeyGroupCacheService {
   private readonly api = inject(ApiService);
-  private readonly cache = new Map<string, Observable<KeyStoreItem[]>>();
+  private readonly cache = new Map<string, { expiresAt: number; obs: Observable<KeyStoreItem[]> }>();
+  private static readonly TTL_MS = 3000;
 
   /**
-   * Retrieves active KeyStores for a given groupCode, cached with shareReplay(1)
-   * to eliminate duplicate HTTP requests across multiple dropdowns on a single page.
+   * Retrieves active KeyStores for a given groupCode, sharing in-flight/recent
+   * requests within a short TTL while staying fresh with Settings edits.
    */
   getOptions(groupCode: string): Observable<KeyStoreItem[]> {
     const key = groupCode.trim().toUpperCase();
+    const now = Date.now();
     const existing = this.cache.get(key);
-    if (existing) {
-      return existing;
+    if (existing && existing.expiresAt > now) {
+      return existing.obs;
     }
 
     const obs = this.api.keyStoresByGroup(key).pipe(
-      map((items) => {
-        const list = items ? [...items] : [];
-        if (key === 'PAYMENT_MODE') {
-          const standardModes = ['Bank Transfer', 'Cheque', 'Cash'];
-          for (const m of standardModes) {
-            const exists = list.some((i) => i.value.toLowerCase() === m.toLowerCase() || i.key.toLowerCase() === m.toLowerCase());
-            if (!exists) {
-              list.push({
-                id: `def-${m.replace(/\s+/g, '-').toLowerCase()}`,
-                keyGroupId: 'kg-payment-mode',
-                key: m,
-                value: m,
-                subValue: null,
-                displayOrder: list.length + 1,
-                isActive: true,
-              });
-            }
-          }
-        }
-        return list;
-      }),
+      map((items) => (items ? [...items] : [])),
       shareReplay(1)
     );
 
-    this.cache.set(key, obs);
+    this.cache.set(key, { expiresAt: now + KeyGroupCacheService.TTL_MS, obs });
     return obs;
   }
 

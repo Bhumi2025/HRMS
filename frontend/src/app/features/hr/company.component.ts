@@ -20,6 +20,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 export type CompanyTab = 'directory' | 'profile' | 'departments' | 'designations' | 'holiday';
 
@@ -87,7 +88,7 @@ function emptyTenantForm(): CreateCompanyRequest {
 @Component({
   selector: 'app-company',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent],
+  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent, NoAutofillDirective],
   template: `
     <div class="company-page">
       @if (!isSuperAdmin()) {
@@ -597,6 +598,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                         <input 
                           #deptFilterInput
                           type="text" 
+                          appNoAutofill
                           class="form-control" 
                           placeholder="Search Department Name..." 
                           [value]="deptFilterName()"
@@ -693,6 +695,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                         <input 
                           #desigFilterInput
                           type="text" 
+                          appNoAutofill
                           class="form-control" 
                           placeholder="Search Designation Name..." 
                           [value]="desigFilterName()"
@@ -792,6 +795,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                         <input 
                           #holidayFilterInput
                           type="text" 
+                          appNoAutofill
                           class="form-control" 
                           placeholder="Search Holiday Name..." 
                           [value]="holidayFilterName()"
@@ -898,7 +902,7 @@ function emptyTenantForm(): CreateCompanyRequest {
       <div class="modal-overlay open" (click)="showCreateTenant.set(false)">
         <div class="modal" style="max-width: 560px;" (click)="$event.stopPropagation()">
           <div class="modal-header">
-            <div style="font-size: 1.1rem; font-weight: 700;">New Company & Dedicated Database</div>
+            <div style="font-size: 1.1rem; font-weight: 700;">Create Company</div>
             <button class="btn btn-ghost btn-sm" (click)="showCreateTenant.set(false)"><span [appIcon]="'x'"></span></button>
           </div>
           <div class="modal-body">
@@ -937,12 +941,9 @@ function emptyTenantForm(): CreateCompanyRequest {
                     }
                     @if (uploadingTenantLogo()) {
                       <span style="font-size: 12px; color: var(--p); display: inline-flex; align-items: center; gap: 4px;">
-                        Uploading to Cloudinary...
+                        Uploading logo...
                       </span>
                     }
-                  </div>
-                  <div style="font-size: 11px; color: var(--muted);">
-                    Uploaded to Cloudinary CDN for all user modules.
                   </div>
                 </div>
               </div>
@@ -1001,16 +1002,12 @@ function emptyTenantForm(): CreateCompanyRequest {
                   <span>~3–4 seconds</span>
                 </div>
               </div>
-            } @else {
-              <div style="background: var(--p-soft); border-radius: 8px; padding: 12px; margin-top: 14px; font-size: 13px;">
-                ⚡ A dedicated, isolated database will automatically be provisioned with its own schema migrations for this company.
-              </div>
             }
           </div>
           <div class="modal-footer">
             <button class="btn btn-outline" (click)="showCreateTenant.set(false)" [disabled]="savingTenant()">Cancel</button>
             <button class="btn btn-primary" (click)="saveTenant()" [disabled]="savingTenant()">
-              {{ savingTenant() ? 'Provisioning Database (' + tenantCreationProgress() + '%)...' : 'Create & Provision Database' }}
+              {{ savingTenant() ? 'Creating Company (' + tenantCreationProgress() + '%)...' : 'Create Company' }}
             </button>
           </div>
         </div>
@@ -1061,12 +1058,9 @@ function emptyTenantForm(): CreateCompanyRequest {
                     }
                     @if (uploadingTenantLogo()) {
                       <span style="font-size: 12px; color: var(--p); display: inline-flex; align-items: center; gap: 4px;">
-                        Uploading to Cloudinary...
+                        Uploading logo...
                       </span>
                     }
-                  </div>
-                  <div style="font-size: 11px; color: var(--muted);">
-                    Uploaded to Cloudinary CDN for all user modules.
                   </div>
                 </div>
               </div>
@@ -1187,6 +1181,7 @@ function emptyTenantForm(): CreateCompanyRequest {
                       <input
                         class="form-control"
                         type="text"
+                        appNoAutofill
                         placeholder="Search employees..."
                         style="padding: 4px 10px; font-size: 12px; height: 32px;"
                         [ngModel]="tenantEmpSearch()"
@@ -1456,10 +1451,6 @@ function emptyTenantForm(): CreateCompanyRequest {
                   <option [value]="d.name">{{ d.name }}</option>
                 }
               </select>
-            </div>
-            <div class="form-group" style="margin-bottom: 12px;">
-              <label class="form-label">Grade / Level</label>
-              <input class="form-control" [(ngModel)]="desigForm.grade" placeholder="e.g. L3, Senior, Specialist" />
             </div>
             <div class="form-group">
               <label class="form-label">Description</label>
@@ -2065,7 +2056,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
 
   protected readonly showDesigModal = signal(false);
   protected readonly editingDesigId = signal<string | null>(null);
-  protected desigForm = { name: '', grade: '', department: '', description: '' };
+  protected desigForm = { name: '', department: '', description: '' };
 
   protected readonly showHolidayModal = signal(false);
   protected readonly editingHolidayId = signal<string | null>(null);
@@ -2730,9 +2721,8 @@ export class CompanyComponent implements OnInit, OnDestroy {
     return this.designations().filter((ds) => {
       const name = (ds.name || '').toLowerCase();
       const dept = (ds.department || '').toLowerCase();
-      const grade = (ds.grade || '').toLowerCase();
       const desc = (ds.description || '').toLowerCase();
-      const text = `${name} ${dept} ${grade} ${desc}`;
+      const text = `${name} ${dept} ${desc}`;
       if (text.includes(raw)) return true;
       return tokens.every((t) => text.includes(t));
     });
@@ -2912,7 +2902,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
         break;
       case 'designations':
         this.editingDesigId.set(null);
-        this.desigForm = { name: '', grade: '', department: '', description: '' };
+        this.desigForm = { name: '', department: '', description: '' };
         this.showDesigModal.set(true);
         break;
       case 'holiday':
@@ -3061,7 +3051,6 @@ export class CompanyComponent implements OnInit, OnDestroy {
     this.editingDesigId.set(ds.id);
     this.desigForm = {
       name: ds.name,
-      grade: ds.grade || '',
       department: ds.department || '',
       description: ds.description || '',
     };
@@ -3074,7 +3063,7 @@ export class CompanyComponent implements OnInit, OnDestroy {
       return;
     }
     const name = this.desigForm.name.trim();
-    const grade = (this.desigForm.grade || 'L1').trim().slice(0, 10);
+    const grade = '';
     const dept = this.departments().find((d) => d.name === this.desigForm.department);
     const departmentId = dept?.id && !dept.id.startsWith('d-') ? dept.id : null;
     const description = this.desigForm.description?.trim() || null;

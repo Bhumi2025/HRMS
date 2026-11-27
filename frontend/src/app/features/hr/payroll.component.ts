@@ -14,6 +14,7 @@ import { UiService } from '../../core/services/ui.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { amountInWords } from '../../core/utils/payroll-utils';
 import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 export interface ComprehensivePayrollRow {
   empId: string;
@@ -42,7 +43,7 @@ export interface ComprehensivePayrollRow {
 
 @Component({
   selector: 'app-payroll',
-  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent],
+  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent, NoAutofillDirective],
   template: `
     <div class="flex justify-end items-center" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div class="flex gap-2">

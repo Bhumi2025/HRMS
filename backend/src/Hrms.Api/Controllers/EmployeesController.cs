@@ -39,6 +39,23 @@ public sealed class EmployeesController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<DepartmentHeadcountDto>>> DepartmentHeadcount(CancellationToken ct) =>
         Ok(await _employees.DepartmentHeadcountAsync(ct));
 
+    [HttpGet("email-available")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> IsEmailAvailable(
+        [FromQuery] string email,
+        [FromQuery] Guid? excludeEmployeeId = null,
+        CancellationToken ct = default)
+    {
+        var available = await _employees.IsEmailAvailableAsync(email, excludeEmployeeId, ct);
+        return Ok(new
+        {
+            available,
+            message = available
+                ? null
+                : $"A user with email '{email.Trim().ToLowerInvariant()}' already exists in this company. Email ID must be unique."
+        });
+    }
+
     /// <summary>Employee record linked to the signed-in user.</summary>
     [HttpGet("me")]
     [ProducesResponseType(typeof(EmployeeDetailDto), StatusCodes.Status200OK)]
@@ -79,8 +96,13 @@ public sealed class EmployeesController : ControllerBase
         [FromBody] UpdateEmployeeRequest request,
         CancellationToken ct)
     {
+        var guarded = GuardRoleAssignment(request, out var errorResult);
+        if (errorResult is not null)
+        {
+            return errorResult;
+        }
         var id = await _employees.ResolveEmployeeIdAsync(null, ct);
-        return Ok(await _employees.UpdateAsync(id, request, ct));
+        return Ok(await _employees.UpdateAsync(id, guarded, ct));
     }
 
     public sealed record UpdatePhotoRequest(string PhotoUrl);
@@ -105,15 +127,7 @@ public sealed class EmployeesController : ControllerBase
         [FromBody] UpdatePhotoRequest request,
         CancellationToken ct)
     {
-        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
-        var isHrAdmin = role.Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
-                        role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) ||
-                        role.Equals("Company Admin", StringComparison.OrdinalIgnoreCase) ||
-                        role.Equals("CompanyAdmin", StringComparison.OrdinalIgnoreCase) ||
-                        role.Equals("HR Manager", StringComparison.OrdinalIgnoreCase) ||
-                        role.Equals("HrManager", StringComparison.OrdinalIgnoreCase);
-
-        if (!isHrAdmin)
+        if (!IsHrAdminCaller())
         {
             var empClaim = User.FindFirst("employeeId")?.Value;
             if (string.IsNullOrWhiteSpace(empClaim) || !Guid.TryParse(empClaim, out var userEmpId) || userEmpId != id)
@@ -134,15 +148,7 @@ public sealed class EmployeesController : ControllerBase
         [FromBody] UpdateEmployeeRequest request,
         CancellationToken ct)
     {
-        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
-        var isHrAdmin = role.Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
-                        role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) ||
-                        role.Equals("Company Admin", StringComparison.OrdinalIgnoreCase) ||
-                        role.Equals("CompanyAdmin", StringComparison.OrdinalIgnoreCase) ||
-                        role.Equals("HR Manager", StringComparison.OrdinalIgnoreCase) ||
-                        role.Equals("HrManager", StringComparison.OrdinalIgnoreCase);
-
-        if (!isHrAdmin)
+        if (!IsHrAdminCaller())
         {
             var empClaim = User.FindFirst("employeeId")?.Value;
             if (string.IsNullOrWhiteSpace(empClaim) || !Guid.TryParse(empClaim, out var userEmpId) || userEmpId != id)
@@ -151,7 +157,47 @@ public sealed class EmployeesController : ControllerBase
             }
         }
 
-        return Ok(await _employees.UpdateAsync(id, request, ct));
+        var guarded = GuardRoleAssignment(request, out var errorResult);
+        if (errorResult is not null)
+        {
+            return errorResult;
+        }
+
+        return Ok(await _employees.UpdateAsync(id, guarded, ct));
+    }
+
+    private string CallerRoleNormalized()
+    {
+        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? _currentUser.Role ?? string.Empty;
+        return new string(role.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+    }
+
+    private bool IsHrAdminCaller() =>
+        CallerRoleNormalized() is "superadmin" or "sa" or "companyadmin" or "ca" or "hrmanager" or "hr";
+
+    private UpdateEmployeeRequest GuardRoleAssignment(UpdateEmployeeRequest request, out ActionResult? errorResult)
+    {
+        errorResult = null;
+        if (!IsHrAdminCaller())
+        {
+            return request with { RoleCode = null };
+        }
+
+        var caller = CallerRoleNormalized();
+        var requested = new string((request.RoleCode ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        if (requested is "superadmin" or "sa" && caller is not ("superadmin" or "sa"))
+        {
+            errorResult = StatusCode(StatusCodes.Status403Forbidden, new { message = "Only Super Admin can assign the Super Admin role." });
+            return request;
+        }
+
+        if (requested is "companyadmin" or "ca" or "manager" && caller is not ("superadmin" or "sa" or "companyadmin" or "ca"))
+        {
+            errorResult = StatusCode(StatusCodes.Status403Forbidden, new { message = "Only Company Admin can assign the Company Admin role." });
+            return request;
+        }
+
+        return request;
     }
 
     [HttpDelete("{id:guid}")]

@@ -236,9 +236,23 @@ public sealed class AuthService : IAuthService
 
         if (!string.IsNullOrWhiteSpace(request.FullName))
         {
-            user.FullName = request.FullName.Trim();
+            var fullName = request.FullName.Trim();
+            user.FullName = fullName;
             user.Initials = Formatting.Initials(user.FullName);
             _uow.Users.Update(user);
+
+            if (user.EmployeeId.HasValue)
+            {
+                var linkedEmp = await _uow.Employees.GetByIdAsync(user.EmployeeId.Value, ct);
+                if (linkedEmp is not null)
+                {
+                    var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    linkedEmp.FirstName = parts.Length > 0 ? parts[0] : fullName;
+                    linkedEmp.LastName = parts.Length > 1 ? string.Join(' ', parts.Skip(1)) : string.Empty;
+                    _uow.Employees.Update(linkedEmp);
+                }
+            }
+
             await _uow.SaveChangesAsync(ct);
         }
 

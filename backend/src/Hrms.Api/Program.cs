@@ -133,6 +133,17 @@ builder.Services.AddAuthorization(options =>
         return !role.Equals("Employee", StringComparison.OrdinalIgnoreCase);
     }));
 
+    // CompanyAdminOnly policy: Super Admin and Company Admin only (excludes HR Manager and Employee)
+    options.AddPolicy("CompanyAdminOnly", policy => policy.RequireAssertion(ctx =>
+    {
+        var role = ctx.User.FindFirst(ClaimTypes.Role)?.Value;
+        if (string.IsNullOrWhiteSpace(role)) return false;
+        return role.Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
+               role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) ||
+               role.Equals("Company Admin", StringComparison.OrdinalIgnoreCase) ||
+               role.Equals("CompanyAdmin", StringComparison.OrdinalIgnoreCase);
+    }));
+
     // Platform-level: only the Super Admin may manage companies.
     options.AddPolicy("SuperAdminOnly", policy => policy.RequireRole("Super Admin", "SuperAdmin"));
 });

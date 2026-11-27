@@ -67,7 +67,7 @@ public class Employee : BaseEntity
 
     public string JobTitle { get; set; } = string.Empty;
 
-    public string Grade { get; set; } = "L3";
+    public string Grade { get; set; } = string.Empty;
 
     public EmploymentType EmploymentType { get; set; } = EmploymentType.FullTime;
 

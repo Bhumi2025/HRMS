@@ -5,26 +5,27 @@ import { ApiService } from '../../core/api/api.service';
 import { EmployeeListItem } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { PermissionService } from '../../core/services/permission.service';
+import { SessionService } from '../../core/services/session.service';
 import { UiService } from '../../core/services/ui.service';
 import { ToastService } from '../../core/services/toast.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
-import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
 import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 interface Employee {
   id: string;
   apiId?: string;
   name: string;
   dept: string;
-  grade: string;
   status: 'Active' | 'On Leave' | 'Offboarding';
   join: string;
   salary: string;
   email: string;
   role?: string;
   roleCode?: string;
+  roleName?: string;
   designationId?: string | null;
   isFaceEnrolled?: boolean;
   facePhotoUrl?: string | null;
@@ -32,11 +33,11 @@ interface Employee {
 
 /**
  * Employees directory — ported from pages/employees.html. Search plus department
- * and status filters, row selection, view/edit/add modals and pagination.
+ * and status filters, row selection, view/edit modals and pagination.
  */
 @Component({
   selector: 'app-employees',
-  imports: [CommonModule, IconDirective, SelectComponent, RouterLink, KeyGroupSelectComponent],
+  imports: [CommonModule, IconDirective, SelectComponent, RouterLink, NoAutofillDirective],
   template: `
     <!-- Single Card: Filter + Table -->
     <div class="card" style="overflow: visible;">
@@ -97,9 +98,6 @@ interface Employee {
             <button class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px; white-space: nowrap;" (click)="exportCsv()">
               <span [appIcon]="'download'"></span> Export
             </button>
-            @if (perms.canCreate('Employees')) {
-              <button class="btn btn-primary btn-sm" style="white-space: nowrap;" (click)="openAdd()"><span [appIcon]="'plus'"></span> Add Employee</button>
-            }
           </div>
         </div>
       </div>
@@ -115,6 +113,7 @@ interface Employee {
               <th>Employee</th>
               <th>ID</th>
               <th class="emp-col-dept">Department</th>
+              <th>Role</th>
               <th class="emp-col-join">Join Date</th>
               <th class="emp-col-salary">Salary</th>
               <th>Status</th>
@@ -124,7 +123,7 @@ interface Employee {
           </thead>
           <tbody>
             @for (e of paginatedEmployees(); track e.id) {
-              <tr>
+              <tr [class.hr-manager-row]="isHrManager(e)">
                 <td>
                   <div class="table-avatar">
                     <a 
@@ -151,6 +150,11 @@ interface Employee {
                 <td class="emp-col-dept">
                   <span style="color: var(--text); font-weight: 600; white-space: nowrap">{{ e.dept }}</span>
                 </td>
+                <td>
+                  <span class="badge" [class]="roleBadgeClass(e)" style="white-space: nowrap; font-weight: 600;">
+                    {{ displayRole(e) }}
+                  </span>
+                </td>
                 <td class="emp-col-join" style="white-space: nowrap">{{ e.join }}</td>
                 <td class="emp-col-salary" style="font-weight: 600; white-space: nowrap">{{ e.salary }}</td>
                 <td><span class="badge" [class]="statusClass(e.status)">{{ e.status }}</span></td>
@@ -160,23 +164,20 @@ interface Employee {
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                       Enrolled
                     </span>
-                  } @else {
+                  } @else if (canEditEmployee(e)) {
                     <button class="btn btn-outline btn-sm" (click)="openFaceEnroll(e)" style="font-size: 11px; padding: 2px 8px; display: inline-flex; align-items: center; gap: 4px; border-color: #38bdf8; color: #0284c7; font-weight: 600;">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                       + Scan Face
                     </button>
+                  } @else {
+                    <span class="badge" style="background: var(--bg); color: var(--muted); font-size: 11px;">Not Enrolled</span>
                   }
                 </td>
                 <td>
                   <div style="display: flex; gap: 4px">
-                    <button class="btn btn-ghost btn-sm" (click)="openFaceEnroll(e)" [attr.data-tooltip]="e.isFaceEnrolled ? 'Manage Face ID' : 'Enroll Face ID'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
-                    <button class="btn btn-ghost btn-sm" (click)="view(e)" data-tooltip="View"><span [appIcon]="'eye'"></span></button>
                     <a class="btn btn-ghost btn-sm" [routerLink]="['/employee-profile']" [queryParams]="{ id: e.apiId || e.id }" data-tooltip="Full Profile"><span [appIcon]="'user'"></span></a>
-                    @if (perms.canEdit('Employees')) {
-                      <button class="btn btn-ghost btn-sm" (click)="edit(e)" data-tooltip="Edit"><span [appIcon]="'edit'"></span></button>
-                    }
-                    @if (perms.canDelete('Employees')) {
-                      <button class="btn btn-ghost btn-sm" data-tooltip="Delete" (click)="remove(e)"><span [appIcon]="'trash'"></span></button>
+                    @if (canDeleteEmployee(e)) {
+                      <button class="btn btn-ghost btn-sm" data-tooltip="Remove" (click)="remove(e)"><span [appIcon]="'trash'"></span></button>
                     }
                   </div>
                 </td>
@@ -189,16 +190,12 @@ interface Employee {
                     @if (search() || dept() || status()) {
                       No employees match your current search and filter criteria.
                     } @else {
-                      Get started by onboarding your first team member.
+                      Get started by onboarding your first team member in Onboarding.
                     }
                   </div>
                   @if (search() || dept() || status()) {
                     <button class="btn btn-outline btn-sm" style="display: inline-flex; align-items: center; gap: 6px" (click)="clearFilters()">
                       <span [appIcon]="'x'"></span> Clear Filters
-                    </button>
-                  } @else if (perms.canCreate('Employees')) {
-                    <button class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px" (click)="openAdd()">
-                      <span [appIcon]="'plus'"></span> Add Employee
                     </button>
                   }
                 </td>
@@ -303,16 +300,20 @@ interface Employee {
                     }
                   </div>
                 </div>
-                <button class="btn btn-outline btn-sm" (click)="openFaceEnrollFromView(e)" style="font-size: 12px; font-weight: 600;">
-                  {{ e.isFaceEnrolled ? 'Manage Face ID' : '+ Enroll Face' }}
-                </button>
+                @if (canEditEmployee(e)) {
+                  <button class="btn btn-outline btn-sm" (click)="openFaceEnrollFromView(e)" style="font-size: 12px; font-weight: 600;">
+                    {{ e.isFaceEnrolled ? 'Manage Face ID' : '+ Enroll Face' }}
+                  </button>
+                }
               </div>
             </div>
           }
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" (click)="ui.close('viewEmpModal')">Close</button>
-          <button class="btn btn-primary" (click)="editFromView()">Edit Employee</button>
+          @if (viewTarget() && canEditEmployee(viewTarget()!)) {
+            <button class="btn btn-primary" (click)="editFromView()">Edit Employee</button>
+          }
         </div>
       </div>
     </div>
@@ -346,7 +347,7 @@ interface Employee {
               </div>
               <div class="form-group">
                 <label class="form-label">Job Title</label>
-                <input class="form-control" [value]="f.role || ''" (input)="patch('role', $any($event.target).value)" />
+                <input class="form-control" [value]="f.role || ''" readonly style="background: var(--bg); color: var(--muted)" />
               </div>
               <div class="form-group">
                 <label class="form-label">Designation</label>
@@ -365,10 +366,6 @@ interface Employee {
                   (valueChange)="patch('roleCode', $event)"
                   width="100%"
                 />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Grade</label>
-                <app-key-select groupCode="GRADE_LEVEL" [value]="f.grade" (valueChange)="patch('grade', $event)" width="100%" />
               </div>
               <div class="form-group">
                 <label class="form-label">Salary</label>
@@ -393,57 +390,6 @@ interface Employee {
         <div class="modal-footer">
           <button class="btn btn-outline" (click)="ui.close('editEmpModal')">Cancel</button>
           <button class="btn btn-primary" (click)="saveEdit()">Save Changes</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add Employee Modal -->
-    <div class="modal-overlay" [class.open]="ui.isOpen('addEmpModal')" (click)="ui.onOverlayClick($event, 'addEmpModal')">
-      <div class="modal" style="max-width: 640px; overflow: visible;">
-        <div class="modal-header">
-          <div style="font-size: 1.1rem; font-weight: 700">Add New Employee</div>
-          <button class="btn btn-ghost btn-sm" (click)="ui.close('addEmpModal')"><span [appIcon]="'x'"></span></button>
-        </div>
-        <div class="modal-body" style="overflow: visible;">
-          <div class="grid-2">
-            <div class="form-group">
-              <label class="form-label">First Name</label>
-              <input class="form-control" placeholder="John" [value]="newEmp().first" (input)="patchNew('first', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Last Name</label>
-              <input class="form-control" placeholder="Doe" [value]="newEmp().last" (input)="patchNew('last', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Email</label>
-              <input class="form-control" type="email" placeholder="john@company.com" [value]="newEmp().email" (input)="patchNew('email', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Phone</label>
-              <input class="form-control" placeholder="+1 234 567 8900" [value]="newEmp().phone" (input)="patchNew('phone', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Department</label>
-              <app-select [options]="addDeptOptions()" [value]="newEmp().dept" (valueChange)="patchNew('dept', $event)" width="100%" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Join Date</label>
-              <input class="form-control" type="date" [value]="newEmp().join" (input)="patchNew('join', $any($event.target).value)" />
-            </div>
-            <div class="form-group" style="grid-column: 1/-1">
-              <label class="form-label">Basic Salary</label>
-              <input class="form-control" [placeholder]="currencyService.currencySymbol() + '0.00'" [value]="newEmp().salary" (input)="patchNew('salary', $any($event.target).value)" />
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-          <button type="button" class="btn btn-ghost btn-sm" (click)="openFullOnboarding()" style="font-size: 12px; color: var(--p);">
-            Launch Full Onboarding Wizard ›
-          </button>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-outline" (click)="ui.close('addEmpModal')">Cancel</button>
-            <button class="btn btn-primary" (click)="saveNew()">Save Employee</button>
-          </div>
         </div>
       </div>
     </div>
@@ -528,6 +474,12 @@ interface Employee {
     `
       thead th {
         white-space: nowrap;
+      }
+      tr.hr-manager-row {
+        background-color: rgba(37, 99, 235, 0.07) !important;
+      }
+      tr.hr-manager-row:hover {
+        background-color: rgba(37, 99, 235, 0.12) !important;
       }
       input[type="search"]::-webkit-search-decoration,
       input[type="search"]::-webkit-search-cancel-button,
@@ -622,6 +574,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
   private readonly router = inject(Router);
   protected readonly ui = inject(UiService);
   protected readonly perms = inject(PermissionService);
+  protected readonly session = inject(SessionService);
   private readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
   protected readonly currencyService = inject(CurrencyService);
@@ -676,16 +629,6 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
   protected uploadedPhotoBase64: string | null = null;
   private cameraStream?: MediaStream;
 
-  protected readonly newEmp = signal({
-    first: '',
-    last: '',
-    email: '',
-    phone: '',
-    dept: '',
-    join: '',
-    salary: '',
-  });
-
   protected readonly filtered = computed(() => {
     // 1. Normalize unicode spaces, trim, lowercase
     const raw = (this.search() || '')
@@ -713,8 +656,8 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
       const department = (e.dept || '').toLowerCase();
       const empStatus = (e.status || '').toLowerCase();
       const role = (e.role || '').toLowerCase();
-      const grade = (e.grade || '').toLowerCase();
-      const combined = `${name} ${id} ${email} ${department} ${empStatus} ${role} ${grade}`;
+      const roleLabel = this.displayRole(e).toLowerCase();
+      const combined = `${name} ${id} ${email} ${department} ${empStatus} ${role} ${roleLabel}`;
 
       // Match full phrase directly
       if (combined.includes(raw)) return true;
@@ -728,7 +671,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
           department.includes(token) ||
           empStatus.includes(token) ||
           role.includes(token) ||
-          grade.includes(token),
+          roleLabel.includes(token),
       );
     });
   });
@@ -828,9 +771,6 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
         const opts: SelectOption[] = list.map((d) => ({ v: d.name, l: d.name }));
         this.addDeptOptions.set(opts);
         this.departmentOptions.set([{ v: '', l: 'All Departments' }, ...opts]);
-        if (list.length > 0 && (!this.newEmp().dept || !this.departmentIds.has(this.newEmp().dept))) {
-          this.newEmp.update((e) => ({ ...e, dept: list[0].name }));
-        }
       },
       error: () => {
         this.addDeptOptions.set([]);
@@ -860,15 +800,62 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
       apiId: e.id,
       name: e.fullName,
       dept: e.department,
-      grade: e.grade,
       status: normalizedStatus,
       join: this.formatDate(e.joinDate),
       salary: `${this.currencySymbol(e.currency)}${e.salary.toLocaleString()}`,
       email: e.email,
       role: e.jobTitle,
+      roleCode: e.roleCode ?? undefined,
+      roleName: e.roleName ?? undefined,
       isFaceEnrolled: e.isFaceEnrolled ?? false,
       facePhotoUrl: e.facePhotoUrl ?? null,
     };
+  }
+
+  protected isHrManager(e: Employee): boolean {
+    const code = (e.roleCode || '').replace(/\s+/g, '').toLowerCase();
+    const name = (e.roleName || '').replace(/\s+/g, '').toLowerCase();
+    return code === 'hrmanager' || name === 'hrmanager';
+  }
+
+  protected isHrOrAdmin(e: Employee): boolean {
+    const code = (e.roleCode || '').replace(/\s+/g, '').toLowerCase();
+    const name = (e.roleName || '').replace(/\s+/g, '').toLowerCase();
+    return code === 'hrmanager' || name === 'hrmanager' ||
+           code === 'companyadmin' || name === 'companyadmin' ||
+           code === 'superadmin' || name === 'superadmin';
+  }
+
+  protected displayRole(e: Employee): string {
+    if (e.roleName && e.roleName.trim()) return e.roleName;
+    const code = (e.roleCode || '').replace(/\s+/g, '').toLowerCase();
+    if (code === 'hrmanager') return 'HR Manager';
+    if (code === 'companyadmin') return 'Company Admin';
+    if (code === 'superadmin') return 'Super Admin';
+    return 'Employee';
+  }
+
+  protected roleBadgeClass(e: Employee): string {
+    if (this.isHrManager(e)) return 'badge-primary';
+    const code = (e.roleCode || '').replace(/\s+/g, '').toLowerCase();
+    if (code === 'companyadmin' || code === 'superadmin') return 'badge-warning';
+    return 'badge-info';
+  }
+
+  protected canEditEmployee(e: Employee): boolean {
+    if (!this.perms.canEdit('Employees')) return false;
+    if (this.session.activeRole() === 'HR Manager' && this.isHrOrAdmin(e)) {
+      return false;
+    }
+    return true;
+  }
+
+  protected canDeleteEmployee(e: Employee): boolean {
+    if (!this.perms.canDelete('Employees')) return false;
+    if (this.session.activeRole() === 'HR Manager' && this.isHrOrAdmin(e)) {
+      return false;
+    }
+    return true;
   }
 
   private formatDate(value: string): string {
@@ -918,7 +905,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
       ['Full Name', e.name],
       ['Email', e.email],
       ['Department', e.dept],
-      ['Grade', e.grade],
+      ['Role', this.displayRole(e)],
       ['Join Date', e.join],
       ['Salary', e.salary],
     ];
@@ -1055,7 +1042,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
           reportingManagerId: null,
           jobTitle: f.role?.trim() || detail.jobTitle,
           roleCode: f.roleCode || (f.role?.toLowerCase().includes('hr') ? 'HrManager' : 'Employee'),
-          grade: f.grade,
+          grade: '',
           employmentType: detail.employmentType,
           status: normalizedStatus,
           joinDate: this.toIsoDate(f.join) ?? detail.joinDate,
@@ -1087,113 +1074,10 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
             this.toast.show('Employee updated successfully!');
             this.loadEmployees();
           },
-          error: (error) => this.toast.show(error?.error?.title ?? 'Could not update the employee.', 'danger'),
+          error: (error) => this.toast.show(error?.error?.detail ?? error?.error?.message ?? error?.error?.title ?? 'Could not update the employee.', 'danger'),
         });
       },
       error: () => this.toast.show('Could not load the employee details.', 'danger'),
-    });
-  }
-
-  protected patchNew(key: 'first' | 'last' | 'email' | 'phone' | 'dept' | 'join' | 'salary', value: string): void {
-    this.newEmp.update((e) => ({ ...e, [key]: value }));
-  }
-
-  protected openAdd(): void {
-    const defaultDept = this.addDeptOptions()[0]?.v || '';
-    this.newEmp.set({
-      first: '',
-      last: '',
-      email: '',
-      phone: '',
-      dept: defaultDept,
-      join: new Date().toISOString().slice(0, 10),
-      salary: '',
-    });
-    this.ui.open('addEmpModal');
-  }
-
-  protected openFullOnboarding(): void {
-    this.ui.close('addEmpModal');
-    void this.router.navigateByUrl('/onboarding');
-  }
-
-  protected saveNew(): void {
-    const n = this.newEmp();
-    let departmentId = this.departmentIds.get(n.dept);
-
-    if (!departmentId) {
-      for (const [key, val] of this.departmentIds.entries()) {
-        if (
-          key.toLowerCase() === n.dept.toLowerCase() ||
-          (n.dept.toLowerCase() === 'hr' && key.toLowerCase().includes('resource')) ||
-          (n.dept.toLowerCase().includes('resource') && key.toLowerCase() === 'hr')
-        ) {
-          departmentId = val;
-          break;
-        }
-      }
-    }
-
-    if (!departmentId && this.departmentIds.size > 0) {
-      departmentId = this.departmentIds.values().next().value;
-    }
-
-    if (!departmentId) {
-      const deptName = n.dept?.trim() || 'General';
-      this.api.createDepartment({ name: deptName, code: deptName.slice(0, 3).toUpperCase() }).subscribe({
-        next: (created) => {
-          this.departmentIds.set(created.name, created.id);
-          this.submitNewEmployee(created.id, n);
-        },
-        error: () => {
-          this.toast.show('Please create a department under Company -> Departments first.', 'warning');
-        },
-      });
-      return;
-    }
-
-    this.submitNewEmployee(departmentId, n);
-  }
-
-  private submitNewEmployee(departmentId: string, n: { first: string; last: string; email: string; phone: string; dept: string; join: string; salary: string }): void {
-    const name = `${n.first} ${n.last}`.trim() || 'New Employee';
-    const [firstName, ...rest] = name.split(' ');
-
-    const body = {
-      firstName: firstName || 'New',
-      middleName: null,
-      lastName: rest.join(' ') || 'Employee',
-      email: n.email?.trim() || `employee${Date.now()}@company.com`,
-      phone: n.phone?.trim() || null,
-      departmentId,
-      designationId: null,
-      branchId: null,
-      shiftId: null,
-      reportingManagerId: null,
-      jobTitle: 'Team Member',
-      grade: 'L3',
-      employmentType: 'FullTime',
-      joinDate: this.toIsoDate(n.join) ?? new Date().toISOString().slice(0, 10),
-      basicSalary: this.parseMoney(n.salary),
-      housingAllowance: 0,
-      transportAllowance: 0,
-      mobileAllowance: 0,
-      otherAllowances: 0,
-      currency: this.currencyService.currencyCode(),
-    };
-
-    this.api.createEmployee(body).subscribe({
-      next: () => {
-        this.ui.close('addEmpModal');
-        this.toast.show('Employee added successfully!', 'success');
-        this.loadEmployees();
-      },
-      error: (error) => {
-        const msg = error?.error?.errors
-          ? Object.values(error.error.errors).flat().join(' ')
-          : (error?.error?.detail ?? error?.error?.message ?? error?.error?.title ?? 'Could not add the employee.');
-        this.toast.show(msg, 'danger');
-      },
     });
   }
 
@@ -1218,7 +1102,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
 
   protected exportCsv(): void {
     const rows = this.filtered();
-    const header = ['ID', 'Name', 'Email', 'Department', 'Job Title', 'Grade', 'Join Date', 'Salary', 'Status', 'Face ID Enrolled'];
+    const header = ['ID', 'Name', 'Email', 'Department', 'Role', 'Job Title', 'Join Date', 'Salary', 'Status', 'Face ID Enrolled'];
     const escapeCell = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const csv = [
       header.map(escapeCell).join(','),
@@ -1227,8 +1111,8 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
         r.name,
         r.email,
         r.dept,
+        this.displayRole(r),
         r.role || '',
-        r.grade,
         r.join,
         r.salary,
         r.status,
@@ -1326,56 +1210,75 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
     }
 
     this.enrollingFace.set(true);
-    let photoDataUrl = this.uploadedPhotoBase64 || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150';
+    let photoDataUrl = this.uploadedPhotoBase64 || '';
     let realDescriptor: number[] | null = null;
 
     try {
       const video = this.enrollVideo?.nativeElement;
       const canvas = this.enrollCanvas?.nativeElement;
       if (video && canvas && video.videoWidth > 0) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          photoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        }
-        const scan = await this.faceService.detectFace(video, canvas);
+        const scan = await this.faceService.detectFace(video, canvas, true);
         if (scan.hasFace && scan.descriptor) {
           realDescriptor = scan.descriptor;
+          photoDataUrl = scan.snapshot || this.faceService.captureSnapshot(video, canvas) || photoDataUrl;
         }
       } else if (this.uploadedPhotoBase64 && canvas) {
         const img = new Image();
         img.src = this.uploadedPhotoBase64;
         await new Promise((resolve) => (img.onload = resolve));
-        const scan = await this.faceService.detectFace(img, canvas);
+        photoDataUrl = this.faceService.compressImageToDataUrl(img, 640, 0.85) || this.uploadedPhotoBase64;
+        const scan = await this.faceService.detectFace(img, canvas, true);
         if (scan.hasFace && scan.descriptor) {
           realDescriptor = scan.descriptor;
         }
       }
     } catch {}
 
-    const descriptorToSave = realDescriptor
-      ? JSON.stringify(realDescriptor)
-      : JSON.stringify(Array.from({ length: 128 }, () => (Math.random() - 0.5) * 0.2));
+    if (!realDescriptor || !photoDataUrl) {
+      this.enrollingFace.set(false);
+      this.toast.show('No face detected. Please align a clear face in the camera or upload a clear frontal face photo.', 'warning');
+      return;
+    }
 
-    this.api
-      .enrollFace(target.apiId, {
-        faceDescriptor: descriptorToSave,
-        facePhotoUrl: photoDataUrl,
-      })
-      .subscribe({
-        next: () => {
+    const employeeId = target.apiId;
+    const submitEnroll = () => {
+      this.api
+        .enrollFace(employeeId, {
+          faceDescriptor: JSON.stringify(realDescriptor),
+          facePhotoUrl: photoDataUrl,
+        })
+        .subscribe({
+          next: () => {
+            this.enrollingFace.set(false);
+            this.toast.show(`Face ID enrolled successfully for ${target.name}!`, 'success');
+            this.closeFaceEnrollModal();
+            this.loadEmployees();
+          },
+          error: (err) => {
+            this.enrollingFace.set(false);
+            this.toast.show(
+              err?.error?.title ?? err?.error?.detail ?? err?.error?.message ?? 'Could not enroll Face ID.',
+              'danger'
+            );
+          },
+        });
+    };
+
+    this.api.enrolledFaces().subscribe({
+      next: (faces) => {
+        const conflict = this.faceService.findDuplicateEnrolledFace(realDescriptor, faces || [], employeeId, photoDataUrl);
+        if (conflict) {
           this.enrollingFace.set(false);
-          this.toast.show(`Face ID enrolled successfully for ${target.name}!`, 'success');
-          this.closeFaceEnrollModal();
-          this.loadEmployees();
-        },
-        error: (err) => {
-          this.enrollingFace.set(false);
-          this.toast.show(err?.error?.message || 'Could not enroll Face ID.', 'danger');
-        },
-      });
+          this.toast.show(
+            `Duplicate face detected: this face is already registered to ${conflict.fullName} (${conflict.employeeCode}).`,
+            'danger'
+          );
+          return;
+        }
+        submitEnroll();
+      },
+      error: () => submitEnroll(),
+    });
   }
 
   protected removeFaceId(emp: Employee): void {

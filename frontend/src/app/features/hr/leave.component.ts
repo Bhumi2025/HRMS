@@ -13,6 +13,7 @@ import { NotificationStateService } from '../../core/services/notification-state
 import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 interface LeaveRequest {
   apiId?: string;
@@ -39,7 +40,7 @@ interface LeaveType {
 /** Leave Management — ported from pages/leave.html. */
 @Component({
   selector: 'app-leave',
-  imports: [CommonModule, FormsModule, IconDirective, SelectComponent, TablePaginationComponent],
+  imports: [CommonModule, FormsModule, IconDirective, SelectComponent, TablePaginationComponent, NoAutofillDirective],
   template: `
     @if (isAdmin()) {
       <div class="card" style="margin-bottom: 16px; overflow: hidden; display: flex; flex-direction: column;">
@@ -634,7 +635,7 @@ export class LeaveComponent implements OnInit, AfterViewInit {
           this.applyEmployeeId.set(res.items[0].id);
         }
       },
-      error: () => {},
+      error: () => { },
     });
   }
 

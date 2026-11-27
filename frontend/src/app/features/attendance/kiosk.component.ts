@@ -17,6 +17,7 @@ import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
 import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 interface RecentKioskPunch {
   name: string;
@@ -30,7 +31,7 @@ interface RecentKioskPunch {
 @Component({
   selector: 'app-face-kiosk',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, NoAutofillDirective],
   template: `
     <div class="kiosk-container" [class.fullscreen]="isFullscreen()">
       <!-- TOP NAVIGATION BAR -->
@@ -236,6 +237,7 @@ interface RecentKioskPunch {
               <div class="search-box" style="display: flex; gap: 8px;">
                 <input
                   type="text"
+                  appNoAutofill
                   class="search-input"
                   placeholder="Filter employee..."
                   [(ngModel)]="searchFilter"
@@ -1679,7 +1681,7 @@ export class KioskComponent implements OnInit, OnDestroy {
         error: (err) => {
           this.savingEnrollment.set(false);
           this.playChime('error');
-          this.toast.show(err?.error?.message || 'Could not enroll Face ID.', 'danger');
+          this.toast.show(err?.error?.title ?? err?.error?.detail ?? err?.error?.message ?? 'Could not enroll Face ID.', 'danger');
         },
       });
   }

@@ -309,7 +309,7 @@ public sealed class RoleService : IRoleService
 
         if (role.IsSystem)
         {
-            throw new ValidationException("System roles (Super Admin, Company Admin, HR Manager, Manager, Employee) cannot be deleted.");
+            throw new ValidationException("System roles (Super Admin, Company Admin, HR Manager, Employee) cannot be deleted.");
         }
 
         var hasUsers = await _uow.Users.AnyAsync(_uow.Users.Query().Where(u => u.RoleId == id), ct);
@@ -402,12 +402,15 @@ public sealed class NavigationService : INavigationService
                               roleCode.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) ||
                               roleName.Equals("Company Admin", StringComparison.OrdinalIgnoreCase) ||
                               roleCode.Equals("CompanyAdmin", StringComparison.OrdinalIgnoreCase) ||
-                              roleName.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
-                              roleCode.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
-                              roleName.Contains("HR", StringComparison.OrdinalIgnoreCase) ||
-                              roleCode.Contains("HR", StringComparison.OrdinalIgnoreCase);
+                              roleName.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                              roleCode.Equals("Admin", StringComparison.OrdinalIgnoreCase);
 
-        // Admins (Company Admin, Super Admin, HR Manager) ALWAYS retain full access to all navigation items
+        bool isHrManager = roleName.Equals("HR Manager", StringComparison.OrdinalIgnoreCase) ||
+                           roleCode.Equals("HrManager", StringComparison.OrdinalIgnoreCase) ||
+                           roleName.Equals("HR", StringComparison.OrdinalIgnoreCase) ||
+                           roleCode.Equals("HR", StringComparison.OrdinalIgnoreCase);
+
+        // Admins (Company Admin, Super Admin) ALWAYS retain full access to all navigation items
         if (isSuperOrAdmin)
         {
             foreach (var nav in allItems)
@@ -415,25 +418,41 @@ public sealed class NavigationService : INavigationService
                 allowedIds.Add(nav.Id);
             }
         }
+        else if (isHrManager)
+        {
+            // HR Manager has access to all operational modules EXCEPT Settings
+            foreach (var nav in allItems.Where(n =>
+                         !n.Route.StartsWith("/settings", StringComparison.OrdinalIgnoreCase) &&
+                         !n.Code.Equals("SETT", StringComparison.OrdinalIgnoreCase) &&
+                         !n.Code.Equals("KEYG", StringComparison.OrdinalIgnoreCase) &&
+                         !n.Code.Equals("NAVM", StringComparison.OrdinalIgnoreCase) &&
+                         !n.Code.Equals("PERM", StringComparison.OrdinalIgnoreCase) &&
+                         !n.Code.Equals("ROLE", StringComparison.OrdinalIgnoreCase)))
+            {
+                allowedIds.Add(nav.Id);
+            }
+        }
         else if (allowedIds.Count == 0)
         {
-            // Fallback if role permissions have not been specifically seeded yet:
-            // HR Manager has access to all operational modules
-            if (roleName.Contains("HR", StringComparison.OrdinalIgnoreCase) || roleCode.Contains("HR", StringComparison.OrdinalIgnoreCase))
+            // General fallback for unconfigured employee roles: allow operational non-settings items
+            foreach (var nav in allItems.Where(n => !n.Route.StartsWith("/settings", StringComparison.OrdinalIgnoreCase)))
             {
-                foreach (var nav in allItems)
-                {
-                    allowedIds.Add(nav.Id);
-                }
+                allowedIds.Add(nav.Id);
             }
-            else
-            {
-                // General fallback for unconfigured employee/manager roles: allow operational non-settings items
-                foreach (var nav in allItems.Where(n => !n.Route.StartsWith("/settings", StringComparison.OrdinalIgnoreCase)))
-                {
-                    allowedIds.Add(nav.Id);
-                }
-            }
+        }
+
+        if (isHrManager)
+        {
+            var settingsIds = allItems
+                .Where(n => n.Route.StartsWith("/settings", StringComparison.OrdinalIgnoreCase) ||
+                            n.Code.Equals("SETT", StringComparison.OrdinalIgnoreCase) ||
+                            n.Code.Equals("KEYG", StringComparison.OrdinalIgnoreCase) ||
+                            n.Code.Equals("NAVM", StringComparison.OrdinalIgnoreCase) ||
+                            n.Code.Equals("PERM", StringComparison.OrdinalIgnoreCase) ||
+                            n.Code.Equals("ROLE", StringComparison.OrdinalIgnoreCase))
+                .Select(n => n.Id)
+                .ToHashSet();
+            allowedIds.RemoveWhere(id => settingsIds.Contains(id));
         }
 
         // Filter items: item is allowed if itself is permitted or any of its children are permitted
@@ -581,11 +600,14 @@ public sealed class NavigationService : INavigationService
         await _uow.NavigationItems.AddAsync(nav, ct);
         await _uow.SaveChangesAsync(ct);
 
-        // Auto grant to Super Admin, Company Admin, and HR Manager
+        // Auto grant to Super Admin and Company Admin (and operational non-settings items to HR Manager)
+        bool isSettingsItem = route.StartsWith("/settings", StringComparison.OrdinalIgnoreCase) ||
+                              code.Equals("SETT", StringComparison.OrdinalIgnoreCase);
         var adminRoles = await _uow.Roles.ToListAsync(
-            _uow.Roles.Query().Where(r => 
-                r.Code == "SuperAdmin" || r.Code == "CompanyAdmin" || r.Code == "HrManager" ||
-                r.Name == "Super Admin" || r.Name == "Company Admin" || r.Name == "HR Manager" ||
+            _uow.Roles.Query().Where(r =>
+                r.Code == "SuperAdmin" || r.Code == "CompanyAdmin" ||
+                r.Name == "Super Admin" || r.Name == "Company Admin" ||
+                (!isSettingsItem && (r.Code == "HrManager" || r.Name == "HR Manager")) ||
                 r.Name.Contains("Admin") || r.Code.Contains("Admin")), ct);
 
         foreach (var role in adminRoles)
@@ -744,10 +766,9 @@ public sealed class NavigationService : INavigationService
             ("PAYR", "Payroll", "/payroll", "payroll", 9),
             ("PAYS", "Payslips", "/payslips", "payslip", 10),
             ("ONBD", "Onboarding", "/onboarding", "onboarding", 11),
-            ("DOCS", "Documents", "/documents", "documents", 12),
-            ("APPR", "Approvals", "/approvals", "approvals", 13),
-            ("REPT", "Reports", "/reports", "reports", 14),
-            ("SETT", "Settings", "/settings", "settings", 15)
+            ("APPR", "Approvals", "/approvals", "approvals", 12),
+            ("REPT", "Reports", "/reports", "reports", 13),
+            ("SETT", "Settings", "/settings", "settings", 14)
         };
 
         var createdNavs = new List<NavigationItem>();
@@ -812,31 +833,25 @@ public sealed class NavigationService : INavigationService
                 if (roleCode == "superadmin" || roleName == "super admin")
                 {
                     isCreate = isEdit = isDelete = isFull = true;
-                    var superHiddenCodes = new[] { "ANAL", "EMPL", "SHIF", "ATTD", "LEAV", "PAYR", "PAYS", "DOCS", "APPR", "REPT" };
+                    var superHiddenCodes = new[] { "ANAL", "EMPL", "SHIF", "ATTD", "LEAV", "PAYR", "PAYS", "APPR", "REPT" };
                     isView = !superHiddenCodes.Contains(nav.Code);
                 }
-                else if (roleCode == "companyadmin" || roleName == "company admin")
+                else if (roleCode == "companyadmin" || roleName == "company admin" || roleCode == "manager" || roleName == "manager")
                 {
                     isView = isCreate = isEdit = isDelete = isFull = true;
                 }
                 else if (roleCode == "hrmanager" || roleName == "hr manager")
                 {
-                    isView = isCreate = isEdit = isFull = true;
-                    isDelete = nav.Code != "SETT" && nav.ParentId != settingsNav.Id;
-                }
-                else if (roleCode == "manager" || roleName == "manager")
-                {
-                    var mgrAllowed = new[] { "DASH", "ANAL", "EMPL", "PROF", "ATTD", "LEAV", "DOCS", "APPR", "REPT" };
-                    if (mgrAllowed.Contains(nav.Code))
-                    {
-                        isView = true;
-                        isCreate = isEdit = new[] { "DASH", "PROF", "APPR", "ATTD", "LEAV" }.Contains(nav.Code);
-                        isFull = new[] { "DASH", "PROF", "APPR" }.Contains(nav.Code);
-                    }
+                    bool isSett = nav.Code == "SETT" || nav.ParentId == settingsNav.Id;
+                    isView = !isSett;
+                    isCreate = !isSett;
+                    isEdit = !isSett;
+                    isDelete = !isSett;
+                    isFull = !isSett;
                 }
                 else // Employee
                 {
-                    var empAllowed = new[] { "DASH", "PROF", "ATTD", "LEAV", "PAYS", "DOCS" };
+                    var empAllowed = new[] { "DASH", "PROF", "ATTD", "LEAV", "PAYS" };
                     if (empAllowed.Contains(nav.Code))
                     {
                         isView = true;
@@ -925,11 +940,6 @@ public sealed class OptionsService : IOptionsService
             group = await _uow.KeyGroups.GetByIdAsync(request.Id.Value, ct)
                     ?? throw NotFoundException.For("KeyGroup", request.Id.Value);
 
-            if (group.IsGeneric && !string.Equals(group.Code, code, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ConflictException($"The code of generic system Key Group '{group.Name}' is read-only and cannot be changed.");
-            }
-
             var conflict = await _uow.KeyGroups.FirstOrDefaultAsync(
                 _uow.KeyGroups.Query().Where(g => g.Id != group.Id && g.Code.ToUpper() == code), ct);
             if (conflict != null)
@@ -937,10 +947,10 @@ public sealed class OptionsService : IOptionsService
                 throw new ConflictException($"A key group with code '{code}' already exists.");
             }
 
-            group.Code = group.IsGeneric ? group.Code : code;
+            group.Code = EnumLockedGroupCodes.Contains(group.Code) ? group.Code : code;
             group.Name = name;
             group.Description = request.Description?.Trim();
-            group.IsGeneric = request.IsGeneric;
+            group.IsGeneric = false;
             _uow.KeyGroups.Update(group);
         }
         else
@@ -957,7 +967,7 @@ public sealed class OptionsService : IOptionsService
                 Code = code,
                 Name = name,
                 Description = request.Description?.Trim(),
-                IsGeneric = request.IsGeneric
+                IsGeneric = false
             };
             await _uow.KeyGroups.AddAsync(group, ct);
         }
@@ -1040,9 +1050,9 @@ public sealed class OptionsService : IOptionsService
         var group = await _uow.KeyGroups.GetByIdAsync(id, ct)
                     ?? throw NotFoundException.For("KeyGroup", id);
 
-        if (group.IsGeneric || EnumLockedGroupCodes.Contains(group.Code))
+        if (EnumLockedGroupCodes.Contains(group.Code))
         {
-            throw new ConflictException($"Key Group '{group.Name}' is a system group and cannot be deleted.");
+            throw new ConflictException($"Key Group '{group.Name}' is a system enum group and cannot be deleted.");
         }
 
         var stores = await _uow.KeyStores.ToListAsync(
@@ -1086,48 +1096,6 @@ public sealed class OptionsService : IOptionsService
 
         var stores = await _uow.KeyStores.ToListAsync(
             _uow.KeyStores.Query().Where(s => s.KeyGroupId == group.Id && s.IsActive).OrderBy(s => s.DisplayOrder), ct);
-
-        if (groupCode.Equals("PAYMENT_MODE", StringComparison.OrdinalIgnoreCase))
-        {
-            var defaultModes = new[] { "Bank Transfer", "Cheque", "Cash" };
-            bool modified = false;
-            int order = stores.Count > 0 ? stores.Max(s => s.DisplayOrder) + 1 : 1;
-            var allStoresForGroup = await _uow.KeyStores.ToListAsync(
-                _uow.KeyStores.Query().Where(s => s.KeyGroupId == group.Id), ct);
-
-            foreach (var mode in defaultModes)
-            {
-                var existing = allStoresForGroup.FirstOrDefault(s =>
-                    s.Key.Equals(mode, StringComparison.OrdinalIgnoreCase) ||
-                    s.Value.Equals(mode, StringComparison.OrdinalIgnoreCase));
-
-                if (existing == null)
-                {
-                    await _uow.KeyStores.AddAsync(new KeyStore
-                    {
-                        KeyGroupId = group.Id,
-                        Key = mode,
-                        Value = mode,
-                        DisplayOrder = order++,
-                        IsActive = true
-                    }, ct);
-                    modified = true;
-                }
-                else if (!existing.IsActive)
-                {
-                    existing.IsActive = true;
-                    _uow.KeyStores.Update(existing);
-                    modified = true;
-                }
-            }
-
-            if (modified)
-            {
-                await _uow.SaveChangesAsync(ct);
-                stores = await _uow.KeyStores.ToListAsync(
-                    _uow.KeyStores.Query().Where(s => s.KeyGroupId == group.Id && s.IsActive).OrderBy(s => s.DisplayOrder), ct);
-            }
-        }
 
         return stores.Select(s => new KeyStoreDto(s.Id, s.KeyGroupId, s.Key, s.Value, s.SubValue, s.DisplayOrder, s.IsActive)).ToList();
     }
@@ -1329,10 +1297,6 @@ public sealed class OptionsService : IOptionsService
         {
             return await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.EmploymentType.ToString() == val || e.EmploymentType.ToString() == key), ct);
         }
-        if (normalizedCode == "GRADE_LEVEL")
-        {
-            return await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.Grade == val || e.Grade == key), ct);
-        }
         if (normalizedCode == "PAYMENT_MODE")
         {
             return await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.PaymentMode.ToString() == val || e.PaymentMode.ToString() == key), ct);
@@ -1370,11 +1334,6 @@ public sealed class OptionsService : IOptionsService
         {
             var emps = await _uow.Employees.ToListAsync(_uow.Employees.Query().Where(e => e.BloodGroup == trimmedOld), ct);
             foreach (var e in emps) { e.BloodGroup = trimmedNew; _uow.Employees.Update(e); }
-        }
-        else if (code == "GRADE_LEVEL")
-        {
-            var emps = await _uow.Employees.ToListAsync(_uow.Employees.Query().Where(e => e.Grade == trimmedOld), ct);
-            foreach (var e in emps) { e.Grade = trimmedNew; _uow.Employees.Update(e); }
         }
         else if (code == "ASSET_TYPE")
         {
@@ -1504,38 +1463,60 @@ public sealed class OptionsService : IOptionsService
         // Standard seed groups
         var groups = new (string Code, string Name, bool IsGeneric, string[] Options)[]
         {
-            ("BLOOD_GROUP", "Blood Group", true, new[] { "O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-" }),
-            ("GENDER", "Gender", true, new[] { "Male", "Female", "Other", "Prefer not to say" }),
-            ("MARITAL_STATUS", "Marital Status", true, new[] { "Single", "Married", "Divorced", "Widowed" }),
-            ("EMPLOYMENT_TYPE", "Employment Type", true, new[] { "Full-time", "Part-time", "Contract", "Internship" }),
-            ("GRADE_LEVEL", "Grade / Level", false, new[] { "L1", "L2", "L3", "L4", "L5", "L6" }),
+            ("BLOOD_GROUP", "Blood Group", false, new[] { "O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-" }),
+            ("GENDER", "Gender", false, new[] { "Male", "Female", "Other" }),
+            ("MARITAL_STATUS", "Marital Status", false, new[] { "Single", "Married" }),
+            ("EMPLOYMENT_TYPE", "Employment Type", false, new[] { "Full-time", "Part-time", "Contract", "Internship" }),
             ("PAYMENT_MODE", "Payment Mode", false, new[] { "Bank Transfer", "Cheque", "Cash" }),
-            ("DOCUMENT_TYPE", "Document Type", false, new[] { "Passport", "Visa", "National ID", "Work Permit", "Medical Insurance", "Other" }),
             ("ASSET_TYPE", "Asset Type", false, new[] { "Laptop", "Monitor", "Keyboard", "Mouse", "Phone", "Access Card", "Other" }),
             ("SUPPORT_TYPE", "Support Type", false, new[] { "IT Hardware", "Software Access", "HR Policy", "Payroll Inquiry", "Facilities" }),
             ("PRIORITY", "Priority", false, new[] { "Low", "Medium", "High", "Critical" })
         };
 
-        foreach (var (code, name, isGeneric, options) in groups)
+        var obsoleteGradeGroup = await _uow.KeyGroups.FirstOrDefaultAsync(
+            _uow.KeyGroups.Query().Where(g => g.Code.ToUpper() == "GRADE_LEVEL"), ct);
+        if (obsoleteGradeGroup != null)
+        {
+            var obsoleteStores = await _uow.KeyStores.ToListAsync(
+                _uow.KeyStores.Query().Where(s => s.KeyGroupId == obsoleteGradeGroup.Id), ct);
+            if (obsoleteStores.Count > 0) _uow.KeyStores.RemoveRange(obsoleteStores);
+            _uow.KeyGroups.Remove(obsoleteGradeGroup);
+            await _uow.SaveChangesAsync(ct);
+        }
+
+        foreach (var (code, name, _, options) in groups)
         {
             var grp = await _uow.KeyGroups.FirstOrDefaultAsync(
                 _uow.KeyGroups.Query().Where(g => g.Code.ToUpper() == code), ct);
 
             if (grp == null)
             {
-                grp = new KeyGroup { Code = code, Name = name, Description = $"{name} dictionary options", IsGeneric = isGeneric };
+                grp = new KeyGroup { Code = code, Name = name, Description = $"{name} dictionary options", IsGeneric = false };
                 await _uow.KeyGroups.AddAsync(grp, ct);
                 await _uow.SaveChangesAsync(ct);
             }
-            else if (grp.IsGeneric != isGeneric)
+            else if (grp.IsGeneric)
             {
-                grp.IsGeneric = isGeneric;
+                grp.IsGeneric = false;
                 _uow.KeyGroups.Update(grp);
                 await _uow.SaveChangesAsync(ct);
             }
 
             var existingStores = await _uow.KeyStores.ToListAsync(
                 _uow.KeyStores.Query().Where(s => s.KeyGroupId == grp.Id), ct);
+
+            if (code is "GENDER" or "MARITAL_STATUS")
+            {
+                var allowedSet = new HashSet<string>(options, StringComparer.OrdinalIgnoreCase);
+                var obsoleteEnumStores = existingStores
+                    .Where(s => !allowedSet.Contains(s.Key) && !allowedSet.Contains(s.Value))
+                    .ToList();
+                if (obsoleteEnumStores.Count > 0)
+                {
+                    _uow.KeyStores.RemoveRange(obsoleteEnumStores);
+                    existingStores = existingStores.Where(s => !obsoleteEnumStores.Contains(s)).ToList();
+                }
+            }
 
             var existingKeys = existingStores.Select(s => s.Key.ToUpperInvariant()).ToHashSet();
 

@@ -1,9 +1,9 @@
 import { IconName } from './icons/icons';
 
-/** The application roles: Super Admin (platform), Company Admin (tenant), HR Manager, Manager and Employee. */
-export type Role = 'Super Admin' | 'HR Manager' | 'Company Admin' | 'Employee' | 'Manager';
+/** The application roles: Super Admin (platform), Company Admin (tenant), HR Manager, and Employee. */
+export type Role = 'Super Admin' | 'HR Manager' | 'Company Admin' | 'Employee';
 
-export const ROLES: Role[] = ['Super Admin', 'Company Admin', 'HR Manager', 'Manager', 'Employee'];
+export const ROLES: Role[] = ['Super Admin', 'Company Admin', 'HR Manager', 'Employee'];
 
 export interface NavItem {
   icon: IconName;

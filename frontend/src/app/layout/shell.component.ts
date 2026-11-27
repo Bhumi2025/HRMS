@@ -43,12 +43,11 @@ const MASTER_NAV_CATALOGUE: MasterNavItem[] = [
   { label: 'Payslips', section: 'HR Modules', icon: 'payslip', path: '/payslips', empPath: '/me/payslips' },
   { label: 'Onboarding', section: 'HR Modules', icon: 'onboarding', path: '/onboarding', empPath: '/onboarding' },
   { label: 'Offboarding', section: 'HR Modules', icon: 'employees', path: '/offboarding', empPath: '/offboarding' },
-  { label: 'Documents', section: 'HR Modules', icon: 'documents', path: '/documents', empPath: '/me/documents' },
   { label: 'Approvals', section: 'HR Modules', icon: 'approvals', path: '/approvals', empPath: '/approvals' },
   { label: 'Reports', section: 'HR Modules', icon: 'reports', path: '/reports', empPath: '/reports' },
   { label: 'Settings', section: 'HR Modules', icon: 'settings', path: '/settings', empPath: '/settings' },
 ];
-
+  
 /**
  * Application chrome shared by every role — ported from renderLayout() and
  * renderEmployeeLayout(). Renders the role-driven sidebar, the header with its
@@ -125,7 +124,8 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   protected readonly userDisplayName = computed(() => {
     const role = this.role();
-    if (role === 'HR Manager' || role === 'Company Admin') return 'HR Manager';
+    if (role === 'Company Admin') return this.user()?.name || 'Company Admin';
+    if (role === 'HR Manager') return this.user()?.name || 'HR Manager';
     return this.user()?.name || role || 'User';
   });
 
@@ -175,7 +175,9 @@ export class ShellComponent implements OnInit, OnDestroy {
       if (r === '/kiosk' || t.includes('kiosk') || t.includes('face kiosk')) return true;
       if (r === '/punch-in-out' || r === '/me/punch' || t === 'punch in/out' || t === 'punch-in/out') return true;
       if (r === '/loans' || t.includes('loan') || t.includes('loans')) return true;
+      if (r === '/documents' || r === '/me/documents' || r.includes('/documents') || t === 'documents') return true;
       if (t === 'announcements' || r.includes('announcement')) return true;
+      if (this.role() === 'HR Manager' && (r === '/settings' || r.startsWith('/settings') || t === 'settings')) return true;
       if (
         t === 'key group' ||
         t === 'key groups' ||
@@ -397,7 +399,7 @@ export class ShellComponent implements OnInit, OnDestroy {
             }
           }
         },
-        error: () => {},
+        error: () => { },
       });
     }
   }
@@ -421,7 +423,7 @@ export class ShellComponent implements OnInit, OnDestroy {
               this.session.updateCompanyLogo(u.companyLogoUrl);
             }
           },
-          error: () => {},
+          error: () => { },
         });
       },
     });
@@ -470,7 +472,7 @@ export class ShellComponent implements OnInit, OnDestroy {
         else if (target.startsWith('/attendance')) target = '/me/attendance';
         else if (target.startsWith('/dashboard')) target = '/me/dashboard';
         else if (target.startsWith('/payslips') || target.startsWith('/payroll')) target = '/me/payslips';
-        else if (target.startsWith('/documents')) target = '/me/documents';
+        else if (target.startsWith('/documents')) target = '/me/dashboard';
         else if (target.startsWith('/company') || target.startsWith('/employees') || target.startsWith('/settings')) target = '/me/dashboard';
       }
       this.router.navigate([target]);

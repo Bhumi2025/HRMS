@@ -45,28 +45,29 @@ public static class DbSeeder
         var superAdminRole = new Role { Code = "SuperAdmin", Name = "Super Admin", Description = "Platform administrator with full system access", IsSystem = true };
         var companyAdminRole = new Role { Code = "CompanyAdmin", Name = "Company Admin", Description = "Manages company organization and HR operations", IsSystem = true };
         var hrManagerRole = new Role { Code = "HrManager", Name = "HR Manager", Description = "HR operations, payroll and approvals", IsSystem = true };
-        var managerRole = new Role { Code = "Manager", Name = "Manager", Description = "Team management, reviews and shift approvals", IsSystem = true };
         var employeeRole = new Role { Code = "Employee", Name = "Employee", Description = "Self-service portal access", IsSystem = true };
-        db.Roles.AddRange(superAdminRole, companyAdminRole, hrManagerRole, managerRole, employeeRole);
+        db.Roles.AddRange(superAdminRole, companyAdminRole, hrManagerRole, employeeRole);
 
         // ── Departments ──
+        var general = new Department { Name = "General", Code = "GEN", Description = "General department" };
         var engineering = new Department { Name = "Engineering", Code = "ENG", Description = "Product engineering" };
         var finance = new Department { Name = "Finance", Code = "FIN", Description = "Finance and accounting" };
         var hr = new Department { Name = "HR", Code = "HR", Description = "People operations" };
         var sales = new Department { Name = "Sales", Code = "SAL", Description = "Revenue team" };
         var marketing = new Department { Name = "Marketing", Code = "MKT", Description = "Brand and growth" };
         var design = new Department { Name = "Design", Code = "DSN", Description = "Product design" };
-        db.Departments.AddRange(engineering, finance, hr, sales, marketing, design);
+        db.Departments.AddRange(general, engineering, finance, hr, sales, marketing, design);
 
         // ── Designations ──
-        var seniorEngineer = new Designation { Name = "Senior Engineer", Grade = "L5", DepartmentId = engineering.Id };
-        var engineer = new Designation { Name = "Engineer", Grade = "L4", DepartmentId = engineering.Id };
-        var financeAnalyst = new Designation { Name = "Finance Analyst", Grade = "L4", DepartmentId = finance.Id };
-        var hrExecutive = new Designation { Name = "HR Executive", Grade = "L3", DepartmentId = hr.Id };
-        var salesExecutive = new Designation { Name = "Sales Executive", Grade = "L4", DepartmentId = sales.Id };
-        var marketingSpecialist = new Designation { Name = "Marketing Specialist", Grade = "L3", DepartmentId = marketing.Id };
-        var designer = new Designation { Name = "Designer", Grade = "L3", DepartmentId = design.Id };
-        db.Designations.AddRange(seniorEngineer, engineer, financeAnalyst, hrExecutive, salesExecutive, marketingSpecialist, designer);
+        var employeeDesig = new Designation { Name = "Employee", Grade = string.Empty, DepartmentId = general.Id };
+        var seniorEngineer = new Designation { Name = "Senior Engineer", Grade = string.Empty, DepartmentId = engineering.Id };
+        var engineer = new Designation { Name = "Engineer", Grade = string.Empty, DepartmentId = engineering.Id };
+        var financeAnalyst = new Designation { Name = "Finance Analyst", Grade = string.Empty, DepartmentId = finance.Id };
+        var hrExecutive = new Designation { Name = "HR Executive", Grade = string.Empty, DepartmentId = hr.Id };
+        var salesExecutive = new Designation { Name = "Sales Executive", Grade = string.Empty, DepartmentId = sales.Id };
+        var marketingSpecialist = new Designation { Name = "Marketing Specialist", Grade = string.Empty, DepartmentId = marketing.Id };
+        var designer = new Designation { Name = "Designer", Grade = string.Empty, DepartmentId = design.Id };
+        db.Designations.AddRange(employeeDesig, seniorEngineer, engineer, financeAnalyst, hrExecutive, salesExecutive, marketingSpecialist, designer);
 
         // ── Branches (India) ──
         var suratHq = new Branch { Name = "Surat HQ", Location = "Surat, Gujarat, India", ManagerName = "Aarav Mehta", EmployeeCount = 350, IsActive = true };
@@ -175,13 +176,13 @@ public static class DbSeeder
         sarah.IfscCode = "SBIN0001850";
         sarah.PaymentMode = PaymentMode.BankTransfer;
 
-        var james = NewEmployee("EMP-1002", "Aarav", "Mehta", finance, financeAnalyst, "L4", EmploymentStatus.Active, new DateOnly(2019, 6, 1), 32500, 19500, 3000, 1500, 8500, "aarav@co.com", mumbai, morning);
-        var priya = NewEmployee("EMP-1003", "Priya", "Sharma", hr, hrExecutive, "L3", EmploymentStatus.Active, new DateOnly(2020, 1, 10), 40000, 24000, 3000, 1500, 11500, "priya@co.com", suratHq, morning);
-        var carlos = NewEmployee("EMP-1004", "Rohan", "Verma", sales, salesExecutive, "L4", EmploymentStatus.Offboarding, new DateOnly(2020, 8, 20), 29000, 17400, 3000, 1500, 7100, "rohan@co.com", ahmedabad, morning);
-        var emma = NewEmployee("EMP-1005", "Ananya", "Joshi", marketing, marketingSpecialist, "L3", EmploymentStatus.Active, new DateOnly(2022, 11, 5), 31000, 18600, 3000, 1500, 7900, "ananya@co.com", pune, morning);
-        var tom = NewEmployee("EMP-1006", "Vikram", "Malhotra", engineering, engineer, "L4", EmploymentStatus.Active, new DateOnly(2020, 2, 14), 42500, 25500, 3000, 1500, 12500, "vikram@co.com", bengaluru, evening);
-        var aisha = NewEmployee("EMP-1007", "Pooja", "Shah", design, designer, "L3", EmploymentStatus.OnLeave, new DateOnly(2022, 4, 3), 34000, 20400, 3000, 1500, 9100, "pooja@co.com", suratHq, morning);
-        var ravi = NewEmployee("EMP-1008", "Ravi", "Kumar", engineering, seniorEngineer, "L5", EmploymentStatus.Active, new DateOnly(2018, 9, 12), 60000, 36000, 3000, 1500, 19500, "ravi@co.com", bengaluru, night);
+        var james = NewEmployee("EMP-1002", "Aarav", "Mehta", finance, financeAnalyst, string.Empty, EmploymentStatus.Active, new DateOnly(2019, 6, 1), 32500, 19500, 3000, 1500, 8500, "aarav@co.com", mumbai, morning);
+        var priya = NewEmployee("EMP-1003", "Priya", "Sharma", hr, hrExecutive, string.Empty, EmploymentStatus.Active, new DateOnly(2020, 1, 10), 40000, 24000, 3000, 1500, 11500, "priya@co.com", suratHq, morning);
+        var carlos = NewEmployee("EMP-1004", "Rohan", "Verma", sales, salesExecutive, string.Empty, EmploymentStatus.Offboarding, new DateOnly(2020, 8, 20), 29000, 17400, 3000, 1500, 7100, "rohan@co.com", ahmedabad, morning);
+        var emma = NewEmployee("EMP-1005", "Ananya", "Joshi", marketing, marketingSpecialist, string.Empty, EmploymentStatus.Active, new DateOnly(2022, 11, 5), 31000, 18600, 3000, 1500, 7900, "ananya@co.com", pune, morning);
+        var tom = NewEmployee("EMP-1006", "Vikram", "Malhotra", engineering, engineer, string.Empty, EmploymentStatus.Active, new DateOnly(2020, 2, 14), 42500, 25500, 3000, 1500, 12500, "vikram@co.com", bengaluru, evening);
+        var aisha = NewEmployee("EMP-1007", "Pooja", "Shah", design, designer, string.Empty, EmploymentStatus.OnLeave, new DateOnly(2022, 4, 3), 34000, 20400, 3000, 1500, 9100, "pooja@co.com", suratHq, morning);
+        var ravi = NewEmployee("EMP-1008", "Ravi", "Kumar", engineering, seniorEngineer, string.Empty, EmploymentStatus.Active, new DateOnly(2018, 9, 12), 60000, 36000, 3000, 1500, 19500, "ravi@co.com", bengaluru, night);
 
         sarah.ReportingManagerId = ravi.Id;
         james.ReportingManagerId = sarah.Id;

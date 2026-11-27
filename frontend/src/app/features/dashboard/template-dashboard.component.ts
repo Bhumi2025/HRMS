@@ -149,11 +149,13 @@ export class TemplateDashboardComponent implements OnInit, OnDestroy {
 
   // Computed properties
   protected readonly role = computed(() => this.session.activeRole());
+  protected readonly isCompanyAdmin = computed(() => this.session.activeRole() === 'Company Admin');
 
   protected readonly userName = computed(() => {
     const role = this.session.activeRole();
-    if (role === 'HR Manager' || role === 'Company Admin') return 'HR Manager';
-    return role === 'Super Admin' ? 'Admin' : role;
+    if (role === 'Company Admin') return this.session.user()?.name || 'Company Admin';
+    if (role === 'HR Manager') return this.session.user()?.name || 'HR Manager';
+    return role === 'Super Admin' ? 'Admin' : (this.session.user()?.name || role);
   });
 
   protected readonly greeting = computed(() => {

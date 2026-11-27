@@ -480,7 +480,6 @@ export class EmpHomeComponent implements OnInit {
       { icon: I.leave, name: 'Leave', path: '/me/leave', cls: 'ic-green', desc: 'Apply & track' },
       { icon: I.payslip, name: 'Payslips', path: '/me/payslips', cls: 'ic-indigo', desc: 'View payslips' },
       { icon: I.profile, name: 'My Profile', path: '/me/profile', cls: 'ic-blue', desc: 'View & edit' },
-      { icon: I.documents, name: 'Documents', path: '/me/documents', cls: 'ic-cyan', desc: 'My files' },
       { icon: I.loans, name: 'Loans', path: '/me/payroll', cls: 'ic-amber', desc: 'Requests' },
       {
         icon: I.announce,

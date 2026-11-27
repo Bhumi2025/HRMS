@@ -44,7 +44,7 @@ export interface EmployeeListItem {
   fullName: string;
   email: string;
   department: string;
-  grade: string;
+  grade?: string;
   status: string;
   joinDate: string;
   salary: number;
@@ -52,6 +52,8 @@ export interface EmployeeListItem {
   jobTitle: string;
   isFaceEnrolled?: boolean;
   facePhotoUrl?: string | null;
+  roleCode?: string | null;
+  roleName?: string | null;
 }
 
 export interface EmployeeDetail {
@@ -82,7 +84,7 @@ export interface EmployeeDetail {
   reportingManagerId?: string | null;
   reportingManager?: string | null;
   jobTitle: string;
-  grade: string;
+  grade?: string;
   employmentType: string;
   status: string;
   joinDate: string;
@@ -885,7 +887,7 @@ export interface KeyGroup {
   name: string;
   description?: string | null;
   items: KeyStore[];
-  isGeneric: boolean;
+  isGeneric?: boolean;
   isEnumLocked?: boolean;
 }
 
@@ -1148,7 +1150,7 @@ export interface SaveKeyGroupRequest {
   code: string;
   name: string;
   description?: string | null;
-  isGeneric: boolean;
+  isGeneric?: boolean;
   items?: SaveKeyStoreRequest[] | null;
 }
 

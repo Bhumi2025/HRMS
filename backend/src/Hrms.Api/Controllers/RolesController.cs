@@ -7,7 +7,7 @@ namespace Hrms.Api.Controllers;
 
 [ApiController]
 [Route("api/roles")]
-[Authorize(Policy = "HrAdmin")]
+[Authorize(Policy = "CompanyAdminOnly")]
 [Tags("Roles")]
 public sealed class RolesController : ControllerBase
 {

@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, landingRedirectGuard, nonEmployeeGuard, superAdminGuard } from './core/guards';
+import { adminOnlyGuard, authGuard, landingRedirectGuard, nonEmployeeGuard, superAdminGuard } from './core/guards';
 import { ShellComponent } from './layout/shell.component';
 
 /**
@@ -166,9 +166,8 @@ export const routes: Routes = [
       },
       {
         path: 'documents',
-        data: { title: 'Documents' },
-        canActivate: [nonEmployeeGuard],
-        loadComponent: () => import('./features/hr/documents.component').then((m) => m.DocumentsComponent),
+        redirectTo: 'dashboard',
+        pathMatch: 'full',
       },
       {
         path: 'approvals',
@@ -204,7 +203,7 @@ export const routes: Routes = [
       {
         path: 'settings',
         data: { title: 'Company Settings' },
-        canActivate: [nonEmployeeGuard],
+        canActivate: [adminOnlyGuard],
         loadComponent: () => import('./features/hr/settings.component').then((m) => m.SettingsComponent),
       },
       {
@@ -266,9 +265,8 @@ export const routes: Routes = [
       },
       {
         path: 'me/documents',
-        data: { title: 'Documents' },
-        loadComponent: () =>
-          import('./features/employee/emp-documents.component').then((m) => m.EmpDocumentsComponent),
+        redirectTo: 'me/dashboard',
+        pathMatch: 'full',
       },
       {
         path: 'me/announcements',

@@ -7,7 +7,7 @@ const overview = (): NavSection => ({
   ],
 });
 
-const hrModules = (approvalBadge?: string): NavSection => ({
+const hrModules = (approvalBadge?: string, includeSettings = false): NavSection => ({
   section: 'HR Modules',
   items: [
     { icon: 'company', label: 'Company', path: '/company' },
@@ -20,14 +20,13 @@ const hrModules = (approvalBadge?: string): NavSection => ({
     { icon: 'payslip', label: 'Payslips', path: '/payslips' },
     { icon: 'onboarding', label: 'Onboarding', path: '/onboarding' },
     { icon: 'employees', label: 'Offboarding', path: '/offboarding' },
-    { icon: 'documents', label: 'Documents', path: '/documents' },
     { icon: 'approvals', label: 'Approvals', path: '/approvals', badge: approvalBadge },
     { icon: 'reports', label: 'Reports', path: '/reports' },
-    { icon: 'settings', label: 'Settings', path: '/settings' },
+    ...(includeSettings ? [{ icon: 'settings' as const, label: 'Settings', path: '/settings' }] : []),
   ],
 });
 
-/** Sidebar navigation per role â€” dynamically filtered by PermissionService. */
+/** Sidebar navigation per role — dynamically filtered by PermissionService. */
 export const NAV_CONFIG: Record<Role, NavSection[]> = {
   'Super Admin': [
     {
@@ -38,26 +37,8 @@ export const NAV_CONFIG: Record<Role, NavSection[]> = {
       ],
     },
   ],
-  'Company Admin': [overview(), hrModules()],
-  'HR Manager': [overview(), hrModules()],
-  Manager: [
-    overview(),
-    {
-      section: 'Management',
-      items: [
-        { icon: 'employees', label: 'Employees', path: '/employees' },
-        { icon: 'user', label: 'Profile', path: '/employee-profile' },
-        { icon: 'attendance', label: 'Attendance', path: '/attendance' },
-        { icon: 'leave', label: 'Leave', path: '/leave' },
-        { icon: 'approvals', label: 'Approvals', path: '/approvals' },
-        { icon: 'documents', label: 'Documents', path: '/documents' },
-      ],
-    },
-    {
-      section: 'Reports',
-      items: [{ icon: 'reports', label: 'Reports', path: '/reports' }],
-    },
-  ],
+  'Company Admin': [overview(), hrModules(undefined, true)],
+  'HR Manager': [overview(), hrModules(undefined, false)],
   Employee: [
     {
       section: 'Main',
@@ -72,7 +53,6 @@ export const NAV_CONFIG: Record<Role, NavSection[]> = {
         { icon: 'attendance', label: 'Attendance', path: '/me/attendance' },
         { icon: 'leave', label: 'Leave', path: '/me/leave' },
         { icon: 'payslip', label: 'Payslips', path: '/me/payslips' },
-        { icon: 'documents', label: 'Documents', path: '/me/documents' },
       ],
     },
     {
@@ -85,12 +65,11 @@ export const NAV_CONFIG: Record<Role, NavSection[]> = {
   ],
 };
 
-/** Where each role lands after signing in â€” mirrors the map in index.html's `go()`. */
+/** Where each role lands after signing in — mirrors the map in index.html's `go()`. */
 export const ROLE_LANDING: Record<Role, string> = {
   'Super Admin': '/dashboard',
   'Company Admin': '/dashboard',
   'HR Manager': '/dashboard',
-  Manager: '/dashboard',
   Employee: '/me/dashboard',
 };
 

@@ -49,7 +49,87 @@ public sealed class EmployeeService : IEmployeeService
     {
         var (page, pageSize) = Paging.Normalise(query.Page, query.PageSize);
         var (items, total) = await _uow.Employees.SearchAsync(query.Search, query.DepartmentId, query.Status, page, pageSize, ct);
-        return new PagedResult<EmployeeListItemDto>(items.Select(ToListDto).ToList(), total, page, pageSize);
+
+        var empIds = items.Select(e => e.Id).ToList();
+        var empEmails = items.Select(e => e.Email.Trim().ToUpperInvariant()).Distinct().ToList();
+
+        var linkedUsers = items.Count == 0
+            ? new List<(Guid? EmployeeId, string NormalizedEmail, string? RoleCode, string? RoleName)>()
+            : (await _uow.Users.ToListAsync(
+                _uow.Users.Query()
+                    .Where(u => (u.EmployeeId != null && empIds.Contains(u.EmployeeId.Value)) || empEmails.Contains(u.NormalizedEmail))
+                    .Select(u => new
+                    {
+                        u.EmployeeId,
+                        u.NormalizedEmail,
+                        RoleCode = u.Role != null ? u.Role.Code : null,
+                        RoleName = u.Role != null ? u.Role.Name : null,
+                    }),
+                ct))
+                .Select(u => (u.EmployeeId, u.NormalizedEmail, u.RoleCode, u.RoleName))
+                .ToList();
+
+        var byEmpId = linkedUsers
+            .Where(u => u.EmployeeId.HasValue)
+            .GroupBy(u => u.EmployeeId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var byEmail = linkedUsers
+            .GroupBy(u => u.NormalizedEmail)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var dtos = items.Select(e =>
+        {
+            string? roleCode = null;
+            string? roleName = null;
+            if (byEmpId.TryGetValue(e.Id, out var uById))
+            {
+                roleCode = uById.RoleCode;
+                roleName = uById.RoleName;
+            }
+            else if (byEmail.TryGetValue(e.Email.Trim().ToUpperInvariant(), out var uByEmail))
+            {
+                roleCode = uByEmail.RoleCode;
+                roleName = uByEmail.RoleName;
+            }
+
+            if (string.IsNullOrWhiteSpace(roleCode))
+            {
+                var isHrTitle = !string.IsNullOrWhiteSpace(e.JobTitle) &&
+                    (e.JobTitle.Contains("HR", StringComparison.OrdinalIgnoreCase) ||
+                     e.JobTitle.Contains("Human Resources", StringComparison.OrdinalIgnoreCase));
+                roleCode = isHrTitle ? "HrManager" : "Employee";
+                roleName = isHrTitle ? "HR Manager" : "Employee";
+            }
+
+            return ToListDto(e, roleCode, roleName);
+        }).ToList();
+
+        return new PagedResult<EmployeeListItemDto>(dtos, total, page, pageSize);
+    }
+
+    public async Task<bool> IsEmailAvailableAsync(string email, Guid? excludeEmployeeId = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return false;
+        }
+
+        var lowerEmail = email.Trim().ToLowerInvariant();
+        var normEmail = lowerEmail.ToUpperInvariant();
+
+        var userExists = await _uow.Users.AnyAsync(
+            _uow.Users.Query().Where(u => u.NormalizedEmail == normEmail && (!excludeEmployeeId.HasValue || u.EmployeeId != excludeEmployeeId.Value)),
+            ct);
+        if (userExists)
+        {
+            return false;
+        }
+
+        var empExists = await _uow.Employees.AnyAsync(
+            _uow.Employees.Query().Where(e => e.Email.ToLower() == lowerEmail && (!excludeEmployeeId.HasValue || e.Id != excludeEmployeeId.Value)),
+            ct);
+        return !empExists;
     }
 
     public async Task<EmployeeDetailDto> GetAsync(Guid id, CancellationToken ct = default)
@@ -57,8 +137,12 @@ public sealed class EmployeeService : IEmployeeService
         var employee = await _uow.Employees.GetWithDetailsAsync(id, ct)
                        ?? throw NotFoundException.For("Employee", id);
 
+        var normEmpEmail = employee.Email.Trim().ToUpperInvariant();
         var linkedUser = await _uow.Users.FirstOrDefaultAsync(
-            _uow.Users.Query().Where(u => u.EmployeeId == id || u.Email == employee.Email), ct);
+            _uow.Users.Query()
+                .Where(u => u.EmployeeId == id || u.NormalizedEmail == normEmpEmail || u.Email == employee.Email)
+                .OrderByDescending(u => u.EmployeeId == id),
+            ct);
         string? roleCode = null;
         string? roleName = null;
         if (linkedUser != null)
@@ -115,9 +199,10 @@ public sealed class EmployeeService : IEmployeeService
             }
         }
 
-        if (await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.Email == email), ct))
+        if (await _uow.Users.EmailExistsAsync(email, ct) ||
+            await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.Email.ToLower() == email), ct))
         {
-            throw new ConflictException($"An employee with email '{email}' already exists.");
+            throw new ConflictException($"A user with email '{email}' already exists in this company. Email ID must be unique.");
         }
 
         var department = await _uow.Departments.GetByIdAsync(request.DepartmentId, ct)
@@ -151,7 +236,7 @@ public sealed class EmployeeService : IEmployeeService
             ShiftId = request.ShiftId,
             ReportingManagerId = request.ReportingManagerId,
             JobTitle = request.JobTitle.Trim(),
-            Grade = string.IsNullOrWhiteSpace(request.Grade) ? "L3" : request.Grade.Trim(),
+            Grade = string.IsNullOrWhiteSpace(request.Grade) ? string.Empty : request.Grade.Trim(),
             EmploymentType = request.EmploymentType,
             Status = EmploymentStatus.Active,
             JoinDate = request.JoinDate,
@@ -186,53 +271,38 @@ public sealed class EmployeeService : IEmployeeService
         var rawPassword = string.IsNullOrWhiteSpace(request.Password) ? null : request.Password.Trim();
         var passwordToHash = rawPassword ?? Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
-        var roles = await _uow.Roles.ListAsync(ct);
-        var reqCode = request.RoleCode?.Trim() ?? string.Empty;
-        var role = roles.FirstOrDefault(r => r.Code.Equals(reqCode, StringComparison.OrdinalIgnoreCase) || r.Name.Equals(reqCode, StringComparison.OrdinalIgnoreCase));
+        var role = await ResolveRoleAsync(request.RoleCode, ct);
 
         if (role is null && (request.JobTitle.Contains("HR", StringComparison.OrdinalIgnoreCase) || department.Name.Contains("HR", StringComparison.OrdinalIgnoreCase)))
         {
-            role = roles.FirstOrDefault(r => r.Code.Equals("HrManager", StringComparison.OrdinalIgnoreCase));
+            role = await ResolveRoleAsync("HrManager", ct);
         }
 
-        role ??= roles.FirstOrDefault(r => r.Code.Equals("Employee", StringComparison.OrdinalIgnoreCase)) ?? roles.First();
+        role ??= await ResolveRoleAsync("Employee", ct) ?? (await _uow.Roles.ListAsync(ct)).First();
 
-        Guid linkedUserId;
-        var existingUser = await _uow.Users.GetByEmailAsync(email, ct);
-        if (existingUser is not null)
+        var firstInitial = request.FirstName.Trim().Length > 0 ? request.FirstName.Trim()[0] : 'E';
+        var lastInitial = request.LastName.Trim().Length > 0 ? request.LastName.Trim()[0] : 'M';
+        var initials = $"{firstInitial}{lastInitial}".Trim().ToUpperInvariant();
+
+        var user = new User
         {
-            existingUser.PasswordHash = _passwordHasher.Hash(passwordToHash);
-            existingUser.EmployeeId = employee.Id;
-            existingUser.RoleId = role.Id;
-            existingUser.IsActive = true;
-            linkedUserId = existingUser.Id;
-        }
-        else
-        {
-            var firstInitial = request.FirstName.Trim().Length > 0 ? request.FirstName.Trim()[0] : 'E';
-            var lastInitial = request.LastName.Trim().Length > 0 ? request.LastName.Trim()[0] : 'M';
-            var initials = $"{firstInitial}{lastInitial}".Trim().ToUpperInvariant();
-
-            var user = new User
-            {
-                Email = email,
-                NormalizedEmail = email.ToUpperInvariant(),
-                PasswordHash = _passwordHasher.Hash(passwordToHash),
-                FullName = $"{request.FirstName.Trim()} {request.LastName.Trim()}".Trim(),
-                Initials = string.IsNullOrWhiteSpace(initials) ? "EM" : initials,
-                RoleId = role.Id,
-                EmployeeId = employee.Id,
-                IsActive = true,
-            };
-            await _uow.Users.AddAsync(user, ct);
-            linkedUserId = user.Id;
-        }
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant(),
+            PasswordHash = _passwordHasher.Hash(passwordToHash),
+            FullName = $"{request.FirstName.Trim()} {request.LastName.Trim()}".Trim(),
+            Initials = string.IsNullOrWhiteSpace(initials) ? "EM" : initials,
+            RoleId = role.Id,
+            EmployeeId = employee.Id,
+            IsActive = true,
+        };
+        await _uow.Users.AddAsync(user, ct);
+        var linkedUserId = user.Id;
 
         await _uow.SaveChangesAsync(ct);
 
         if (request.SendWelcomeEmail)
         {
-            await SendOnboardingWelcomeEmailAsync(employee, linkedUserId, ct);
+            await SendOnboardingWelcomeEmailAsync(employee, linkedUserId, role.Name, ct);
         }
 
         return await GetAsync(employee.Id, ct);
@@ -242,6 +312,8 @@ public sealed class EmployeeService : IEmployeeService
         {
             var employee = await _uow.Employees.GetWithDetailsAsync(id, ct)
                         ?? throw NotFoundException.For("Employee", id);
+
+            await EnsureCallerCanEditEmployeeAsync(employee, ct);
 
             var email = request.Email.Trim().ToLowerInvariant();
             if (!System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
@@ -258,14 +330,17 @@ public sealed class EmployeeService : IEmployeeService
                 }
             }
 
-            if (await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.Email == email && e.Id != id), ct))
+            var normEmail = email.ToUpperInvariant();
+            if (await _uow.Employees.AnyAsync(_uow.Employees.Query().Where(e => e.Email.ToLower() == email && e.Id != id), ct) ||
+                await _uow.Users.AnyAsync(_uow.Users.Query().Where(u => u.NormalizedEmail == normEmail && u.EmployeeId != id), ct))
             {
-                throw new ConflictException($"An employee with email '{email}' already exists.");
+                throw new ConflictException($"A user with email '{email}' already exists in this company. Email ID must be unique.");
             }
 
             _ = await _uow.Departments.GetByIdAsync(request.DepartmentId, ct)
                 ?? throw NotFoundException.For("Department", request.DepartmentId);
 
+            var previousEmail = employee.Email;
             employee.Salutation = string.IsNullOrWhiteSpace(request.Salutation) ? null : request.Salutation.Trim();
             employee.FirstName = request.FirstName.Trim();
             employee.MiddleName = request.MiddleName?.Trim();
@@ -277,7 +352,17 @@ public sealed class EmployeeService : IEmployeeService
             employee.BranchId = request.BranchId;
             employee.ReportingManagerId = request.ReportingManagerId;
             employee.JobTitle = request.JobTitle.Trim();
-            employee.Grade = request.Grade;
+            employee.Grade = string.IsNullOrWhiteSpace(request.Grade) ? string.Empty : request.Grade.Trim();
+
+        var emailLinkedUser = await _uow.Users.FirstOrDefaultAsync(
+                _uow.Users.Query()
+                    .Where(u => u.EmployeeId == employee.Id || u.Email == previousEmail)
+                    .OrderByDescending(u => u.EmployeeId == employee.Id),
+                ct);
+            if (emailLinkedUser is not null)
+            {
+                await SyncLinkedUserAsync(emailLinkedUser, employee, request, email, normEmail, ct);
+            }
             employee.EmploymentType = request.EmploymentType;
             employee.Status = request.Status;
             employee.JoinDate = request.JoinDate;
@@ -325,56 +410,15 @@ public sealed class EmployeeService : IEmployeeService
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(request.RoleCode))
+        var normEmpEmail = employee.Email.Trim().ToUpperInvariant();
+        var linkedUser = await _uow.Users.FirstOrDefaultAsync(
+            _uow.Users.Query()
+                .Where(u => u.EmployeeId == employee.Id || u.NormalizedEmail == normEmpEmail || u.Email == employee.Email)
+                .OrderByDescending(u => u.EmployeeId == employee.Id),
+            ct);
+        if (linkedUser is not null)
         {
-            var linkedUser = await _uow.Users.FirstOrDefaultAsync(
-                _uow.Users.Query().Where(u => u.EmployeeId == employee.Id || u.Email == employee.Email), ct);
-            if (linkedUser is not null)
-            {
-                var target = request.RoleCode.Trim();
-                var role = await _uow.Roles.FirstOrDefaultAsync(
-                    _uow.Roles.Query().Where(r => r.Code.ToLower() == target.ToLower() || r.Name.ToLower() == target.ToLower()), ct);
-                if (role is not null)
-                {
-                    linkedUser.RoleId = role.Id;
-                    _uow.Users.Update(linkedUser);
-                }
-            }
-        }
-        else if (request.JobTitle.Contains("HR", StringComparison.OrdinalIgnoreCase))
-        {
-            var linkedUser = await _uow.Users.FirstOrDefaultAsync(
-                _uow.Users.Query().Where(u => u.EmployeeId == employee.Id || u.Email == employee.Email), ct);
-            if (linkedUser is not null)
-            {
-                var currentRole = await _uow.Roles.GetByIdAsync(linkedUser.RoleId, ct);
-                if (currentRole != null && currentRole.Code.Equals("Employee", StringComparison.OrdinalIgnoreCase))
-                {
-                    var hrRole = await _uow.Roles.FirstOrDefaultAsync(
-                        _uow.Roles.Query().Where(r => r.Code.ToLower() == "hrmanager" || r.Name.ToLower() == "hr manager"), ct);
-                    if (hrRole is not null)
-                    {
-                        linkedUser.RoleId = hrRole.Id;
-                        _uow.Users.Update(linkedUser);
-                    }
-                }
-            }
-        }
-
-        // Synchronize user active state with employee employment status (restores access on Active, deactivates on Offboarding/Terminated/Resigned)
-        var statusSyncUser = await _uow.Users.FirstOrDefaultAsync(
-            _uow.Users.Query().Where(u => u.EmployeeId == employee.Id || u.Email == employee.Email), ct);
-        if (statusSyncUser != null)
-        {
-            if (employee.Status == EmploymentStatus.Active)
-            {
-                statusSyncUser.IsActive = true;
-            }
-            else if (employee.Status is EmploymentStatus.Offboarding or EmploymentStatus.Terminated or EmploymentStatus.Resigned)
-            {
-                statusSyncUser.IsActive = false;
-            }
-            _uow.Users.Update(statusSyncUser);
+            await SyncLinkedUserAsync(linkedUser, employee, request, employee.Email, normEmpEmail, ct);
         }
 
         // Keep dedicated EmployeeBanks table in sync with primary employee bank details
@@ -498,9 +542,49 @@ public sealed class EmployeeService : IEmployeeService
         var employee = await _uow.Employees.GetByIdAsync(id, ct)
             ?? throw NotFoundException.For("Employee", id);
 
+        await EnsureCallerCanEditEmployeeAsync(employee, ct);
+
         employee.FacePhotoUrl = photoUrl;
         _uow.Employees.Update(employee);
         await _uow.SaveChangesAsync(ct);
+    }
+
+    private async Task EnsureCallerCanEditEmployeeAsync(Employee target, CancellationToken ct)
+    {
+        var callerRole = _currentUser.Role?.Trim();
+        if (string.IsNullOrWhiteSpace(callerRole))
+        {
+            return;
+        }
+
+        var isHrCaller = callerRole.Equals("HR Manager", StringComparison.OrdinalIgnoreCase) ||
+                         callerRole.Equals("HrManager", StringComparison.OrdinalIgnoreCase);
+        if (!isHrCaller)
+        {
+            return;
+        }
+
+        var linkedUser = await _uow.Users.FirstOrDefaultAsync(
+            _uow.Users.Query().Where(u => u.EmployeeId == target.Id || u.Email == target.Email), ct);
+        string? targetRoleCode = null;
+        if (linkedUser is not null)
+        {
+            var role = await _uow.Roles.GetByIdAsync(linkedUser.RoleId, ct);
+            targetRoleCode = role?.Code;
+        }
+
+        var targetIsHrOrAdmin =
+            string.Equals(targetRoleCode, "HrManager", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(targetRoleCode, "CompanyAdmin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(targetRoleCode, "SuperAdmin", StringComparison.OrdinalIgnoreCase) ||
+            (string.IsNullOrWhiteSpace(targetRoleCode) &&
+             !string.IsNullOrWhiteSpace(target.JobTitle) &&
+             target.JobTitle.Contains("HR", StringComparison.OrdinalIgnoreCase));
+
+        if (targetIsHrOrAdmin)
+        {
+            throw new ForbiddenException("HR Managers can only edit employee profiles, not HR Manager profiles.");
+        }
     }
 
     public async Task<Guid> ResolveEmployeeIdAsync(Guid? explicitEmployeeId, CancellationToken ct = default)
@@ -522,7 +606,7 @@ public sealed class EmployeeService : IEmployeeService
         return first ?? throw new NotFoundException("No employees exist yet.");
     }
 
-    private static EmployeeListItemDto ToListDto(Employee e) => new(
+    private static EmployeeListItemDto ToListDto(Employee e, string? roleCode = null, string? roleName = null) => new(
         e.Id,
         e.EmployeeCode,
         $"{e.FirstName} {e.LastName}".Trim(),
@@ -535,7 +619,9 @@ public sealed class EmployeeService : IEmployeeService
         e.Currency,
         e.JobTitle,
         e.IsFaceEnrolled,
-        e.FacePhotoUrl);
+        e.FacePhotoUrl,
+        roleCode,
+        roleName);
 
     private static EmployeeDetailDto ToDetailDto(Employee e, string? roleCode = null, string? roleName = null, bool hasPassword = false) => new(
         e.Id,
@@ -601,7 +687,83 @@ public sealed class EmployeeService : IEmployeeService
     private static decimal Gross(Employee e) =>
         e.BasicSalary + e.HousingAllowance + e.TransportAllowance + e.MobileAllowance + e.OtherAllowances;
 
-    private async Task SendOnboardingWelcomeEmailAsync(Employee employee, Guid userId, CancellationToken ct)
+    private static string NormalizeRoleToken(string? value) =>
+        new string((value ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+    private async Task<Role?> ResolveRoleAsync(string? target, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return null;
+        }
+
+        var normalized = NormalizeRoleToken(target);
+        var canonical = normalized switch
+        {
+            "manager" or "ca" or "companyadmin" => "companyadmin",
+            "hr" or "hrmanager" => "hrmanager",
+            "emp" or "employee" or "employeeselfserviceportal" => "employee",
+            "sa" or "superadmin" => "superadmin",
+            _ => normalized,
+        };
+
+        var roles = await _uow.Roles.ListAsync(ct);
+        return roles.FirstOrDefault(r =>
+            NormalizeRoleToken(r.Code) == canonical ||
+            NormalizeRoleToken(r.Name) == canonical ||
+            NormalizeRoleToken(r.Code) == normalized ||
+            NormalizeRoleToken(r.Name) == normalized);
+    }
+
+    private async Task SyncLinkedUserAsync(
+        User linkedUser,
+        Employee employee,
+        UpdateEmployeeRequest request,
+        string email,
+        string normEmail,
+        CancellationToken ct)
+    {
+        var fullName = $"{employee.FirstName} {employee.LastName}".Trim();
+        linkedUser.Email = email;
+        linkedUser.NormalizedEmail = normEmail;
+        linkedUser.FullName = fullName;
+        linkedUser.Initials = Formatting.Initials(fullName);
+        linkedUser.EmployeeId ??= employee.Id;
+
+        if (!string.IsNullOrWhiteSpace(request.RoleCode))
+        {
+            var role = await ResolveRoleAsync(request.RoleCode, ct);
+            if (role is not null)
+            {
+                linkedUser.RoleId = role.Id;
+            }
+        }
+        else if (request.JobTitle.Contains("HR", StringComparison.OrdinalIgnoreCase))
+        {
+            var currentRole = await _uow.Roles.GetByIdAsync(linkedUser.RoleId, ct);
+            if (currentRole is not null && NormalizeRoleToken(currentRole.Code) is "emp" or "employee")
+            {
+                var hrRole = await ResolveRoleAsync("HrManager", ct);
+                if (hrRole is not null)
+                {
+                    linkedUser.RoleId = hrRole.Id;
+                }
+            }
+        }
+
+        if (employee.Status == EmploymentStatus.Active)
+        {
+            linkedUser.IsActive = true;
+        }
+        else if (employee.Status is EmploymentStatus.Offboarding or EmploymentStatus.Terminated or EmploymentStatus.Resigned)
+        {
+            linkedUser.IsActive = false;
+        }
+
+        _uow.Users.Update(linkedUser);
+    }
+
+    private async Task SendOnboardingWelcomeEmailAsync(Employee employee, Guid userId, string roleName, CancellationToken ct)
     {
         if (_emailSender is null || string.IsNullOrWhiteSpace(employee.Email))
         {
@@ -640,10 +802,12 @@ public sealed class EmployeeService : IEmployeeService
                 ? $"{baseUrl}/set-password"
                 : $"{baseUrl}/set-password?token={Uri.EscapeDataString(token)}";
 
+            var resolvedRole = string.IsNullOrWhiteSpace(roleName) ? "Employee" : roleName.Trim();
             var safeCompany = WebUtility.HtmlEncode(companyName);
             var safeCode = WebUtility.HtmlEncode(employee.EmployeeCode);
             var safeName = WebUtility.HtmlEncode(employeeName);
             var safeEmail = WebUtility.HtmlEncode(employee.Email);
+            var safeRole = WebUtility.HtmlEncode(resolvedRole);
             var safeUrl = WebUtility.HtmlEncode(setPasswordUrl);
 
             var htmlBody = $"""
@@ -670,6 +834,10 @@ public sealed class EmployeeService : IEmployeeService
                         <td style="padding: 8px 12px; border: 1px solid #e2e8f0; background: #f8fafc; font-weight: 600;">Email</td>
                         <td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{safeEmail}</td>
                       </tr>
+                      <tr>
+                        <td style="padding: 8px 12px; border: 1px solid #e2e8f0; background: #f8fafc; font-weight: 600;">Role</td>
+                        <td style="padding: 8px 12px; border: 1px solid #e2e8f0;">{safeRole}</td>
+                      </tr>
                     </table>
                     <div style="text-align: center; margin-top: 8px;">
                       <a href="{safeUrl}" style="display: inline-block; padding: 12px 28px; background: #1e40af; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px;">Set Password</a>
@@ -683,7 +851,8 @@ public sealed class EmployeeService : IEmployeeService
                 $"Company Name: {companyName}\n" +
                 $"Employee Code: {employee.EmployeeCode}\n" +
                 $"Employee Name: {employeeName}\n" +
-                $"Email: {employee.Email}\n\n" +
+                $"Email: {employee.Email}\n" +
+                $"Role: {resolvedRole}\n\n" +
                 $"Set Password: {setPasswordUrl}";
 
             var result = await _emailSender.SendAsync(

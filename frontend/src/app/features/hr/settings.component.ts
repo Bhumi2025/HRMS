@@ -17,13 +17,13 @@ import { KeyGroupCacheService } from '../../core/services/key-group-cache.servic
 import { UiService } from '../../core/services/ui.service';
 import { SessionService } from '../../core/services/session.service';
 import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 export interface FlatKeyGroupItem {
   id: string;
   srNo: number;
   name: string;
   code: string;
-  isGeneric: boolean;
   itemCount: number;
   raw: KeyGroup;
 }
@@ -46,7 +46,7 @@ export interface FlatNavigationItem {
 
 @Component({
   selector: 'app-settings',
-  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent],
+  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent, NoAutofillDirective],
   template: `
     <div class="settings-page">
       <!-- Settings Top Tabs Navigation -->
@@ -132,15 +132,6 @@ export interface FlatNavigationItem {
                     placeholder="e.g. Employee blood groups dictionary" 
                     style="width: 100%; font-size: 13px;" 
                   />
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px; margin-top: 18px;">
-                  <input 
-                    type="checkbox" 
-                    id="sgIsGen" 
-                    [(ngModel)]="keyGroupEditForm.isGeneric" 
-                    style="cursor: pointer; width: 16px; height: 16px;" 
-                  />
-                  <label for="sgIsGen" style="font-weight: 600; font-size: 13px; cursor: pointer; margin: 0; color: var(--text);">Is Generic</label>
                 </div>
               </div>
 
@@ -240,7 +231,7 @@ export interface FlatNavigationItem {
             <div class="card-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border);">
               <div>
                 <h5 class="mb-0" style="font-weight: 700; font-size: 15px;">Key Group Management</h5>
-                <div style="font-size: 12px; color: var(--muted);">Tenant dictionary options and drop-down value configurations</div>
+          
               </div>
               <div style="display: flex; gap: 8px;">
                 <button class="btn btn-outline btn-sm" [class.btn-primary]="showFilterRow()" (click)="toggleFilter()" data-tooltip="Filter">
@@ -260,7 +251,6 @@ export interface FlatNavigationItem {
                     <th>Name</th>
                     <th>Code</th>
                     <th style="width: 110px; text-align: center;">Values</th>
-                    <th style="width: 120px; text-align: center;">Is Generic</th>
                     <th style="width: 120px; text-align: right;">Action</th>
                   </tr>
                   @if (showFilterRow()) {
@@ -269,6 +259,7 @@ export interface FlatNavigationItem {
                       <th style="padding: 6px 12px;">
                         <input 
                           type="text" 
+                          appNoAutofill
                           class="form-control" 
                           placeholder="Search Name..." 
                           [ngModel]="keyGroupSearch()" 
@@ -276,7 +267,7 @@ export interface FlatNavigationItem {
                           style="width: 100%; font-size: 12px; padding: 4px 8px;"
                         />
                       </th>
-                      <th style="padding: 6px 12px;" colspan="3"></th>
+                      <th style="padding: 6px 12px;" colspan="2"></th>
                       <th style="padding: 6px 12px; text-align: right;">
                         <button class="btn btn-ghost btn-sm" (click)="keyGroupSearch.set(''); keyGroupPage.set(1)" data-tooltip="Clear">
                           <span [appIcon]="'x'"></span>
@@ -300,37 +291,17 @@ export interface FlatNavigationItem {
                           {{ kg.itemCount }} options
                         </span>
                       </td>
-                      <td style="text-align: center;">
-                        <label class="switch-toggle" style="display: inline-block; position: relative; width: 36px; height: 20px; cursor: pointer;">
-                          <input 
-                            type="checkbox" 
-                            [checked]="kg.isGeneric" 
-                            (change)="toggleGeneric(kg)"
-                            style="opacity: 0; width: 0; height: 0;"
-                          />
-                          <span 
-                            class="slider"
-                            [style.background]="kg.isGeneric ? '#059669' : '#d1d5db'"
-                            style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; border-radius: 20px; transition: .3s;"
-                          >
-                            <span 
-                              [style.transform]="kg.isGeneric ? 'translateX(16px)' : 'translateX(2px)'"
-                              style="position: absolute; height: 16px; width: 16px; left: 1px; bottom: 2px; background-color: white; border-radius: 50%; transition: .3s;"
-                            ></span>
-                          </span>
-                        </label>
-                      </td>
                       <td style="text-align: right;">
                         <div style="display: inline-flex; gap: 6px;">
                           <button class="tbl-btn" (click)="editKeyGroup(kg.raw)" data-tooltip="Edit">
                             <span [appIcon]="'edit'"></span>
                           </button>
-                          @if (!kg.isGeneric && !kg.raw.isEnumLocked) {
+                          @if (!kg.raw.isEnumLocked) {
                             <button class="tbl-btn danger" (click)="deleteKeyGroup(kg.raw)" data-tooltip="Delete">
                               <span [appIcon]="'trash'"></span>
                             </button>
                           } @else {
-                            <span style="font-size: 11px; color: var(--muted); padding: 4px 6px;" [title]="kg.raw.isEnumLocked ? 'Enum-backed system group cannot be deleted' : 'System generic group cannot be deleted'">
+                            <span style="font-size: 11px; color: var(--muted); padding: 4px 6px;" title="Enum-backed system group cannot be deleted">
                               <span [appIcon]="'lock'"></span>
                             </span>
                           }
@@ -339,7 +310,7 @@ export interface FlatNavigationItem {
                     </tr>
                   } @empty {
                     <tr>
-                      <td colspan="6" style="text-align: center; padding: 24px; color: var(--muted);">
+                      <td colspan="5" style="text-align: center; padding: 24px; color: var(--muted);">
                         No key groups match your search.
                       </td>
                     </tr>
@@ -391,6 +362,7 @@ export interface FlatNavigationItem {
                     <th style="padding: 6px 12px;">
                       <input 
                         type="text" 
+                        appNoAutofill
                         class="form-control" 
                         placeholder="Search Title..." 
                         [ngModel]="navSearch()" 
@@ -525,6 +497,7 @@ export interface FlatNavigationItem {
                     <th style="padding: 6px 12px;">
                       <input 
                         type="text" 
+                        appNoAutofill
                         class="form-control" 
                         placeholder="Search Role..." 
                         [ngModel]="roleSearch()" 
@@ -657,7 +630,6 @@ export interface FlatNavigationItem {
                   <option value="payroll">Payroll</option>
                   <option value="payslip">Payslip</option>
                   <option value="onboarding">Onboarding</option>
-                  <option value="documents">Documents</option>
                   <option value="approvals">Approvals</option>
                   <option value="reports">Reports</option>
                   <option value="settings">Settings</option>
@@ -681,7 +653,6 @@ export interface FlatNavigationItem {
                 <option value="/payroll">Payroll</option>
                 <option value="/payslips">Payslips</option>
                 <option value="/onboarding">Onboarding</option>
-                <option value="/documents">Documents</option>
                 <option value="/approvals">Approvals</option>
                 <option value="/reports">Reports</option>
                 <option value="/settings">Settings</option>
@@ -932,7 +903,7 @@ export class SettingsComponent implements OnInit {
   protected readonly keyGroups = signal<KeyGroup[]>([]);
   protected readonly isEditingKeyGroup = signal<boolean>(false);
   protected readonly savingKeyGroup = signal<boolean>(false);
-  protected keyGroupEditForm = { id: '', code: '', name: '', description: '', isGeneric: false };
+  protected keyGroupEditForm = { id: '', code: '', name: '', description: '' };
   protected readonly keyStoreRows = signal<Array<{ id?: string; key: string; value: string; subValue?: string; isActive: boolean }>>([]);
   private originalEditingKg: KeyGroup | null = null;
   protected readonly isEnumLocked = computed(() => {
@@ -993,7 +964,6 @@ export class SettingsComponent implements OnInit {
       srNo: idx + 1,
       name: kg.name,
       code: kg.code,
-      isGeneric: kg.isGeneric ?? false,
       itemCount: kg.items?.length || 0,
       raw: kg,
     }));
@@ -1396,8 +1366,8 @@ export class SettingsComponent implements OnInit {
           this.ui.triggerNavigationRefresh();
         },
         error: (err) => {
-          const msg = err?.error?.message 
-            || err?.error?.title 
+          const msg = err?.error?.message
+            || err?.error?.title
             || (err?.error?.errors ? Object.values(err.error.errors).flat().join(', ') : null)
             || 'Failed to update navigation item';
           this.toast.show(msg, 'danger');
@@ -1414,8 +1384,8 @@ export class SettingsComponent implements OnInit {
           this.ui.triggerNavigationRefresh();
         },
         error: (err) => {
-          const msg = err?.error?.message 
-            || err?.error?.title 
+          const msg = err?.error?.message
+            || err?.error?.title
             || (err?.error?.errors ? Object.values(err.error.errors).flat().join(', ') : null)
             || 'Failed to create navigation item';
           this.toast.show(msg, 'danger');
@@ -1460,7 +1430,7 @@ export class SettingsComponent implements OnInit {
 
   protected openAddKeyGroup(): void {
     this.originalEditingKg = null;
-    this.keyGroupEditForm = { id: '', code: '', name: '', description: '', isGeneric: false };
+    this.keyGroupEditForm = { id: '', code: '', name: '', description: '' };
     this.keyStoreRows.set([
       { key: '', value: '', subValue: '', isActive: true },
     ]);
@@ -1474,7 +1444,6 @@ export class SettingsComponent implements OnInit {
       code: kg.code,
       name: kg.name,
       description: kg.description || '',
-      isGeneric: kg.isGeneric ?? false,
     };
     const rows = (kg.items || []).map((s) => ({
       id: s.id,
@@ -1553,7 +1522,7 @@ export class SettingsComponent implements OnInit {
       code,
       name,
       description: this.keyGroupEditForm.description?.trim() || null,
-      isGeneric: this.keyGroupEditForm.isGeneric ?? false,
+      isGeneric: false,
       items,
     };
 
@@ -1566,8 +1535,8 @@ export class SettingsComponent implements OnInit {
         this.loadKeyGroups();
       },
       error: (err) => {
-        const msg = err?.error?.message 
-          || err?.error?.title 
+        const msg = err?.error?.message
+          || err?.error?.title
           || (err?.error?.errors ? Object.values(err.error.errors).flat().join(', ') : null)
           || 'Failed to save key group';
         this.toast.show(msg, 'danger');
@@ -1577,8 +1546,8 @@ export class SettingsComponent implements OnInit {
   }
 
   protected deleteKeyGroup(kg: KeyGroup): void {
-    if (kg.isGeneric) {
-      this.toast.show(`Key group '${kg.name}' is a generic system group and cannot be deleted`, 'warning');
+    if (kg.isEnumLocked) {
+      this.toast.show(`Key group '${kg.name}' is mapped to system enums and cannot be deleted.`, 'warning');
       return;
     }
     if (!confirm(`Are you sure you want to delete key group '${kg.name}'?`)) {
@@ -1594,25 +1563,6 @@ export class SettingsComponent implements OnInit {
       error: (err) => {
         this.toast.show(err?.error?.message || 'Failed to delete key group', 'danger');
         this.loadKeyGroups();
-      },
-    });
-  }
-
-  protected toggleGeneric(kg: FlatKeyGroupItem): void {
-    const updated: SaveKeyGroupRequest = {
-      id: kg.id,
-      code: kg.code,
-      name: kg.name,
-      isGeneric: !kg.isGeneric,
-    };
-    this.api.saveKeyGroup(updated).subscribe({
-      next: () => {
-        this.toast.show(`Key group '${kg.name}' isGeneric: ${!kg.isGeneric}`, 'info');
-        this.keyGroupCache.clearCache();
-        this.loadKeyGroups();
-      },
-      error: (err) => {
-        this.toast.show(err?.error?.message || 'Failed to update generic status', 'danger');
       },
     });
   }

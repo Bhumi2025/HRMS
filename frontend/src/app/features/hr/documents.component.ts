@@ -8,6 +8,7 @@ import { UiService } from '../../core/services/ui.service';
 import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 interface DocumentRow {
   id?: string;
@@ -25,7 +26,7 @@ interface DocumentRow {
 /** Document Management — ported from pages/documents.html. */
 @Component({
   selector: 'app-documents',
-  imports: [CommonModule, IconDirective, SelectComponent, TablePaginationComponent],
+  imports: [CommonModule, IconDirective, SelectComponent, TablePaginationComponent, NoAutofillDirective],
   template: `
     <div class="page-header-row">
       <div>
@@ -49,7 +50,7 @@ interface DocumentRow {
       <div class="card-header">
         <div class="card-title">All Documents</div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap">
-          <input class="form-control" placeholder="Search..." style="width: 200px" [value]="search()" (input)="search.set($any($event.target).value); page.set(1)" />
+          <input class="form-control" appNoAutofill placeholder="Search..." style="width: 200px" [value]="search()" (input)="search.set($any($event.target).value); page.set(1)" />
           <app-select [options]="typeOptions" [value]="type()" (valueChange)="type.set($event); page.set(1)" width="140px" />
           <app-select [options]="statusOptions" [value]="status()" (valueChange)="status.set($event); page.set(1)" width="120px" />
         </div>
@@ -556,7 +557,7 @@ export class DocumentsComponent implements OnInit {
           this.uploadEmployee.set(list[0].v);
         }
       },
-      error: () => {},
+      error: () => { },
     });
   }
 
@@ -569,7 +570,7 @@ export class DocumentsComponent implements OnInit {
           { l: 'Expired', v: `${summary.expired}`, c: 'var(--danger)', bg: 'var(--danger-soft)' },
           { l: 'Valid', v: `${summary.valid}`, c: 'var(--success)', bg: 'var(--success-soft)' },
         ]),
-      error: () => {},
+      error: () => { },
     });
   }
 

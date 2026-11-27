@@ -5,12 +5,13 @@ import { Router } from '@angular/router';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { DetailedNotification, NotificationStateService } from '../../core/services/notification-state.service';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 export type { DetailedNotification };
 
 @Component({
   selector: 'app-notifications',
-  imports: [CommonModule, FormsModule, IconDirective],
+  imports: [CommonModule, FormsModule, IconDirective, NoAutofillDirective],
   template: `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div>

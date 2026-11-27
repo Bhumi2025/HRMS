@@ -4,6 +4,7 @@ import {
   ElementRef,
   HostListener,
   OnDestroy,
+  ViewChild,
   computed,
   inject,
   input,
@@ -11,6 +12,7 @@ import {
   signal,
 } from '@angular/core';
 import { IconDirective } from '../core/icons/icon.directive';
+import { attachMenuToBody, computeDropdownCoords, restoreMenuToHost } from './dropdown-position.util';
 
 export interface SelectOption {
   v: string;
@@ -18,8 +20,8 @@ export interface SelectOption {
 }
 
 /**
- * Standalone custom dropdown — the Angular port of `customSelect()`.
- * Usage: `<app-select [options]="opts" [(value)]="val" width="150px" />`
+ * Standalone custom dropdown — renders a portal-positioned menu attached to
+ * document.body when open so modal/card overflow or transforms never clip it.
  */
 @Component({
   selector: 'app-select',
@@ -28,12 +30,23 @@ export interface SelectOption {
     '[class.csel-host-open]': 'open()',
   },
   template: `
-    <div class="csel-wrap" [class.csel-open]="open()" [class.disabled]="disabled()" [style.width]="width() || null">
-      <button type="button" class="csel-btn" [class.open]="open()" [disabled]="disabled()" (click)="toggle()">
+    <div #wrapEl class="csel-wrap" [class.csel-open]="open()" [class.disabled]="disabled()" [style.width]="width() || null">
+      <button #triggerBtn type="button" class="csel-btn" [class.open]="open()" [disabled]="disabled()" (click)="toggle()">
         <span class="csel-label">{{ selectedLabel() }}</span>
         <span class="csel-arrow" [class.up]="open()" appIcon="chevron"></span>
       </button>
-      <div class="csel-menu" [class.drop-up]="dropUp()" [class.align-right]="alignRight()" [style.display]="open() ? 'block' : 'none'">
+      <div
+        #menuEl
+        class="csel-menu csel-fixed-portal"
+        [class.drop-up]="dropUp()"
+        style="position: fixed; z-index: 99999;"
+        [style.display]="open() ? 'block' : 'none'"
+        [style.top]="menuTop() ?? 'auto'"
+        [style.bottom]="menuBottom() ?? 'auto'"
+        [style.left.px]="menuLeft()"
+        [style.width.px]="menuWidth()"
+        [style.max-height.px]="menuMaxHeight()"
+      >
         @for (option of options(); track option.v) {
           <div class="csel-opt" [class.csel-active]="option.v === value()" (click)="pick(option)">
             {{ option.l }}
@@ -59,17 +72,10 @@ export interface SelectOption {
       background-color: var(--surface, #ffffff) !important;
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
       z-index: 99999 !important;
-      max-height: 280px !important;
       overflow-y: auto !important;
     }
     .csel-menu.drop-up {
-      top: auto !important;
-      bottom: calc(100% + 4px) !important;
       box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.18), 0 -8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-    }
-    .csel-menu.align-right {
-      left: auto !important;
-      right: 0 !important;
     }
     .csel-btn[disabled],
     .csel-wrap.disabled .csel-btn {
@@ -83,17 +89,46 @@ export interface SelectOption {
 })
 export class SelectComponent implements OnDestroy {
   private readonly elementRef = inject(ElementRef);
+  @ViewChild('wrapEl') private wrapEl?: ElementRef<HTMLDivElement>;
+  @ViewChild('triggerBtn') private triggerBtn?: ElementRef<HTMLButtonElement>;
+  @ViewChild('menuEl') private menuEl?: ElementRef<HTMLDivElement>;
 
   readonly options = input<SelectOption[]>([]);
   readonly value = input<string>('');
   readonly width = input<string>('');
   readonly valueChange = output<string>();
-
   readonly disabled = input<boolean>(false);
 
   readonly open = signal(false);
   readonly dropUp = signal(false);
-  readonly alignRight = signal(false);
+  readonly menuTop = signal<string | null>(null);
+  readonly menuBottom = signal<string | null>(null);
+  readonly menuLeft = signal(0);
+  readonly menuWidth = signal(150);
+  readonly menuMaxHeight = signal(280);
+
+  private rafId: number | null = null;
+
+  private readonly onViewportChange = (event?: Event): void => {
+    if (!this.open()) return;
+    const target = event?.target as Node | null;
+    if (target && this.menuEl?.nativeElement &&
+      (this.menuEl.nativeElement === target || this.menuEl.nativeElement.contains(target))) {
+      return;
+    }
+    if (this.rafId !== null) return;
+    this.rafId = requestAnimationFrame(() => {
+      this.rafId = null;
+      if (!this.open()) return;
+      const anchor = this.triggerBtn?.nativeElement ?? (this.elementRef.nativeElement as HTMLElement);
+      const rect = anchor.getBoundingClientRect();
+      if (rect.width === 0 || rect.bottom < 0 || rect.top > window.innerHeight) {
+        this.close();
+        return;
+      }
+      this.updatePosition();
+    });
+  };
 
   readonly selectedLabel = computed(() => {
     const current = this.options().find((o) => o.v === this.value());
@@ -102,7 +137,11 @@ export class SelectComponent implements OnDestroy {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
-    if (this.open() && !this.elementRef.nativeElement.contains(event.target)) {
+    if (!this.open()) return;
+    const target = event.target as Node | null;
+    const insideHost = !!target && this.elementRef.nativeElement.contains(target);
+    const insideMenu = !!target && !!this.menuEl?.nativeElement?.contains(target);
+    if (!insideHost && !insideMenu) {
       this.close();
     }
   }
@@ -110,48 +149,40 @@ export class SelectComponent implements OnDestroy {
   toggle(): void {
     if (this.disabled()) return;
     if (!this.open()) {
-      try {
-        const el = this.elementRef.nativeElement as HTMLElement;
-        const rect = el.getBoundingClientRect();
-        const spaceBelow = window.innerHeight - rect.bottom;
-
-        // Check for any sticky bottom obstacles (e.g. .tab-action-bar, .action-bar, fixed footers)
-        let bottomObstacleHeight = 0;
-        const obstacles = document.querySelectorAll(
-          '.tab-action-bar, .action-bar, .form-footer, .sticky-bottom, [class*="sticky-bottom"]'
-        );
-        for (let i = 0; i < obstacles.length; i++) {
-          const obRect = (obstacles[i] as HTMLElement).getBoundingClientRect();
-          if (obRect.top > rect.bottom && obRect.top < window.innerHeight && obRect.height > 0) {
-            const obstacleCutoff = window.innerHeight - obRect.top;
-            if (obstacleCutoff > bottomObstacleHeight) {
-              bottomObstacleHeight = obstacleCutoff;
-            }
-          }
-        }
-
-        const effectiveSpaceBelow = Math.max(0, spaceBelow - bottomObstacleHeight);
-        // If effective space below is less than 280px (standard menu height) and there is more space above, open upwards!
-        const shouldDropUp =
-          (effectiveSpaceBelow < 280 && rect.top > effectiveSpaceBelow) ||
-          (spaceBelow < 220 && rect.top > 220);
-        this.dropUp.set(shouldDropUp);
-        const shouldAlignRight = rect.right + 60 > window.innerWidth;
-        this.alignRight.set(shouldAlignRight);
-      } catch {
-        this.dropUp.set(false);
-        this.alignRight.set(false);
-      }
+      attachMenuToBody(this.menuEl?.nativeElement);
+      this.updatePosition();
       this.open.set(true);
-      this.setParentElevation(true);
+      document.addEventListener('scroll', this.onViewportChange, true);
+      window.addEventListener('resize', this.onViewportChange);
     } else {
       this.close();
     }
   }
 
+  private updatePosition(): void {
+    try {
+      const anchor = this.triggerBtn?.nativeElement ?? (this.elementRef.nativeElement as HTMLElement);
+      const coords = computeDropdownCoords(anchor);
+      this.dropUp.set(coords.dropUp);
+      this.menuTop.set(coords.top);
+      this.menuBottom.set(coords.bottom);
+      this.menuLeft.set(coords.left);
+      this.menuWidth.set(coords.width);
+      this.menuMaxHeight.set(coords.maxHeight);
+    } catch {
+      this.dropUp.set(false);
+    }
+  }
+
   close(): void {
     this.open.set(false);
-    this.setParentElevation(false);
+    restoreMenuToHost(this.menuEl?.nativeElement, this.wrapEl?.nativeElement);
+    document.removeEventListener('scroll', this.onViewportChange, true);
+    window.removeEventListener('resize', this.onViewportChange);
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
   }
 
   pick(option: SelectOption): void {
@@ -160,43 +191,10 @@ export class SelectComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.setParentElevation(false);
-  }
-
-  private setParentElevation(elevate: boolean): void {
-    try {
-      const el = this.elementRef.nativeElement as HTMLElement;
-      const parentCard = el.closest('.card') as HTMLElement | null;
-      const parentGrid = el.closest('.grid-2, .grid-3, .grid-4') as HTMLElement | null;
-      if (elevate) {
-        if (parentCard) {
-          parentCard.classList.add('has-open-dropdown');
-          parentCard.style.zIndex = '50';
-          parentCard.style.position = 'relative';
-        }
-        if (parentGrid) {
-          parentGrid.classList.add('has-open-dropdown');
-          parentGrid.style.zIndex = '50';
-          parentGrid.style.position = 'relative';
-        }
-      } else {
-        if (parentCard) {
-          parentCard.classList.remove('has-open-dropdown');
-          parentCard.style.zIndex = '';
-          if (parentCard.style.position === 'relative') {
-            parentCard.style.removeProperty('position');
-          }
-        }
-        if (parentGrid) {
-          parentGrid.classList.remove('has-open-dropdown');
-          parentGrid.style.zIndex = '';
-          if (parentGrid.style.position === 'relative') {
-            parentGrid.style.removeProperty('position');
-          }
-        }
-      }
-    } catch {
-      // Safe no-op
+    this.close();
+    const menu = this.menuEl?.nativeElement;
+    if (menu && menu.parentElement === document.body) {
+      menu.remove();
     }
   }
 }

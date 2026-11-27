@@ -16,7 +16,9 @@ public sealed record EmployeeListItemDto(
     string Currency,
     string JobTitle,
     bool IsFaceEnrolled = false,
-    string? FacePhotoUrl = null);
+    string? FacePhotoUrl = null,
+    string? RoleCode = null,
+    string? RoleName = null);
 
 public sealed record EmployeeDetailDto(
     Guid Id,
@@ -92,7 +94,7 @@ public sealed record CreateEmployeeRequest(
     Guid? ShiftId,
     Guid? ReportingManagerId,
     [Required] string JobTitle,
-    string Grade,
+    string? Grade,
     EmploymentType EmploymentType,
     DateOnly JoinDate,
     decimal BasicSalary,
@@ -133,7 +135,7 @@ public sealed record UpdateEmployeeRequest(
     Guid? BranchId,
     Guid? ReportingManagerId,
     [Required] string JobTitle,
-    string Grade,
+    string? Grade,
     EmploymentType EmploymentType,
     EmploymentStatus Status,
     DateOnly JoinDate,

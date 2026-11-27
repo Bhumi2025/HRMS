@@ -11,7 +11,6 @@ const USER_MAP: Record<Role, SessionUser> = {
   'Super Admin': { role: 'Super Admin', name: 'Super Admin', initials: 'SA' },
   'HR Manager': { role: 'HR Manager', name: 'HR Manager', initials: 'HR' },
   'Company Admin': { role: 'Company Admin', name: 'Company Admin', initials: 'CA' },
-  Manager: { role: 'Manager', name: 'Team Manager', initials: 'TM' },
   Employee: { role: 'Employee', name: 'Employee', initials: 'EM' },
 };
 
@@ -41,7 +40,8 @@ export class SessionService {
 
   /** Stores the JWT + profile returned by `POST /api/auth/login`. */
   setSession(accessToken: string, apiUser: ApiUser): string {
-    const role = apiUser.role as Role;
+    const rawRole = apiUser.role;
+    const role: Role = rawRole === 'Manager' ? 'Company Admin' : (rawRole as Role);
     const isSuperAdmin = role === 'Super Admin';
     if (isSuperAdmin && typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem('current_tenant');
@@ -122,7 +122,8 @@ export class SessionService {
   private readStoredRole(): Role | null {
     if (typeof sessionStorage === 'undefined') return null;
     const stored = sessionStorage.getItem(ROLE_KEY);
-    return stored ? (stored as Role) : null;
+    if (!stored) return null;
+    return stored === 'Manager' ? 'Company Admin' : (stored as Role);
   }
 
   private readStoredToken(): string | null {

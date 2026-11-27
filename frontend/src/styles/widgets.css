@@ -64,10 +64,24 @@
   overflow-y: auto;
 }
 
+.csel-menu.csel-fixed-portal {
+  position: fixed !important;
+  top: auto;
+  bottom: auto;
+  left: auto;
+  right: auto;
+  min-width: 0;
+  margin: 0;
+  z-index: 99999 !important;
+}
+
 .csel-menu.drop-up {
+  box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.18), 0 -8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.csel-menu.drop-up:not(.csel-fixed-portal) {
   top: auto !important;
   bottom: calc(100% + 4px) !important;
-  box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.18), 0 -8px 10px -6px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* Elevate card and grid stacking context above sticky bars when dropdown is open */
@@ -135,6 +149,7 @@
     right: 16px !important;
     align-items: center !important;
   }
+
   .toast {
     max-width: 100% !important;
     width: 100% !important;
@@ -179,6 +194,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -190,10 +206,12 @@
   body * {
     visibility: hidden;
   }
+
   .print-doc,
   .print-doc * {
     visibility: visible;
   }
+
   .print-doc {
     position: absolute;
     top: 0;
@@ -205,6 +223,7 @@
     border-radius: 0;
     margin: 0;
   }
+
   .print-doc .grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -218,6 +237,7 @@
     opacity: 0;
     transform: translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -225,12 +245,14 @@
 }
 
 @keyframes aiDot {
+
   0%,
   80%,
   100% {
     transform: scale(0.6);
     opacity: 0.4;
   }
+
   40% {
     transform: scale(1);
     opacity: 1;
@@ -256,16 +278,19 @@
     bottom: 72px !important;
     width: calc(100vw - 16px) !important;
   }
+
   #aiChatFab {
     right: 10px !important;
     bottom: 6px !important;
     width: 40px !important;
     height: 40px !important;
   }
+
   #aiChatFab svg {
     width: 18px;
     height: 18px;
   }
+
   #aiUnreadDot {
     top: 5px !important;
     right: 5px !important;
@@ -294,6 +319,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -370,6 +396,7 @@
     opacity: 0;
     transform: translate(-50%, -47%) scale(0.9);
   }
+
   to {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
@@ -403,6 +430,7 @@
 }
 
 @media (max-width: 768px) {
+
   .dash-widget.widget-popped,
   .dash-widget.widget-popped.attendance-widget,
   .dash-widget.widget-popped.hours-widget {

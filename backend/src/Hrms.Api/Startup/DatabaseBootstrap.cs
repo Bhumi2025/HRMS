@@ -32,8 +32,8 @@ BEGIN
 END
 
 -- 2. Ensure existing static system roles have IsSystem = 1
-EXEC(N'UPDATE Roles SET IsSystem = 1 WHERE Name IN (''Super Admin'', ''Company Admin'', ''HR Manager'', ''Manager'', ''Employee'') 
-   OR Code IN (''SuperAdmin'', ''CompanyAdmin'', ''HrManager'', ''Manager'', ''Employee'');');
+EXEC(N'UPDATE Roles SET IsSystem = 1 WHERE Name IN (''Super Admin'', ''Company Admin'', ''HR Manager'', ''Employee'') 
+   OR Code IN (''SuperAdmin'', ''CompanyAdmin'', ''HrManager'', ''Employee'');');
 
 -- 3. Ensure NavigationItems.Code and NavigationItems.IsActive exist
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'NavigationItems' AND COLUMN_NAME = 'Code')
@@ -202,6 +202,27 @@ BEGIN
     UPDATE Employees 
     SET Currency = 'INR' 
     WHERE Currency IS NULL OR Currency = '' OR Currency = 'USD' OR Currency = 'AED';
+
+    UPDATE Employees
+    SET Gender = 'Other'
+    WHERE Gender IN ('PreferNotToSay', 'Prefer not to say', '4');
+
+    UPDATE Employees
+    SET MaritalStatus = 'Single'
+    WHERE MaritalStatus IN ('Divorced', 'Widowed', '3', '4');
+END
+
+-- 15. Clean up obsolete Grade/Level key group and restricted Gender/MaritalStatus options
+IF OBJECT_ID('KeyStores', 'U') IS NOT NULL AND OBJECT_ID('KeyGroups', 'U') IS NOT NULL
+BEGIN
+    DELETE ks
+    FROM KeyStores ks
+    INNER JOIN KeyGroups kg ON ks.KeyGroupId = kg.Id
+    WHERE UPPER(kg.Code) = 'GRADE_LEVEL'
+       OR (UPPER(kg.Code) = 'GENDER' AND ks.[Key] NOT IN ('Male', 'Female', 'Other'))
+       OR (UPPER(kg.Code) = 'MARITAL_STATUS' AND ks.[Key] NOT IN ('Single', 'Married'));
+
+    DELETE FROM KeyGroups WHERE UPPER(Code) = 'GRADE_LEVEL';
 END
 ";
 
@@ -234,8 +255,10 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
         await tenant.Database.MigrateAsync(ct);
         await tenant.Database.ExecuteSqlRawAsync(EnsureSchemaSql, ct);
         await RunOneTimeKeyGroupCleanupMigrationAsync(tenant, DefaultCompanyCode, defaultDbName, logger, ct);
+        await EnsureDefaultKeyGroupsBackfilledAsync(tenant, DefaultCompanyCode, defaultDbName, logger, ct);
         await RunPunchAndTenantSettingsMigrationAsync(tenant, DefaultCompanyCode, defaultDbName, configuration, logger, ct);
         await DbSeeder.SeedAsync(tenant, hasher, isProduction, ct);
+        await EnsureDefaultGeneralDepartmentAndDesignationAsync(tenant, logger, ct);
         await EnsureShiftTemplatesSeededAsync(tenant, logger, ct);
         await EnsureHolidayTemplatesSeededAsync(tenant, logger, ct);
         await EnsureNavigationItemsSeededAsync(tenant, logger, ct);
@@ -292,7 +315,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Comp
                         await tenantDb.Database.MigrateAsync(ct);
                         await tenantDb.Database.ExecuteSqlRawAsync(EnsureSchemaSql, ct);
                         await RunOneTimeKeyGroupCleanupMigrationAsync(tenantDb, company.Code, company.DatabaseName, logger, ct);
+                        await EnsureDefaultKeyGroupsBackfilledAsync(tenantDb, company.Code, company.DatabaseName, logger, ct);
                         await RunPunchAndTenantSettingsMigrationAsync(tenantDb, company.Code, company.DatabaseName, configuration, logger, ct);
+                        await EnsureDefaultGeneralDepartmentAndDesignationAsync(tenantDb, logger, ct);
                         await EnsureShiftTemplatesSeededAsync(tenantDb, logger, ct);
                         await EnsureHolidayTemplatesSeededAsync(tenantDb, logger, ct);
                         await EnsureNavigationItemsSeededAsync(tenantDb, logger, ct);
@@ -460,6 +485,119 @@ VALUES (@id, SYSUTCDATETIME());";
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to complete one-time key group cleanup migration for tenant '{CompanyCode}' ({DatabaseName})", companyCode, databaseName);
+        }
+    }
+
+    private static async Task EnsureDefaultKeyGroupsBackfilledAsync(
+        HrmsDbContext db,
+        string companyCode,
+        string databaseName,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        const string migrationId = "20261127_BackfillDefaultKeyGroups";
+
+        try
+        {
+            const string ensureTrackerSql = @"
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AppMigrations')
+BEGIN
+    CREATE TABLE AppMigrations (
+        MigrationId NVARCHAR(100) NOT NULL PRIMARY KEY,
+        AppliedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+    );
+END";
+            await db.Database.ExecuteSqlRawAsync(ensureTrackerSql, ct);
+
+            var conn = db.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open)
+            {
+                await conn.OpenAsync(ct);
+            }
+
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(1) FROM AppMigrations WHERE MigrationId = @id";
+                var param = cmd.CreateParameter();
+                param.ParameterName = "@id";
+                param.Value = migrationId;
+                cmd.Parameters.Add(param);
+                var exists = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct) ?? 0);
+                if (exists > 0)
+                {
+                    return;
+                }
+            }
+
+            await db.Database.ExecuteSqlRawAsync("IF OBJECT_ID('KeyGroups', 'U') IS NOT NULL UPDATE KeyGroups SET IsGeneric = 0;", ct);
+
+            var defaultGroups = new (string Code, string Name, string[] Options)[]
+            {
+                ("BLOOD_GROUP", "Blood Group", new[] { "O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-" }),
+                ("GENDER", "Gender", new[] { "Male", "Female", "Other" }),
+                ("MARITAL_STATUS", "Marital Status", new[] { "Single", "Married" }),
+                ("EMPLOYMENT_TYPE", "Employment Type", new[] { "Full-time", "Part-time", "Contract", "Internship" }),
+                ("PAYMENT_MODE", "Payment Mode", new[] { "Bank Transfer", "Cheque", "Cash" }),
+                ("ASSET_TYPE", "Asset Type", new[] { "Laptop", "Monitor", "Keyboard", "Mouse", "Phone", "Access Card", "Other" }),
+                ("SUPPORT_TYPE", "Support Type", new[] { "IT Hardware", "Software Access", "HR Policy", "Payroll Inquiry", "Facilities" }),
+                ("PRIORITY", "Priority", new[] { "Low", "Medium", "High", "Critical" })
+            };
+
+            foreach (var (code, name, options) in defaultGroups)
+            {
+                var grp = await db.KeyGroups.FirstOrDefaultAsync(g => g.Code.ToUpper() == code, ct);
+                if (grp is null)
+                {
+                    grp = new KeyGroup
+                    {
+                        Code = code,
+                        Name = name,
+                        Description = $"{name} dictionary options",
+                        IsGeneric = false
+                    };
+                    db.KeyGroups.Add(grp);
+                    await db.SaveChangesAsync(ct);
+                }
+
+                var existingStores = await db.KeyStores.Where(s => s.KeyGroupId == grp.Id).ToListAsync(ct);
+                var existingKeys = existingStores.Select(s => s.Key.Trim().ToUpperInvariant()).ToHashSet();
+                var order = existingStores.Count > 0 ? existingStores.Max(s => s.DisplayOrder) + 1 : 1;
+
+                foreach (var opt in options)
+                {
+                    if (!existingKeys.Contains(opt.ToUpperInvariant()))
+                    {
+                        db.KeyStores.Add(new KeyStore
+                        {
+                            KeyGroupId = grp.Id,
+                            Key = opt,
+                            Value = opt,
+                            DisplayOrder = order++,
+                            IsActive = true
+                        });
+                    }
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "INSERT INTO AppMigrations (MigrationId, AppliedAtUtc) VALUES (@id, SYSUTCDATETIME());";
+                var param = cmd.CreateParameter();
+                param.ParameterName = "@id";
+                param.Value = migrationId;
+                cmd.Parameters.Add(param);
+                await cmd.ExecuteNonQueryAsync(ct);
+            }
+
+            logger.LogInformation(
+                "One-time migration [{MigrationId}] completed for tenant '{CompanyCode}' ({DatabaseName}).",
+                migrationId, companyCode, databaseName);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to backfill default key groups for tenant '{CompanyCode}' ({DatabaseName})", companyCode, databaseName);
         }
     }
 
@@ -882,10 +1020,21 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
                         }
 
                         var expectedName = $"{emp.FirstName.Trim()} {emp.LastName.Trim()}".Trim();
-                        if (!string.IsNullOrWhiteSpace(expectedName) && matchedUser.FullName != expectedName)
+                        if (!string.IsNullOrWhiteSpace(expectedName))
                         {
-                            matchedUser.FullName = expectedName;
-                            changed = true;
+                            var fCh = emp.FirstName.Trim().Length > 0 ? emp.FirstName.Trim()[0] : 'E';
+                            var lCh = emp.LastName.Trim().Length > 0 ? emp.LastName.Trim()[0] : 'M';
+                            var expectedInitials = $"{fCh}{lCh}".Trim().ToUpperInvariant();
+                            if (matchedUser.FullName != expectedName)
+                            {
+                                matchedUser.FullName = expectedName;
+                                changed = true;
+                            }
+                            if (matchedUser.Initials != expectedInitials)
+                            {
+                                matchedUser.Initials = string.IsNullOrWhiteSpace(expectedInitials) ? "EM" : expectedInitials;
+                                changed = true;
+                            }
                         }
                     }
 
@@ -943,6 +1092,56 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
         else
         {
             logger.LogWarning("No SuperAdmin exists and SUPERADMIN_EMAIL / SUPERADMIN_PASSWORD environment variables are not set. Set these variables or use the CLI setup command to create the initial administrator.");
+        }
+    }
+
+    private static async Task EnsureDefaultGeneralDepartmentAndDesignationAsync(
+        HrmsDbContext db,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var generalDept = await db.Departments
+                .FirstOrDefaultAsync(d => d.Name.ToLower() == "general", ct);
+            if (generalDept is null)
+            {
+                generalDept = new Department
+                {
+                    Name = "General",
+                    Code = "GEN",
+                    Description = "General department",
+                    IsActive = true
+                };
+                db.Departments.Add(generalDept);
+                await db.SaveChangesAsync(ct);
+                logger.LogInformation("Seeded default 'General' department into tenant database.");
+            }
+            else if (!generalDept.IsActive)
+            {
+                generalDept.IsActive = true;
+                await db.SaveChangesAsync(ct);
+            }
+
+            var empDesig = await db.Designations
+                .FirstOrDefaultAsync(d => d.Name.ToLower() == "employee" && d.DepartmentId == generalDept.Id, ct);
+            if (empDesig is null)
+            {
+                empDesig = new Designation
+                {
+                    Name = "Employee",
+                    Grade = string.Empty,
+                    DepartmentId = generalDept.Id,
+                    Description = "Default employee designation"
+                };
+                db.Designations.Add(empDesig);
+                await db.SaveChangesAsync(ct);
+                logger.LogInformation("Seeded default 'Employee' designation under 'General' department.");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to ensure default 'General' department and 'Employee' designation.");
         }
     }
 
@@ -1186,17 +1385,20 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
     {
         try
         {
-            // 1. Remove any legacy /loans, /erp, /kiosk, /announcements, /analytics navigation items
+            // 1. Remove any legacy /loans, /erp, /kiosk, /announcements, /analytics, /documents navigation items
             var toRemove = await db.NavigationItems
                 .Where(n => n.Route.ToLower().Contains("/loans") ||
                             n.Route.ToLower().Contains("/erp") ||
                             n.Route.ToLower().Contains("/kiosk") ||
                             n.Route.ToLower().Contains("announcement") ||
                             n.Route.ToLower().Contains("/analytics") ||
+                            n.Route.ToLower().Contains("/documents") ||
                             n.Title.ToLower() == "loans" ||
                             n.Title.ToLower() == "analytics" ||
+                            n.Title.ToLower() == "documents" ||
                             n.Code.ToLower() == "loan" ||
-                            n.Code.ToLower() == "anal")
+                            n.Code.ToLower() == "anal" ||
+                            n.Code.ToLower() == "docs")
                 .ToListAsync(ct);
 
             if (toRemove.Count > 0)
@@ -1208,6 +1410,29 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
                 db.RoleNavigations.RemoveRange(permsToRemove);
                 db.NavigationItems.RemoveRange(toRemove);
                 await db.SaveChangesAsync(ct);
+            }
+
+            // Reassign any legacy 'Manager' role users to 'CompanyAdmin' and remove standalone 'Manager' role
+            var legacyManagerRoles = await db.Roles
+                .Where(r => r.Code.ToLower() == "manager" || r.Name.ToLower() == "manager")
+                .ToListAsync(ct);
+            if (legacyManagerRoles.Count > 0)
+            {
+                var companyAdminRole = await db.Roles
+                    .FirstOrDefaultAsync(r => r.Code.ToLower() == "companyadmin" || r.Name.ToLower() == "company admin", ct);
+                if (companyAdminRole != null)
+                {
+                    var legacyIds = legacyManagerRoles.Select(r => r.Id).ToList();
+                    var mgrUsers = await db.Users.Where(u => legacyIds.Contains(u.RoleId)).ToListAsync(ct);
+                    foreach (var u in mgrUsers)
+                    {
+                        u.RoleId = companyAdminRole.Id;
+                    }
+                    var mgrNavs = await db.RoleNavigations.Where(rn => legacyIds.Contains(rn.RoleId)).ToListAsync(ct);
+                    db.RoleNavigations.RemoveRange(mgrNavs);
+                    db.Roles.RemoveRange(legacyManagerRoles);
+                    await db.SaveChangesAsync(ct);
+                }
             }
 
             // 2. Standard navigation items matching sidebar
@@ -1223,10 +1448,9 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
                 ("PAYR", "Payroll", "/payroll", "payroll", 8),
                 ("PAYS", "Payslips", "/payslips", "payslip", 9),
                 ("ONBD", "Onboarding", "/onboarding", "onboarding", 10),
-                ("DOCS", "Documents", "/documents", "documents", 11),
-                ("APPR", "Approvals", "/approvals", "approvals", 12),
-                ("REPT", "Reports", "/reports", "reports", 13),
-                ("SETT", "Settings", "/settings", "settings", 14),
+                ("APPR", "Approvals", "/approvals", "approvals", 11),
+                ("REPT", "Reports", "/reports", "reports", 12),
+                ("SETT", "Settings", "/settings", "settings", 13),
             };
 
             var existingNavs = await db.NavigationItems.ToListAsync(ct);
@@ -1259,20 +1483,79 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
 
             await db.SaveChangesAsync(ct);
 
-            // Grant full permissions to Super Admin, Company Admin, and HR Manager
+            // Grant full permissions to Super Admin and Company Admin; grant operational non-settings permissions to HR Manager
             var allCurrentNavs = await db.NavigationItems.ToListAsync(ct);
-            var rolesToGrant = await db.Roles
-                .Where(r => r.Code == "SuperAdmin" || r.Code == "CompanyAdmin" || r.Code == "HrManager" ||
-                            r.Name == "Super Admin" || r.Name == "Company Admin" || r.Name == "HR Manager")
+            var settingsNavIds = allCurrentNavs
+                .Where(n => n.Code is "SETT" or "KEYG" or "NAVM" or "PERM" or "ROLE" ||
+                            n.Route.StartsWith("/settings", StringComparison.OrdinalIgnoreCase))
+                .Select(n => n.Id)
+                .ToHashSet();
+
+            var superAndCompanyAdmins = await db.Roles
+                .Where(r => r.Code == "SuperAdmin" || r.Code == "CompanyAdmin" ||
+                            r.Name == "Super Admin" || r.Name == "Company Admin")
                 .ToListAsync(ct);
 
+            var hrRoles = await db.Roles
+                .Where(r => r.Code == "HrManager" || r.Name == "HR Manager")
+                .ToListAsync(ct);
+
+            if (hrRoles.Count > 0 && settingsNavIds.Count > 0)
+            {
+                var hrIds = hrRoles.Select(r => r.Id).ToList();
+                var hrSettingsPerms = await db.RoleNavigations
+                    .Where(rn => hrIds.Contains(rn.RoleId) && settingsNavIds.Contains(rn.NavigationItemId))
+                    .ToListAsync(ct);
+                if (hrSettingsPerms.Count > 0)
+                {
+                    db.RoleNavigations.RemoveRange(hrSettingsPerms);
+                    await db.SaveChangesAsync(ct);
+                }
+            }
+
             var existingPerms = await db.RoleNavigations.ToListAsync(ct);
+            var existingByRoleNav = existingPerms.ToDictionary(p => $"{p.RoleId}:{p.NavigationItemId}");
             var permKeySet = existingPerms.Select(p => $"{p.RoleId}:{p.NavigationItemId}").ToHashSet();
 
-            foreach (var r in rolesToGrant)
+            foreach (var r in superAndCompanyAdmins)
             {
                 foreach (var nav in allCurrentNavs)
                 {
+                    var k = $"{r.Id}:{nav.Id}";
+                    if (!existingByRoleNav.TryGetValue(k, out var existingPerm))
+                    {
+                        db.RoleNavigations.Add(new RoleNavigation
+                        {
+                            RoleId = r.Id,
+                            NavigationItemId = nav.Id,
+                            IsFull = true,
+                            IsView = true,
+                            IsCreate = true,
+                            IsEdit = true,
+                            IsDelete = true
+                        });
+                        permKeySet.Add(k);
+                    }
+                    else if (!existingPerm.IsFull || !existingPerm.IsView || !existingPerm.IsCreate || !existingPerm.IsEdit || !existingPerm.IsDelete)
+                    {
+                        existingPerm.IsFull = true;
+                        existingPerm.IsView = true;
+                        existingPerm.IsCreate = true;
+                        existingPerm.IsEdit = true;
+                        existingPerm.IsDelete = true;
+                    }
+                }
+            }
+
+            foreach (var r in hrRoles)
+            {
+                foreach (var nav in allCurrentNavs)
+                {
+                    if (settingsNavIds.Contains(nav.Id))
+                    {
+                        continue;
+                    }
+
                     if (!permKeySet.Contains($"{r.Id}:{nav.Id}"))
                     {
                         db.RoleNavigations.Add(new RoleNavigation
@@ -1290,36 +1573,27 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AttendanceRecords_Empl
                 }
             }
 
-            // Grant role-appropriate permissions to Manager and Employee roles
+            // Grant role-appropriate permissions to Employee role
             var otherRoles = await db.Roles
-                .Where(r => r.Code == "Manager" || r.Code == "Employee" ||
-                            r.Name == "Manager" || r.Name == "Employee")
+                .Where(r => r.Code == "Employee" || r.Name == "Employee")
                 .ToListAsync(ct);
 
             foreach (var r in otherRoles)
             {
-                bool isManager = r.Code == "Manager" || r.Name == "Manager";
-                var allowedCodes = isManager
-                    ? new[] { "DASH", "ANAL", "EMPL", "PROF", "ATTD", "LEAV", "DOCS", "APPR", "REPT", "COMP", "PAYS" }
-                    : new[] { "DASH", "PROF", "ATTD", "LEAV", "PAYS", "DOCS" };
+                var allowedCodes = new[] { "DASH", "PROF", "ATTD", "LEAV", "PAYS" };
 
                 foreach (var nav in allCurrentNavs)
                 {
                     if (allowedCodes.Contains(nav.Code) && !permKeySet.Contains($"{r.Id}:{nav.Id}"))
                     {
-                        bool isFull = isManager && new[] { "DASH", "PROF", "APPR" }.Contains(nav.Code);
-                        bool isCreate = isManager
-                            ? new[] { "DASH", "PROF", "APPR", "ATTD", "LEAV", "DOCS" }.Contains(nav.Code)
-                            : new[] { "ATTD", "LEAV" }.Contains(nav.Code);
-                        bool isEdit = isManager
-                            ? new[] { "DASH", "PROF", "APPR", "ATTD", "LEAV", "DOCS" }.Contains(nav.Code)
-                            : new[] { "DASH", "PROF" }.Contains(nav.Code);
+                        bool isCreate = new[] { "ATTD", "LEAV" }.Contains(nav.Code);
+                        bool isEdit = new[] { "DASH", "PROF" }.Contains(nav.Code);
 
                         db.RoleNavigations.Add(new RoleNavigation
                         {
                             RoleId = r.Id,
                             NavigationItemId = nav.Id,
-                            IsFull = isFull,
+                            IsFull = false,
                             IsView = true,
                             IsCreate = isCreate,
                             IsEdit = isEdit,

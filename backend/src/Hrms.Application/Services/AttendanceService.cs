@@ -1817,15 +1817,84 @@ public sealed class AttendanceService : IAttendanceService
         )).ToList();
     }
 
+    private static float[]? ParseFaceDescriptor(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<float[]>(json);
+            return parsed is { Length: > 0 } ? parsed : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static double ComputeEuclideanDistance(float[] storedDescriptor, float[] candidateDescriptor)
+    {
+        double sumSq = 0.0;
+        for (int i = 0; i < storedDescriptor.Length; i++)
+        {
+            var diff = storedDescriptor[i] - candidateDescriptor[i];
+            sumSq += diff * diff;
+        }
+        return Math.Sqrt(sumSq);
+    }
+
+    private static bool IsDummyPlaceholderDescriptor(float[] descriptor)
+    {
+        // Guard against legacy dummy arrays (e.g. [0.1, 0.2, 0.3] or all values in 0.08..0.35)
+        return descriptor.Length < 64 || descriptor.All(v => v >= 0.08f && v <= 0.35f);
+    }
+
     public async Task<bool> EnrollFaceAsync(Guid employeeId, EnrollFaceRequest request, CancellationToken ct = default)
     {
         var employee = await _uow.Employees.GetByIdAsync(employeeId, ct)
             ?? throw NotFoundException.For("Employee", employeeId);
 
-        employee.FaceDescriptor = request.FaceDescriptor;
-        if (!string.IsNullOrWhiteSpace(request.FacePhotoUrl))
+        var candidateDescriptor = ParseFaceDescriptor(request.FaceDescriptor)
+            ?? throw new ValidationException("Valid facial biometric descriptor data is required.");
+
+        var candidatePhoto = request.FacePhotoUrl?.Trim();
+
+        // Prevent enrolling the same face across multiple distinct employee records
+        var otherEmployees = await _uow.Employees.ToListAsync(
+            _uow.Employees.Query().Where(e => e.Id != employeeId && (!string.IsNullOrEmpty(e.FaceDescriptor) || !string.IsNullOrEmpty(e.FacePhotoUrl))),
+            ct);
+
+        const double duplicateFaceThreshold = 0.58;
+        foreach (var other in otherEmployees)
         {
-            employee.FacePhotoUrl = request.FacePhotoUrl;
+            if (!string.IsNullOrWhiteSpace(candidatePhoto) &&
+                !string.IsNullOrWhiteSpace(other.FacePhotoUrl) &&
+                string.Equals(candidatePhoto, other.FacePhotoUrl.Trim(), StringComparison.Ordinal))
+            {
+                throw new ValidationException($"Duplicate face detected: this photo is already registered to {other.FullName} ({other.EmployeeCode}). Each employee must have a unique face biometric.");
+            }
+
+            if (IsDummyPlaceholderDescriptor(candidateDescriptor))
+            {
+                continue;
+            }
+
+            var existingDescriptor = ParseFaceDescriptor(other.FaceDescriptor);
+            if (existingDescriptor is null || existingDescriptor.Length != candidateDescriptor.Length || IsDummyPlaceholderDescriptor(existingDescriptor))
+            {
+                continue;
+            }
+
+            var distance = ComputeEuclideanDistance(existingDescriptor, candidateDescriptor);
+            if (distance <= duplicateFaceThreshold)
+            {
+                throw new ValidationException($"Duplicate face detected: this face is already registered to {other.FullName} ({other.EmployeeCode}). Each employee must have a unique face biometric.");
+            }
+        }
+
+        employee.FaceDescriptor = request.FaceDescriptor;
+        if (!string.IsNullOrWhiteSpace(candidatePhoto))
+        {
+            employee.FacePhotoUrl = candidatePhoto;
         }
         employee.FaceEnrolledAtUtc = DateTime.UtcNow;
 
@@ -2252,16 +2321,10 @@ public sealed class AttendanceService : IAttendanceService
         {
             try
             {
-                var storedDescriptor = JsonSerializer.Deserialize<float[]>(employee.FaceDescriptor);
+                var storedDescriptor = ParseFaceDescriptor(employee.FaceDescriptor);
                 if (storedDescriptor != null && storedDescriptor.Length == request.FaceDescriptor.Length)
                 {
-                    double sumSq = 0.0;
-                    for (int i = 0; i < storedDescriptor.Length; i++)
-                    {
-                        var diff = storedDescriptor[i] - request.FaceDescriptor[i];
-                        sumSq += diff * diff;
-                    }
-                    var euclideanDist = Math.Sqrt(sumSq);
+                    var euclideanDist = ComputeEuclideanDistance(storedDescriptor, request.FaceDescriptor);
 
                     if (euclideanDist <= 0.35)
                         matchScore = Math.Round(100.0 - (euclideanDist / 0.35) * 8.0);

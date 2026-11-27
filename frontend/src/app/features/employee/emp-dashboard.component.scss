@@ -585,18 +585,63 @@
 }
 
 .punch-timers {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  margin-bottom: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 7px;
   flex-shrink: 0;
+  width: 100%;
 
   .timer-box {
+    display: block;
+    width: 100%;
     text-align: center;
     background: var(--surface, #ffffff);
     border: 1px solid var(--border, #e5e7eb);
-    padding: 2px 2px;
-    border-radius: 5px;
+    padding: 5px 8px;
+    border-radius: 7px;
+
+    &.work-hero {
+      padding: 8px 10px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(59, 130, 246, 0.03));
+      border: 1.5px solid rgba(37, 99, 235, 0.24);
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+
+      .timer-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--p, #2563eb);
+      }
+
+      .timer-value {
+        font-size: 1.4rem;
+        font-weight: 800;
+        line-height: 1.15;
+        margin-top: 2px;
+      }
+    }
+
+    &.break-secondary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+      padding: 4px 10px;
+
+      .timer-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--muted, #6b7280);
+      }
+
+      .timer-value.break {
+        font-size: 0.85rem;
+        margin-top: 0;
+      }
+    }
 
     .timer-label {
       font-size: 7.5px;
@@ -1087,10 +1132,16 @@
 
   .punch-timers {
     gap: 8px !important;
-    .timer-box {
-      padding: 8px 10px !important;
+    .timer-box.work-hero {
+      padding: 10px 12px !important;
       .timer-value {
-        font-size: 1.15rem !important;
+        font-size: 1.5rem !important;
+      }
+    }
+    .timer-box.break-secondary {
+      padding: 6px 12px !important;
+      .timer-value {
+        font-size: 0.9rem !important;
       }
     }
   }

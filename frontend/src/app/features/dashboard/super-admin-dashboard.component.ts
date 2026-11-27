@@ -9,10 +9,11 @@ import { CompanyListItem, CompanyDetail, CreateCompanyRequest, STANDARD_TIMEZONE
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 @Component({
   selector: 'app-super-admin-dashboard',
-  imports: [CommonModule, FormsModule, IconDirective, DatePipe, TablePaginationComponent],
+  imports: [CommonModule, FormsModule, IconDirective, DatePipe, TablePaginationComponent, NoAutofillDirective],
   template: `
     <div class="super-admin-dashboard">
       <!-- 4 Top KPI Cards for Super Admin Platform -->
@@ -442,6 +443,7 @@ import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagi
                       <div style="max-width: 220px;">
                         <input
                           type="text"
+                          appNoAutofill
                           class="search-input-sm"
                           placeholder="Search employees..."
                           [ngModel]="empModalSearch()"

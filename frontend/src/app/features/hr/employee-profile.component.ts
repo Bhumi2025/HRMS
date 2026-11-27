@@ -10,37 +10,24 @@ import { UiService } from '../../core/services/ui.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
-import { triggerDocumentDownload } from '../../core/utils/document-download.util';
-import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
+import { KeyGroupCacheService } from '../../core/services/key-group-cache.service';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
-import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface ProfileData {
   id: string;
   name: string;
   dept: string;
-  grade: string;
+  grade?: string;
   status: string;
   join: string;
   salary: string;
   email: string;
 }
 
-interface DocRow {
-  id?: string;
-  doc: string;
-  type: string;
-  issue: string;
-  exp: string;
-  s: string;
-  fileUrl?: string | null;
-  fileSize?: string | null;
-}
-
 /** Employee Profile — ported from pages/employee-profile.html. */
 @Component({
   selector: 'app-employee-profile',
-  imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent, RouterModule, TablePaginationComponent],
+  imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent, RouterModule],
   template: `
     @if (viewMode() === 'admin') {
       <!-- ADMINISTRATOR BANNER -->
@@ -221,7 +208,7 @@ interface DocRow {
         <div style="flex: 1; min-width: 0">
           <div style="font-size: 1.2rem; font-weight: 700; color: var(--text); margin-bottom: 2px">{{ profile().name }}</div>
           <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px">
-            {{ profile().grade }} - {{ profile().dept }} - {{ profile().id }}
+            {{ profile().dept }} - {{ profile().id }}
           </div>
           <div style="display: flex; gap: 6px; flex-wrap: wrap">
             <span class="profile-badge" [class.active]="profile().status === 'Active'" [class.warning]="profile().status === 'On Leave'">{{ profile().status }}</span>
@@ -263,9 +250,15 @@ interface DocRow {
       </div>
 
       <div class="profile-content-scroll">
+        @if (!canEditCurrentProfile()) {
+          <div style="margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.28); color: #1e40af; font-size: 13px; font-weight: 500;">
+            Read-only view: HR Managers can edit Employee profiles, not HR Manager or Administrator profiles.
+          </div>
+        }
 
     <!-- PERSONAL TAB -->
     @if (tab() === 'personal') {
+      <fieldset [disabled]="!canEditCurrentProfile()" style="border: 0; padding: 0; margin: 0;" [style.pointer-events]="!canEditCurrentProfile() ? 'none' : null" [style.opacity]="!canEditCurrentProfile() ? '0.82' : null">
       <div class="grid-2">
         <div class="card" style="overflow: visible">
           <div class="card-header"><div class="card-title">Personal Details</div></div>
@@ -306,15 +299,15 @@ interface DocRow {
             </div>
             <div class="form-group">
               <label class="form-label">Job Title</label>
-              <input class="form-control" [value]="job().title" (input)="patchJob('title', $any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Designation</label>
-              <app-select [options]="designationOptions()" [value]="selectedDesignationId()" (valueChange)="selectedDesignationId.set($event)" width="100%" />
+              <input class="form-control" [value]="job().title" readonly style="background: var(--bg); color: var(--muted)" />
             </div>
             <div class="form-group">
               <label class="form-label">Department</label>
-              <app-select [options]="deptOptions" [value]="job().dept" (valueChange)="patchJob('dept', $event)" width="100%" />
+              <app-select [options]="deptOptions()" [value]="job().dept" (valueChange)="patchJob('dept', $event)" width="100%" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Designation</label>
+              <app-select [options]="designationOptions()" [value]="selectedDesignationId()" (valueChange)="onDesignationChange($event)" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">Reporting To</label>
@@ -326,32 +319,17 @@ interface DocRow {
             </div>
             <div class="form-group">
               <label class="form-label">System Access Role</label>
-              <app-select [options]="systemRoleOptions" [value]="job().roleCode" (valueChange)="patchJob('roleCode', $event)" width="100%" />
-              <div style="font-size: 11px; color: var(--muted); margin-top: 3px">
-                Controls module access &amp; permissions (HR Manager, Company Admin, or Employee)
-              </div>
+              <app-select [options]="systemRoleOptions()" [value]="job().roleCode" (valueChange)="patchJob('roleCode', $event)" [disabled]="!canManageEmployees()" width="100%" />
             </div>
           </div>
         </div>
       </div>
-
-      <div class="tab-action-bar">
-        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
-          <span [appIcon]="'arrow_left'"></span> Back
-        </button>
-        <div class="tab-action-group">
-          <button class="btn btn-outline btn-sm" type="button" (click)="save('Personal & Job details saved!')">
-            <span [appIcon]="'check'"></span> Save Changes
-          </button>
-          <button class="btn btn-primary btn-sm" type="button" (click)="saveAndNext('Personal & Job details saved!')">
-            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
-          </button>
-        </div>
-      </div>
+      </fieldset>
     }
 
     <!-- CONTACT TAB -->
     @if (tab() === 'contact') {
+      <fieldset [disabled]="!canEditCurrentProfile()" style="border: 0; padding: 0; margin: 0;" [style.pointer-events]="!canEditCurrentProfile() ? 'none' : null" [style.opacity]="!canEditCurrentProfile() ? '0.82' : null">
       <div class="grid-2">
         <div class="card" style="overflow: visible">
           <div class="card-header"><div class="card-title">Contact Details</div></div>
@@ -399,10 +377,6 @@ interface DocRow {
               <label class="form-label">City</label>
               <input class="form-control" [value]="contact().city" (input)="patchContact('city', $any($event.target).value)" />
             </div>
-            <div class="form-group">
-              <label class="form-label">Country</label>
-              <app-select [options]="countryOptions" [value]="contact().country" (valueChange)="patchContact('country', $event)" width="100%" />
-            </div>
           </div>
         </div>
 
@@ -432,26 +406,14 @@ interface DocRow {
           </div>
         </div>
       </div>
-
-      <div class="tab-action-bar">
-        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
-          <span [appIcon]="'arrow_left'"></span> Back
-        </button>
-        <div class="tab-action-group">
-          <button class="btn btn-outline btn-sm" type="button" (click)="save('Contact & Identity details saved!')">
-            <span [appIcon]="'check'"></span> Save Changes
-          </button>
-          <button class="btn btn-primary btn-sm" type="button" (click)="saveAndNext('Contact & Identity details saved!')">
-            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
-          </button>
-        </div>
-      </div>
+      </fieldset>
     }
 
     <!-- BANK TAB -->
     @if (tab() === 'bank') {
-      <div class="grid-2">
-        <div class="card" style="overflow: visible">
+      <fieldset [disabled]="!canEditCurrentProfile()" style="border: 0; padding: 0; margin: 0;" [style.pointer-events]="!canEditCurrentProfile() ? 'none' : null" [style.opacity]="!canEditCurrentProfile() ? '0.82' : null">
+      <div style="width: 100%">
+        <div class="card" style="overflow: visible; width: 100%">
           <div class="card-header"><div class="card-title">Bank Details</div></div>
           <div class="card-body" style="overflow: visible">
             <div class="form-group">
@@ -484,108 +446,29 @@ interface DocRow {
             </div>
             <div class="form-group">
               <label class="form-label">Payment Mode</label>
-              <app-select [options]="paymentModeOptions" [value]="bank().paymentMode" (valueChange)="patchBank('paymentMode', $event)" width="100%" />
+              <app-key-select groupCode="PAYMENT_MODE" [value]="bank().paymentMode" (valueChange)="patchBank('paymentMode', $event)" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">WPS ID</label>
               <input class="form-control" [value]="bank().wpsId" (input)="patchBank('wpsId', $any($event.target).value)" />
             </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header"><div class="card-title">Salary Structure</div></div>
-          <div class="card-body">
-            <div style="margin-bottom: 14px">
-              <div style="font-size: 20px; font-weight: 800; color: var(--p)">{{ profile().salary || (currencyService.currencySymbol() + '0') }}</div>
-              <div style="font-size: 14px; color: var(--muted)">Gross Monthly Salary</div>
+            <div class="form-group">
+              <label class="form-label">Basic Salary</label>
+              <input class="form-control" type="number" min="0"
+                [value]="editSalary() !== null ? editSalary() : (detail()?.basicSalary ?? '')"
+                (input)="onSalaryInput($any($event.target).value)"
+                placeholder="Enter basic salary" />
             </div>
-            @for (s of salaryStructure; track s[0]) {
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border)">
-                <span style="font-size: 13px; color: var(--muted)">{{ s[0] }}</span>
-                <span style="font-size: 13px; font-weight: 700" [style.color]="s[2]">{{ s[1] }}</span>
-              </div>
-            }
           </div>
         </div>
       </div>
-
-      <div class="tab-action-bar">
-        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
-          <span [appIcon]="'arrow_left'"></span> Back
-        </button>
-        <div class="tab-action-group">
-          <button class="btn btn-outline btn-sm" type="button" (click)="save('Bank details saved!')">
-            <span [appIcon]="'check'"></span> Save Changes
-          </button>
-          <button class="btn btn-primary btn-sm" type="button" (click)="saveAndNext('Bank details saved!')">
-            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
-          </button>
-        </div>
-      </div>
-    }
-
-    <!-- DOCUMENTS TAB -->
-    @if (tab() === 'docs') {
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Documents</div>
-          <button class="btn btn-primary btn-sm" (click)="ui.open('uploadDocModal')"><span [appIcon]="'upload2'"></span> Upload</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Document</th>
-                <th>Type</th>
-                <th>Issue Date</th>
-                <th>Expiry Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (r of paginatedDocs(); track r.doc) {
-                <tr>
-                  <td style="font-weight: 600">{{ r.doc }}</td>
-                  <td><span class="badge badge-info">{{ r.type }}</span></td>
-                  <td><input class="form-control" type="date" [value]="r.issue" style="font-size: 12px; padding: 4px 8px" /></td>
-                  <td><input class="form-control" type="date" [value]="r.exp" style="font-size: 12px; padding: 4px 8px" /></td>
-                  <td><span class="badge badge-success">{{ r.s }}</span></td>
-                  <td>
-                    <div style="display: flex; gap: 4px">
-                      <button class="btn btn-ghost btn-sm" data-tooltip="View" (click)="viewDoc(r)"><span [appIcon]="'eye'"></span></button>
-                      <button class="btn btn-ghost btn-sm" data-tooltip="Download" (click)="downloadDocument(r)"><span [appIcon]="'download'"></span></button>
-                      <button class="btn btn-ghost btn-sm" data-tooltip="Save" (click)="saveDocRow(r)"><span [appIcon]="'check'"></span></button>
-                    </div>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-        <app-table-pagination [total]="docs().length" [page]="docsPage()" (pageChange)="docsPage.set($event)" />
-      </div>
-
-      <div class="tab-action-bar">
-        <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
-          <span [appIcon]="'arrow_left'"></span> Back
-        </button>
-        <div class="tab-action-group">
-          <button class="btn btn-outline btn-sm" type="button" (click)="save('Document records saved!')">
-            <span [appIcon]="'check'"></span> Save Changes
-          </button>
-          <button class="btn btn-primary btn-sm" type="button" (click)="nextTab()">
-            Save &amp; Next <span [appIcon]="'arrow_right'"></span>
-          </button>
-        </div>
-      </div>
+      </fieldset>
     }
 
     <!-- BIOMETRIC & FACE ID TAB -->
     @if (tab() === 'biometric') {
-      <div class="grid-2">
-        <div class="card" style="overflow: visible">
+      <div style="width: 100%">
+        <div class="card" style="overflow: visible; width: 100%">
           <div class="card-header"><div class="card-title">Face Recognition Profile</div></div>
           <div class="card-body" style="overflow: visible">
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
@@ -609,51 +492,48 @@ interface DocRow {
               </div>
             </div>
 
-            <div style="font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 16px;">
-              Enrolling employee Face ID enables hands-free punch in/out on the Office Kiosk and self-service selfie attendance on their mobile or web portal.
-            </div>
+        
 
-            <div style="display: flex; gap: 10px;">
-              <button class="btn btn-outline btn-sm" type="button" (click)="openFaceEnrollModal()">
-                📷 {{ isFaceEnrolled() ? 'Re-enroll Face ID' : 'Enroll Face ID' }}
-              </button>
-              @if (isFaceEnrolled()) {
-                <button class="btn btn-outline btn-sm" type="button" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" (click)="removeFaceId()">
-                  Remove Face ID
+            @if (canEditCurrentProfile()) {
+              <div style="display: flex; gap: 10px;">
+                <button class="btn btn-outline btn-sm" type="button" (click)="openFaceEnrollModal()">
+                  📷 {{ isFaceEnrolled() ? 'Re-enroll Face ID' : 'Enroll Face ID' }}
                 </button>
-              }
-            </div>
+                @if (isFaceEnrolled()) {
+                  <button class="btn btn-outline btn-sm" type="button" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" (click)="removeFaceId()">
+                    Remove Face ID
+                  </button>
+                }
+              </div>
+            }
           </div>
         </div>
 
-        <div class="card" style="overflow: visible">
-          <div class="card-header"><div class="card-title">Kiosk &amp; Terminal Verification</div></div>
-          <div class="card-body" style="overflow: visible">
-            <div style="padding: 14px; border-radius: 8px; background: var(--bg); border: 1px dashed var(--border); margin-bottom: 14px;">
-              <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px; color: var(--text);">⚡ Instant Terminal Recognition</div>
-              <div style="font-size: 12px; color: var(--muted); line-height: 1.5;">
-                Once enrolled, this employee can walk up to any office entrance kiosk or tablet running <b>Face Kiosk Mode</b> to automatically punch in without pressing any buttons or carrying an ID card.
-              </div>
-            </div>
-            <a class="btn btn-outline btn-sm" routerLink="/kiosk" target="_blank" style="display: inline-flex; align-items: center; gap: 6px;">
-              Launch Kiosk Mode ⛶
-            </a>
-          </div>
-        </div>
       </div>
+    }
+    </div>
 
       <div class="tab-action-bar">
         <button class="btn btn-outline btn-sm" type="button" (click)="previousTab()">
           <span [appIcon]="'arrow_left'"></span> Back
         </button>
-        <div class="tab-action-group">
-          <button class="btn btn-primary btn-sm" type="button" (click)="save('Biometric & Profile details saved!')">
-            <span [appIcon]="'check'"></span> Save Changes
-          </button>
-        </div>
+        @if (canEditCurrentProfile()) {
+          <div class="tab-action-group">
+            @if (!isLastTab()) {
+              <button class="btn btn-outline btn-sm" type="button" (click)="save(currentSaveMessage())">
+                <span [appIcon]="'check'"></span> Save
+              </button>
+              <button class="btn btn-primary btn-sm" type="button" (click)="saveAndNext(currentSaveMessage())">
+                Save &amp; Next <span [appIcon]="'arrow_right'"></span>
+              </button>
+            } @else {
+              <button class="btn btn-primary btn-sm" type="button" (click)="save('Biometric & Profile details saved!')">
+                <span [appIcon]="'check'"></span> Save Changes
+              </button>
+            }
+          </div>
+        }
       </div>
-    }
-    </div>
   }
 
     <!-- ENROLL FACE ID WEBCAM MODAL -->
@@ -686,123 +566,16 @@ interface DocRow {
         </div>
       </div>
     }
-
-    <!-- Upload Doc Modal -->
-    <div class="modal-overlay" [class.open]="ui.isOpen('uploadDocModal')" (click)="ui.onOverlayClick($event, 'uploadDocModal')">
-      <div class="modal">
-        <div class="modal-header">
-          <div style="font-size: 14px; font-weight: 700">Upload Document</div>
-          <button class="btn btn-ghost btn-sm" (click)="ui.close('uploadDocModal')"><span [appIcon]="'x'"></span></button>
-        </div>
-        <div class="modal-body" style="overflow: visible">
-          <div class="form-group">
-            <label class="form-label">Document Type</label>
-            <app-select [options]="uploadTypeOptions" [value]="uploadType()" (valueChange)="uploadType.set($event)" width="100%" />
-          </div>
-          <div class="grid-2">
-            <div class="form-group">
-              <label class="form-label">Issue Date</label>
-              <input class="form-control" type="date" [value]="uploadIssueDate()" (input)="uploadIssueDate.set($any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Expiry Date</label>
-              <input class="form-control" type="date" [value]="uploadExpiryDate()" (input)="uploadExpiryDate.set($any($event.target).value)" />
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Upload File</label>
-            <input #docFileInput type="file" [accept]="acceptDocTypes" (change)="onDocFileSelected($event)" style="display: none" />
-            <div
-              style="border: 2px dashed var(--border); border-radius: var(--r); padding: 24px; text-align: center; cursor: pointer; transition: var(--t)"
-              [style.borderColor]="selectedDocFile() ? 'var(--p)' : 'var(--border)'"
-              [style.background]="selectedDocFile() ? 'var(--p-soft)' : 'transparent'"
-              (click)="docFileInput.click()"
-              (dragover)="$event.preventDefault()"
-              (drop)="onDocFileDrop($event)"
-            >
-              @if (selectedDocFile()) {
-                <div style="color: var(--p); margin-bottom: 6px"><span [appIcon]="'check'"></span></div>
-                <div style="font-size: 0.9rem; font-weight: 700; color: var(--text)">{{ selectedDocFile()?.name }}</div>
-                <div style="font-size: 0.78rem; color: var(--muted); margin-top: 3px">{{ formatFileSize(selectedDocFile()?.size || 0) }} &bull; Click to change file</div>
-              } @else {
-                <div style="color: var(--p); margin-bottom: 6px"><span [appIcon]="'upload2'"></span></div>
-                <div style="font-size: 0.86rem; font-weight: 600">Drop file or click to browse</div>
-                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG up to 2MB</div>
-              }
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" (click)="closeUploadDocModal()">Cancel</button>
-          <button class="btn btn-primary" [disabled]="uploadingDoc()" (click)="uploadDocument()">
-            {{ uploadingDoc() ? 'Uploading...' : 'Upload' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- View Doc Modal -->
-    <div class="modal-overlay" [class.open]="ui.isOpen('viewDocModal')" (click)="ui.onOverlayClick($event, 'viewDocModal')">
-      <div class="modal" style="max-width: 560px;">
-        <div class="modal-header">
-          <div>
-            <div style="font-size: 15px; font-weight: 700;">{{ selectedDocView()?.doc }}</div>
-            <div style="font-size: 12px; color: var(--muted);">{{ detail()?.fullName }} &bull; {{ detail()?.employeeCode }}</div>
-          </div>
-          <button class="btn btn-ghost btn-sm" (click)="ui.close('viewDocModal')"><span [appIcon]="'x'"></span></button>
-        </div>
-        <div class="modal-body">
-          @if (selectedDocView(); as d) {
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Document Type</div>
-                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.type }}</div>
-              </div>
-              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Status</div>
-                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">
-                  <span class="badge" [class]="d.s === 'Expired' ? 'badge-danger' : 'badge-success'">{{ d.s }}</span>
-                </div>
-              </div>
-              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Issue Date</div>
-                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.issue || 'Not set' }}</div>
-              </div>
-              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Expiry Date</div>
-                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.exp || 'Not set' }}</div>
-              </div>
-            </div>
-
-            @if (d.fileUrl && (d.fileUrl.startsWith('data:image') || d.fileUrl.endsWith('.jpg') || d.fileUrl.endsWith('.jpeg') || d.fileUrl.endsWith('.png'))) {
-              <div style="text-align: center; background: #0f172a; border-radius: 8px; padding: 12px; margin-bottom: 12px; max-height: 260px; overflow: hidden;">
-                <img [src]="d.fileUrl" alt="Document Preview" style="max-height: 240px; max-width: 100%; object-fit: contain; border-radius: 6px;" />
-              </div>
-            } @else {
-              <div style="border: 2px dashed var(--border); border-radius: 10px; padding: 24px; text-align: center; background: var(--bg); margin-bottom: 12px;">
-                <div style="color: var(--p); font-size: 28px; margin-bottom: 6px;"><span [appIcon]="'documents'"></span></div>
-                <div style="font-size: 14px; font-weight: 700; color: var(--text);">{{ d.doc }}</div>
-                <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">Verified HR Document &bull; Ready for Download</div>
-              </div>
-            }
-          }
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" (click)="ui.close('viewDocModal')">Close</button>
-          <button class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;" (click)="selectedDocView() && downloadDocument(selectedDocView()!)">
-            <span [appIcon]="'download'"></span> Download Document
-          </button>
-        </div>
-      </div>
-    </div>
   `,
   styles: [
     `
       :host {
         display: flex;
         flex-direction: column;
-        height: calc(100vh - var(--header-h, 52px) - 32px);
-        max-height: calc(100vh - var(--header-h, 52px) - 32px);
+        height: 100%;
+        max-height: 100%;
+        flex: 1;
+        min-height: 0;
         overflow: hidden;
         box-sizing: border-box;
       }
@@ -812,7 +585,7 @@ interface DocRow {
         overflow-y: auto;
         overflow-x: hidden;
         padding-right: 4px;
-        padding-bottom: 14px;
+        padding-bottom: 90px;
       }
       .profile-content-scroll::-webkit-scrollbar {
         width: 6px;
@@ -956,15 +729,13 @@ interface DocRow {
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        margin-top: 14px;
+        margin-top: 10px;
         padding: 12px 16px;
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--r);
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        position: sticky;
-        bottom: 0;
-        z-index: 10;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04);
+        flex-shrink: 0;
       }
       .grid-2:has(.csel-open),
       .grid-2:has(.csel-host-open),
@@ -1086,6 +857,7 @@ export class EmployeeProfileComponent implements OnInit {
   protected readonly session = inject(SessionService);
   protected readonly currencyService = inject(CurrencyService);
   private readonly api = inject(ApiService);
+  private readonly keyGroupCache = inject(KeyGroupCacheService);
   private readonly faceService = inject(FaceRecognitionService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -1093,8 +865,24 @@ export class EmployeeProfileComponent implements OnInit {
   private readonly detail = signal<EmployeeDetail | null>(null);
   private readonly apiId = signal<string | null>(null);
   private departmentIds = new Map<string, string>();
-  protected readonly designationOptions = signal<SelectOption[]>([]);
+  private reportingManagerMap = new Map<string, string>();
+  private readonly allDesignations = signal<any[]>([]);
   protected readonly selectedDesignationId = signal<string>('');
+  protected readonly designationOptions = computed<SelectOption[]>(() => {
+    const list = this.allDesignations();
+    const currentDeptName = this.job().dept;
+    const currentDeptId = this.departmentIds.get(currentDeptName);
+
+    const matching = list.filter((d: any) =>
+      (currentDeptId && d.departmentId?.toLowerCase() === currentDeptId.toLowerCase()) ||
+      (currentDeptName && d.department && d.department.toLowerCase() === currentDeptName.toLowerCase())
+    );
+
+    if (matching.length === 0) {
+      return [{ v: '', l: 'No Designations for Department' }];
+    }
+    return matching.map((d: any) => ({ v: d.id, l: d.name }));
+  });
 
   // Profile View Mode: admin vs employee
   protected readonly viewMode = signal<'admin' | 'employee'>('admin');
@@ -1169,6 +957,20 @@ export class EmployeeProfileComponent implements OnInit {
   protected readonly canManageEmployees = computed(() =>
     ['Super Admin', 'Company Admin', 'HR Manager', 'HR'].includes(this.currentRole())
   );
+  protected readonly isCompanyOrSuperAdmin = computed(() =>
+    ['Super Admin', 'Company Admin'].includes(this.currentRole())
+  );
+  protected readonly isTargetHrOrAdmin = computed(() => {
+    const code = (this.detail()?.roleCode || this.detail()?.roleName || '').toLowerCase().replace(/[^a-z]/g, '');
+    return code === 'hrmanager' || code === 'hr' || code === 'companyadmin' || code === 'superadmin';
+  });
+  protected readonly canEditCurrentProfile = computed(() => {
+    if (['Super Admin', 'Company Admin'].includes(this.currentRole())) return true;
+    if (['HR Manager', 'HR'].includes(this.currentRole())) {
+      return !this.isTargetHrOrAdmin();
+    }
+    return true;
+  });
   protected readonly isAdminViewAvailable = computed(() =>
     ['Super Admin', 'Company Admin'].includes(this.currentRole()) || !this.session.user()?.employeeId
   );
@@ -1188,25 +990,23 @@ export class EmployeeProfileComponent implements OnInit {
   protected readonly savingAdminProfile = signal<boolean>(false);
 
   ngOnInit(): void {
+    this.keyGroupCache.clearCache();
     this.adminFullName.set(this.currentAdminName());
 
     this.api.departments().subscribe({
       next: (departments) => {
         this.departmentIds = new Map(departments.map((d) => [d.name, d.id]));
-        this.deptOptions = departments.map((d) => ({ v: d.name, l: d.name }));
+        this.deptOptions.set(departments.map((d) => ({ v: d.name, l: d.name })));
       },
-      error: () => {},
+      error: () => { },
     });
 
     this.api.designations().subscribe({
       next: (list) => {
-        this.designationOptions.set([
-          { v: '', l: 'Select Designation (Optional)' },
-          ...(list || []).map((d) => ({ v: d.id, l: d.name }))
-        ]);
+        this.allDesignations.set(list || []);
       },
       error: () => {
-        this.designationOptions.set([{ v: '', l: 'Select Designation (Optional)' }]);
+        this.allDesignations.set([]);
       },
     });
 
@@ -1243,18 +1043,17 @@ export class EmployeeProfileComponent implements OnInit {
           })),
         );
         this.employeeOptions.set(opts);
+        this.reportingManagerMap = new Map(res.items.map((e) => [e.fullName, e.id]));
         this.reportingOptions = [
-          { v: '', l: 'None (Direct Report to Management)' },
-          { v: 'HR Manager', l: 'HR Manager' },
-          { v: 'Manager', l: 'Manager' },
           { v: 'Company Admin', l: 'Company Admin' },
+          { v: 'HR Manager', l: 'HR Manager' },
           ...res.items.map((e) => ({
             v: e.fullName,
             l: `${e.fullName} (${e.employeeCode})`,
           })),
         ];
       },
-      error: () => {},
+      error: () => { },
     });
   }
 
@@ -1262,13 +1061,29 @@ export class EmployeeProfileComponent implements OnInit {
     this.router.navigate(['/employees']);
   }
 
-  protected readonly tabOrder: Array<'personal' | 'contact' | 'bank' | 'docs' | 'biometric'> = [
+  protected readonly tabOrder: Array<'personal' | 'contact' | 'bank' | 'biometric'> = [
     'personal',
     'contact',
     'bank',
-    'docs',
     'biometric',
   ];
+
+  protected isLastTab(): boolean {
+    return this.tab() === this.tabOrder[this.tabOrder.length - 1];
+  }
+
+  protected currentSaveMessage(): string {
+    switch (this.tab()) {
+      case 'contact':
+        return 'Contact & Identity details saved!';
+      case 'bank':
+        return 'Bank details saved!';
+      case 'biometric':
+        return 'Biometric & Profile details saved!';
+      default:
+        return 'Personal & Job details saved!';
+    }
+  }
 
   protected previousTab(): void {
     const current = this.tab();
@@ -1418,13 +1233,13 @@ export class EmployeeProfileComponent implements OnInit {
   private populateEmployee(employee: EmployeeDetail): void {
     this.detail.set(employee);
     this.apiId.set(employee.id);
+    this.editSalary.set(employee.basicSalary);
 
     const sym = this.currencyService.getSymbol(employee.currency || this.currencyService.currencyCode());
     this.profile.set({
       id: employee.employeeCode,
       name: employee.fullName,
       dept: employee.department,
-      grade: employee.grade,
       status: employee.status,
       join: employee.joinDate,
       salary: `${sym}${employee.grossSalary.toLocaleString()}`,
@@ -1452,9 +1267,9 @@ export class EmployeeProfileComponent implements OnInit {
     this.job.set({
       title: employee.jobTitle,
       dept: employee.department,
-      reportsTo: employee.reportingManager ?? '',
+      reportsTo: (!employee.reportingManager || employee.reportingManager === 'Manager') ? 'Company Admin' : employee.reportingManager,
       joinDate: employee.joinDate,
-      roleCode: employee.roleCode || (employee.jobTitle.toLowerCase().includes('hr') ? 'HrManager' : 'Employee'),
+      roleCode: this.normalizeRoleCode(employee.roleCode, employee.roleName, employee.jobTitle),
     });
     this.selectedDesignationId.set(employee.designationId ?? '');
 
@@ -1505,34 +1320,15 @@ export class EmployeeProfileComponent implements OnInit {
           this.facePhotoUrl.set(null);
         }
       },
-      error: () => {},
-    });
-
-    this.loadDocuments(employee.id);
-  }
-
-  private loadDocuments(employeeId: string): void {
-    this.api.documents({ employeeId }).subscribe({
-      next: (rows) =>
-        this.docs.set(
-          rows.map((d) => ({
-            id: d.id,
-            doc: d.name,
-            type: d.type,
-            issue: d.issueDate ?? '',
-            exp: d.expiryDate ?? '',
-            s: d.status,
-            fileUrl: d.fileUrl ?? null,
-            fileSize: d.fileSize ?? '1.2 MB',
-          })),
-        ),
-      error: () => {
-        /* API offline — keep demo documents. */
-      },
+      error: () => { },
     });
   }
 
   protected save(message: string, onSuccess?: () => void): void {
+    if (!this.canEditCurrentProfile()) {
+      this.toast.show('HR Managers can only edit Employee profiles, not HR Manager profiles.', 'warning');
+      return;
+    }
     const id = this.apiId();
     const detail = this.detail();
     if (!id || !detail) {
@@ -1558,15 +1354,15 @@ export class EmployeeProfileComponent implements OnInit {
       departmentId: this.departmentIds.get(job.dept) ?? detail.departmentId,
       designationId: this.selectedDesignationId() ? this.selectedDesignationId() : null,
       branchId: detail.branchId,
-      reportingManagerId: null,
+      reportingManagerId: this.reportingManagerMap.get(job.reportsTo) ?? null,
       jobTitle: job.title || detail.jobTitle,
-      roleCode: job.roleCode || (job.title.toLowerCase().includes('hr') ? 'HrManager' : 'Employee'),
-      grade: detail.grade,
+      roleCode: job.roleCode || detail.roleCode || (job.title.toLowerCase().includes('hr') ? 'HrManager' : 'Employee'),
+      grade: '',
       employmentType: detail.employmentType,
       status: detail.status === 'On Leave' ? 'OnLeave' : detail.status,
       joinDate: this.toIso(job.joinDate) ?? detail.joinDate,
       noticePeriodDays: detail.noticePeriodDays,
-      basicSalary: detail.basicSalary,
+      basicSalary: this.editSalary() !== null ? this.editSalary()! : detail.basicSalary,
       housingAllowance: detail.housingAllowance,
       transportAllowance: detail.transportAllowance,
       mobileAllowance: detail.mobileAllowance,
@@ -1578,7 +1374,7 @@ export class EmployeeProfileComponent implements OnInit {
       iban: bank.iban || null,
       ifscCode: bank.ifsc || null,
       swiftCode: bank.swift || null,
-      paymentMode: bank.paymentMode,
+      paymentMode: this.normalizePaymentMode(bank.paymentMode),
       wpsId: bank.wpsId || null,
       passportNumber: identity.passportNo || null,
       passportExpiry: this.toIso(identity.passportExp),
@@ -1593,7 +1389,7 @@ export class EmployeeProfileComponent implements OnInit {
       nationality: personal.nationality || null,
       address: contact.address || null,
       city: contact.city || null,
-      country: contact.country || null,
+      country: detail.country || contact.country || null,
       password: contact.password || null,
       emergencyContactName: contact.emergency?.includes('(') ? contact.emergency.split('(')[0].trim() : (contact.emergency?.trim() || null),
       emergencyContactPhone: contact.emergency?.includes('(') ? contact.emergency.split('(')[1]?.replace(')', '').trim() : null,
@@ -1630,145 +1426,14 @@ export class EmployeeProfileComponent implements OnInit {
     return `${y}-${m}-${d}`;
   }
 
-  protected readonly selectedDocFile = signal<File | null>(null);
-  protected readonly uploadIssueDate = signal(new Date().toISOString().slice(0, 10));
-  protected readonly uploadExpiryDate = signal('');
-  protected readonly uploadingDoc = signal(false);
-
-  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
-
-  protected onDocFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-      const file = input.files[0];
-      const check = validateDocumentFile(file);
-      if (!check.valid) {
-        this.toast.show(check.error || 'Invalid file.', 'danger');
-        input.value = '';
-        this.selectedDocFile.set(null);
-        return;
-      }
-      this.selectedDocFile.set(file);
-    }
-  }
-
-  protected onDocFileDrop(event: DragEvent): void {
-    event.preventDefault();
-    if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-      const file = event.dataTransfer.files[0];
-      const check = validateDocumentFile(file);
-      if (!check.valid) {
-        this.toast.show(check.error || 'Invalid file.', 'danger');
-        return;
-      }
-      this.selectedDocFile.set(file);
-    }
-  }
-
-  protected formatFileSize(bytes: number): string {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  }
-
-  protected readonly selectedDocView = signal<DocRow | null>(null);
-
-  protected viewDoc(r: DocRow): void {
-    this.selectedDocView.set(r);
-    this.ui.open('viewDocModal');
-  }
-
-  protected saveDocRow(r: DocRow): void {
-    this.toast.show(`Document details for ${r.doc} saved!`, 'success');
-  }
-
-  protected downloadDocument(r: DocRow): void {
-    triggerDocumentDownload(r.doc, r.fileUrl, {
-      employeeName: this.detail()?.fullName || 'Employee',
-      employeeCode: this.detail()?.employeeCode || 'EMP',
-      issueDate: r.issue,
-      expiryDate: r.exp,
-      status: r.s,
-      type: r.type,
-    });
-    this.toast.show(`Downloaded ${r.doc}`, 'success');
-  }
-
-  protected closeUploadDocModal(): void {
-    this.selectedDocFile.set(null);
-    this.uploadIssueDate.set(new Date().toISOString().slice(0, 10));
-    this.uploadExpiryDate.set('');
-    this.ui.close('uploadDocModal');
-  }
-
-  protected uploadDocument(): void {
-    const employeeId = this.apiId();
-    if (!employeeId) {
-      this.toast.show('The employee profile is not loaded yet.', 'danger');
-      return;
-    }
-
-    const file = this.selectedDocFile();
-    const type = this.uploadType();
-    const documentType = type === 'Visa' || type === 'Work Permit'
-      ? 'Legal'
-      : type === 'Medical Insurance'
-        ? 'Benefits'
-        : type === 'Other'
-          ? 'Other'
-          : 'Identity';
-
-    const docName = file ? file.name : `${type} Document`;
-    const fileSize = file ? this.formatFileSize(file.size) : '1.2 MB';
-
-    this.uploadingDoc.set(true);
-
-    const proceedUpload = (fileDataUrl: string | null) => {
-      this.api
-        .createDocument({
-          employeeId,
-          name: docName,
-          type: documentType,
-          issueDate: this.uploadIssueDate() || new Date().toISOString().slice(0, 10),
-          expiryDate: this.uploadExpiryDate() || null,
-          notes: null,
-          fileUrl: fileDataUrl,
-          fileSize,
-          isCompanyDocument: false,
-        })
-        .subscribe({
-          next: () => {
-            this.uploadingDoc.set(false);
-            this.closeUploadDocModal();
-            this.toast.show('Document uploaded successfully!', 'success');
-            this.loadDocuments(employeeId);
-          },
-          error: (error) => {
-            this.uploadingDoc.set(false);
-            this.toast.show(error?.error?.title ?? error?.error?.message ?? 'Could not upload the document.', 'danger');
-          },
-        });
-    };
-
-    if (file && file.size < 4 * 1024 * 1024) {
-      const reader = new FileReader();
-      reader.onload = () => proceedUpload(reader.result as string);
-      reader.onerror = () => proceedUpload(file.name);
-      reader.readAsDataURL(file);
-    } else {
-      proceedUpload(file ? file.name : null);
-    }
-  }
-
   protected readonly tabs = [
     { id: 'personal', label: 'Personal', icon: 'user' },
     { id: 'contact', label: 'Contact', icon: 'mail' },
     { id: 'bank', label: 'Bank', icon: 'payroll' },
-    { id: 'docs', label: 'Documents', icon: 'documents' },
     { id: 'biometric', label: 'Face ID & Biometrics', icon: 'clock' },
   ] as const;
 
-  protected readonly tab = signal<'personal' | 'contact' | 'bank' | 'docs' | 'biometric'>('personal');
+  protected readonly tab = signal<'personal' | 'contact' | 'bank' | 'biometric'>('personal');
 
   @ViewChild('enrollVideo') enrollVideo?: ElementRef<HTMLVideoElement>;
   @ViewChild('enrollCanvas') enrollCanvas?: ElementRef<HTMLCanvasElement>;
@@ -1791,11 +1456,30 @@ export class EmployeeProfileComponent implements OnInit {
     blood: '',
   });
 
-  protected readonly systemRoleOptions: SelectOption[] = [
-    { v: 'Employee', l: 'Employee (Self-Service Portal)' },
-    { v: 'HrManager', l: 'HR Manager' },
-    { v: 'CompanyAdmin', l: 'Company Admin' },
-  ];
+  protected readonly systemRoleOptions = computed<SelectOption[]>(() => {
+    const base: SelectOption[] = [
+      { v: 'Employee', l: 'Employee (Self-Service Portal)' },
+      { v: 'HrManager', l: 'HR Manager' },
+    ];
+    if (this.isCompanyOrSuperAdmin()) {
+      base.push({ v: 'CompanyAdmin', l: 'Company Admin' });
+    }
+    const current = this.job().roleCode;
+    if (current && !base.some((o) => o.v === current)) {
+      base.push({ v: current, l: this.detail()?.roleName || current });
+    }
+    return base;
+  });
+
+  private normalizeRoleCode(rawCode?: string | null, rawName?: string | null, jobTitle?: string | null): string {
+    const token = (rawCode || rawName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (token === 'hr' || token === 'hrmanager') return 'HrManager';
+    if (token === 'ca' || token === 'companyadmin' || token === 'manager') return 'CompanyAdmin';
+    if (token === 'sa' || token === 'superadmin') return 'SuperAdmin';
+    if (token === 'emp' || token === 'employee' || token === 'employeeselfserviceportal') return 'Employee';
+    if (rawCode?.trim()) return rawCode.trim();
+    return (jobTitle || '').toLowerCase().includes('hr') ? 'HrManager' : 'Employee';
+  }
 
   protected readonly job = signal({
     title: '',
@@ -1839,39 +1523,15 @@ export class EmployeeProfileComponent implements OnInit {
     wpsId: '',
   });
 
+  /** Editable salary field (separate from bank signal to avoid type issues) */
+  protected readonly editSalary = signal<number | null>(null);
+
   protected salaryStructure: [string, string, string][] = [];
 
-  protected readonly docs = signal<DocRow[]>([]);
-  protected readonly docsPage = signal(1);
-  protected readonly paginatedDocs = computed(() => paginateSlice(this.docs(), this.docsPage()));
-
-  protected readonly uploadType = signal('Passport');
-
-  protected readonly genderOptions: SelectOption[] = [
-    { v: 'Female', l: 'Female' },
-    { v: 'Male', l: 'Male' },
-    { v: 'Other', l: 'Other' },
-  ];
-  protected readonly maritalOptions: SelectOption[] = [
-    { v: 'Married', l: 'Married' },
-    { v: 'Single', l: 'Single' },
-    { v: 'Divorced', l: 'Divorced' },
-    { v: 'Widowed', l: 'Widowed' },
-  ];
-  protected readonly bloodOptions: SelectOption[] = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((b) => ({ v: b, l: b }));
-  protected deptOptions: SelectOption[] = [];
+  protected deptOptions = signal<SelectOption[]>([]);
   protected reportingOptions: SelectOption[] = [
-    { v: '', l: 'None (Direct Report to Management)' },
-    { v: 'HR Manager', l: 'HR Manager' },
-    { v: 'Manager', l: 'Manager' },
     { v: 'Company Admin', l: 'Company Admin' },
-  ];
-  protected readonly countryOptions: SelectOption[] = [
-    { v: 'UAE', l: 'UAE' },
-    { v: 'Saudi Arabia', l: 'Saudi Arabia' },
-    { v: 'Qatar', l: 'Qatar' },
-    { v: 'United Kingdom', l: 'United Kingdom' },
-    { v: 'United States', l: 'United States' },
+    { v: 'HR Manager', l: 'HR Manager' },
   ];
   protected readonly bankOptions: SelectOption[] = [
     { v: 'Emirates NBD', l: 'Emirates NBD' },
@@ -1881,20 +1541,14 @@ export class EmployeeProfileComponent implements OnInit {
     { v: 'Other', l: 'Other' },
   ];
   protected readonly bankCurrencyOptions: SelectOption[] = ['INR', 'USD', 'AED', 'SAR', 'EUR', 'GBP'].map((c) => ({ v: c, l: c }));
-  protected readonly paymentModeOptions: SelectOption[] = [
-    { v: 'Bank Transfer', l: 'Bank Transfer' },
-    { v: 'WPS', l: 'WPS' },
-    { v: 'Cheque', l: 'Cheque' },
-    { v: 'Cash', l: 'Cash' },
-  ];
-  protected readonly uploadTypeOptions: SelectOption[] = [
-    { v: 'Passport', l: 'Passport' },
-    { v: 'Visa', l: 'Visa' },
-    { v: 'Work Permit', l: 'Work Permit' },
-    { v: 'Emirates ID', l: 'Emirates ID' },
-    { v: 'Medical Insurance', l: 'Medical Insurance' },
-    { v: 'Other', l: 'Other' },
-  ];
+
+  private normalizePaymentMode(value: string): string {
+    const v = (value || '').trim().toLowerCase().replace(/[^a-z]/g, '');
+    if (v.includes('cash')) return 'Cash';
+    if (v.includes('cheque') || v.includes('check')) return 'Cheque';
+    if (v.includes('wps')) return 'Wps';
+    return 'BankTransfer';
+  }
 
   protected initials(): string {
     const name = this.profile().name?.trim();
@@ -1912,6 +1566,25 @@ export class EmployeeProfileComponent implements OnInit {
 
   protected patchJob(key: 'title' | 'dept' | 'reportsTo' | 'joinDate' | 'roleCode', value: string): void {
     this.job.update((j) => ({ ...j, [key]: value }));
+    if (key === 'dept') {
+      const deptId = this.departmentIds.get(value);
+      const matching = this.allDesignations().filter((d: any) =>
+        (deptId && d.departmentId?.toLowerCase() === deptId.toLowerCase()) ||
+        (d.department && d.department.toLowerCase() === value.toLowerCase())
+      );
+      const preferred = matching.find((d: any) => d.name?.trim().toLowerCase() === 'employee') || matching[0];
+      const nextDesigId = preferred?.id || '';
+      const desigName = preferred?.name?.trim() || 'Employee';
+      this.selectedDesignationId.set(nextDesigId);
+      this.job.update((j) => ({ ...j, title: `${desigName}-${value}` }));
+    }
+  }
+
+  protected onDesignationChange(desigId: string): void {
+    this.selectedDesignationId.set(desigId);
+    const desigName = this.allDesignations().find((d: any) => d.id === desigId)?.name?.trim() || 'Employee';
+    const deptName = this.job().dept?.trim() || 'General';
+    this.job.update((j) => ({ ...j, title: `${desigName}-${deptName}` }));
   }
 
   protected patchContact(key: 'phone' | 'email' | 'password' | 'emergency' | 'address' | 'city' | 'country', value: string): void {
@@ -1926,7 +1599,21 @@ export class EmployeeProfileComponent implements OnInit {
     this.bank.update((b) => ({ ...b, [key]: value }));
   }
 
+  protected onSalaryInput(raw: string): void {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      this.editSalary.set(0);
+      return;
+    }
+    const parsed = Number(trimmed);
+    this.editSalary.set(Number.isFinite(parsed) && parsed >= 0 ? parsed : 0);
+  }
+
   protected async openFaceEnrollModal(): Promise<void> {
+    if (!this.canEditCurrentProfile()) {
+      this.toast.show('HR Managers can only edit Employee profiles.', 'warning');
+      return;
+    }
     this.faceEnrollModalOpen.set(true);
     try {
       this.cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -1959,34 +1646,49 @@ export class EmployeeProfileComponent implements OnInit {
     }
 
     this.enrollingFace.set(true);
-    let photoDataUrl = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150';
+    let photoDataUrl = '';
     let realDescriptor: number[] | null = null;
 
     try {
       const video = this.enrollVideo?.nativeElement;
       const canvas = this.enrollCanvas?.nativeElement;
       if (video && canvas && video.videoWidth > 0) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          photoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        }
-        const scan = await this.faceService.detectFace(video, canvas);
+        const scan = await this.faceService.detectFace(video, canvas, true);
         if (scan.hasFace && scan.descriptor) {
           realDescriptor = scan.descriptor;
+          photoDataUrl = scan.snapshot || this.faceService.captureSnapshot(video, canvas) || '';
         }
       }
     } catch { }
 
-    const descriptorToSave = realDescriptor
-      ? JSON.stringify(realDescriptor)
-      : JSON.stringify(Array.from({ length: 128 }, () => (Math.random() - 0.5) * 0.2));
+    if (!realDescriptor || !photoDataUrl) {
+      this.enrollingFace.set(false);
+      this.toast.show('No face detected in camera. Please look directly into the camera in good lighting.', 'warning');
+      return;
+    }
 
+    // Check against already-enrolled employees before enrolling
+    this.api.enrolledFaces().subscribe({
+      next: (faces) => {
+        const conflict = this.faceService.findDuplicateEnrolledFace(realDescriptor, faces || [], id, photoDataUrl);
+        if (conflict) {
+          this.enrollingFace.set(false);
+          this.toast.show(
+            `Duplicate face detected: this face is already registered to ${conflict.fullName} (${conflict.employeeCode}).`,
+            'danger'
+          );
+          return;
+        }
+        this.persistFaceEnrollment(id, realDescriptor!, photoDataUrl);
+      },
+      error: () => this.persistFaceEnrollment(id, realDescriptor!, photoDataUrl),
+    });
+  }
+
+  private persistFaceEnrollment(employeeId: string, descriptor: number[], photoDataUrl: string): void {
     this.api
-      .enrollFace(id, {
-        faceDescriptor: descriptorToSave,
+      .enrollFace(employeeId, {
+        faceDescriptor: JSON.stringify(descriptor),
         facePhotoUrl: photoDataUrl,
       })
       .subscribe({
@@ -2000,12 +1702,19 @@ export class EmployeeProfileComponent implements OnInit {
         },
         error: (err) => {
           this.enrollingFace.set(false);
-          this.toast.show(err?.error?.message || 'Could not register Face ID.', 'danger');
+          this.toast.show(
+            err?.error?.title ?? err?.error?.detail ?? err?.error?.message ?? 'Could not register Face ID.',
+            'danger'
+          );
         },
       });
   }
 
   protected removeFaceId(): void {
+    if (!this.canEditCurrentProfile()) {
+      this.toast.show('HR Managers can only edit Employee profiles.', 'warning');
+      return;
+    }
     const id = this.apiId();
     if (!id) return;
     this.api.removeFace(id).subscribe({

@@ -7,9 +7,10 @@ import { IconDirective } from '../../core/icons/icon.directive';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { ToastService } from '../../core/services/toast.service';
-import { ACCEPT_DOC_TYPES, ACCEPT_IMG_TYPES, validateDocumentFile, validateImageFile } from '../../core/utils/file-validator';
+import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
+import { KeyGroupCacheService } from '../../core/services/key-group-cache.service';
 
 interface AccountItem {
   l: string;
@@ -18,8 +19,8 @@ interface AccountItem {
 }
 
 /**
- * Employee Onboarding wizard — ported from pages/onboarding.html. Six steps
- * (Personal → Job → Salary → Documents → Account → Review) with a live stepper,
+ * Employee Onboarding wizard — ported from pages/onboarding.html. Five steps
+ * (Personal → Job → Salary → Account → Review) with a live stepper,
  * progress bar and a review screen. Bootstrap's grid is replaced by local CSS grid.
  */
 @Component({
@@ -69,7 +70,7 @@ interface AccountItem {
             <div>
               <div style="font-weight: 700; color: var(--text); margin-bottom: 2px">Profile Photo &amp; Face Biometrics<span class="req">*</span></div>
               <div style="color: #6b7280; margin-bottom: 10px">
-                {{ isFaceEnrolled() ? '✅ Face Biometrics Captured (Ready for instant Clock In & Login)' : 'Register facial biometric identity now for automated face recognition & attendance.' }}
+                {{ isFaceEnrolled() ? 'Profile photo & facial scan ready for attendance verification and login.' : 'Register facial biometric identity now for attendance verification & login (JPG/PNG up to 2MB, or webcam scan).' }}
               </div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <button type="button" class="btn btn-primary btn-sm" (click)="openFaceModal()">
@@ -166,8 +167,17 @@ interface AccountItem {
               }
             </div>
             <div class="form-group">
-              <label class="form-label">Date of Birth</label>
-              <input class="form-control" type="date" [value]="personal().dob" (input)="patchP('dob', $any($event.target).value)" />
+              <label class="form-label">Date of Birth<span class="req">*</span></label>
+              <input
+                class="form-control"
+                [class.is-invalid]="!!fieldError('dob')"
+                type="date"
+                [value]="personal().dob"
+                (input)="patchP('dob', $any($event.target).value); clearError('dob')"
+              />
+              @if (fieldError('dob')) {
+                <div class="field-error-msg">{{ fieldError('dob') }}</div>
+              }
             </div>
             <div class="form-group">
               <label class="form-label">Gender</label>
@@ -204,25 +214,12 @@ interface AccountItem {
         @if (step() === 1) {
           <div class="ob-grid ob-grid-3">
             <div class="form-group">
-              <label class="form-label">Job Title<span class="req">*</span></label>
-              <input 
-                class="form-control" 
-                [class.is-invalid]="!!fieldError('jobTitle')"
-                placeholder="Software Engineer" 
-                [value]="job().jobTitle" 
-                (input)="patchJ('jobTitle', $any($event.target).value); clearError('jobTitle')" 
-              />
-              @if (fieldError('jobTitle')) {
-                <div class="field-error-msg">{{ fieldError('jobTitle') }}</div>
-              }
-            </div>
-            <div class="form-group">
               <label class="form-label">Department<span class="req">*</span></label>
-              <app-select 
-                [options]="deptOptions()" 
-                [value]="job().department" 
-                (valueChange)="patchJ('department', $event); clearError('department')" 
-                width="100%" 
+              <app-select
+                [options]="deptOptions()"
+                [value]="job().department"
+                (valueChange)="patchJ('department', $event); clearError('department')"
+                width="100%"
               />
               @if (fieldError('department')) {
                 <div class="field-error-msg">{{ fieldError('department') }}</div>
@@ -231,10 +228,6 @@ interface AccountItem {
             <div class="form-group">
               <label class="form-label">Designation</label>
               <app-select [options]="designationOptions()" [value]="job().designationId" (valueChange)="patchJ('designationId', $event)" width="100%" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Grade</label>
-              <app-key-select groupCode="GRADE_LEVEL" [value]="job().grade" (valueChange)="patchJ('grade', $event)" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">Join Date<span class="req">*</span></label>
@@ -254,7 +247,7 @@ interface AccountItem {
               <app-key-select groupCode="EMPLOYMENT_TYPE" [value]="job().employmentType" (valueChange)="patchJ('employmentType', $event)" width="100%" />
             </div>
             <div class="form-group">
-              <label class="form-label">Reporting Manager</label>
+              <label class="form-label">Reporting To</label>
               <app-select [options]="managerOptions()" [value]="job().reportingManager" (valueChange)="patchJ('reportingManager', $event)" width="100%" />
             </div>
             <div class="form-group">
@@ -325,38 +318,8 @@ interface AccountItem {
           </div>
         }
 
-        <!-- STEP 3: DOCUMENTS -->
+        <!-- STEP 3: ACCOUNT -->
         @if (step() === 3) {
-          <div style="display: flex; flex-direction: column">
-            @for (d of docNames; track d) {
-              <div class="doc-row">
-                <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0">
-                  <div style="width: 32px; height: 32px; min-width: 32px; border-radius: 8px; background: var(--p-soft); display: flex; align-items: center; justify-content: center; color: var(--p)">
-                    <span [appIcon]="'documents'"></span>
-                  </div>
-                  <div style="min-width: 0">
-                    <div class="doc-label" style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ d }}</div>
-                    <div class="doc-label" style="color: var(--muted); white-space: nowrap">PDF, JPG, PNG up to 3MB</div>
-                  </div>
-                </div>
-                <input
-                  #docFileInput
-                  type="file"
-                  [accept]="acceptDocTypes"
-                  style="display: none"
-                  (change)="onDocFileSelected(d, $event)"
-                />
-                <button class="btn btn-outline btn-sm doc-upload-btn" style="display: flex; align-items: center; gap: 6px; flex-shrink: 0" (click)="docFileInput.click()">
-                  <span [appIcon]="'upload2'"></span>
-                  <span class="doc-upload-text">{{ uploaded().has(d) ? 'Uploaded' : 'Upload' }}</span>
-                </button>
-              </div>
-            }
-          </div>
-        }
-
-        <!-- STEP 4: ACCOUNT -->
-        @if (step() === 4) {
           <div style="display: flex; flex-direction: column; gap: 16px">
             <div style="background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; padding: 18px">
               <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px">
@@ -425,11 +388,11 @@ interface AccountItem {
                     }
                     <div>
                       <div style="font-size: 13.5px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px">
-                        <span>Biometric Descriptor Ready</span>
-                        <span style="font-size: 11px; background: rgba(16,185,129,0.15); color: var(--success); padding: 2px 8px; border-radius: 4px; font-weight: 600">128D Neural AI</span>
+                        <span>Face Profile Ready</span>
+                        <span style="font-size: 11px; background: rgba(16,185,129,0.15); color: var(--success); padding: 2px 8px; border-radius: 4px; font-weight: 600">Verified</span>
                       </div>
                       <div style="font-size: 12px; color: var(--muted); margin-top: 3px">
-                        Facial signature verified &amp; ready for instant attendance punching and secure portal login.
+                        Facial verification ready for attendance punching and secure portal login.
                       </div>
                     </div>
                   </div>
@@ -509,7 +472,7 @@ interface AccountItem {
                   <div>
                     <div class="sys-label" style="font-weight: 600">Face Biometric Identity</div>
                     <div class="sys-label" style="color: var(--muted)">
-                      {{ isFaceEnrolled() ? '128D Deep AI Embedding active for automated Login & Clock In/Out' : 'Webcam scan required for biometric attendance' }}
+                      {{ isFaceEnrolled() ? 'Face recognition active for automated Login & Clock In/Out' : 'Webcam scan required for biometric attendance' }}
                     </div>
                   </div>
                 </div>
@@ -536,8 +499,8 @@ interface AccountItem {
           </div>
         }
 
-        <!-- STEP 5: REVIEW / SUCCESS -->
-        @if (step() === 5) {
+        <!-- STEP 4: REVIEW / SUCCESS -->
+        @if (step() === 4) {
           @if (submitted()) {
             <div class="review-card" style="text-align: center; padding: 48px 20px">
               <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--p); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: #fff">
@@ -589,6 +552,10 @@ interface AccountItem {
                   <button class="btn btn-outline btn-sm" (click)="step.set(1)">Edit</button>
                 </div>
                 <div class="ob-grid ob-grid-3" style="padding: 11px">
+                  <div>
+                    <div style="font-size: 13px; color: var(--muted); margin-bottom: 2px">Designation</div>
+                    <div style="font-size: 13px; font-weight: 600; color: var(--text)">{{ selectedDesignationName() }}</div>
+                  </div>
                   @for (f of jobReview; track f[1]) {
                     <div>
                       <div style="font-size: 13px; color: var(--muted); margin-bottom: 2px">{{ f[0] }}</div>
@@ -618,33 +585,9 @@ interface AccountItem {
               <div style="border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden">
                 <div style="background: var(--p-soft); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between">
                   <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9rem; color: var(--text)">
-                    <span [appIcon]="'documents'"></span> Documents
-                  </div>
-                  <button class="btn btn-outline btn-sm" (click)="step.set(3)">Edit</button>
-                </div>
-                <div style="padding: 10px; display: flex; flex-direction: column; gap: 8px">
-                  @for (name of docNames; track name) {
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
-                      <div style="display: flex; align-items: center; gap: 8px">
-                        <div style="width: 28px; height: 28px; border-radius: 6px; background: var(--p-soft); display: flex; align-items: center; justify-content: center; color: var(--p); flex-shrink: 0">
-                          <span [appIcon]="'documents'"></span>
-                        </div>
-                        <div style="font-size: 13px; font-weight: 600; color: var(--text)">{{ name }}</div>
-                      </div>
-                      <span class="badge" [class]="uploaded().has(name) ? 'badge-success' : 'badge-warning'">
-                        {{ uploaded().has(name) ? '✓ Uploaded' : 'Pending' }}
-                      </span>
-                    </div>
-                  }
-                </div>
-              </div>
-
-              <div style="border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden">
-                <div style="background: var(--p-soft); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between">
-                  <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9rem; color: var(--text)">
                     <span [appIcon]="'lock'"></span> Account &amp; Login Access
                   </div>
-                  <button class="btn btn-outline btn-sm" (click)="step.set(4)">Edit</button>
+                  <button class="btn btn-outline btn-sm" (click)="step.set(3)">Edit</button>
                 </div>
                 <div class="ob-grid ob-grid-3" style="padding: 12px">
                   <div>
@@ -662,34 +605,75 @@ interface AccountItem {
                   <div>
                     <div style="font-size: 13px; color: var(--muted); margin-bottom: 2px">Face Biometrics</div>
                     <div style="font-size: 13px; font-weight: 700;" [style.color]="isFaceEnrolled() ? 'var(--success)' : 'var(--warning)'">
-                      {{ isFaceEnrolled() ? '✅ Enrolled (128D AI Biometric)' : '⚠️ Not enrolled' }}
+                      {{ isFaceEnrolled() ? '✅ Enrolled' : '⚠️ Not enrolled' }}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+            @if (submitting()) {
+              <div class="ob-waiting-bar" style="margin-top: 14px; padding: 14px 16px; border-radius: 10px; background: var(--p-soft); border: 1px solid var(--p-mid);">
+                <div style="display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 13.5px; color: var(--text); margin-bottom: 8px;">
+                  <span class="ob-wait-spinner"></span>
+                  <span>Creating employee profile &amp; sending onboarding email… Please wait.</span>
+                </div>
+                <div class="ob-progress-track">
+                  <div class="ob-progress-indeterminate"></div>
+                </div>
+              </div>
+            }
           }
         }
       </div>
 
-      @if (step() < 5 || !submitted()) {
+      @if (step() < 4 || !submitted()) {
         <div class="ob-card-footer">
           <div style="font-size: 13px; color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
             {{ subtitles[step()] }}
           </div>
           <div style="display: flex; gap: 10px; flex-shrink: 0">
             @if (step() > 0) {
-              <button class="btn btn-outline" style="display: flex; align-items: center; gap: 6px" (click)="back()">
+              <button class="btn btn-outline" style="display: flex; align-items: center; gap: 6px" [disabled]="submitting()" (click)="back()">
                 <span [appIcon]="'chevron'"></span> Back
               </button>
             }
-            <button class="btn btn-primary" style="display: flex; align-items: center; gap: 6px" (click)="next()">
-              {{ step() === 5 ? 'Submit & Complete' : 'Next' }} <span [appIcon]="'arrow_right'"></span>
+            <button class="btn btn-primary" style="display: flex; align-items: center; gap: 6px" [disabled]="checkingEmail() || submitting()" (click)="next()">
+              {{ submitting() ? 'Sending Onboarding Email…' : (checkingEmail() ? 'Verifying…' : (step() === 4 ? 'Submit & Complete' : 'Next')) }} <span [appIcon]="'arrow_right'"></span>
             </button>
           </div>
         </div>
       }
     </div>
+
+    <!-- Onboarding Success Popup (5-second auto-dismiss) -->
+    @if (showOnboardSuccess()) {
+      <div class="ob-success-backdrop" (click)="dismissOnboardSuccess()">
+        <div class="ob-success-popup" (click)="$event.stopPropagation()">
+          <div class="ob-success-icon-wrap">
+            <div class="ob-success-icon">
+              <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+          </div>
+          <div class="ob-success-title">Onboarding Complete!</div>
+          <div class="ob-success-name">{{ onboardedEmployeeName() }}</div>
+          <div class="ob-success-meta">
+            <span class="ob-success-role">{{ onboardedEmployeeRole() }}</span>
+          </div>
+          <div class="ob-success-msg">
+            Onboarding is complete for <strong>{{ onboardedEmployeeName() }}</strong>.
+            The onboarding &amp; password-setup link has been sent to
+            <span style="color: var(--p); font-weight: 600; word-break: break-all;">{{ onboardedEmployeeEmail() }}</span>.
+          </div>
+          <div class="ob-success-actions">
+            <button type="button" class="btn btn-outline" (click)="dismissOnboardSuccess(); restart()">Onboard Another</button>
+            <button type="button" class="btn btn-primary" (click)="dismissOnboardSuccess(); goEmployees()">View Employees</button>
+          </div>
+          <div class="ob-success-timer-bar">
+            <div class="ob-success-timer-fill"></div>
+          </div>
+        </div>
+      </div>
+    }
 
     <!-- Onboarding Face Enrollment Modal -->
     @if (showFaceModal()) {
@@ -718,7 +702,7 @@ interface AccountItem {
                 <div class="face-camera-loading">
                   <div class="face-spinner"></div>
                   <div class="face-loading-text">
-                    {{ faceService.loadingModels() ? 'Loading AI Face Neural Networks…' : 'Starting camera feed…' }}
+                    {{ faceService.loadingModels() ? 'Preparing camera verification…' : 'Starting camera feed…' }}
                   </div>
                 </div>
               }
@@ -1244,6 +1228,149 @@ interface AccountItem {
       .form-control.is-invalid {
         border-color: #ef4444 !important;
       }
+      .ob-wait-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2.5px solid rgba(37, 99, 235, 0.25);
+        border-top-color: var(--p, #2563eb);
+        border-radius: 50%;
+        display: inline-block;
+        animation: obSpin 0.8s linear infinite;
+        flex-shrink: 0;
+      }
+      .ob-progress-track {
+        width: 100%;
+        height: 6px;
+        background: rgba(37, 99, 235, 0.14);
+        border-radius: 999px;
+        overflow: hidden;
+        position: relative;
+      }
+      .ob-progress-indeterminate {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 40%;
+        background: linear-gradient(90deg, var(--p, #2563eb), #60a5fa);
+        border-radius: 999px;
+        animation: obProgressSlide 1.3s ease-in-out infinite;
+      }
+      @keyframes obSpin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes obProgressSlide {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(350%);
+        }
+      }
+
+      /* ── Onboarding Success Popup ── */
+      .ob-success-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 20000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(6px);
+        animation: modalFadeIn 0.25s ease;
+      }
+      .ob-success-popup {
+        background: var(--surface, #fff);
+        border-radius: 20px;
+        padding: 36px 32px 24px;
+        max-width: 420px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 30px 80px -20px rgba(0,0,0,0.3), 0 0 0 1px rgba(37,99,235,0.08);
+        animation: modalPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+        overflow: hidden;
+      }
+      .ob-success-icon-wrap {
+        margin-bottom: 20px;
+      }
+      .ob-success-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        box-shadow: 0 8px 24px rgba(34, 197, 94, 0.35);
+        animation: popBounce 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes popBounce {
+        0% { transform: scale(0); }
+        70% { transform: scale(1.12); }
+        100% { transform: scale(1); }
+      }
+      .ob-success-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--text, #0f172a);
+        margin-bottom: 6px;
+      }
+      .ob-success-name {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--p, #2563eb);
+        margin-bottom: 6px;
+      }
+      .ob-success-meta {
+        margin-bottom: 12px;
+      }
+      .ob-success-role {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: var(--p-soft, #eff6ff);
+        color: var(--p, #2563eb);
+        font-size: 11.5px;
+        font-weight: 700;
+      }
+      .ob-success-msg {
+        font-size: 13.5px;
+        color: var(--muted, #64748b);
+        line-height: 1.6;
+        margin-bottom: 24px;
+      }
+      .ob-success-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .ob-success-timer-bar {
+        height: 4px;
+        background: var(--border, #e5e7eb);
+        border-radius: 999px;
+        overflow: hidden;
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
+      .ob-success-timer-fill {
+        height: 100%;
+        background: var(--p, #2563eb);
+        border-radius: 999px;
+        animation: countdownBar 5s linear forwards;
+      }
+      @keyframes countdownBar {
+        from { width: 100%; }
+        to { width: 0%; }
+      }
     `,
   ],
 })
@@ -1251,6 +1378,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   protected readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
+  private readonly keyGroupCache = inject(KeyGroupCacheService);
   protected readonly faceService = inject(FaceRecognitionService);
   protected readonly currencyService = inject(CurrencyService);
 
@@ -1285,22 +1413,52 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       return false;
     });
 
-    const toUse = filtered.length > 0 ? filtered : list;
-    return toUse.map((d: any) => ({ v: d.id, l: d.name }));
+    return filtered.map((d: any) => ({ v: d.id, l: d.name }));
+  });
+
+  protected readonly checkingEmail = signal(false);
+  protected readonly submitting = signal(false);
+  protected readonly showOnboardSuccess = signal(false);
+  protected readonly onboardedEmployeeName = signal('');
+  protected readonly onboardedEmployeeEmail = signal('');
+  protected readonly onboardedEmployeeRole = signal('Employee');
+  private enrolledFacesList: EnrolledFace[] = [];
+  private successPopupTimer?: ReturnType<typeof setTimeout>;
+
+  protected readonly selectedDesignationName = computed(() => {
+    const id = this.job().designationId;
+    if (!id) return 'Employee';
+    return this.allDesignations().find((d: any) => d.id === id)?.name?.trim() || 'Employee';
+  });
+
+  protected readonly computedJobTitle = computed(() => {
+    const desig = this.selectedDesignationName() || 'Employee';
+    const dept = this.job().department?.trim() || 'General';
+    return `${desig}-${dept}`;
   });
 
   ngOnInit(): void {
+    this.keyGroupCache.clearCache();
+    this.loadEnrolledFacesCache();
     this.api.departments().subscribe({
       next: (departments) => {
         const list = departments || [];
         this.departmentIds = new Map(list.map((d) => [d.name, d.id]));
         const opts = list.map((d) => ({ v: d.name, l: d.name }));
-        this.deptOptions.set(opts.length > 0 ? opts : [{ v: 'General', l: 'General' }]);
-        if (list.length > 0) {
-          const current = this.job().department;
-          const chosen = this.departmentIds.has(current) ? current : list[0].name;
-          this.job.update((job) => ({ ...job, department: chosen }));
+        if (!opts.some((o) => o.v.toLowerCase() === 'general')) {
+          opts.unshift({ v: 'General', l: 'General' });
+        } else {
+          opts.sort((a, b) => (a.v.toLowerCase() === 'general' ? -1 : b.v.toLowerCase() === 'general' ? 1 : 0));
         }
+        this.deptOptions.set(opts);
+
+        const generalDept = list.find((d) => d.name.trim().toLowerCase() === 'general');
+        const current = this.job().department;
+        const chosen = this.departmentIds.has(current)
+          ? current
+          : (generalDept?.name ?? list[0]?.name ?? 'General');
+        this.job.update((job) => ({ ...job, department: chosen }));
+        this.syncDefaultDesignation(false);
       },
       error: () => {
         this.deptOptions.set([{ v: 'General', l: 'General' }]);
@@ -1310,10 +1468,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     this.api.designations().subscribe({
       next: (list) => {
         this.allDesignations.set(list || []);
-        const opts = this.designationOptions();
-        if (opts.length > 0 && !this.job().designationId) {
-          this.job.update((j) => ({ ...j, designationId: opts[0].v }));
-        }
+        this.syncDefaultDesignation(false);
       },
       error: () => this.allDesignations.set([]),
     });
@@ -1330,19 +1485,22 @@ export class OnboardingComponent implements OnInit, OnDestroy {
           };
         });
         this.managerOptions.set([
-          { v: 'HR Manager', l: 'HR Manager' },
           { v: 'Company Admin', l: 'Company Admin' },
+          { v: 'HR Manager', l: 'HR Manager' },
           ...emps,
         ]);
-        if (!this.job().reportingManager) {
-          this.job.update((j) => ({ ...j, reportingManager: 'HR Manager' }));
+        if (!this.job().reportingManager || this.job().reportingManager === 'HR Manager' || this.job().reportingManager === 'Manager') {
+          this.job.update((j) => ({ ...j, reportingManager: 'Company Admin' }));
         }
       },
       error: () => {
         this.managerOptions.set([
-          { v: 'HR Manager', l: 'HR Manager' },
           { v: 'Company Admin', l: 'Company Admin' },
+          { v: 'HR Manager', l: 'HR Manager' },
         ]);
+        if (!this.job().reportingManager || this.job().reportingManager === 'HR Manager' || this.job().reportingManager === 'Manager') {
+          this.job.update((j) => ({ ...j, reportingManager: 'Company Admin' }));
+        }
       },
     });
   }
@@ -1351,7 +1509,6 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     { label: 'Personal', icon: 'user' },
     { label: 'Job Details', icon: 'employees' },
     { label: 'Salary', icon: 'payroll' },
-    { label: 'Documents', icon: 'documents' },
     { label: 'Account', icon: 'lock' },
     { label: 'Review', icon: 'check' },
   ];
@@ -1360,16 +1517,12 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     "Enter the employee's basic personal information.",
     'Job role, department and reporting details.',
     'Compensation, salary and allowances.',
-    'Upload required identity and legal documents.',
     'Create system login and access credentials.',
     'Review all information before submitting.',
   ];
 
-  protected readonly docNames = ['Passport', 'Visa / Work Permit', 'Emirates ID', 'Educational Certificates', 'Medical Insurance'];
-
   protected readonly step = signal(0);
   protected readonly submitted = signal(false);
-  protected readonly uploaded = signal<Set<string>>(new Set());
 
   protected readonly progress = computed(() => Math.round((this.step() / (this.steps.length - 1)) * 100));
 
@@ -1390,13 +1543,11 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   });
 
   protected readonly job = signal({
-    jobTitle: '',
     designationId: '',
-    department: 'Engineering',
-    grade: 'L3',
+    department: 'General',
     joinDate: '',
     employmentType: 'Full-time',
-    reportingManager: '',
+    reportingManager: 'Company Admin',
     workLocation: '',
     shift: 'Morning (9AM - 6PM)',
     noticePeriod: '',
@@ -1446,12 +1597,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   ];
 
   protected readonly jobReview: [string, keyof ReturnType<typeof this.job>][] = [
-    ['Job Title', 'jobTitle'],
     ['Department', 'department'],
-    ['Grade', 'grade'],
     ['Join Date', 'joinDate'],
     ['Employment Type', 'employmentType'],
-    ['Reporting Manager', 'reportingManager'],
+    ['Reporting To', 'reportingManager'],
     ['Work Location', 'workLocation'],
     ['Shift', 'shift'],
     ['Notice Period', 'noticePeriod'],
@@ -1469,13 +1618,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     { v: 'Male', l: 'Male' },
     { v: 'Female', l: 'Female' },
     { v: 'Other', l: 'Other' },
-    { v: 'Prefer not to say', l: 'Prefer not to say' },
   ];
   protected readonly maritalOptions: SelectOption[] = [
     { v: 'Married', l: 'Married' },
     { v: 'Single', l: 'Single' },
-    { v: 'Divorced', l: 'Divorced' },
-    { v: 'Widowed', l: 'Widowed' },
   ];
   protected readonly emailTouched = signal(false);
   protected readonly phoneTouched = signal(false);
@@ -1488,16 +1634,14 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     return phone.length === 0 || /^(?:\+91|91|0)?[6-9]\d{9}$/.test(phone);
   });
 
-  private readonly uploadedDocs = new Map<string, string>();
-  protected readonly gradeOptions: SelectOption[] = ['L3', 'L4', 'L5'].map((g) => ({ v: g, l: g }));
   protected readonly employmentOptions: SelectOption[] = [
     { v: 'Full-time', l: 'Full-time' },
     { v: 'Part-time', l: 'Part-time' },
     { v: 'Contract', l: 'Contract' },
   ];
   protected readonly managerOptions = signal<SelectOption[]>([
-    { v: 'HR Manager', l: 'HR Manager' },
     { v: 'Company Admin', l: 'Company Admin' },
+    { v: 'HR Manager', l: 'HR Manager' },
   ]);
   protected readonly shiftOptions: SelectOption[] = [
     { v: 'Morning (9AM - 6PM)', l: 'Morning (9AM - 6PM)' },
@@ -1525,24 +1669,34 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     this.personal.update((p) => ({ ...p, [key]: value }));
   }
 
+  private syncDefaultDesignation(forceReset = false): void {
+    const list = this.allDesignations();
+    if (list.length === 0) return;
+
+    const currentDeptName = this.job().department || 'General';
+    const currentDeptId = this.departmentIds.get(currentDeptName);
+    const matching = list.filter((d: any) =>
+      (currentDeptId && d.departmentId?.toLowerCase() === currentDeptId.toLowerCase()) ||
+      (currentDeptName && d.department && d.department.toLowerCase() === currentDeptName.toLowerCase())
+    );
+    const pool = matching;
+    const currentId = this.job().designationId;
+
+    if (!forceReset && currentId && pool.some((d: any) => d.id === currentId)) {
+      return;
+    }
+
+    const employeeDesig = pool.find((d: any) => d.name?.trim().toLowerCase() === 'employee');
+    const chosenId = employeeDesig?.id || pool[0]?.id || '';
+    this.job.update((j) => ({ ...j, designationId: chosenId }));
+  }
+
   protected patchJ(key: keyof ReturnType<typeof this.job>, value: string): void {
-    this.job.update((j) => {
-      const next = { ...j, [key]: value };
-      if (key === 'department') {
-        const deptId = this.departmentIds.get(value);
-        const matching = this.allDesignations().filter((d: any) =>
-          (deptId && d.departmentId?.toLowerCase() === deptId.toLowerCase()) ||
-          (d.department && d.department.toLowerCase() === value.toLowerCase())
-        );
-        if (matching.length > 0) {
-          next.designationId = matching[0].id;
-        } else {
-          next.designationId = '';
-        }
-      }
-      return next;
-    });
-    if ((key === 'department' || key === 'jobTitle') && /\bhr\b|human resources/i.test(value)) {
+    this.job.update((j) => ({ ...j, [key]: value }));
+    if (key === 'department') {
+      this.syncDefaultDesignation(true);
+    }
+    if (key === 'department' && /\bhr\b|human resources/i.test(value)) {
       if (this.accountForm().role === 'Employee') {
         this.accountForm.update((a) => ({ ...a, role: 'HrManager' }));
       }
@@ -1553,40 +1707,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     this.salary.update((s) => ({ ...s, [key]: value }));
   }
 
-  protected uploadDoc(name: string): void {
-    this.uploaded.update((set) => new Set(set).add(name));
-    this.toast.show(`${name} uploaded!`);
-  }
-
-  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
   protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
-
-  protected onDocFileSelected(name: string, event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (!input.files || input.files.length === 0) return;
-    const file = input.files[0];
-
-    const check = validateDocumentFile(file);
-    if (!check.valid) {
-      this.toast.show(check.error || 'Invalid file.', 'danger');
-      input.value = '';
-      return;
-    }
-
-    this.api.uploadFile(file).subscribe({
-      next: (res) => {
-        const stored = res.cloudinaryUrl || res.url || res.storedName || res.fileName;
-        this.uploadedDocs.set(name, stored);
-        this.uploaded.update((set) => new Set(set).add(name));
-        this.toast.show(`${name} (${file.name}) uploaded!`, 'success');
-      },
-      error: (err) => {
-        const msg = err?.error?.message || `Failed to upload ${name}`;
-        this.toast.show(msg, 'danger');
-      },
-    });
-    input.value = '';
-  }
 
   protected readonly errors = signal<Record<string, string>>({});
 
@@ -1613,9 +1734,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       delete errs['lastName'];
       delete errs['email'];
       delete errs['phone'];
+      delete errs['dob'];
 
       if (!this.isFaceEnrolled() || !this.enrolledFacePhoto()) {
-        errs['facePhoto'] = 'Profile photo and Face Biometrics are required before proceeding.';
+        errs['facePhoto'] = 'Profile photo and Face Biometrics are required before proceeding (JPG/PNG up to 2MB, or webcam scan).';
       }
 
       const p = this.personal();
@@ -1642,13 +1764,17 @@ export class OnboardingComponent implements OnInit, OnDestroy {
         errs['phone'] = 'Please enter a valid 10-digit Indian phone number (e.g. +91 98765 43210).';
       }
 
+      if (!p.dob || !p.dob.trim()) {
+        errs['dob'] = 'Date of birth is required.';
+      }
+
       this.errors.set(errs);
-      const isValid = !errs['facePhoto'] && !errs['firstName'] && !errs['lastName'] && !errs['email'] && !errs['phone'];
+      const isValid = !errs['facePhoto'] && !errs['firstName'] && !errs['lastName'] && !errs['email'] && !errs['phone'] && !errs['dob'];
       if (!isValid) {
         this.toast.show(
-          errs['facePhoto'] && !errs['firstName'] && !errs['lastName'] && !errs['email'] && !errs['phone']
-            ? 'Please upload Profile Photo or scan Face Biometrics before continuing.'
-            : 'Please complete all required personal details (including Profile Photo & Face Biometrics).',
+          errs['facePhoto'] && !errs['firstName'] && !errs['lastName'] && !errs['email'] && !errs['phone'] && !errs['dob']
+            ? errs['facePhoto']
+            : 'Please complete all required personal details (including Profile Photo, Face Biometrics & Date of Birth).',
           'danger',
         );
       }
@@ -1656,15 +1782,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     }
 
     if (stepIndex === 1) {
-      delete errs['jobTitle'];
       delete errs['department'];
       delete errs['joinDate'];
 
       const j = this.job();
-      if (!j.jobTitle.trim()) {
-        errs['jobTitle'] = 'Job title is required.';
-      }
-
       if (!j.department || !j.department.trim()) {
         errs['department'] = 'Department is required.';
       }
@@ -1674,7 +1795,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       }
 
       this.errors.set(errs);
-      const isValid = !errs['jobTitle'] && !errs['department'] && !errs['joinDate'];
+      const isValid = !errs['department'] && !errs['joinDate'];
       if (!isValid) {
         this.toast.show('Please complete all required job details.', 'danger');
       }
@@ -1710,10 +1831,6 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     }
 
     if (stepIndex === 3) {
-      return true;
-    }
-
-    if (stepIndex === 4) {
       delete errs['facePhoto'];
 
       if (!this.isFaceEnrolled() || !this.enrolledFacePhoto()) {
@@ -1738,6 +1855,21 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       this.step.set(targetIndex);
       return;
     }
+    if (this.step() === 0) {
+      if (!this.validateStep(0)) {
+        return;
+      }
+      this.verifyEmailUniqueAndAdvance(() => {
+        for (let s = 1; s < targetIndex; s++) {
+          if (!this.validateStep(s)) {
+            this.step.set(s);
+            return;
+          }
+        }
+        this.step.set(targetIndex);
+      });
+      return;
+    }
     for (let s = this.step(); s < targetIndex; s++) {
       if (!this.validateStep(s)) {
         this.step.set(s);
@@ -1752,11 +1884,41 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.step() < 5) {
+    if (this.step() === 0) {
+      this.verifyEmailUniqueAndAdvance(() => this.step.set(1));
+      return;
+    }
+
+    if (this.step() < 4) {
       this.step.update((s) => s + 1);
     } else {
       this.submit();
     }
+  }
+
+  private verifyEmailUniqueAndAdvance(onUnique: () => void): void {
+    const email = this.personal().email.trim();
+    if (!email || this.checkingEmail()) return;
+
+    this.checkingEmail.set(true);
+    this.api.checkEmployeeEmailAvailable(email).subscribe({
+      next: (res) => {
+        this.checkingEmail.set(false);
+        if (!res.available) {
+          const msg = res.message || `Email "${email}" is already registered under this company. Please use a unique email address.`;
+          this.errors.update((e) => ({ ...e, email: msg }));
+          this.toast.show(msg, 'danger');
+          return;
+        }
+        onUnique();
+      },
+      error: (err) => {
+        this.checkingEmail.set(false);
+        const msg = err?.error?.message || 'Unable to verify email uniqueness. Please try again.';
+        this.errors.update((e) => ({ ...e, email: msg }));
+        this.toast.show(msg, 'danger');
+      },
+    });
   }
 
   protected back(): void {
@@ -1766,7 +1928,9 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   }
 
   private submit(): void {
-    for (let s = 0; s <= 4; s++) {
+    if (this.submitting()) return;
+
+    for (let s = 0; s <= 3; s++) {
       if (!this.validateStep(s)) {
         this.step.set(s);
         this.toast.show(`Please complete required fields in Step ${s + 1}: ${this.steps[s].label}.`, 'danger');
@@ -1797,6 +1961,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     }
 
     if (!departmentId) {
+      this.submitting.set(true);
       const deptName = job.department?.trim() || 'General';
       this.api.createDepartment({ name: deptName, code: deptName.slice(0, 3).toUpperCase() }).subscribe({
         next: (created) => {
@@ -1805,13 +1970,46 @@ export class OnboardingComponent implements OnInit, OnDestroy {
           this.sendEmployeePayload(created.id);
         },
         error: () => {
+          this.submitting.set(false);
           this.toast.show('Please create a department under Company -> Departments first.', 'warning');
         },
       });
       return;
     }
 
+    this.submitting.set(true);
     this.sendEmployeePayload(departmentId);
+  }
+
+  private loadEnrolledFacesCache(): void {
+    this.api.enrolledFaces().subscribe({
+      next: (faces) => {
+        this.enrolledFacesList = faces || [];
+      },
+      error: () => {
+        this.enrolledFacesList = [];
+      },
+    });
+  }
+
+  protected dismissOnboardSuccess(): void {
+    if (this.successPopupTimer) {
+      clearTimeout(this.successPopupTimer);
+      this.successPopupTimer = undefined;
+    }
+    this.showOnboardSuccess.set(false);
+  }
+
+  private triggerOnboardSuccessPopup(name: string, email: string, roleCode: string): void {
+    this.dismissOnboardSuccess();
+    this.onboardedEmployeeName.set(name);
+    this.onboardedEmployeeEmail.set(email);
+    this.onboardedEmployeeRole.set(roleCode === 'HrManager' ? 'HR Manager' : 'Employee');
+    this.showOnboardSuccess.set(true);
+    this.successPopupTimer = setTimeout(() => {
+      this.showOnboardSuccess.set(false);
+      this.successPopupTimer = undefined;
+    }, 5000);
   }
 
   private sendEmployeePayload(departmentId: string): void {
@@ -1820,6 +2018,38 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     const salary = this.salary();
     const account = this.accountForm();
 
+    const descriptor = this.enrolledFaceDescriptor();
+    const photo = this.enrolledFacePhoto() || '';
+    if (descriptor) {
+      this.api.enrolledFaces().subscribe({
+        next: (faces) => {
+          this.enrolledFacesList = faces || [];
+          const conflict = this.faceService.findDuplicateEnrolledFace(descriptor, this.enrolledFacesList, undefined, photo);
+          if (conflict) {
+            this.submitting.set(false);
+            const msg = `Duplicate face detected: this face is already registered to ${conflict.fullName} (${conflict.employeeCode}). Please use a unique face.`;
+            this.errors.update((e) => ({ ...e, facePhoto: msg }));
+            this.step.set(0);
+            this.toast.show(msg, 'danger');
+            return;
+          }
+          this.executeCreateEmployee(departmentId, personal, job, salary, account);
+        },
+        error: () => this.executeCreateEmployee(departmentId, personal, job, salary, account),
+      });
+      return;
+    }
+
+    this.executeCreateEmployee(departmentId, personal, job, salary, account);
+  }
+
+  private executeCreateEmployee(
+    departmentId: string,
+    personal: ReturnType<typeof this.personal>,
+    job: ReturnType<typeof this.job>,
+    salary: ReturnType<typeof this.salary>,
+    account: ReturnType<typeof this.accountForm>
+  ): void {
     const body = {
       firstName: personal.firstName.trim(),
       middleName: personal.middleName.trim() || null,
@@ -1831,8 +2061,8 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       branchId: null,
       shiftId: null,
       reportingManagerId: this.managerMap.get(job.reportingManager) || null,
-      jobTitle: job.jobTitle.trim() || 'Employee',
-      grade: job.grade || 'L3',
+      jobTitle: this.computedJobTitle(),
+      grade: '',
       employmentType: this.employmentType(job.employmentType),
       joinDate: this.toIso(job.joinDate) ?? new Date().toISOString().slice(0, 10),
       basicSalary: this.numeric(salary.basicSalary),
@@ -1859,11 +2089,19 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       sendWelcomeEmail: true,
     };
 
+    const fullName = `${personal.firstName} ${personal.lastName}`.trim();
+    const finalizeSuccess = () => {
+      this.submitting.set(false);
+      this.submitted.set(true);
+      this.loadEnrolledFacesCache();
+      this.triggerOnboardSuccessPopup(fullName, personal.email.trim(), account.role || 'Employee');
+      this.toast.show('Employee onboarded successfully!', 'success');
+    };
+
     this.api.createEmployee(body).subscribe({
       next: (created) => {
         const empId = created?.id || personal.email;
         const empCode = created?.employeeCode || empId;
-        const fullName = `${personal.firstName} ${personal.lastName}`.trim();
 
         if (this.enrolledFaceDescriptor()) {
           const descriptorStr = JSON.stringify(this.enrolledFaceDescriptor());
@@ -1888,27 +2126,23 @@ export class OnboardingComponent implements OnInit, OnDestroy {
           this.api.enrollFace(empId, {
             faceDescriptor: descriptorStr,
             facePhotoUrl: photo,
-          }).subscribe({ next: () => {}, error: () => {} });
+          }).subscribe({
+            next: () => finalizeSuccess(),
+            error: (err) => {
+              this.toast.show(
+                err?.error?.title ?? err?.error?.detail ?? err?.error?.message ?? 'Employee created, but Face ID upload failed. You can re-enroll from their profile.',
+                'warning'
+              );
+              finalizeSuccess();
+            },
+          });
+          return;
         }
 
-        // Persist uploaded document records in database
-        if (created?.id && this.uploadedDocs.size > 0) {
-          for (const [docName, storedFileName] of this.uploadedDocs.entries()) {
-            this.api.createDocument({
-              employeeId: created.id,
-              name: docName,
-              type: this.mapDocType(docName),
-              fileUrl: storedFileName,
-              fileSize: '3 MB',
-              isCompanyDocument: false,
-            }).subscribe({ next: () => {}, error: () => {} });
-          }
-        }
-
-        this.submitted.set(true);
-        this.toast.show('Employee onboarded with biometric Face ID!', 'success');
+        finalizeSuccess();
       },
       error: (error) => {
+        this.submitting.set(false);
         const msg = error?.error?.errors
           ? Object.values(error.error.errors).flat().join(' ')
           : (error?.error?.detail ?? error?.error?.message ?? error?.error?.title ?? 'Could not onboard the employee.');
@@ -1917,19 +2151,8 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     });
   }
 
-  private mapDocType(docName: string): string {
-    const n = (docName || '').toLowerCase();
-    if (n.includes('passport') || n.includes('id')) return 'Identity';
-    if (n.includes('visa') || n.includes('permit')) return 'Legal';
-    if (n.includes('medical') || n.includes('insurance')) return 'Benefits';
-    if (n.includes('certificate') || n.includes('contract')) return 'Employment';
-    return 'Other';
-  }
-
   private mapGender(value: string): string {
     switch (value) {
-      case 'Prefer not to say':
-        return 'PreferNotToSay';
       case 'Female':
         return 'Female';
       case 'Other':
@@ -1971,11 +2194,11 @@ export class OnboardingComponent implements OnInit, OnDestroy {
   protected restart(): void {
     this.step.set(0);
     this.submitted.set(false);
-    this.uploaded.set(new Set());
     this.enrolledFaceDescriptor.set(null);
     this.enrolledFacePhoto.set(null);
     this.errors.set({});
     this.accountForm.set({ role: 'Employee' });
+    this.syncDefaultDesignation(true);
   }
 
   protected goEmployees(): void {
@@ -1984,6 +2207,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopFaceCamera();
+    if (this.successPopupTimer) {
+      clearTimeout(this.successPopupTimer);
+      this.successPopupTimer = undefined;
+    }
   }
 
   protected openFaceModal(): void {
@@ -2010,45 +2237,84 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     const file = input.files[0];
     const check = validateImageFile(file);
     if (!check.valid) {
-      this.toast.show(check.error || 'Invalid photo file.', 'danger');
+      const msg = check.error || 'Please upload a valid JPG or PNG image up to 2 MB.';
+      this.errors.update((e) => ({ ...e, facePhoto: msg }));
+      this.toast.show(msg, 'danger');
       input.value = '';
       return;
     }
 
     const reader = new FileReader();
+    reader.onerror = () => {
+      const msg = 'Unable to read the selected image file. Please try another JPG or PNG photo.';
+      this.errors.update((e) => ({ ...e, facePhoto: msg }));
+      this.toast.show(msg, 'danger');
+    };
     reader.onload = async (e) => {
       const dataUrl = e.target?.result as string;
-      if (!dataUrl) return;
+      if (!dataUrl) {
+        const msg = 'The selected image file is empty. Please choose a valid JPG or PNG photo.';
+        this.errors.update((err) => ({ ...err, facePhoto: msg }));
+        this.toast.show(msg, 'danger');
+        return;
+      }
 
-      this.enrolledFacePhoto.set(dataUrl);
-      this.clearError('facePhoto');
-
-      // Attempt AI face detection and feature descriptor extraction
       const img = new Image();
-      img.src = dataUrl;
       img.onload = async () => {
+        // Compress oversized photos to <= 640px JPEG so upload/enrollment payloads never exceed size limits
+        const compactPhoto = this.faceService.compressImageToDataUrl(img, 640, 0.85) || dataUrl;
+
+        let candidateDescriptor: number[];
+        let detectedRealFace = false;
         try {
           await this.faceService.loadModels();
-          const scan = await this.faceService.detectFace(img);
+          const scan = await this.faceService.detectFace(img, undefined, true);
           if (scan.hasFace && scan.descriptor) {
-            this.enrolledFaceDescriptor.set(scan.descriptor);
-            this.toast.show('Profile photo uploaded and Face ID registered! 📸', 'success');
+            candidateDescriptor = scan.descriptor;
+            detectedRealFace = true;
           } else {
-            const fallback = this.generateFallbackDescriptor(dataUrl);
-            this.enrolledFaceDescriptor.set(fallback);
-            this.toast.show('Profile photo uploaded successfully! 📸', 'success');
+            candidateDescriptor = this.generateFallbackDescriptor(compactPhoto);
           }
         } catch {
-          const fallback = this.generateFallbackDescriptor(dataUrl);
-          this.enrolledFaceDescriptor.set(fallback);
-          this.toast.show('Profile photo uploaded successfully! 📸', 'success');
+          candidateDescriptor = this.generateFallbackDescriptor(compactPhoto);
         }
+
+        // Prevent using a photo/face that is already enrolled for another employee
+        const applyValidatedPhoto = (faces: EnrolledFace[]) => {
+          const conflict = this.faceService.findDuplicateEnrolledFace(candidateDescriptor, faces, undefined, compactPhoto);
+          if (conflict) {
+            const msg = `Duplicate face detected: this photo/face is already registered to ${conflict.fullName} (${conflict.employeeCode}). Please use a unique photo for this employee.`;
+            this.enrolledFaceDescriptor.set(null);
+            this.enrolledFacePhoto.set(null);
+            this.errors.update((err) => ({ ...err, facePhoto: msg }));
+            this.toast.show(msg, 'danger');
+            return;
+          }
+          this.enrolledFacePhoto.set(compactPhoto);
+          this.enrolledFaceDescriptor.set(candidateDescriptor);
+          this.clearError('facePhoto');
+          this.toast.show(
+            detectedRealFace
+              ? 'Profile photo uploaded and Face ID registered!'
+              : 'Profile photo uploaded successfully! For stronger face recognition accuracy, you can also use "Scan & Register Face ID".',
+            'success'
+          );
+        };
+
+        this.api.enrolledFaces().subscribe({
+          next: (faces) => {
+            this.enrolledFacesList = faces || [];
+            applyValidatedPhoto(this.enrolledFacesList);
+          },
+          error: () => applyValidatedPhoto(this.enrolledFacesList),
+        });
       };
       img.onerror = () => {
-        const fallback = this.generateFallbackDescriptor(dataUrl);
-        this.enrolledFaceDescriptor.set(fallback);
-        this.toast.show('Profile photo uploaded successfully! 📸', 'success');
+        const msg = 'Unable to load this image file. Please upload a valid JPG or PNG photo under 2 MB.';
+        this.errors.update((err) => ({ ...err, facePhoto: msg }));
+        this.toast.show(msg, 'danger');
       };
+      img.src = dataUrl;
     };
 
     reader.readAsDataURL(file);
@@ -2112,7 +2378,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     if (!this.cameraActive() || !this.obFaceVideoRef?.nativeElement) return;
 
     this.faceCapturing.set(true);
-    this.faceModalMsg.set('Analyzing facial biometrics and extracting 128D AI descriptor…');
+    this.faceModalMsg.set('Scanning face, please look directly into the camera…');
 
     const video = this.obFaceVideoRef.nativeElement;
     const canvas = this.obFaceCanvasRef?.nativeElement;
@@ -2121,7 +2387,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     const samples: number[][] = [];
     let snapshot = '';
     for (let i = 0; i < 3; i++) {
-      const scan = await this.faceService.detectFace(video, canvas);
+      const scan = await this.faceService.detectFace(video, canvas, true);
       if (scan.hasFace && scan.descriptor) {
         samples.push(scan.descriptor);
         if (scan.snapshot) snapshot = scan.snapshot;
@@ -2129,10 +2395,14 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       if (i < 2) await new Promise((r) => setTimeout(r, 120));
     }
 
+    if (!snapshot && canvas) {
+      snapshot = this.faceService.captureSnapshot(video, canvas) || '';
+    }
+
     this.faceCapturing.set(false);
 
     if (samples.length === 0) {
-      this.faceModalMsg.set('❌ No face detected by AI model. Look directly into camera.');
+      this.faceModalMsg.set('❌ No face detected. Please look directly into the camera in good lighting.');
       this.toast.show('No face detected. Please face the camera.', 'warning');
       return;
     }
@@ -2148,15 +2418,33 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       for (let j = 0; j < 128; j++) finalDescriptor[j] /= norm;
     }
 
-    this.enrolledFaceDescriptor.set(finalDescriptor);
-    if (snapshot) this.enrolledFacePhoto.set(snapshot);
-    this.clearError('facePhoto');
+    const finalizeCapture = (faces: EnrolledFace[]) => {
+      const conflict = this.faceService.findDuplicateEnrolledFace(finalDescriptor, faces, undefined, snapshot);
+      if (conflict) {
+        const msg = `Duplicate face detected: this face is already registered to ${conflict.fullName} (${conflict.employeeCode}).`;
+        this.faceModalMsg.set(`❌ ${msg}`);
+        this.toast.show(msg, 'danger');
+        return;
+      }
 
-    this.faceModalMsg.set('✅ Face Biometrics Captured (128D Deep Neural Embedding)!');
-    this.toast.show('Face biometrics registered for onboarding!', 'success');
+      this.enrolledFaceDescriptor.set(finalDescriptor);
+      if (snapshot) this.enrolledFacePhoto.set(snapshot);
+      this.clearError('facePhoto');
 
-    setTimeout(() => {
-      this.closeFaceModal();
-    }, 700);
+      this.faceModalMsg.set('✅ Face profile captured successfully!');
+      this.toast.show('Face biometrics registered for onboarding!', 'success');
+
+      setTimeout(() => {
+        this.closeFaceModal();
+      }, 700);
+    };
+
+    this.api.enrolledFaces().subscribe({
+      next: (faces) => {
+        this.enrolledFacesList = faces || [];
+        finalizeCapture(this.enrolledFacesList);
+      },
+      error: () => finalizeCapture(this.enrolledFacesList),
+    });
   }
 }

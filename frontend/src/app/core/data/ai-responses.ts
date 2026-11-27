@@ -106,8 +106,6 @@ export const AI_GREETINGS: Record<Role, string> = {
     'Hi HR Manager! I can help with employee queries, leave policies, payroll processing, and compliance.',
   'Company Admin':
     'Hi! I can help you manage your company — employees, leave, payroll, attendance, and reports.',
-  Manager:
-    'Hi Manager! I can help you manage team attendance, review leave approvals, monitor shift rosters, and reports.',
   Employee:
     "Hi! I'm your HR assistant. I can help with leave, payroll, attendance, onboarding, and company policies.",
 };
@@ -116,7 +114,6 @@ export const AI_GREETINGS: Record<Role, string> = {
 export const AI_SUGGESTIONS: Record<Role, string[]> = {
   'Super Admin': ['Payroll Overview', 'Pending Approvals', 'Document Expiry', 'Company Settings'],
   'HR Manager': ['Leave Requests', 'Payroll Processing', 'Employee Onboarding', 'Attendance Report'],
-  'Company Admin': ['Add Employee', 'Leave Requests', 'Payroll Processing', 'Attendance Report'],
-  Manager: ['Team Attendance', 'Pending Approvals', 'Shift Roster', 'Leave Requests'],
+  'Company Admin': ['Leave Requests', 'Payroll Processing', 'Employee Onboarding', 'Attendance Report'],
   Employee: ['Apply for Leave', 'View Payslip', 'Attendance Query', 'Loan Request'],
 };

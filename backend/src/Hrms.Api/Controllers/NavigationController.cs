@@ -32,13 +32,13 @@ public sealed class NavigationController : ControllerBase
         Ok(await _navigation.GetUserNavigationAsync(_currentUser.UserId ?? Guid.Empty, ct));
 
     [HttpGet("role/{roleId:guid}")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(typeof(IReadOnlyList<RoleNavigationDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<RoleNavigationDto>>> GetRolePermissions(Guid roleId, CancellationToken ct) =>
         Ok(await _navigation.GetRolePermissionsAsync(roleId, ct));
 
     [HttpPost("role")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> SaveRolePermissions(
         [FromBody] SaveRolePermissionsRequest request,
@@ -49,7 +49,7 @@ public sealed class NavigationController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(typeof(NavigationItemDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<NavigationItemDto>> CreateNavigationItem(
@@ -61,7 +61,7 @@ public sealed class NavigationController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(typeof(NavigationItemDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -72,7 +72,7 @@ public sealed class NavigationController : ControllerBase
         Ok(await _navigation.UpdateNavigationItemAsync(id, request, ct));
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -83,7 +83,7 @@ public sealed class NavigationController : ControllerBase
     }
 
     [HttpPut("reorder")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> ReorderNavigation(
         [FromBody] ReorderNavigationBatchRequest request,

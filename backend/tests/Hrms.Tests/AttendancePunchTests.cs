@@ -949,5 +949,38 @@ public sealed class AttendancePunchTests
         var ex = await Assert.ThrowsAsync<ValidationException>(() => service.ProcessCentralizedPunchAsync(req));
         Assert.Contains("outside the permitted company location", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task EnrollFaceAsync_DuplicateFaceForDifferentEmployee_ThrowsValidationException()
+    {
+        var (db, uow, emp1Id, userId, _) = SetupTestTenant();
+        var emp2Id = Guid.NewGuid();
+        db.Employees.Add(new Employee
+        {
+            Id = emp2Id,
+            FirstName = "Alex",
+            LastName = "Reed",
+            EmployeeCode = "EMP-1002",
+            Email = "alex@example.com",
+            Status = EmploymentStatus.Active,
+            JobTitle = "Developer",
+            Grade = "L2",
+            Currency = "USD"
+        });
+        await db.SaveChangesAsync();
+
+        var service = new AttendanceService(uow, new FakeCurrentUser { UserId = userId, EmployeeId = emp1Id });
+        var vector = "[" + string.Join(",", Enumerable.Range(0, 128).Select(i => ((i % 2 == 0 ? 0.09f : -0.09f)).ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]";
+
+        await service.EnrollFaceAsync(emp1Id, new EnrollFaceRequest(vector, "data:image/jpeg;base64,img1"));
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.EnrollFaceAsync(emp2Id, new EnrollFaceRequest(vector, "data:image/jpeg;base64,img2")));
+        Assert.Contains("Duplicate face", ex.Message, StringComparison.OrdinalIgnoreCase);
+
+        // Re-enrolling the same employee's own face should succeed
+        var reEnroll = await service.EnrollFaceAsync(emp1Id, new EnrollFaceRequest(vector, "data:image/jpeg;base64,img1b"));
+        Assert.True(reEnroll);
+    }
 }
 

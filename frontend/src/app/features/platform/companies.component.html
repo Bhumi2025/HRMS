@@ -29,7 +29,7 @@
     <div class="card-title">Registered Companies</div>
     <div class="input-group" style="max-width: 280px;">
       <span class="input-icon" [appIcon]="'search'"></span>
-      <input class="form-control" type="text" placeholder="Search name, code or email" [(ngModel)]="search" (keyup.enter)="load()" />
+      <input class="form-control" type="text" appNoAutofill placeholder="Search name, code or email" [(ngModel)]="search" (keyup.enter)="load()" />
     </div>
   </div>
 

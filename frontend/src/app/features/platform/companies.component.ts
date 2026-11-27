@@ -12,6 +12,7 @@ import {
 import { IconDirective } from '../../core/icons/icon.directive';
 import { ToastService } from '../../core/services/toast.service';
 import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 function emptyForm(): CreateCompanyRequest {
   return {
@@ -32,7 +33,7 @@ function emptyForm(): CreateCompanyRequest {
  */
 @Component({
   selector: 'app-companies',
-  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent],
+  imports: [CommonModule, FormsModule, IconDirective, TablePaginationComponent, NoAutofillDirective],
   templateUrl: './companies.component.html',
 })
 export class CompaniesComponent implements OnInit, OnDestroy {
@@ -191,7 +192,7 @@ export class CompaniesComponent implements OnInit, OnDestroy {
           timeZone: d.timeZone ?? '',
         };
       },
-      error: () => {},
+      error: () => { },
     });
   }
 

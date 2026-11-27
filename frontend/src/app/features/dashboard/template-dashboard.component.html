@@ -10,9 +10,11 @@
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'approvals'" (click)="setMobileSection('approvals')">
       <span>Approvals ({{ pendingApprovals().length }})</span>
     </button>
-    <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'clock'" (click)="setMobileSection('clock')">
-      <span>Time Tracker</span>
-    </button>
+    @if (!isCompanyAdmin()) {
+      <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'clock'" (click)="setMobileSection('clock')">
+        <span>Time Tracker</span>
+      </button>
+    }
     <button type="button" class="m-tab-btn" [class.active]="activeMobileSection() === 'notices'" (click)="setMobileSection('notices')">
       <span>Notices ({{ notices().length }})</span>
     </button>
@@ -459,7 +461,8 @@
 
     <!-- RIGHT COLUMN: Time Tracker & Holiday Calendar -->
     <div class="dash-right-col">
-      <!-- 1. Time Tracker & Attendance Punch Card -->
+      <!-- 1. Time Tracker & Attendance Punch Card (hidden for Company Admin) -->
+      @if (!isCompanyAdmin()) {
       <div
         class="dash-widget punch-widget"
         [class.mobile-hidden]="activeMobileSection() !== 'all' && activeMobileSection() !== 'clock'"
@@ -469,10 +472,6 @@
         @if (poppedWidget() === 'punch') {
           <button type="button" class="widget-popout-close" (click)="closePopout($event)" aria-label="Close">✕</button>
         }
-        <div class="punch-header">
-          <div class="punch-date">{{ currentTime() | date:'EEEE, MMM d, y' }}</div>
-          <div class="punch-live-clock">{{ currentTime() | date:'hh:mm:ss a' }}</div>
-        </div>
 
         <!-- Shift & Status Badge -->
         <div class="punch-status-badge" [class.active]="punchService.state() === 'active'"
@@ -485,13 +484,13 @@
           }
         </div>
 
-        <!-- Timers: Production Time & Break Time -->
+        <!-- Timers: Production Time (Full-Width Block Focus) & Break Time -->
         <div class="punch-timers">
-          <div class="timer-box">
+          <div class="timer-box work-hero">
             <div class="timer-label">Work Time</div>
             <div class="timer-value">{{ punchService.workTime() }}</div>
           </div>
-          <div class="timer-box">
+          <div class="timer-box break-secondary">
             <div class="timer-label">Break Time</div>
             <div class="timer-value break">{{ punchService.breakTime() }}</div>
           </div>
@@ -591,6 +590,7 @@
           </div>
         </div>
       </div>
+      }
 
       <!-- 2. Upcoming Holidays / Holiday Calendar Card -->
       <div

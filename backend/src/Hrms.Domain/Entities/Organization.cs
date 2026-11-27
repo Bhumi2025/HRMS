@@ -22,7 +22,7 @@ public class Designation : BaseEntity
 {
     public string Name { get; set; } = string.Empty;
 
-    public string Grade { get; set; } = "L3";
+    public string Grade { get; set; } = string.Empty;
 
     public Guid? DepartmentId { get; set; }
 

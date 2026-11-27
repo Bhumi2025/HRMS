@@ -29,7 +29,7 @@ export const superAdminGuard: CanActivateFn = () => {
 };
 
 /**
- * Restricts administrative HR/Company modules to Super Admin, Company Admin, HR Manager, and Manager.
+ * Restricts administrative HR/Company modules to Super Admin, Company Admin, and HR Manager.
  * Employees attempting to access admin routes are redirected to their employee self-service dashboard (`/me/dashboard`).
  */
 export const nonEmployeeGuard: CanActivateFn = () => {
@@ -39,4 +39,12 @@ export const nonEmployeeGuard: CanActivateFn = () => {
     return router.parseUrl('/me/dashboard');
   }
   return true;
+};
+
+/** Restricts Company Settings (Key Groups, Navigation, Roles) to Super Admin and Company Admin only. */
+export const adminOnlyGuard: CanActivateFn = () => {
+  const session = inject(SessionService);
+  const router = inject(Router);
+  const role = session.role();
+  return role === 'Super Admin' || role === 'Company Admin' ? true : router.parseUrl(session.landingPath());
 };

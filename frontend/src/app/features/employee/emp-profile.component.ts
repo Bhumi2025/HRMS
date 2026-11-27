@@ -8,20 +8,9 @@ import { UiService } from '../../core/services/ui.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
-import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
-import { triggerDocumentDownload } from '../../core/utils/document-download.util';
-import { ACCEPT_DOC_TYPES, ACCEPT_IMG_TYPES, validateDocumentFile, validateImageFile } from '../../core/utils/file-validator';
-
-interface DocRow {
-  id?: string;
-  doc: string;
-  type: string;
-  issue: string;
-  exp: string;
-  s: string;
-  fileUrl?: string | null;
-  fileSize?: string | null;
-}
+import { SessionService } from '../../core/services/session.service';
+import { KeyGroupCacheService } from '../../core/services/key-group-cache.service';
+import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 
 /**
  * My Profile (employee) — ported from pages/emp-profile.html. The original's
@@ -29,7 +18,7 @@ interface DocRow {
  */
 @Component({
   selector: 'app-emp-profile',
-  imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent, TablePaginationComponent],
+  imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent],
   template: `
     <!-- Banner -->
     <div
@@ -88,55 +77,55 @@ interface DocRow {
             <div class="form-grid-salutation">
               <div class="form-group">
                 <label class="form-label">Salutation</label>
-                <app-select [options]="salutationOptions" [value]="personal().salutation" [disabled]="true" width="100%" />
+                <app-select [options]="salutationOptions" [value]="personal().salutation" (valueChange)="patchPersonal('salutation', $event)" width="100%" />
               </div>
               <div class="form-group">
                 <label class="form-label">First Name</label>
-                <input class="form-control" [value]="personal().firstName" disabled placeholder="First Name" />
+                <input class="form-control" [value]="personal().firstName" (input)="patchPersonal('firstName', $any($event.target).value)" placeholder="First Name" />
               </div>
             </div>
 
             <div class="form-grid-2">
               <div class="form-group">
                 <label class="form-label">Middle Name</label>
-                <input class="form-control" [value]="personal().middleName" disabled placeholder="Middle Name" />
+                <input class="form-control" [value]="personal().middleName" (input)="patchPersonal('middleName', $any($event.target).value)" placeholder="Middle Name" />
               </div>
               <div class="form-group">
                 <label class="form-label">Last Name</label>
-                <input class="form-control" [value]="personal().lastName" disabled placeholder="Last Name" />
+                <input class="form-control" [value]="personal().lastName" (input)="patchPersonal('lastName', $any($event.target).value)" placeholder="Last Name" />
               </div>
             </div>
 
             <div class="form-grid-2">
               <div class="form-group">
                 <label class="form-label">Personal Email</label>
-                <input class="form-control" type="email" [value]="personal().email" disabled placeholder="Personal Email" />
+                <input class="form-control" type="email" [value]="personal().email" (input)="patchPersonal('email', $any($event.target).value)" placeholder="Personal Email" />
               </div>
               <div class="form-group">
                 <label class="form-label">Contact Number</label>
-                <input class="form-control" type="tel" [value]="personal().phone" disabled placeholder="Contact Number" />
+                <input class="form-control" type="tel" [value]="personal().phone" (input)="patchPersonal('phone', $any($event.target).value)" placeholder="Contact Number" />
               </div>
             </div>
 
             <div class="form-grid-2">
               <div class="form-group">
                 <label class="form-label">Date of Birth</label>
-                <input class="form-control" type="date" [value]="personal().dob" disabled />
+                <input class="form-control" type="date" [value]="personal().dob" (input)="patchPersonal('dob', $any($event.target).value)" />
               </div>
               <div class="form-group">
                 <label class="form-label">Gender</label>
-                <app-key-select groupCode="GENDER" [value]="personal().gender" [disabled]="true" width="100%" />
+                <app-key-select groupCode="GENDER" [value]="personal().gender" (valueChange)="patchPersonal('gender', $event)" width="100%" />
               </div>
             </div>
 
             <div class="form-grid-2">
               <div class="form-group">
                 <label class="form-label">Marital Status</label>
-                <app-key-select groupCode="MARITAL_STATUS" [value]="personal().marital" [disabled]="true" width="100%" />
+                <app-key-select groupCode="MARITAL_STATUS" [value]="personal().marital" (valueChange)="patchPersonal('marital', $event)" width="100%" />
               </div>
               <div class="form-group">
                 <label class="form-label">Blood Group</label>
-                <app-key-select groupCode="BLOOD_GROUP" [value]="personal().blood" [disabled]="true" width="100%" />
+                <app-key-select groupCode="BLOOD_GROUP" [value]="personal().blood" (valueChange)="patchPersonal('blood', $event)" width="100%" />
               </div>
             </div>
           </div>
@@ -150,7 +139,7 @@ interface DocRow {
             </div>
             <div class="form-group">
               <label class="form-label">Job Title</label>
-              <input class="form-control" [value]="job().title" disabled />
+              <input class="form-control" [value]="job().title" disabled readonly style="background: var(--bg); color: var(--muted)" />
             </div>
             <div class="form-group">
               <label class="form-label">Department</label>
@@ -163,6 +152,11 @@ interface DocRow {
           </div>
         </div>
       </div>
+
+      <div class="form-footer" style="margin-top: 16px;">
+        <button class="btn btn-outline btn-sm" type="button" (click)="load()">Cancel</button>
+        <button class="btn btn-primary btn-sm" type="button" (click)="save('Personal details saved!')"><span [appIcon]="'check'"></span> Save Changes</button>
+      </div>
     }
 
     <!-- CONTACT -->
@@ -173,7 +167,7 @@ interface DocRow {
           <div class="form-grid-2">
             <div class="form-group">
               <label class="form-label">Email</label>
-              <input class="form-control" type="email" [value]="personal().email" disabled placeholder="Email Address" />
+              <input class="form-control" type="email" [value]="personal().email" (input)="patchPersonal('email', $any($event.target).value)" placeholder="Email Address" />
             </div>
             <div class="form-group">
               <label class="form-label">Password</label>
@@ -183,8 +177,8 @@ interface DocRow {
                   class="form-control profile-pwd-input"
                   [type]="showContactPassword() ? 'text' : 'password'"
                   [value]="personal().password"
-                  disabled
-                  [placeholder]="hasStoredPassword() && !personal().password ? 'Password set (change password to sync)' : 'Password'"
+                  (input)="patchPersonal('password', $any($event.target).value)"
+                  [placeholder]="hasStoredPassword() && !personal().password ? 'Enter new password to change' : 'Password'"
                 />
                 <button
                   type="button"
@@ -240,39 +234,39 @@ interface DocRow {
           <div class="card-body" style="overflow: visible">
             <div class="form-group">
               <label class="form-label">Bank Name</label>
-              <app-select [options]="bankOptions" [value]="bank().bankName" [disabled]="true" width="100%" />
+              <app-select [options]="bankOptions" [value]="bank().bankName" (valueChange)="patchBank('bankName', $event)" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">Bank Account Name</label>
-              <input class="form-control" [value]="bank().accountName" disabled />
+              <input class="form-control" [value]="bank().accountName" (input)="patchBank('accountName', $any($event.target).value)" />
             </div>
             <div class="form-group">
               <label class="form-label">Account No</label>
-              <input class="form-control" [value]="bank().accountNo" disabled />
+              <input class="form-control" [value]="bank().accountNo" (input)="patchBank('accountNo', $any($event.target).value)" />
             </div>
             <div class="form-group">
               <label class="form-label">IBAN</label>
-              <input class="form-control" [value]="bank().iban" disabled />
+              <input class="form-control" [value]="bank().iban" (input)="patchBank('iban', $any($event.target).value)" />
             </div>
             <div class="form-group">
               <label class="form-label">IFSC Code</label>
-              <input class="form-control" [value]="bank().ifsc" disabled />
+              <input class="form-control" [value]="bank().ifsc" (input)="patchBank('ifsc', $any($event.target).value)" />
             </div>
             <div class="form-group">
               <label class="form-label">Swift Code</label>
-              <input class="form-control" [value]="bank().swift" disabled />
+              <input class="form-control" [value]="bank().swift" (input)="patchBank('swift', $any($event.target).value)" />
             </div>
             <div class="form-group">
               <label class="form-label">Currency</label>
-              <app-select [options]="currencyOptions" [value]="bank().currency" [disabled]="true" width="100%" />
+              <app-select [options]="currencyOptions" [value]="bank().currency" (valueChange)="patchBank('currency', $event)" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">Payment Mode</label>
-              <app-key-select groupCode="PAYMENT_MODE" [value]="bank().paymentMode" [disabled]="true" width="100%" />
+              <app-key-select groupCode="PAYMENT_MODE" [value]="bank().paymentMode" (valueChange)="patchBank('paymentMode', $event)" width="100%" />
             </div>
             <div class="form-group">
               <label class="form-label">WPS ID</label>
-              <input class="form-control" [value]="bank().wpsId" disabled />
+              <input class="form-control" [value]="bank().wpsId" (input)="patchBank('wpsId', $any($event.target).value)" />
             </div>
           </div>
         </div>
@@ -292,158 +286,12 @@ interface DocRow {
           </div>
         </div>
       </div>
-    }
 
-    <!-- DOCUMENTS -->
-    @if (tab() === 'docs') {
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">My Documents</div>
-          <button class="btn btn-primary btn-sm" (click)="ui.open('empUploadDocModal')"><span [appIcon]="'upload2'"></span> Upload</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Document</th>
-                <th>Type</th>
-                <th>Issue Date</th>
-                <th>Expiry Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (r of paginatedDocs(); track r.doc) {
-                <tr>
-                  <td style="font-weight: 600">{{ r.doc }}</td>
-                  <td><span class="badge badge-info">{{ r.type }}</span></td>
-                  <td><input class="form-control" type="date" [value]="r.issue" (input)="r.issue = $any($event.target).value" style="padding: 4px 8px; font-size: 12px" /></td>
-                  <td><input class="form-control" type="date" [value]="r.exp" (input)="r.exp = $any($event.target).value" style="padding: 4px 8px; font-size: 12px" /></td>
-                  <td><span class="badge badge-success">{{ r.s }}</span></td>
-                  <td>
-                    <div style="display: flex; gap: 4px">
-                      <button class="btn btn-ghost btn-sm" data-tooltip="View" (click)="viewDoc(r)"><span [appIcon]="'eye'"></span></button>
-                      <button class="btn btn-ghost btn-sm" data-tooltip="Download" (click)="downloadDocument(r)"><span [appIcon]="'download'"></span></button>
-                    </div>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-        <app-table-pagination [total]="docs().length" [page]="docsPage()" (pageChange)="docsPage.set($event)" />
+      <div class="form-footer" style="margin-top: 16px;">
+        <button class="btn btn-outline btn-sm" type="button" (click)="load()">Cancel</button>
+        <button class="btn btn-primary btn-sm" type="button" (click)="save('Bank details saved!')"><span [appIcon]="'check'"></span> Save Changes</button>
       </div>
     }
-
-    <!-- Upload Doc Modal -->
-    <div class="modal-overlay" [class.open]="ui.isOpen('empUploadDocModal')" (click)="ui.onOverlayClick($event, 'empUploadDocModal')">
-      <div class="modal">
-        <div class="modal-header">
-          <div style="font-size: 14px; font-weight: 700">Upload Document</div>
-          <button class="btn btn-ghost btn-sm" (click)="ui.close('empUploadDocModal')"><span [appIcon]="'x'"></span></button>
-        </div>
-        <div class="modal-body" style="overflow: visible">
-          <div class="form-group">
-            <label class="form-label">Document Type</label>
-            <app-select [options]="uploadTypeOptions" [value]="uploadType()" (valueChange)="uploadType.set($event)" width="100%" />
-          </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
-            <div class="form-group">
-              <label class="form-label">Issue Date</label>
-              <input class="form-control" type="date" [value]="uploadIssueDate()" (input)="uploadIssueDate.set($any($event.target).value)" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Expiry Date</label>
-              <input class="form-control" type="date" [value]="uploadExpiryDate()" (input)="uploadExpiryDate.set($any($event.target).value)" />
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Upload File</label>
-            <input #empFileInput type="file" [accept]="acceptDocTypes" (change)="onDocFileSelected($event)" style="display: none" />
-            <div
-              style="border: 2px dashed var(--border); border-radius: var(--r); padding: 24px; text-align: center; cursor: pointer; transition: var(--t)"
-              [style.borderColor]="selectedDocFile() ? 'var(--p)' : 'var(--border)'"
-              [style.background]="selectedDocFile() ? 'var(--p-soft)' : 'transparent'"
-              (click)="empFileInput.click()"
-              (dragover)="$event.preventDefault()"
-              (drop)="onDocFileDrop($event)"
-            >
-              @if (selectedDocFile()) {
-                <div style="color: var(--p); margin-bottom: 6px"><span [appIcon]="'check'"></span></div>
-                <div style="font-size: 0.9rem; font-weight: 700; color: var(--text)">{{ selectedDocFile()?.name }}</div>
-                <div style="font-size: 0.78rem; color: var(--muted); margin-top: 3px">{{ formatFileSize(selectedDocFile()?.size || 0) }} &bull; Click to change file</div>
-              } @else {
-                <div style="color: var(--p); margin-bottom: 6px"><span [appIcon]="'upload2'"></span></div>
-                <div style="font-size: 0.86rem; font-weight: 600">Drop file or click to browse</div>
-                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG up to 2MB</div>
-              }
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" (click)="closeUploadDocModal()">Cancel</button>
-          <button class="btn btn-primary" [disabled]="uploadingDoc()" (click)="uploadDocument()">
-            {{ uploadingDoc() ? 'Uploading...' : 'Upload' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- View Document Modal -->
-    <div class="modal-overlay" [class.open]="ui.isOpen('viewDocModal')" (click)="ui.onOverlayClick($event, 'viewDocModal')">
-      <div class="modal" style="max-width: 650px;">
-        <div class="modal-header">
-          <div>
-            <div style="font-size: 15px; font-weight: 700;">{{ selectedDocView()?.doc }}</div>
-            <div style="font-size: 12px; color: var(--muted);">Document Details & Verification</div>
-          </div>
-          <button class="btn btn-ghost btn-sm" (click)="ui.close('viewDocModal')"><span [appIcon]="'x'"></span></button>
-        </div>
-        <div class="modal-body">
-          @if (selectedDocView(); as d) {
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Document Type</div>
-                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.type }}</div>
-              </div>
-              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Status</div>
-                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">
-                  <span class="badge" [class]="d.s === 'Expired' ? 'badge-danger' : 'badge-success'">{{ d.s }}</span>
-                </div>
-              </div>
-              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Issue Date</div>
-                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.issue || 'Not set' }}</div>
-              </div>
-              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Expiry Date</div>
-                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.exp || 'Not set' }}</div>
-              </div>
-            </div>
-
-            @if (d.fileUrl && (d.fileUrl.startsWith('data:image') || d.fileUrl.endsWith('.jpg') || d.fileUrl.endsWith('.jpeg') || d.fileUrl.endsWith('.png'))) {
-              <div style="text-align: center; background: #0f172a; border-radius: 8px; padding: 12px; margin-bottom: 12px; max-height: 240px; overflow: hidden;">
-                <img [src]="d.fileUrl" alt="Document Preview" style="max-height: 220px; max-width: 100%; object-fit: contain; border-radius: 6px;" />
-              </div>
-            } @else {
-              <div style="border: 2px dashed var(--border); border-radius: 10px; padding: 24px; text-align: center; background: var(--bg); margin-bottom: 12px;">
-                <div style="color: var(--p); font-size: 28px; margin-bottom: 6px;"><span [appIcon]="'documents'"></span></div>
-                <div style="font-size: 14px; font-weight: 700; color: var(--text);">{{ d.doc }}</div>
-                <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">Verified HR Document &bull; Ready for Download</div>
-              </div>
-            }
-          }
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" (click)="ui.close('viewDocModal')">Close</button>
-          <button class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;" (click)="selectedDocView() && downloadDocument(selectedDocView()!)">
-            <span [appIcon]="'download'"></span> Download Document
-          </button>
-        </div>
-      </div>
-    </div>
   `,
   styles: [
     `
@@ -587,6 +435,8 @@ export class EmpProfileComponent implements OnInit {
   protected readonly ui = inject(UiService);
   protected readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
+  private readonly session = inject(SessionService);
+  private readonly keyGroupCache = inject(KeyGroupCacheService);
   protected readonly currencyService = inject(CurrencyService);
 
   protected readonly detail = signal<EmployeeDetail | null>(null);
@@ -594,10 +444,6 @@ export class EmpProfileComponent implements OnInit {
   private departmentIds = new Map<string, string>();
 
   protected readonly avatarUrl = signal<string | null>(null);
-  protected readonly selectedDocFile = signal<File | null>(null);
-  protected readonly uploadIssueDate = signal(new Date().toISOString().slice(0, 10));
-  protected readonly uploadExpiryDate = signal('');
-  protected readonly uploadingDoc = signal(false);
 
   protected readonly displayName = computed(() => {
     const p = this.personal();
@@ -614,7 +460,6 @@ export class EmpProfileComponent implements OnInit {
     return initials || 'EP';
   }
 
-  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
   protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
 
   protected onAvatarSelected(event: Event): void {
@@ -665,120 +510,12 @@ export class EmpProfileComponent implements OnInit {
     }
   }
 
-  protected onDocFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-      const file = input.files[0];
-      const check = validateDocumentFile(file);
-      if (!check.valid) {
-        this.toast.show(check.error || 'Invalid file.', 'danger');
-        input.value = '';
-        this.selectedDocFile.set(null);
-        return;
-      }
-      this.selectedDocFile.set(file);
-    }
-  }
-
-  protected onDocFileDrop(event: DragEvent): void {
-    event.preventDefault();
-    if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-      const file = event.dataTransfer.files[0];
-      const check = validateDocumentFile(file);
-      if (!check.valid) {
-        this.toast.show(check.error || 'Invalid file.', 'danger');
-        return;
-      }
-      this.selectedDocFile.set(file);
-    }
-  }
-
-  protected formatFileSize(bytes: number): string {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  }
-
-  protected closeUploadDocModal(): void {
-    this.selectedDocFile.set(null);
-    this.uploadIssueDate.set(new Date().toISOString().slice(0, 10));
-    this.uploadExpiryDate.set('');
-    this.ui.close('empUploadDocModal');
-  }
-
-  protected uploadDocument(): void {
-    const employeeId = this.apiId();
-    if (!employeeId) {
-      this.toast.show('Your profile is still loading.', 'danger');
-      return;
-    }
-
-    const file = this.selectedDocFile();
-    const type = this.uploadType();
-    const documentType = type === 'Visa' || type === 'Work Permit'
-      ? 'Legal'
-      : type === 'Medical Insurance'
-        ? 'Benefits'
-        : type === 'Other'
-          ? 'Other'
-          : 'Identity';
-
-    const docName = file ? file.name : `${type} Document`;
-    const fileSize = file ? this.formatFileSize(file.size) : '1.2 MB';
-
-    this.uploadingDoc.set(true);
-
-    const executeSave = (fileUrl: string | null, size: string) => {
-      this.api
-        .createDocument({
-          employeeId,
-          name: docName,
-          type: documentType,
-          issueDate: this.uploadIssueDate() || new Date().toISOString().slice(0, 10),
-          expiryDate: this.uploadExpiryDate() || null,
-          notes: null,
-          fileUrl,
-          fileSize: size,
-          isCompanyDocument: false,
-        })
-        .subscribe({
-          next: () => {
-            this.uploadingDoc.set(false);
-            this.closeUploadDocModal();
-            this.toast.show('Document uploaded successfully!', 'success');
-            this.loadDocuments(employeeId);
-          },
-          error: (error) => {
-            this.uploadingDoc.set(false);
-            this.toast.show(error?.error?.title ?? error?.error?.message ?? 'Could not upload the document.', 'danger');
-          },
-        });
-    };
-
-    if (file) {
-      this.api.uploadFile(file).subscribe({
-        next: (uploadRes) => {
-          executeSave(uploadRes.url, uploadRes.size || fileSize);
-        },
-        error: () => {
-          const reader = new FileReader();
-          reader.onload = () => executeSave(reader.result as string, fileSize);
-          reader.onerror = () => {
-            this.uploadingDoc.set(false);
-            this.toast.show('Failed to read document file.', 'danger');
-          };
-          reader.readAsDataURL(file);
-        },
-      });
-    } else {
-      executeSave(null, fileSize);
-    }
-  }
-
   ngOnInit(): void {
+    this.keyGroupCache.clearCache();
     this.api.departments().subscribe({
       next: (departments) => {
         this.departmentIds = new Map(departments.map((d) => [d.name, d.id]));
+        this.deptOptions = departments.map((d) => ({ v: d.name, l: d.name }));
       },
       error: () => {
         /* API offline — department mapping stays empty. */
@@ -788,7 +525,7 @@ export class EmpProfileComponent implements OnInit {
     this.load();
   }
 
-  private load(): void {
+  protected load(): void {
     this.api.employeeMe().subscribe({
       next: (employee) => {
         this.detail.set(employee);
@@ -815,11 +552,11 @@ export class EmpProfileComponent implements OnInit {
         this.job.set({
           title: employee.jobTitle,
           dept: employee.department,
-          reportsTo: employee.reportingManager ?? '',
+          reportsTo: (!employee.reportingManager || employee.reportingManager === 'Manager') ? 'Company Admin' : employee.reportingManager,
           joinDate: employee.joinDate,
         });
 
-        if (employee.reportingManager && !this.reportingOptions.some((o) => o.v.toLowerCase() === employee.reportingManager?.toLowerCase())) {
+        if (employee.reportingManager && employee.reportingManager !== 'Manager' && !this.reportingOptions.some((o) => o.v.toLowerCase() === employee.reportingManager?.toLowerCase())) {
           this.reportingOptions = [
             ...this.reportingOptions,
             { v: employee.reportingManager, l: employee.reportingManager },
@@ -867,32 +604,9 @@ export class EmpProfileComponent implements OnInit {
           paymentMode: employee.paymentMode || 'Bank Transfer',
           wpsId: employee.wpsId ?? '',
         });
-
-        this.loadDocuments(employee.id);
       },
       error: () => {
         this.toast.show('Could not load your profile.', 'danger');
-      },
-    });
-  }
-
-  private loadDocuments(employeeId: string): void {
-    this.api.documents({ employeeId }).subscribe({
-      next: (rows) =>
-        this.docs.set(
-          rows.map((d) => ({
-            id: d.id,
-            doc: d.name,
-            type: d.type,
-            issue: d.issueDate ?? '',
-            exp: d.expiryDate ?? '',
-            s: d.status,
-            fileUrl: d.fileUrl ?? null,
-            fileSize: d.fileSize ?? null,
-          })),
-        ),
-      error: () => {
-        /* API offline — no documents. */
       },
     });
   }
@@ -946,19 +660,14 @@ export class EmpProfileComponent implements OnInit {
       const v = g.trim().toLowerCase();
       if (v === 'male') return 'Male';
       if (v === 'female') return 'Female';
-      if (v === 'other') return 'Other';
-      if (v === 'prefer not to say' || v === 'prefernottosay') return 'PreferNotToSay';
-      return g.trim();
+      return 'Other';
     };
 
     const normalizeMarital = (m: string | null | undefined): string | null => {
       if (!m || !m.trim()) return null;
       const v = m.trim().toLowerCase();
-      if (v === 'single') return 'Single';
       if (v === 'married') return 'Married';
-      if (v === 'divorced') return 'Divorced';
-      if (v === 'widowed') return 'Widowed';
-      return m.trim();
+      return 'Single';
     };
 
     const normalizePaymentMode = (p: string | null | undefined): string => {
@@ -984,7 +693,7 @@ export class EmpProfileComponent implements OnInit {
         branchId: detail.branchId,
         reportingManagerId: detail.reportingManagerId ?? null,
         jobTitle: job.title || detail.jobTitle,
-        grade: detail.grade,
+        grade: '',
         employmentType: detail.employmentType,
         status: detail.status,
         joinDate: this.toIso(job.joinDate) ?? detail.joinDate,
@@ -1019,13 +728,23 @@ export class EmpProfileComponent implements OnInit {
         country: country || null,
         emergencyContactName: contact.emergencyName?.trim() || null,
         emergencyContactPhone: contact.emergencyPhone?.trim() || null,
+        password: personal.password?.trim() || null,
       })
       .subscribe({
         next: (updated) => {
           this.detail.set(updated);
-          this.toast.show(message);
+          this.hasStoredPassword.set(!!updated.password || !!updated.hasPassword);
+          const fCh = updated.firstName?.trim().slice(0, 1) || '';
+          const lCh = updated.lastName?.trim().slice(0, 1) || '';
+          const initials = (fCh + lCh).toUpperCase() || this.initials();
+          this.session.updateUser({
+            name: updated.fullName,
+            email: updated.email,
+            initials,
+          });
+          this.toast.show(message, 'success');
         },
-        error: (error) => this.toast.show(error?.error?.title ?? 'Could not save your profile.', 'danger'),
+        error: (error) => this.toast.show(error?.error?.detail ?? error?.error?.message ?? error?.error?.title ?? 'Could not save your profile.', 'danger'),
       });
   }
 
@@ -1040,10 +759,9 @@ export class EmpProfileComponent implements OnInit {
     { id: 'personal', label: 'Personal', icon: 'user' },
     { id: 'contact', label: 'Contact', icon: 'mail' },
     { id: 'bank', label: 'Bank', icon: 'payroll' },
-    { id: 'docs', label: 'Documents', icon: 'documents' },
   ] as const;
 
-  protected readonly tab = signal<'personal' | 'contact' | 'bank' | 'docs'>('personal');
+  protected readonly tab = signal<'personal' | 'contact' | 'bank'>('personal');
 
   protected readonly showContactPassword = signal(false);
   protected readonly hasStoredPassword = signal(false);
@@ -1131,56 +849,12 @@ export class EmpProfileComponent implements OnInit {
     ];
   });
 
-  protected readonly docs = signal<DocRow[]>([]);
-  protected readonly docsPage = signal(1);
-  protected readonly paginatedDocs = computed(() => paginateSlice(this.docs(), this.docsPage()));
-  protected readonly selectedDocView = signal<DocRow | null>(null);
-
-  protected viewDoc(r: DocRow): void {
-    this.selectedDocView.set(r);
-    this.ui.open('viewDocModal');
-  }
-
-  protected downloadDocument(r: DocRow): void {
-    triggerDocumentDownload(r.doc, r.fileUrl, {
-      employeeName: this.detail()?.fullName || 'Employee',
-      employeeCode: this.detail()?.employeeCode || 'EMP',
-      issueDate: r.issue,
-      expiryDate: r.exp,
-      status: r.s,
-      type: r.type,
-    });
-    this.toast.show(`Downloaded ${r.doc}`, 'success');
-  }
-
-  protected saveDocRow(r: DocRow): void {
-    this.toast.show(`Saved ${r.doc} details!`, 'success');
-  }
-
-  protected readonly uploadType = signal('Passport');
-
-  protected readonly genderOptions: SelectOption[] = [
-    { v: 'Female', l: 'Female' },
-    { v: 'Male', l: 'Male' },
-    { v: 'Other', l: 'Other' },
-    { v: 'Prefer not to say', l: 'Prefer not to say' },
-  ];
-  protected readonly maritalOptions: SelectOption[] = [
-    { v: 'Married', l: 'Married' },
-    { v: 'Single', l: 'Single' },
-    { v: 'Divorced', l: 'Divorced' },
-    { v: 'Widowed', l: 'Widowed' },
-  ];
-  protected readonly bloodOptions: SelectOption[] = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((b) => ({ v: b, l: b }));
-  protected readonly deptOptions: SelectOption[] = ['Engineering', 'Finance', 'HR', 'Sales', 'Marketing', 'Design'].map((d) => ({ v: d, l: d }));
+  protected deptOptions: SelectOption[] = ['General', 'Engineering', 'Finance', 'HR', 'Sales', 'Marketing', 'Design'].map((d) => ({ v: d, l: d }));
   protected reportingOptions: SelectOption[] = [
-    { v: '', l: 'None (Direct Report)' },
-    { v: 'HR Manager', l: 'HR Manager' },
-    { v: 'Manager', l: 'Manager' },
     { v: 'Company Admin', l: 'Company Admin' },
+    { v: 'HR Manager', l: 'HR Manager' },
     { v: 'Sarah Mitchell', l: 'Sarah Mitchell (HR Manager)' },
     { v: 'Priya Sharma', l: 'Priya Sharma (HR Executive)' },
-    { v: 'Ravi Kumar', l: 'Ravi Kumar (Manager)' },
     { v: 'David Vance', l: 'David Vance (Company Admin)' },
   ];
   protected readonly countryOptions: SelectOption[] = ['UAE', 'Saudi Arabia', 'Qatar', 'United Kingdom', 'United States', 'India'].map((c) => ({ v: c, l: c }));
@@ -1198,7 +872,6 @@ export class EmpProfileComponent implements OnInit {
     { v: 'Cheque', l: 'Cheque' },
     { v: 'Cash', l: 'Cash' },
   ];
-  protected readonly uploadTypeOptions: SelectOption[] = ['Passport', 'Visa', 'Work Permit', 'Emirates ID', 'Medical Insurance', 'Other'].map((t) => ({ v: t, l: t }));
 
   protected readonly salutationOptions: SelectOption[] = [
     { v: 'Mr', l: 'Mr' },
@@ -1207,7 +880,7 @@ export class EmpProfileComponent implements OnInit {
   ];
 
   protected patchPersonal(
-    key: 'salutation' | 'firstName' | 'middleName' | 'lastName' | 'email' | 'phone' | 'dob' | 'gender' | 'marital' | 'blood',
+    key: 'salutation' | 'firstName' | 'middleName' | 'lastName' | 'email' | 'password' | 'phone' | 'dob' | 'gender' | 'marital' | 'blood',
     value: string
   ): void {
     this.personal.update((p) => ({ ...p, [key]: value }));

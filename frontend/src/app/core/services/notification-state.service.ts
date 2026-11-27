@@ -106,8 +106,8 @@ export class NotificationStateService {
             actionLabel = 'Read Announcement';
           } else if (full.includes('document') || full.includes('passport') || full.includes('expiry') || full.includes('visa')) {
             category = 'Document';
-            actionUrl = isEmp ? '/me/documents' : '/documents';
-            actionLabel = 'Check Documents';
+            actionUrl = isEmp ? '/me/profile' : '/employees';
+            actionLabel = 'View Profile';
           } else if (full.includes('payroll') || full.includes('salary') || full.includes('payslip')) {
             category = 'Payroll';
             actionUrl = isEmp ? '/me/payslips' : '/payroll';

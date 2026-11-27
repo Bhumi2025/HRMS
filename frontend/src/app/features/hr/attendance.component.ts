@@ -10,6 +10,7 @@ import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 import { UiService } from '../../core/services/ui.service';
 import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 interface Regularization {
   id: string;
@@ -90,7 +91,7 @@ interface MusterDay {
 
 @Component({
   selector: 'app-attendance',
-  imports: [CommonModule, FormsModule, IconDirective, RouterModule, TablePaginationComponent],
+  imports: [CommonModule, FormsModule, IconDirective, RouterModule, TablePaginationComponent, NoAutofillDirective],
   template: `
     <!-- Top Action Header (only shown in Daily Punch Log & Regularization) -->
     @if (tab() !== 'muster') {
@@ -393,6 +394,7 @@ interface MusterDay {
             <span class="search-mini-icon">🔍</span>
             <input 
               type="text" 
+              appNoAutofill
               class="sidebar-search-field" 
               placeholder="Search employee..." 
               [ngModel]="sidebarSearch()" 
@@ -553,6 +555,7 @@ interface MusterDay {
                   <span class="pill-search-icon">🔍</span>
                   <input 
                     type="text" 
+                    appNoAutofill
                     placeholder="Search day..." 
                     [ngModel]="timelineSearch()" 
                     (ngModelChange)="timelineSearch.set($event); musterPage.set(1)"

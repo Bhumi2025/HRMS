@@ -250,10 +250,24 @@ public sealed class PermissionAuthorizationFilter : IAsyncActionFilter
             return;
         }
 
-        // Lockout protection: Company Admin is guaranteed access to Settings
+        // Lockout protection: Company Admin is guaranteed full read/write access to Settings
         if (isCompanyAdmin && moduleCode == "SETT")
         {
             await next();
+            return;
+        }
+
+        // Restrict Company Settings (Key Groups, Navigation, Roles) to Company Admin / Super Admin only
+        if (isHrManager && moduleCode == "SETT")
+        {
+            context.Result = new ObjectResult(new
+            {
+                errorCode = "PERMISSION_DENIED",
+                message = "Access denied: Settings and Key Group Management are restricted to Company Admin."
+            })
+            {
+                StatusCode = StatusCodes.Status403Forbidden
+            };
             return;
         }
 

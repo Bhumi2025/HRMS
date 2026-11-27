@@ -123,6 +123,7 @@ public sealed class OnboardingEmailTests
         Assert.Contains(created.EmployeeCode, msg.HtmlBody);
         Assert.Contains("Aarav Sharma", msg.HtmlBody);
         Assert.Contains("aarav.sharma@example.com", msg.HtmlBody);
+        Assert.Contains("Employee", msg.HtmlBody);
         Assert.Contains("Set Password", msg.HtmlBody);
         Assert.Contains("http://localhost:4200/set-password?token=", msg.HtmlBody);
 

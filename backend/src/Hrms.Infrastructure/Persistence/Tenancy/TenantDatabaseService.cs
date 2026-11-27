@@ -44,8 +44,8 @@ BEGIN
     ALTER TABLE Roles ADD IsSystem BIT NOT NULL CONSTRAINT DF_Roles_IsSystem DEFAULT 0;
 END
 
-EXEC(N'UPDATE Roles SET IsSystem = 1 WHERE Name IN (''Super Admin'', ''Company Admin'', ''HR Manager'', ''Manager'', ''Employee'') 
-   OR Code IN (''SuperAdmin'', ''CompanyAdmin'', ''HrManager'', ''Manager'', ''Employee'');');
+EXEC(N'UPDATE Roles SET IsSystem = 1 WHERE Name IN (''Super Admin'', ''Company Admin'', ''HR Manager'', ''Employee'') 
+   OR Code IN (''SuperAdmin'', ''CompanyAdmin'', ''HrManager'', ''Employee'');');
 
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'NavigationItems' AND COLUMN_NAME = 'Code')
 BEGIN
@@ -188,6 +188,23 @@ BEGIN
         pr.TotalNet = (SELECT ISNULL(SUM(p.NetPay), 0) FROM Payslips p WHERE p.PayrollRunId = pr.Id)
     FROM PayrollRuns pr;
 END
+
+IF OBJECT_ID('Employees', 'U') IS NOT NULL
+BEGIN
+    UPDATE Employees SET Gender = 'Other' WHERE Gender IN ('PreferNotToSay', 'Prefer not to say', '4');
+    UPDATE Employees SET MaritalStatus = 'Single' WHERE MaritalStatus IN ('Divorced', 'Widowed', '3', '4');
+END
+
+IF OBJECT_ID('KeyStores', 'U') IS NOT NULL AND OBJECT_ID('KeyGroups', 'U') IS NOT NULL
+BEGIN
+    DELETE ks
+    FROM KeyStores ks
+    INNER JOIN KeyGroups kg ON ks.KeyGroupId = kg.Id
+    WHERE UPPER(kg.Code) = 'GRADE_LEVEL'
+       OR (UPPER(kg.Code) = 'GENDER' AND ks.[Key] NOT IN ('Male', 'Female', 'Other'))
+       OR (UPPER(kg.Code) = 'MARITAL_STATUS' AND ks.[Key] NOT IN ('Single', 'Married'));
+    DELETE FROM KeyGroups WHERE UPPER(Code) = 'GRADE_LEVEL';
+END
 ";
         await db.Database.ExecuteSqlRawAsync(ensureSchemaSql, ct);
     }
@@ -217,8 +234,32 @@ END
 
         var companyAdminRole = EnsureRole("CompanyAdmin", "Company Admin", "Manages this company");
         EnsureRole("HrManager", "HR Manager", "HR operations and approvals");
-        EnsureRole("Manager", "Manager", "Team management, reviews and shift approvals");
         EnsureRole("Employee", "Employee", "Self-service portal");
+
+        var generalDept = await db.Departments.FirstOrDefaultAsync(d => d.Name.ToLower() == "general", ct);
+        if (generalDept is null)
+        {
+            generalDept = new Department
+            {
+                Name = "General",
+                Code = "GEN",
+                Description = "General department",
+                IsActive = true,
+            };
+            db.Departments.Add(generalDept);
+            await db.SaveChangesAsync(ct);
+        }
+
+        if (!await db.Designations.AnyAsync(d => d.Name.ToLower() == "employee" && d.DepartmentId == generalDept.Id, ct))
+        {
+            db.Designations.Add(new Designation
+            {
+                Name = "Employee",
+                Grade = string.Empty,
+                DepartmentId = generalDept.Id,
+                Description = "Default employee designation",
+            });
+        }
 
         var email = bootstrap.AdminEmail.Trim().ToLowerInvariant();
         var normalizedEmail = email.ToUpperInvariant();
@@ -268,10 +309,9 @@ END
             ("PAYR", "Payroll", "/payroll", "payroll", 8),
             ("PAYS", "Payslips", "/payslips", "payslip", 9),
             ("ONBD", "Onboarding", "/onboarding", "onboarding", 10),
-            ("DOCS", "Documents", "/documents", "documents", 11),
-            ("APPR", "Approvals", "/approvals", "approvals", 12),
-            ("REPT", "Reports", "/reports", "reports", 13),
-            ("SETT", "Settings", "/settings", "settings", 14),
+            ("APPR", "Approvals", "/approvals", "approvals", 11),
+            ("REPT", "Reports", "/reports", "reports", 12),
+            ("SETT", "Settings", "/settings", "settings", 13),
         };
 
         var existingNavs = await db.NavigationItems.ToListAsync(ct);
@@ -306,6 +346,13 @@ END
         {
             foreach (var n in allNavs)
             {
+                if (r.Code == "HrManager" &&
+                    (n.Code is "SETT" or "KEYG" or "NAVM" or "PERM" or "ROLE" ||
+                     n.Route.StartsWith("/settings", StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
                 if (!permKeys.Contains($"{r.Id}:{n.Id}"))
                 {
                     db.RoleNavigations.Add(new RoleNavigation
@@ -317,6 +364,47 @@ END
                         IsCreate = true,
                         IsEdit = true,
                         IsDelete = true
+                    });
+                }
+            }
+        }
+
+        if (!await db.KeyGroups.AnyAsync(ct))
+        {
+            var seedGroups = new (string Code, string Name, string[] Options)[]
+            {
+                ("BLOOD_GROUP", "Blood Group", new[] { "O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-" }),
+                ("GENDER", "Gender", new[] { "Male", "Female", "Other" }),
+                ("MARITAL_STATUS", "Marital Status", new[] { "Single", "Married" }),
+                ("EMPLOYMENT_TYPE", "Employment Type", new[] { "Full-time", "Part-time", "Contract", "Internship" }),
+                ("PAYMENT_MODE", "Payment Mode", new[] { "Bank Transfer", "Cheque", "Cash" }),
+                ("ASSET_TYPE", "Asset Type", new[] { "Laptop", "Monitor", "Keyboard", "Mouse", "Phone", "Access Card", "Other" }),
+                ("SUPPORT_TYPE", "Support Type", new[] { "IT Hardware", "Software Access", "HR Policy", "Payroll Inquiry", "Facilities" }),
+                ("PRIORITY", "Priority", new[] { "Low", "Medium", "High", "Critical" })
+            };
+
+            foreach (var (code, name, opts) in seedGroups)
+            {
+                var grp = new KeyGroup
+                {
+                    Code = code,
+                    Name = name,
+                    Description = $"{name} dictionary options",
+                    IsGeneric = false
+                };
+                db.KeyGroups.Add(grp);
+                await db.SaveChangesAsync(ct);
+
+                var order = 1;
+                foreach (var opt in opts)
+                {
+                    db.KeyStores.Add(new KeyStore
+                    {
+                        KeyGroupId = grp.Id,
+                        Key = opt,
+                        Value = opt,
+                        DisplayOrder = order++,
+                        IsActive = true
                     });
                 }
             }

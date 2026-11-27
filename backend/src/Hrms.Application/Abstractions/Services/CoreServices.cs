@@ -31,6 +31,8 @@ public interface IEmployeeService
 
     Task UpdatePhotoAsync(Guid id, string photoUrl, CancellationToken ct = default);
 
+    Task<bool> IsEmailAvailableAsync(string email, Guid? excludeEmployeeId = null, CancellationToken ct = default);
+
     /// <summary>Resolves the employee record linked to the current user (or the first employee).</summary>
     Task<Guid> ResolveEmployeeIdAsync(Guid? explicitEmployeeId, CancellationToken ct = default);
 }

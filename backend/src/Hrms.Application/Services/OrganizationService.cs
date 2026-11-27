@@ -102,7 +102,7 @@ public sealed class OrganizationService : IOrganizationService
         var designation = new Designation
         {
             Name = request.Name.Trim(),
-            Grade = request.Grade.Trim(),
+            Grade = request.Grade?.Trim() ?? string.Empty,
             DepartmentId = request.DepartmentId,
             Description = request.Description,
         };
@@ -126,7 +126,7 @@ public sealed class OrganizationService : IOrganizationService
                           ?? throw NotFoundException.For("Designation", id);
 
         designation.Name = request.Name.Trim();
-        designation.Grade = request.Grade.Trim();
+        designation.Grade = request.Grade?.Trim() ?? string.Empty;
         designation.DepartmentId = request.DepartmentId;
         designation.Description = request.Description;
 

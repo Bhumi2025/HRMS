@@ -6,8 +6,7 @@ import { EnrolledFace } from '../../core/api/api.models';
 import { IconDirective } from '../../core/icons/icon.directive';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
 import { ToastService } from '../../core/services/toast.service';
-import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
-import { SelectComponent, SelectOption } from '../../shared/select.component';
+import { SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 
 /**
@@ -145,32 +144,8 @@ import { KeyGroupSelectComponent } from '../../shared/key-select.component';
               </div>
             }
 
-            <!-- STEP 2: DOCUMENTS -->
+            <!-- STEP 2: FACE BIOMETRICS -->
             @if (step() === 2) {
-              <p style="margin-bottom: 16px; font-size: 0.84rem; color: var(--muted)">
-                Upload your identity and legal documents. You can also do this later from your profile.
-              </p>
-              <div class="ob-grid ob-grid-3">
-                @for (doc of docSlots; track doc.key) {
-                  <div>
-                    <label class="form-label">{{ doc.label }}</label>
-                    <div class="doc-upload" (click)="triggerUpload(doc.key)">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
-                      <div class="doc-upload-title">{{ uploadedLabel(doc.key) }}</div>
-                      <div class="doc-upload-sub">PDF, JPG, PNG · 2MB</div>
-                    </div>
-                    <input [id]="'file_' + doc.key" type="file" [accept]="acceptDocTypes" style="display: none" (change)="onUpload(doc.key, $event)" />
-                  </div>
-                }
-              </div>
-            }
-
-            <!-- STEP 3: FACE BIOMETRICS -->
-            @if (step() === 3) {
               <div style="max-width: 500px; margin: 0 auto; text-align: center;">
                 <p style="margin-bottom: 16px; font-size: 0.85rem; color: var(--muted); line-height: 1.5;">
                   Register your facial biometrics to enable 1-second Face ID login and automated Clock In &amp; Clock Out.
@@ -184,7 +159,7 @@ import { KeyGroupSelectComponent } from '../../shared/key-select.component';
                     <div class="emp-face-loading">
                       <div class="face-spinner"></div>
                       <div style="font-size: 13px; font-weight: 600; color: #e2e8f0;">
-                        {{ faceService.loadingModels() ? 'Loading Face AI Neural Networks…' : 'Initializing webcam…' }}
+                        {{ faceService.loadingModels() ? 'Loading face recognition…' : 'Initializing webcam…' }}
                       </div>
                       <div style="font-size: 11px; color: #94a3b8;">Center your face in front of the camera</div>
                     </div>
@@ -723,34 +698,24 @@ export class EmpOnboardingComponent implements OnDestroy {
   protected readonly step = signal(0);
   protected readonly phase = signal<'form' | 'sending' | 'done'>('form');
   protected readonly invalid = signal<Set<string>>(new Set());
-  protected readonly uploaded = signal<Record<string, string>>({});
 
-  protected readonly stepLabels = ['Personal', 'Bank Details', 'Documents', 'Face Biometrics'];
-  protected readonly stepTitles = ['Personal Information', 'Bank Details', 'Upload Documents', 'Face Biometric Identity'];
+  protected readonly stepLabels = ['Personal', 'Bank Details', 'Face Biometrics'];
+  protected readonly stepTitles = ['Personal Information', 'Bank Details', 'Face Biometric Identity'];
 
   protected readonly genderOptions: SelectOption[] = [
     { v: '', l: 'Select' },
     { v: 'Male', l: 'Male' },
     { v: 'Female', l: 'Female' },
     { v: 'Other', l: 'Other' },
-    { v: 'Prefer not to say', l: 'Prefer not to say' },
   ];
   protected readonly maritalOptions: SelectOption[] = [
     { v: '', l: 'Select' },
     { v: 'Single', l: 'Single' },
     { v: 'Married', l: 'Married' },
-    { v: 'Divorced', l: 'Divorced' },
-    { v: 'Widowed', l: 'Widowed' },
   ];
   protected readonly bloodOptions: SelectOption[] = [
     { v: '', l: 'Select' },
     ...['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((b) => ({ v: b, l: b })),
-  ];
-
-  protected readonly docSlots = [
-    { key: 'passport', label: 'Passport Copy' },
-    { key: 'emiratesId', label: 'Emirates ID / National ID' },
-    { key: 'eduCert', label: 'Educational Certificates' },
   ];
 
   protected readonly personal = signal({
@@ -798,38 +763,11 @@ export class EmpOnboardingComponent implements OnDestroy {
     this.bank.update((b) => ({ ...b, [key]: value }));
   }
 
-  protected uploadedLabel(key: string): string {
-    const name = this.uploaded()[key];
-    if (!name) return 'Click to Upload';
-    return `✓ ${name.length > 20 ? `${name.substring(0, 20)}…` : name}`;
-  }
-
-  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
-
-  protected triggerUpload(key: string): void {
-    document.getElementById(`file_${key}`)?.click();
-  }
-
-  protected onUpload(key: string, event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-
-    const check = validateDocumentFile(file);
-    if (!check.valid) {
-      this.toast.show(check.error || 'Invalid file.', 'danger');
-      input.value = '';
-      return;
-    }
-
-    this.uploaded.update((u) => ({ ...u, [key]: file.name }));
-  }
-
   protected nextStep(): void {
     if (!this.validate()) return;
-    if (this.step() < 3) {
+    if (this.step() < 2) {
       this.step.update((s) => s + 1);
-      if (this.step() === 3) {
+      if (this.step() === 2) {
         setTimeout(() => void this.startEmpCamera(), 200);
       } else {
         this.stopEmpCamera();
@@ -892,7 +830,7 @@ export class EmpOnboardingComponent implements OnDestroy {
     if (!this.empCameraActive() || !this.empFaceVideoRef?.nativeElement) return;
 
     this.empFaceCapturing.set(true);
-    this.empFaceMsg.set('Analyzing facial biometrics and computing 128D AI descriptor…');
+    this.empFaceMsg.set('Capturing face biometrics…');
 
     const video = this.empFaceVideoRef.nativeElement;
     const canvas = this.empFaceCanvasRef?.nativeElement;
@@ -900,7 +838,7 @@ export class EmpOnboardingComponent implements OnDestroy {
     const samples: number[][] = [];
     let snapshot = '';
     for (let i = 0; i < 3; i++) {
-      const scan = await this.faceService.detectFace(video, canvas);
+      const scan = await this.faceService.detectFace(video, canvas, true);
       if (scan.hasFace && scan.descriptor) {
         samples.push(scan.descriptor);
         if (scan.snapshot) snapshot = scan.snapshot;
@@ -930,7 +868,7 @@ export class EmpOnboardingComponent implements OnDestroy {
     this.empFaceDescriptor.set(finalDescriptor);
     if (snapshot) this.empFacePhoto.set(snapshot);
 
-    this.empFaceMsg.set('✅ Face Biometrics Captured (128D Deep Neural Embedding)!');
+    this.empFaceMsg.set('Face biometrics captured!');
     this.toast.show('Face profile successfully registered!', 'success');
   }
 
@@ -944,7 +882,6 @@ export class EmpOnboardingComponent implements OnDestroy {
       0: ['firstName', 'lastName', 'email', 'phone'],
       1: ['bankName', 'accountName', 'accountNumber'],
       2: [],
-      3: [],
     };
     const fields = required[this.step()];
     const missing = fields.filter((f) => {
@@ -990,7 +927,7 @@ export class EmpOnboardingComponent implements OnDestroy {
             branchId: employee.branchId,
             reportingManagerId: employee.reportingManagerId ?? null,
             jobTitle: employee.jobTitle,
-            grade: employee.grade,
+            grade: '',
             employmentType: employee.employmentType,
             status: employee.status,
             joinDate: employee.joinDate,

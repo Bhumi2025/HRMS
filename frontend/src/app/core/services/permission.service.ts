@@ -24,7 +24,6 @@ export const SYSTEM_MODULES: { id: string; name: string }[] = [
   { id: 'm8', name: 'Payroll' },
   { id: 'm9', name: 'Payslips' },
   { id: 'm10', name: 'Onboarding' },
-  { id: 'm11', name: 'Documents' },
   { id: 'm12', name: 'Approvals' },
   { id: 'm13', name: 'Reports' },
   { id: 'm14', name: 'Settings' },
@@ -44,34 +43,18 @@ function noPerm(id: string, name: string): ModulePermission {
 
 function defaultForRole(roleCode: string): ModulePermission[] {
   const code = (roleCode || '').toUpperCase().replace(/\s+/g, '');
-  if (code === 'SUPERADMIN' || code === 'ADMIN' || code === 'COMPANYADMIN') {
+  if (code === 'SUPERADMIN' || code === 'ADMIN' || code === 'COMPANYADMIN' || code === 'MANAGER') {
     return SYSTEM_MODULES.map((m) => fullPerm(m.id, m.name));
   }
   if (code === 'HR' || code === 'HRMANAGER') {
     return SYSTEM_MODULES.map((m) => {
       if (m.name === 'Settings') {
-        return { moduleId: m.id, moduleName: m.name, canView: true, canCreate: true, canEdit: true, canDelete: false, isFull: false };
+        return noPerm(m.id, m.name);
       }
       return fullPerm(m.id, m.name);
     });
   }
-  if (code === 'MANAGER') {
-    const allowed = ['Dashboard', 'Employees', 'Profile', 'Attendance', 'Leave', 'Approvals', 'Documents', 'Reports'];
-    return SYSTEM_MODULES.map((m) => {
-      if (['Dashboard', 'Profile', 'Approvals'].includes(m.name)) {
-        return fullPerm(m.id, m.name);
-      }
-      if (['Attendance', 'Leave', 'Documents'].includes(m.name)) {
-        return { moduleId: m.id, moduleName: m.name, canView: true, canCreate: true, canEdit: true, canDelete: false, isFull: false };
-      }
-      if (allowed.includes(m.name)) {
-        return viewOnlyPerm(m.id, m.name);
-      }
-      return noPerm(m.id, m.name);
-    });
-  }
   // Default for EMP / Employee
-  const empModules = ['Dashboard', 'Profile', 'Attendance', 'Leave', 'Payslips', 'Documents'];
   return SYSTEM_MODULES.map((m) => {
     if (['Dashboard', 'Profile'].includes(m.name)) {
       return { moduleId: m.id, moduleName: m.name, canView: true, canCreate: false, canEdit: true, canDelete: false, isFull: false };
@@ -79,7 +62,7 @@ function defaultForRole(roleCode: string): ModulePermission[] {
     if (['Attendance', 'Leave'].includes(m.name)) {
       return { moduleId: m.id, moduleName: m.name, canView: true, canCreate: true, canEdit: false, canDelete: false, isFull: false };
     }
-    if (['Payslips', 'Documents'].includes(m.name)) {
+    if (m.name === 'Payslips') {
       return viewOnlyPerm(m.id, m.name);
     }
     return noPerm(m.id, m.name);
@@ -162,32 +145,39 @@ export class PermissionService {
     if (key === 'punch in/out' || (moduleName || '').toLowerCase().includes('punch')) {
       return false;
     }
-    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
+    if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (key === 'settings') return false;
+    if (role === 'HR Manager') return true;
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canView : false;
   }
 
   canCreate(moduleName: string): boolean {
     const role = this.session.activeRole();
-    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
     const key = this.normKey(moduleName);
+    if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (key === 'settings') return false;
+    if (role === 'HR Manager') return true;
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canCreate : false;
   }
 
   canEdit(moduleName: string): boolean {
     const role = this.session.activeRole();
-    if (role === 'Super Admin' || role === 'Company Admin' || role === 'HR Manager') return true;
     const key = this.normKey(moduleName);
+    if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (key === 'settings') return false;
+    if (role === 'HR Manager') return true;
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canEdit : false;
   }
 
   canDelete(moduleName: string): boolean {
     const role = this.session.activeRole();
-    if (role === 'Super Admin' || role === 'Company Admin') return true;
-    if (role === 'HR Manager' && moduleName !== 'Company') return true;
     const key = this.normKey(moduleName);
+    if (role === 'Super Admin' || role === 'Company Admin') return true;
+    if (key === 'settings') return false;
+    if (role === 'HR Manager' && moduleName !== 'Company') return true;
     const perm = this.currentPermissions().get(key);
     return perm ? perm.canDelete : false;
   }
@@ -218,16 +208,15 @@ export class PermissionService {
     this.writeStorage(`role.${raw}`, permissions);
     this.writeStorage(`role.${norm}`, permissions);
     // Also save under standard aliases so any role mapping matches
-    if (norm === 'ADMIN' || norm === 'COMPANYADMIN') {
+    if (norm === 'ADMIN' || norm === 'COMPANYADMIN' || norm === 'MANAGER') {
       this.writeStorage('role.ADMIN', permissions);
       this.writeStorage('role.COMPANY ADMIN', permissions);
       this.writeStorage('role.COMPANYADMIN', permissions);
+      this.writeStorage('role.MANAGER', permissions);
     } else if (norm === 'HR' || norm === 'HRMANAGER') {
       this.writeStorage('role.HR', permissions);
       this.writeStorage('role.HR MANAGER', permissions);
       this.writeStorage('role.HRMANAGER', permissions);
-    } else if (norm === 'MANAGER') {
-      this.writeStorage('role.MANAGER', permissions);
     } else if (norm === 'EMP' || norm === 'EMPLOYEE') {
       this.writeStorage('role.EMP', permissions);
       this.writeStorage('role.EMPLOYEE', permissions);

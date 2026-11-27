@@ -30,7 +30,7 @@ public sealed class OptionsController : ControllerBase
         Ok(await _options.GetKeyGroupByIdAsync(id, ct));
 
     [HttpPost("groups")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(typeof(KeyGroupDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<KeyGroupDto>> CreateGroup(
         [FromBody] SaveKeyGroupRequest request,
@@ -38,7 +38,7 @@ public sealed class OptionsController : ControllerBase
         Ok(await _options.SaveKeyGroupAsync(request, ct));
 
     [HttpPut("groups/{id:guid}")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(typeof(KeyGroupDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<KeyGroupDto>> UpdateGroup(
         Guid id,
@@ -47,7 +47,7 @@ public sealed class OptionsController : ControllerBase
         Ok(await _options.SaveKeyGroupAsync(request with { Id = id }, ct));
 
     [HttpDelete("groups/{id:guid}")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteGroup(Guid id, CancellationToken ct)
     {
@@ -68,7 +68,7 @@ public sealed class OptionsController : ControllerBase
         Ok(await _options.GetMultipleOptionsAsync(groupCodes, ct));
 
     [HttpPost]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(typeof(KeyStoreDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<KeyStoreDto>> Save(
         [FromBody] SaveKeyStoreRequest request,
@@ -76,7 +76,7 @@ public sealed class OptionsController : ControllerBase
         Ok(await _options.SaveKeyStoreAsync(request, ct));
 
     [HttpPost("values")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(typeof(KeyStoreDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<KeyStoreDto>> CreateValue(
         [FromBody] SaveKeyStoreRequest request,
@@ -84,7 +84,7 @@ public sealed class OptionsController : ControllerBase
         Ok(await _options.SaveKeyStoreAsync(request, ct));
 
     [HttpPut("values/{id:guid}")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(typeof(KeyStoreDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<KeyStoreDto>> UpdateValue(
         Guid id,
@@ -93,7 +93,7 @@ public sealed class OptionsController : ControllerBase
         Ok(await _options.SaveKeyStoreAsync(request with { Id = id }, ct));
 
     [HttpDelete("values/{id:guid}")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteValue(Guid id, CancellationToken ct)
     {
@@ -102,7 +102,7 @@ public sealed class OptionsController : ControllerBase
     }
 
     [HttpPut("values/reorder")]
-    [Authorize(Policy = "HrAdmin")]
+    [Authorize(Policy = "CompanyAdminOnly")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> ReorderValues(
         [FromBody] ReorderKeyStoresRequest request,

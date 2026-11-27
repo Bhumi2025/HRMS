@@ -84,7 +84,7 @@ import { ToastService } from '../core/services/toast.service';
               <div class="face-camera-loading">
                 <div class="face-spinner"></div>
                 <div class="face-loading-text">
-                  {{ faceService.loadingModels() ? 'Loading AI Neural Network…' : 'Initializing camera stream…' }}
+                  {{ faceService.loadingModels() ? 'Loading face recognition…' : 'Initializing camera stream…' }}
                 </div>
                 <div class="face-loading-sub">Position your face in front of the webcam</div>
               </div>
@@ -503,7 +503,7 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
   protected readonly faceVerifying = signal(false);
   protected readonly faceStatus = signal<'idle' | 'scanning' | 'matched' | 'failed'>('idle');
   protected readonly faceMatchScore = signal<number | null>(null);
-  protected readonly statusMessage = signal('Initializing face detection AI neural network…');
+  protected readonly statusMessage = signal('Initializing face detection…');
 
   private mediaStream?: MediaStream;
   private referenceFaceFeatures: number[] | null = null;
@@ -548,7 +548,7 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
           localStorage.removeItem('hrms_face_' + empId);
           localStorage.removeItem('hrms_face_' + empName.toLowerCase());
         }
-      } catch {}
+      } catch { }
     }
 
     // Try backend enrolled faces
@@ -567,7 +567,7 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
               setTimeout(() => void this.startCamera(), 200);
               return;
             }
-          } catch {}
+          } catch { }
         }
 
         // If not enrolled yet, prompt registration
@@ -599,7 +599,7 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
       video.srcObject = this.mediaStream;
       try {
         await video.play();
-      } catch {}
+      } catch { }
 
       this.cameraActive.set(true);
       if (this.isFaceEnrolled()) {
@@ -627,8 +627,8 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
     this.referenceFaceFeatures = null;
     this.faceMatchScore.set(null);
     this.faceStatus.set('idle');
-    this.statusMessage.set('Position face in reticle and click "Register Face" to capture a clean 128D template.');
-    this.toast.show('Ready to re-register face template.', 'info');
+    this.statusMessage.set('Position face in reticle and click "Register Face" to capture your face.');
+    this.toast.show('Ready to re-register face.', 'info');
   }
 
   protected async enrollCurrentFace(): Promise<void> {
@@ -636,7 +636,7 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
 
     this.faceVerifying.set(true);
     this.faceStatus.set('scanning');
-    this.statusMessage.set('AI scanning face and extracting 128D deep neural embedding…');
+    this.statusMessage.set('Scanning face…');
 
     const video = this.faceVideoRef.nativeElement;
     const canvas = this.faceCanvasRef?.nativeElement;
@@ -656,7 +656,7 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
     if (samples.length === 0) {
       this.faceVerifying.set(false);
       this.faceStatus.set('failed');
-      this.statusMessage.set('No face detected by AI model. Look directly into the camera.');
+      this.statusMessage.set('No face detected. Look directly into the camera.');
       this.toast.show('No face detected. Please face the camera.', 'danger');
       return;
     }
@@ -690,18 +690,33 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
     try {
       localStorage.setItem('hrms_face_' + empId, JSON.stringify(record));
       localStorage.setItem('hrms_face_' + empName.toLowerCase(), JSON.stringify(record));
-    } catch {}
+    } catch { }
 
     this.api.enrollFace(empId, {
       faceDescriptor: JSON.stringify(finalDescriptor),
       facePhotoUrl: snapshot,
-    }).subscribe({ next: () => {}, error: () => {} });
-
-    this.faceVerifying.set(false);
-    this.faceStatus.set('idle');
-    this.faceMatchScore.set(null);
-    this.statusMessage.set(`✅ Face enrolled! Now click Verify Face & ${this.actionLabel()}.`);
-    this.toast.show(`Face profile registered for ${empName}!`, 'success');
+    }).subscribe({
+      next: () => {
+        this.faceVerifying.set(false);
+        this.faceStatus.set('idle');
+        this.faceMatchScore.set(null);
+        this.statusMessage.set(`✅ Face enrolled! Now click Verify Face & ${this.actionLabel()}.`);
+        this.toast.show(`Face profile registered for ${empName}!`, 'success');
+      },
+      error: (err) => {
+        this.faceVerifying.set(false);
+        this.faceStatus.set('idle');
+        this.isFaceEnrolled.set(false);
+        this.referenceFaceFeatures = null;
+        try {
+          localStorage.removeItem('hrms_face_' + empId);
+          localStorage.removeItem('hrms_face_' + empName.toLowerCase());
+        } catch { }
+        const msg = err?.error?.title ?? err?.error?.detail ?? err?.error?.message ?? 'Could not enroll Face ID.';
+        this.statusMessage.set(`❌ ${msg}`);
+        this.toast.show(msg, 'danger');
+      },
+    });
   }
 
   protected async verifyFaceAndPunch(): Promise<void> {
@@ -709,7 +724,7 @@ export class FacePunchModalComponent implements OnInit, OnDestroy {
 
     this.faceVerifying.set(true);
     this.faceStatus.set('scanning');
-    this.statusMessage.set('AI comparing biometric face vector against enrolled template…');
+    this.statusMessage.set('Verifying your face…');
 
     const video = this.faceVideoRef.nativeElement;
     const canvas = this.faceCanvasRef?.nativeElement;

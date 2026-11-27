@@ -9,11 +9,12 @@ import { UiService } from '../../core/services/ui.service';
 import { NotificationStateService } from '../../core/services/notification-state.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
+import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 @Component({
   selector: 'app-offboarding',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconDirective, SelectComponent, TablePaginationComponent],
+  imports: [CommonModule, FormsModule, IconDirective, SelectComponent, TablePaginationComponent, NoAutofillDirective],
   template: `
     <!-- KPI Summary Row -->
     <div class="grid-5" style="margin-bottom: 20px;">
