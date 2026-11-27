@@ -125,7 +125,11 @@ public class Employee : BaseEntity
 
     public DateTime? FaceEnrolledAtUtc { get; set; }
 
-    public bool IsFaceEnrolled => !string.IsNullOrWhiteSpace(FaceDescriptor);
+    public bool IsFaceEnrolled =>
+        !string.IsNullOrWhiteSpace(FaceDescriptor) &&
+        !(FacePhotoUrl != null &&
+          FacePhotoUrl.StartsWith("https://images.unsplash.com/", StringComparison.OrdinalIgnoreCase) &&
+          FaceDescriptor.Length < 1000);
 
     // ── Collections ──
     public ICollection<EmployeeDocument> Documents { get; set; } = new List<EmployeeDocument>();

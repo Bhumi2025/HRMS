@@ -54,6 +54,7 @@ public static class DependencyInjection
 
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
+        services.Configure<FaceRecognitionOptions>(configuration.GetSection(FaceRecognitionOptions.SectionName));
         services.Configure<EmailOptions>(options =>
         {
             configuration.GetSection(EmailOptions.SectionName).Bind(options);

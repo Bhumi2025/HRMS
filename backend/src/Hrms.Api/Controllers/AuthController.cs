@@ -1,9 +1,12 @@
 using System.Security.Claims;
 using Hrms.Api.Extensions;
+using Hrms.Api.Security;
 using Hrms.Application.Abstractions.Services;
+using Hrms.Application.Common;
 using Hrms.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Hrms.Api.Controllers;
 
@@ -15,17 +18,21 @@ public sealed class AuthController : ControllerBase
     private readonly IAuthService _auth;
     private readonly IAccountActivationService _activation;
     private readonly Hrms.Application.Abstractions.Tenancy.ITenantResolutionService _tenants;
-
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (int Count, DateTime WindowStart)> RateLimits = new();
+    private readonly IFaceRecognitionService _faceRecognition;
+    private readonly FaceRecognitionOptions _faceOptions;
 
     public AuthController(
         IAuthService auth,
         IAccountActivationService activation,
-        Hrms.Application.Abstractions.Tenancy.ITenantResolutionService tenants)
+        Hrms.Application.Abstractions.Tenancy.ITenantResolutionService tenants,
+        IFaceRecognitionService faceRecognition,
+        IOptions<FaceRecognitionOptions> faceOptions)
     {
         _auth = auth;
         _activation = activation;
         _tenants = tenants;
+        _faceRecognition = faceRecognition;
+        _faceOptions = faceOptions.Value;
     }
 
     /// <summary>Returns the public tenant branding for login screen resolution.</summary>
@@ -38,22 +45,9 @@ public sealed class AuthController : ControllerBase
         [FromQuery] string? subdomain,
         CancellationToken ct)
     {
-        // IP-based Rate Limiting (max 60 requests per minute per IP)
-        // Uses RemoteIpAddress resolved by ASP.NET Core ForwardedHeaders middleware
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        var now = DateTime.UtcNow;
-        var entry = RateLimits.AddOrUpdate(ip, (1, now), (_, old) =>
-            now - old.WindowStart < TimeSpan.FromMinutes(1)
-                ? (old.Count + 1, old.WindowStart)
-                : (1, now));
-
-        if (entry.Count > 60)
+        if (!EndpointRateLimiter.TryConsume(HttpContext, "branding", 60, out var limited))
         {
-            return StatusCode(StatusCodes.Status429TooManyRequests, new ProblemDetails
-            {
-                Status = 429,
-                Title = "Rate limit exceeded. Please wait a moment."
-            });
+            return limited!;
         }
 
         var lookup = !string.IsNullOrWhiteSpace(code) ? code.Trim() : (!string.IsNullOrWhiteSpace(subdomain) ? subdomain.Trim() : null);
@@ -80,6 +74,26 @@ public sealed class AuthController : ControllerBase
         [FromBody] LoginRequest request,
         CancellationToken ct) =>
         Ok(await _auth.LoginAsync(request, ct));
+
+    /// <summary>Authenticates a user via facial biometric verification and returns a JWT access token.</summary>
+    [HttpPost("face-login")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(FaceLoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<FaceLoginResponse>> FaceLogin(
+        [FromBody] FaceLoginRequest request,
+        CancellationToken ct)
+    {
+        if (!EndpointRateLimiter.TryConsume(HttpContext, "face-login", _faceOptions.RateLimitPerMinute, out var limited))
+        {
+            return limited!;
+        }
+
+        return Ok(await _faceRecognition.FaceLoginAsync(request, ct));
+    }
 
     /// <summary>Returns the profile of the authenticated caller.</summary>
     [HttpGet("me")]

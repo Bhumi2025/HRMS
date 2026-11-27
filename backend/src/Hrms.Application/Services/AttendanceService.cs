@@ -6,7 +6,7 @@ using Hrms.Application.Common;
 using Hrms.Application.DTOs;
 using Hrms.Domain.Entities;
 using Hrms.Domain.Enums;
-using System.Text.Json;
+using Microsoft.Extensions.Options;
 
 namespace Hrms.Application.Services;
 
@@ -15,12 +15,18 @@ public sealed class AttendanceService : IAttendanceService
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUser _currentUser;
     private readonly ITenantContext? _tenantContext;
+    private readonly FaceRecognitionOptions _faceOptions;
 
-    public AttendanceService(IUnitOfWork uow, ICurrentUser currentUser, ITenantContext? tenantContext = null)
+    public AttendanceService(
+        IUnitOfWork uow,
+        ICurrentUser currentUser,
+        ITenantContext? tenantContext = null,
+        IOptions<FaceRecognitionOptions>? faceOptions = null)
     {
         _uow = uow;
         _currentUser = currentUser;
         _tenantContext = tenantContext;
+        _faceOptions = faceOptions?.Value ?? new FaceRecognitionOptions();
     }
 
     public async Task<AttendanceSummaryDto> GetSummaryAsync(CancellationToken ct = default)
@@ -1803,33 +1809,50 @@ public sealed class AttendanceService : IAttendanceService
     public async Task<IReadOnlyList<EnrolledFaceDto>> GetEnrolledFacesAsync(CancellationToken ct = default)
     {
         var employees = await _uow.Employees.ToListAsync(
-            _uow.Employees.Query().Where(e => !string.IsNullOrEmpty(e.FaceDescriptor)),
+            _uow.Employees.Query().Where(e =>
+                !string.IsNullOrEmpty(e.FaceDescriptor) &&
+                e.Status != EmploymentStatus.Offboarding &&
+                e.Status != EmploymentStatus.Terminated &&
+                e.Status != EmploymentStatus.Resigned),
             ct);
 
-        return employees.Select(e => new EnrolledFaceDto(
-            EmployeeId: e.Id,
-            EmployeeCode: e.EmployeeCode,
-            FullName: e.FullName,
-            Department: e.Department?.Name ?? e.JobTitle ?? "Staff",
-            AvatarUrl: e.FacePhotoUrl,
-            FaceDescriptor: e.FaceDescriptor!,
-            EnrolledAtUtc: e.FaceEnrolledAtUtc
-        )).ToList();
+        var revokedEmployeeIds = (await _uow.OffboardingRecords.ToListAsync(
+                _uow.OffboardingRecords.Query().Where(o => o.Status == OffboardingStatus.Completed || o.AccessRevoked),
+                ct))
+            .Select(o => o.EmployeeId)
+            .ToHashSet();
+
+        var enrolled = new List<EnrolledFaceDto>(employees.Count);
+        foreach (var e in employees)
+        {
+            if (revokedEmployeeIds.Contains(e.Id))
+            {
+                continue;
+            }
+
+            var parsed = FaceBiometricMatcher.TryParseDescriptor(e.FaceDescriptor);
+            if (parsed is null ||
+                FaceBiometricMatcher.IsPlaceholderDescriptor(parsed, e.FacePhotoUrl, _faceOptions.ExpectedDescriptorLength))
+            {
+                continue;
+            }
+
+            var canonical = FaceBiometricMatcher.NormalizeToScale(parsed, _faceOptions.CanonicalClientDescriptorNorm);
+            enrolled.Add(new EnrolledFaceDto(
+                EmployeeId: e.Id,
+                EmployeeCode: e.EmployeeCode,
+                FullName: e.FullName,
+                Department: e.Department?.Name ?? e.JobTitle ?? "Staff",
+                AvatarUrl: e.FacePhotoUrl,
+                FaceDescriptor: FaceBiometricMatcher.SerializeDescriptor(canonical),
+                EnrolledAtUtc: e.FaceEnrolledAtUtc));
+        }
+
+        return enrolled;
     }
 
-    private static float[]? ParseFaceDescriptor(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return null;
-        try
-        {
-            var parsed = JsonSerializer.Deserialize<float[]>(json);
-            return parsed is { Length: > 0 } ? parsed : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
+    private static float[]? ParseFaceDescriptor(string? json) =>
+        FaceBiometricMatcher.TryParseDescriptor(json);
 
     private static double ComputeEuclideanDistance(float[] storedDescriptor, float[] candidateDescriptor)
     {
@@ -1842,19 +1865,19 @@ public sealed class AttendanceService : IAttendanceService
         return Math.Sqrt(sumSq);
     }
 
-    private static bool IsDummyPlaceholderDescriptor(float[] descriptor)
-    {
-        // Guard against legacy dummy arrays (e.g. [0.1, 0.2, 0.3] or all values in 0.08..0.35)
-        return descriptor.Length < 64 || descriptor.All(v => v >= 0.08f && v <= 0.35f);
-    }
-
     public async Task<bool> EnrollFaceAsync(Guid employeeId, EnrollFaceRequest request, CancellationToken ct = default)
     {
         var employee = await _uow.Employees.GetByIdAsync(employeeId, ct)
             ?? throw NotFoundException.For("Employee", employeeId);
 
-        var candidateDescriptor = ParseFaceDescriptor(request.FaceDescriptor)
-            ?? throw new ValidationException("Valid facial biometric descriptor data is required.");
+        if (employee.Status is EmploymentStatus.Offboarding or EmploymentStatus.Terminated or EmploymentStatus.Resigned)
+        {
+            throw new ForbiddenException("Cannot enroll face biometric for an inactive or offboarded employee.");
+        }
+
+        var candidateDescriptor = FaceBiometricMatcher.ParseAndValidateDescriptor(
+            request.FaceDescriptor,
+            _faceOptions.ExpectedDescriptorLength);
 
         var candidatePhoto = request.FacePhotoUrl?.Trim();
 
@@ -1863,7 +1886,6 @@ public sealed class AttendanceService : IAttendanceService
             _uow.Employees.Query().Where(e => e.Id != employeeId && (!string.IsNullOrEmpty(e.FaceDescriptor) || !string.IsNullOrEmpty(e.FacePhotoUrl))),
             ct);
 
-        const double duplicateFaceThreshold = 0.58;
         foreach (var other in otherEmployees)
         {
             if (!string.IsNullOrWhiteSpace(candidatePhoto) &&
@@ -1873,25 +1895,22 @@ public sealed class AttendanceService : IAttendanceService
                 throw new ValidationException($"Duplicate face detected: this photo is already registered to {other.FullName} ({other.EmployeeCode}). Each employee must have a unique face biometric.");
             }
 
-            if (IsDummyPlaceholderDescriptor(candidateDescriptor))
+            var existingDescriptor = FaceBiometricMatcher.TryParseDescriptor(other.FaceDescriptor);
+            if (existingDescriptor is null ||
+                FaceBiometricMatcher.IsPlaceholderDescriptor(existingDescriptor, other.FacePhotoUrl, _faceOptions.ExpectedDescriptorLength))
             {
                 continue;
             }
 
-            var existingDescriptor = ParseFaceDescriptor(other.FaceDescriptor);
-            if (existingDescriptor is null || existingDescriptor.Length != candidateDescriptor.Length || IsDummyPlaceholderDescriptor(existingDescriptor))
-            {
-                continue;
-            }
-
-            var distance = ComputeEuclideanDistance(existingDescriptor, candidateDescriptor);
-            if (distance <= duplicateFaceThreshold)
+            var metrics = FaceBiometricMatcher.CompareUnitDescriptors(existingDescriptor, candidateDescriptor);
+            if (metrics.UnitDistance <= _faceOptions.DuplicateMaxUnitDistance)
             {
                 throw new ValidationException($"Duplicate face detected: this face is already registered to {other.FullName} ({other.EmployeeCode}). Each employee must have a unique face biometric.");
             }
         }
 
-        employee.FaceDescriptor = request.FaceDescriptor;
+        var canonicalDescriptor = FaceBiometricMatcher.NormalizeToScale(candidateDescriptor, _faceOptions.CanonicalClientDescriptorNorm);
+        employee.FaceDescriptor = FaceBiometricMatcher.SerializeDescriptor(canonicalDescriptor);
         if (!string.IsNullOrWhiteSpace(candidatePhoto))
         {
             employee.FacePhotoUrl = candidatePhoto;

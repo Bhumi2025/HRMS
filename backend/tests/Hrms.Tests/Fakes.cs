@@ -17,6 +17,8 @@ internal sealed class FakeTenantDatabaseService : ITenantDatabaseService
 
     public Dictionary<string, TenantUserRecord> Users { get; } = new(StringComparer.Ordinal);
 
+    public Dictionary<string, List<TenantFaceCandidate>> FaceCandidates { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     public bool ThrowOnProvision { get; set; }
 
     public int ProvisionCalls { get; private set; }
@@ -61,6 +63,10 @@ internal sealed class FakeTenantDatabaseService : ITenantDatabaseService
     public Task<TenantUserRecord?> FindUserByEmailAsync(string databaseName, string email, CancellationToken ct = default) =>
         Task.FromResult(Users.TryGetValue(Key(databaseName, email), out var user) ? user : null);
 
+    public Task<IReadOnlyList<TenantFaceCandidate>> GetFaceLoginCandidatesAsync(string databaseName, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<TenantFaceCandidate>>(
+            FaceCandidates.TryGetValue(databaseName, out var list) ? list.ToList() : Array.Empty<TenantFaceCandidate>());
+
     public Task RecordLoginAsync(string databaseName, Guid userId, CancellationToken ct = default, string? verifiedPlainPassword = null) =>
         Task.CompletedTask;
 
@@ -84,6 +90,7 @@ internal sealed class FakeTenantDatabaseService : ITenantDatabaseService
     public Task DropDatabaseAsync(string databaseName, CancellationToken ct = default)
     {
         Databases.Remove(databaseName);
+        FaceCandidates.Remove(databaseName);
         var keys = Users.Keys.Where(k => k.StartsWith(databaseName + "|", StringComparison.OrdinalIgnoreCase)).ToList();
         foreach (var key in keys)
         {
@@ -99,6 +106,19 @@ internal sealed class FakeTenantDatabaseService : ITenantDatabaseService
         var record = new TenantUserRecord(Guid.NewGuid(), email.ToLowerInvariant(), "Test User", "TU", passwordHash, isActive, null, roleName, roleCode);
         Users[Key(databaseName, email)] = record;
         return record;
+    }
+
+    /// <summary>Seeds an enrolled face candidate directly (used to set up face login tests).</summary>
+    public TenantFaceCandidate SeedFaceCandidate(string databaseName, TenantFaceCandidate candidate)
+    {
+        if (!FaceCandidates.TryGetValue(databaseName, out var list))
+        {
+            list = new List<TenantFaceCandidate>();
+            FaceCandidates[databaseName] = list;
+        }
+
+        list.Add(candidate);
+        return candidate;
     }
 
     private static string Key(string databaseName, string email) => $"{databaseName}|{email.Trim().ToLowerInvariant()}";

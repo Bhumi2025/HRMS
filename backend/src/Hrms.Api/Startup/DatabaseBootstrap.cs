@@ -210,6 +210,20 @@ BEGIN
     UPDATE Employees
     SET MaritalStatus = 'Single'
     WHERE MaritalStatus IN ('Divorced', 'Widowed', '3', '4');
+
+    IF COL_LENGTH('Employees', 'FaceDescriptor') IS NOT NULL
+       AND COL_LENGTH('Employees', 'FacePhotoUrl') IS NOT NULL
+       AND COL_LENGTH('Employees', 'FaceEnrolledAtUtc') IS NOT NULL
+    BEGIN
+        EXEC(N'
+            UPDATE Employees
+            SET FaceDescriptor = NULL,
+                FaceEnrolledAtUtc = NULL
+            WHERE FaceDescriptor IS NOT NULL
+              AND FacePhotoUrl LIKE ''https://images.unsplash.com/%''
+              AND LEN(FaceDescriptor) < 1000;
+        ');
+    END
 END
 
 -- 15. Clean up obsolete Grade/Level key group and restricted Gender/MaritalStatus options
