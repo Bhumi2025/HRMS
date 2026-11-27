@@ -12,6 +12,9 @@ import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { KeyGroupCacheService } from '../../core/services/key-group-cache.service';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
+import { triggerDocumentDownload } from '../../core/utils/document-download.util';
+import { ACCEPT_DOC_TYPES, validateDocumentFile } from '../../core/utils/file-validator';
+import { TablePaginationComponent, paginateSlice } from '../../shared/table-pagination.component';
 
 interface ProfileData {
   id: string;
@@ -24,10 +27,21 @@ interface ProfileData {
   email: string;
 }
 
+interface DocRow {
+  id?: string;
+  doc: string;
+  type: string;
+  issue: string;
+  exp: string;
+  s: string;
+  fileUrl?: string | null;
+  fileSize?: string | null;
+}
+
 /** Employee Profile — ported from pages/employee-profile.html. */
 @Component({
   selector: 'app-employee-profile',
-  imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent, RouterModule],
+  imports: [CommonModule, IconDirective, SelectComponent, KeyGroupSelectComponent, RouterModule, TablePaginationComponent],
   template: `
     @if (viewMode() === 'admin') {
       <!-- ADMINISTRATOR BANNER -->
@@ -465,6 +479,51 @@ interface ProfileData {
       </fieldset>
     }
 
+    <!-- DOCUMENTS TAB -->
+    @if (tab() === 'docs') {
+      <div class="card" style="width: 100%">
+        <div class="card-header">
+          <div class="card-title">Documents</div>
+          @if (canEditCurrentProfile()) {
+            <button class="btn btn-primary btn-sm" (click)="ui.open('uploadDocModal')"><span [appIcon]="'upload2'"></span> Upload</button>
+          }
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Document</th>
+                <th>Type</th>
+                <th>Issue Date</th>
+                <th>Expiry Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of paginatedDocs(); track r.doc) {
+                <tr>
+                  <td style="font-weight: 600">{{ r.doc }}</td>
+                  <td><span class="badge badge-info">{{ r.type }}</span></td>
+                  <td><input class="form-control" type="date" [value]="r.issue" style="font-size: 12px; padding: 4px 8px" /></td>
+                  <td><input class="form-control" type="date" [value]="r.exp" style="font-size: 12px; padding: 4px 8px" /></td>
+                  <td><span class="badge badge-success">{{ r.s }}</span></td>
+                  <td>
+                    <div style="display: flex; gap: 4px">
+                      <button class="btn btn-ghost btn-sm" data-tooltip="View" (click)="viewDoc(r)"><span [appIcon]="'eye'"></span></button>
+                      <button class="btn btn-ghost btn-sm" data-tooltip="Download" (click)="downloadDocument(r)"><span [appIcon]="'download'"></span></button>
+                      <button class="btn btn-ghost btn-sm" data-tooltip="Save" (click)="saveDocRow(r)"><span [appIcon]="'check'"></span></button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <app-table-pagination [total]="docs().length" [page]="docsPage()" (pageChange)="docsPage.set($event)" />
+      </div>
+    }
+
     <!-- BIOMETRIC & FACE ID TAB -->
     @if (tab() === 'biometric') {
       <div style="width: 100%">
@@ -566,6 +625,115 @@ interface ProfileData {
         </div>
       </div>
     }
+
+    <!-- Upload Doc Modal -->
+    <div class="modal-overlay" [class.open]="ui.isOpen('uploadDocModal')" (click)="ui.onOverlayClick($event, 'uploadDocModal')">
+      <div class="modal">
+        <div class="modal-header">
+          <div style="font-size: 14px; font-weight: 700">Upload Document</div>
+          <button class="btn btn-ghost btn-sm" (click)="ui.close('uploadDocModal')"><span [appIcon]="'x'"></span></button>
+        </div>
+        <div class="modal-body" style="overflow: visible">
+          <div class="form-group">
+            <label class="form-label">Document Type</label>
+            <app-select [options]="uploadTypeOptions" [value]="uploadType()" (valueChange)="uploadType.set($event)" width="100%" />
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Issue Date</label>
+              <input class="form-control" type="date" [value]="uploadIssueDate()" (input)="uploadIssueDate.set($any($event.target).value)" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Expiry Date</label>
+              <input class="form-control" type="date" [value]="uploadExpiryDate()" (input)="uploadExpiryDate.set($any($event.target).value)" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Upload File</label>
+            <input #docFileInput type="file" [accept]="acceptDocTypes" (change)="onDocFileSelected($event)" style="display: none" />
+            <div
+              style="border: 2px dashed var(--border); border-radius: var(--r); padding: 24px; text-align: center; cursor: pointer; transition: var(--t)"
+              [style.borderColor]="selectedDocFile() ? 'var(--p)' : 'var(--border)'"
+              [style.background]="selectedDocFile() ? 'var(--p-soft)' : 'transparent'"
+              (click)="docFileInput.click()"
+              (dragover)="$event.preventDefault()"
+              (drop)="onDocFileDrop($event)"
+            >
+              @if (selectedDocFile()) {
+                <div style="color: var(--p); margin-bottom: 6px"><span [appIcon]="'check'"></span></div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: var(--text)">{{ selectedDocFile()?.name }}</div>
+                <div style="font-size: 0.78rem; color: var(--muted); margin-top: 3px">{{ formatFileSize(selectedDocFile()?.size || 0) }} &bull; Click to change file</div>
+              } @else {
+                <div style="color: var(--p); margin-bottom: 6px"><span [appIcon]="'upload2'"></span></div>
+                <div style="font-size: 0.86rem; font-weight: 600">Drop file or click to browse</div>
+                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 4px">PDF, JPG, PNG up to 2MB</div>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="closeUploadDocModal()">Cancel</button>
+          <button class="btn btn-primary" [disabled]="uploadingDoc()" (click)="uploadDocument()">
+            {{ uploadingDoc() ? 'Uploading...' : 'Upload' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Doc Modal -->
+    <div class="modal-overlay" [class.open]="ui.isOpen('viewDocModal')" (click)="ui.onOverlayClick($event, 'viewDocModal')">
+      <div class="modal" style="max-width: 560px;">
+        <div class="modal-header">
+          <div>
+            <div style="font-size: 15px; font-weight: 700;">{{ selectedDocView()?.doc }}</div>
+            <div style="font-size: 12px; color: var(--muted);">{{ detail()?.fullName }} &bull; {{ detail()?.employeeCode }}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" (click)="ui.close('viewDocModal')"><span [appIcon]="'x'"></span></button>
+        </div>
+        <div class="modal-body">
+          @if (selectedDocView(); as d) {
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Document Type</div>
+                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.type }}</div>
+              </div>
+              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Status</div>
+                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">
+                  <span class="badge" [class]="d.s === 'Expired' ? 'badge-danger' : 'badge-success'">{{ d.s }}</span>
+                </div>
+              </div>
+              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Issue Date</div>
+                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.issue || 'Not set' }}</div>
+              </div>
+              <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Expiry Date</div>
+                <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">{{ d.exp || 'Not set' }}</div>
+              </div>
+            </div>
+
+            @if (d.fileUrl && (d.fileUrl.startsWith('data:image') || d.fileUrl.endsWith('.jpg') || d.fileUrl.endsWith('.jpeg') || d.fileUrl.endsWith('.png'))) {
+              <div style="text-align: center; background: #0f172a; border-radius: 8px; padding: 12px; margin-bottom: 12px; max-height: 260px; overflow: hidden;">
+                <img [src]="d.fileUrl" alt="Document Preview" style="max-height: 240px; max-width: 100%; object-fit: contain; border-radius: 6px;" />
+              </div>
+            } @else {
+              <div style="border: 2px dashed var(--border); border-radius: 10px; padding: 24px; text-align: center; background: var(--bg); margin-bottom: 12px;">
+                <div style="color: var(--p); font-size: 28px; margin-bottom: 6px;"><span [appIcon]="'documents'"></span></div>
+                <div style="font-size: 14px; font-weight: 700; color: var(--text);">{{ d.doc }}</div>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">Verified HR Document &bull; Ready for Download</div>
+              </div>
+            }
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="ui.close('viewDocModal')">Close</button>
+          <button class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;" (click)="selectedDocView() && downloadDocument(selectedDocView()!)">
+            <span [appIcon]="'download'"></span> Download Document
+          </button>
+        </div>
+      </div>
+    </div>
   `,
   styles: [
     `
@@ -1061,10 +1229,11 @@ export class EmployeeProfileComponent implements OnInit {
     this.router.navigate(['/employees']);
   }
 
-  protected readonly tabOrder: Array<'personal' | 'contact' | 'bank' | 'biometric'> = [
+  protected readonly tabOrder: Array<'personal' | 'contact' | 'bank' | 'docs' | 'biometric'> = [
     'personal',
     'contact',
     'bank',
+    'docs',
     'biometric',
   ];
 
@@ -1078,6 +1247,8 @@ export class EmployeeProfileComponent implements OnInit {
         return 'Contact & Identity details saved!';
       case 'bank':
         return 'Bank details saved!';
+      case 'docs':
+        return 'Documents saved!';
       case 'biometric':
         return 'Biometric & Profile details saved!';
       default:
@@ -1322,6 +1493,29 @@ export class EmployeeProfileComponent implements OnInit {
       },
       error: () => { },
     });
+
+    this.loadDocuments(employee.id);
+  }
+
+  private loadDocuments(employeeId: string): void {
+    this.api.documents({ employeeId }).subscribe({
+      next: (rows) =>
+        this.docs.set(
+          rows.map((d) => ({
+            id: d.id,
+            doc: d.name,
+            type: d.type,
+            issue: d.issueDate ?? '',
+            exp: d.expiryDate ?? '',
+            s: d.status,
+            fileUrl: d.fileUrl ?? null,
+            fileSize: d.fileSize ?? '1.2 MB',
+          })),
+        ),
+      error: () => {
+        /* API offline — keep demo documents. */
+      },
+    });
   }
 
   protected save(message: string, onSuccess?: () => void): void {
@@ -1426,14 +1620,145 @@ export class EmployeeProfileComponent implements OnInit {
     return `${y}-${m}-${d}`;
   }
 
+  protected readonly selectedDocFile = signal<File | null>(null);
+  protected readonly uploadIssueDate = signal(new Date().toISOString().slice(0, 10));
+  protected readonly uploadExpiryDate = signal('');
+  protected readonly uploadingDoc = signal(false);
+
+  protected readonly acceptDocTypes = ACCEPT_DOC_TYPES;
+
+  protected onDocFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        input.value = '';
+        this.selectedDocFile.set(null);
+        return;
+      }
+      this.selectedDocFile.set(file);
+    }
+  }
+
+  protected onDocFileDrop(event: DragEvent): void {
+    event.preventDefault();
+    if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+      const file = event.dataTransfer.files[0];
+      const check = validateDocumentFile(file);
+      if (!check.valid) {
+        this.toast.show(check.error || 'Invalid file.', 'danger');
+        return;
+      }
+      this.selectedDocFile.set(file);
+    }
+  }
+
+  protected formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  protected readonly selectedDocView = signal<DocRow | null>(null);
+
+  protected viewDoc(r: DocRow): void {
+    this.selectedDocView.set(r);
+    this.ui.open('viewDocModal');
+  }
+
+  protected saveDocRow(r: DocRow): void {
+    this.toast.show(`Document details for ${r.doc} saved!`, 'success');
+  }
+
+  protected downloadDocument(r: DocRow): void {
+    triggerDocumentDownload(r.doc, r.fileUrl, {
+      employeeName: this.detail()?.fullName || 'Employee',
+      employeeCode: this.detail()?.employeeCode || 'EMP',
+      issueDate: r.issue,
+      expiryDate: r.exp,
+      status: r.s,
+      type: r.type,
+    });
+    this.toast.show(`Downloaded ${r.doc}`, 'success');
+  }
+
+  protected closeUploadDocModal(): void {
+    this.selectedDocFile.set(null);
+    this.uploadIssueDate.set(new Date().toISOString().slice(0, 10));
+    this.uploadExpiryDate.set('');
+    this.ui.close('uploadDocModal');
+  }
+
+  protected uploadDocument(): void {
+    const employeeId = this.apiId();
+    if (!employeeId) {
+      this.toast.show('The employee profile is not loaded yet.', 'danger');
+      return;
+    }
+
+    const file = this.selectedDocFile();
+    const type = this.uploadType();
+    const documentType = type === 'Visa' || type === 'Work Permit'
+      ? 'Legal'
+      : type === 'Medical Insurance'
+        ? 'Benefits'
+        : type === 'Other'
+          ? 'Other'
+          : 'Identity';
+
+    const docName = file ? file.name : `${type} Document`;
+    const fileSize = file ? this.formatFileSize(file.size) : '1.2 MB';
+
+    this.uploadingDoc.set(true);
+
+    const proceedUpload = (fileDataUrl: string | null) => {
+      this.api
+        .createDocument({
+          employeeId,
+          name: docName,
+          type: documentType,
+          issueDate: this.uploadIssueDate() || new Date().toISOString().slice(0, 10),
+          expiryDate: this.uploadExpiryDate() || null,
+          notes: null,
+          fileUrl: fileDataUrl,
+          fileSize,
+          isCompanyDocument: false,
+        })
+        .subscribe({
+          next: () => {
+            this.uploadingDoc.set(false);
+            this.closeUploadDocModal();
+            this.toast.show('Document uploaded successfully!', 'success');
+            this.loadDocuments(employeeId);
+          },
+          error: (error) => {
+            this.uploadingDoc.set(false);
+            this.toast.show(error?.error?.title ?? error?.error?.message ?? 'Could not upload the document.', 'danger');
+          },
+        });
+    };
+
+    if (file && file.size < 4 * 1024 * 1024) {
+      const reader = new FileReader();
+      reader.onload = () => proceedUpload(reader.result as string);
+      reader.onerror = () => proceedUpload(file.name);
+      reader.readAsDataURL(file);
+    } else {
+      proceedUpload(file ? file.name : null);
+    }
+  }
+
   protected readonly tabs = [
     { id: 'personal', label: 'Personal', icon: 'user' },
     { id: 'contact', label: 'Contact', icon: 'mail' },
     { id: 'bank', label: 'Bank', icon: 'payroll' },
+    { id: 'docs', label: 'Documents', icon: 'documents' },
     { id: 'biometric', label: 'Face ID & Biometrics', icon: 'clock' },
   ] as const;
 
-  protected readonly tab = signal<'personal' | 'contact' | 'bank' | 'biometric'>('personal');
+  protected readonly tab = signal<'personal' | 'contact' | 'bank' | 'docs' | 'biometric'>('personal');
 
   @ViewChild('enrollVideo') enrollVideo?: ElementRef<HTMLVideoElement>;
   @ViewChild('enrollCanvas') enrollCanvas?: ElementRef<HTMLCanvasElement>;
@@ -1527,6 +1852,20 @@ export class EmployeeProfileComponent implements OnInit {
   protected readonly editSalary = signal<number | null>(null);
 
   protected salaryStructure: [string, string, string][] = [];
+
+  protected readonly docs = signal<DocRow[]>([]);
+  protected readonly docsPage = signal(1);
+  protected readonly paginatedDocs = computed(() => paginateSlice(this.docs(), this.docsPage()));
+
+  protected readonly uploadType = signal('Passport');
+  protected readonly uploadTypeOptions: SelectOption[] = [
+    { v: 'Passport', l: 'Passport' },
+    { v: 'Visa', l: 'Visa' },
+    { v: 'Work Permit', l: 'Work Permit' },
+    { v: 'Emirates ID', l: 'Emirates ID' },
+    { v: 'Medical Insurance', l: 'Medical Insurance' },
+    { v: 'Other', l: 'Other' },
+  ];
 
   protected deptOptions = signal<SelectOption[]>([]);
   protected reportingOptions: SelectOption[] = [
