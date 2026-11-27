@@ -243,12 +243,26 @@ interface MusterDay {
             <!-- Refresh Button -->
             <button 
               class="btn btn-outline btn-sm" 
-              style="display: flex; align-items: center; gap: 5px; padding: 6px 12px;"
+              style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; cursor: pointer; transition: all 0.2s ease;"
+              [disabled]="isRefreshingDaily()"
               (click)="refreshDailyAttendance()"
               title="Refresh live attendance"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
-              Refresh
+              <svg 
+                width="14" 
+                height="14" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                stroke-width="2.2"
+                [class.refresh-icon-spin]="isRefreshingDaily()"
+              >
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+                <path d="M16 21h5v-5"/>
+              </svg>
+              <span>{{ isRefreshingDaily() ? 'Refreshing...' : 'Refresh' }}</span>
             </button>
           </div>
         </div>
@@ -257,7 +271,7 @@ interface MusterDay {
           <span [appIcon]="'chevron-right'"></span> Swipe horizontally to view all employee punch records
         </div>
 
-        <div class="table-wrap custom-scroll daily-punch-table-wrap">
+        <div class="table-wrap custom-scroll daily-punch-table-wrap" [class.table-refresh-blink]="isRefreshingDaily()">
           <table class="daily-punch-table" style="width: 100%; min-width: 1080px; border-collapse: collapse;">
             <thead style="position: sticky; top: 0; z-index: 5; background: var(--surface, #fff); box-shadow: 0 1px 2px rgba(0,0,0,0.06);">
               <tr>
@@ -2405,6 +2419,24 @@ interface MusterDay {
         width: 0 !important;
         height: 0 !important;
       }
+
+      .table-refresh-blink {
+        opacity: 0.28 !important;
+        filter: grayscale(30%) blur(0.5px);
+        transition: opacity 0.18s ease-in-out, filter 0.18s ease-in-out;
+        pointer-events: none;
+      }
+      .daily-punch-table-wrap {
+        transition: opacity 0.25s ease-in-out, filter 0.25s ease-in-out;
+      }
+      .refresh-icon-spin {
+        animation: spinRefresh 0.65s linear infinite;
+        transform-origin: center;
+      }
+      @keyframes spinRefresh {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
     </style>
   `
 })
@@ -2442,6 +2474,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly searchKeyword = signal('');
   protected readonly filterStatus = signal('');
   protected readonly filterDate = signal<string>(new Date().toISOString().slice(0, 10));
+  protected readonly isRefreshingDaily = signal(false);
 
   // Time Management split-view & muster signals
   protected readonly selectedMusterEmpId = signal<string>('');
@@ -2779,8 +2812,25 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected refreshDailyAttendance(): void {
-    this.loadDailyAttendance(false);
-    this.toast.show('Attendance records refreshed');
+    if (this.isRefreshingDaily()) return;
+    this.isRefreshingDaily.set(true);
+
+    const startTime = Date.now();
+    const minWaitMs = 500;
+
+    this.loadDailyAttendance(false, () => {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, minWaitMs - elapsed);
+      setTimeout(() => {
+        this.isRefreshingDaily.set(false);
+        this.toast.show('Attendance records refreshed');
+      }, remaining);
+    });
+
+    this.loadRegularizations();
+    if (this.selectedMusterEmpId() && this.tab() === 'muster') {
+      this.generateMuster();
+    }
   }
 
   private loadEmployees(): void {
@@ -2799,7 +2849,7 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  protected loadDailyAttendance(silent: boolean = false): void {
+  protected loadDailyAttendance(silent: boolean = false, onDone?: () => void): void {
     const curDate = this.filterDate();
     const search = this.searchKeyword()?.trim() || undefined;
     this.api.todayAttendanceOverview(curDate, search).subscribe({
@@ -2880,11 +2930,13 @@ export class AttendanceComponent implements OnInit, AfterViewInit, OnDestroy {
         } else {
           this.dailyRows.set([]);
         }
+        onDone?.();
       },
       error: () => {
         if (!silent) {
           this.dailyRows.set([]);
         }
+        onDone?.();
       },
     });
   }
