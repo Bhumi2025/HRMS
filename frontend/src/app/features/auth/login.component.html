@@ -29,8 +29,6 @@
               placeholder="you@company.com"
               [(ngModel)]="email"
               autocomplete="off"
-              [readOnly]="emailReadOnly()"
-              (focus)="emailReadOnly.set(false)"
             />
           </div>
         </div>
@@ -59,8 +57,6 @@
               placeholder="Enter password"
               [(ngModel)]="password"
               autocomplete="new-password"
-              [readOnly]="passwordReadOnly()"
-              (focus)="passwordReadOnly.set(false)"
             />
             <button type="button" class="eye" (click)="togglePassword()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

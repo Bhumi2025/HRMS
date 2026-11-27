@@ -745,7 +745,6 @@ interface MusterDay {
                         <th>Break Hours</th>
                         <th>Productive Hours</th>
                         <th>Extra Time</th>
-                        <th>Shift</th>
                         <th>Location</th>
                         <th>Job</th>
                         <th style="text-align: center;">Actions</th>
@@ -806,7 +805,6 @@ interface MusterDay {
                           <td>{{ day.breakHoursStr }}</td>
                           <td>{{ day.productiveHoursStr }}</td>
                           <td [class.extra-positive]="day.extraTimeStr !== '—'">{{ day.extraTimeStr }}</td>
-                          <td><span class="shift-badge-link">{{ day.shiftName }}</span></td>
                           <td>{{ day.locationName }}</td>
                           <td>{{ day.jobRole }}</td>
                           <td style="text-align: center;">

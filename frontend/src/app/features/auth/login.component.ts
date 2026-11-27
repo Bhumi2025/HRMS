@@ -71,8 +71,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   protected password = '';
   protected companyCode = '';
   protected rememberMe = false;
-  protected readonly emailReadOnly = signal(true);
-  protected readonly passwordReadOnly = signal(true);
+  protected readonly emailReadOnly = signal(false);
+  protected readonly passwordReadOnly = signal(false);
   protected readonly showPassword = signal(false);
   protected readonly submitting = signal(false);
 
