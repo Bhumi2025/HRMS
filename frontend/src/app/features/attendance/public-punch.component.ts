@@ -150,14 +150,18 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
               <img src="assets/images/shape-logo.png" alt="HRMS" class="auth-logo" />
             </div>
             <div class="punch-badge">Attendance terminal setup</div>
-            <h1 class="auth-title">HR authentication required</h1>
+            <h1 class="auth-title">HR / Company Admin login required</h1>
             <p class="auth-subtitle">
-              Sign in with company HR Manager or Company Admin credentials to open this terminal
+              First log in with HR Manager or Company Admin credentials, then do punch.
             </p>
           </div>
 
           @if (authError()) {
             <div class="auth-error">{{ authError() }}</div>
+          } @else {
+            <div class="auth-error" style="background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.32); color: var(--p);">
+              First log in as HR Manager or Company Admin, then do punch.
+            </div>
           }
 
           <form class="auth-form" (ngSubmit)="unlockWithHrCredentials()">
@@ -238,11 +242,7 @@ const ALLOWED_HR_ROLES = new Set(['hr manager', 'company admin', 'hrmanager', 'c
           </div>
 
           <div class="header-right-group">
-            <div class="live-clock-box">
-              <div class="clock-label">Current Time</div>
-              <div class="clock-time">{{ liveTime() | date:'hh:mm:ss a' }}</div>
-              <div class="clock-date">{{ liveTime() | date:'EEE, MMM d y' }}</div>
-            </div>
+           
 
             <button
               type="button"
@@ -1196,8 +1196,8 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly isAuthenticating = signal(false);
   protected readonly authError = signal<string | null>(null);
   protected readonly showPassword = signal(false);
-  protected hrEmail = 'hr@hrnexus.com';
-  protected hrPassword = 'Admin@123';
+  protected hrEmail = '';
+  protected hrPassword = '';
 
   // Terminal & company state
   protected readonly liveTime = signal<Date>(new Date());
@@ -1229,6 +1229,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
   protected enrolledFaces: EnrolledFace[] = [];
   private activeToken: string | undefined;
   private activeCompanyCode: string | undefined;
+  private activeRole: string | undefined;
   private queryCompanyCode: string | undefined;
 
   private videoStream: MediaStream | null = null;
@@ -1289,6 +1290,31 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
     return ALLOWED_HR_ROLES.has(role.trim().toLowerCase());
   }
 
+  private hasValidHrSession(): boolean {
+    return (
+      this.isUnlocked() &&
+      !!this.activeToken &&
+      !!this.activeCompanyCode &&
+      this.isAllowedHrRole(this.activeRole) &&
+      !this.isJwtExpired(this.activeToken)
+    );
+  }
+
+  private isJwtExpired(token?: string | null): boolean {
+    if (!token) return true;
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return false;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number };
+      if (typeof payload.exp === 'number') {
+        return payload.exp * 1000 <= Date.now();
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   private restoreHrTerminalAuth(): void {
     // 1. Check dedicated terminal auth stored in localStorage
     try {
@@ -1296,7 +1322,15 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
       if (raw) {
         const parsed = JSON.parse(raw) as TerminalAuthState;
         const expMs = Date.parse(parsed.expiresAtUtc);
-        if (parsed.token && parsed.companyCode && (!Number.isFinite(expMs) || expMs > Date.now())) {
+        if (
+          parsed.token &&
+          parsed.companyCode &&
+          parsed.companyCode !== 'ALL' &&
+          this.isAllowedHrRole(parsed.role) &&
+          Number.isFinite(expMs) &&
+          expMs > Date.now() &&
+          !this.isJwtExpired(parsed.token)
+        ) {
           if (!this.queryCompanyCode || parsed.companyCode.toLowerCase() === this.queryCompanyCode.toLowerCase()) {
             this.applyUnlockedAuth(parsed);
             return;
@@ -1309,11 +1343,12 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
       localStorage.removeItem(TERMINAL_AUTH_KEY);
     }
 
-    // 2. Fallback: if already signed in on this browser with HR credentials for a company
+    // 2. Fallback: if already signed in on this browser with HR / Company Admin credentials for a company
     const sessionUser = this.session.user();
     const sessionToken = this.session.token();
     if (
       sessionToken &&
+      !this.isJwtExpired(sessionToken) &&
       sessionUser?.companyCode &&
       sessionUser.companyCode !== 'ALL' &&
       this.isAllowedHrRole(sessionUser.role) &&
@@ -1328,7 +1363,10 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
         hrName: sessionUser.name || 'HR Manager',
         role: sessionUser.role,
       });
+      return;
     }
+
+    this.authError.set('First log in as HR Manager or Company Admin, then do punch.');
   }
 
   protected unlockWithHrCredentials(): void {
@@ -1336,7 +1374,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
     const password = this.hrPassword.trim();
 
     if (!email || !password) {
-      this.authError.set('Please enter your HR email address and password.');
+      this.authError.set('First log in with your HR Manager or Company Admin email and password, then do punch.');
       return;
     }
 
@@ -1349,8 +1387,8 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
         const role = res.user?.role;
         const companyCode = res.user?.companyCode;
 
-        if (!this.isAllowedHrRole(role) || !companyCode || companyCode === 'ALL') {
-          this.authError.set('Access denied. Please sign in with company HR Manager or Company Admin credentials.');
+        if (!res.accessToken || !this.isAllowedHrRole(role) || !companyCode || companyCode === 'ALL') {
+          this.authError.set('Access denied. First log in with company HR Manager or Company Admin credentials, then do punch.');
           return;
         }
 
@@ -1361,7 +1399,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
           companyName: res.user.companyName || companyCode,
           companyLogoUrl: res.user.companyLogoUrl ?? null,
           hrName: res.user.fullName || 'HR Manager',
-          role,
+          role: role!,
         };
 
         try {
@@ -1380,7 +1418,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
           err?.error?.detail ||
           err?.error?.title ||
           err?.error?.message ||
-          'Invalid HR credentials. Please check your email and password.',
+          'Invalid credentials. First log in as HR Manager or Company Admin, then do punch.',
         );
       },
     });
@@ -1389,8 +1427,10 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
   private applyUnlockedAuth(auth: TerminalAuthState): void {
     this.activeToken = auth.token;
     this.activeCompanyCode = auth.companyCode;
+    this.activeRole = auth.role;
     this.companyName.set(auth.companyName || auth.companyCode);
     this.companyLogoUrl.set(auth.companyLogoUrl ?? null);
+    this.authError.set(null);
     this.isUnlocked.set(true);
     this.loadEnrolledFaces();
     this.startGpsTracking();
@@ -1460,6 +1500,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.activeToken = undefined;
     this.activeCompanyCode = undefined;
+    this.activeRole = undefined;
     this.enrolledFaces = [];
     this.facesLoaded.set(false);
     this.hasFaceDetected.set(false);
@@ -1497,7 +1538,10 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async startCamera(): Promise<void> {
-    if (!this.isUnlocked()) return;
+    if (!this.hasValidHrSession()) {
+      this.lockTerminal('First log in as HR Manager or Company Admin, then do punch.');
+      return;
+    }
     try {
       this.isCamLoading.set(true);
       this.cameraError.set(null);
@@ -1535,7 +1579,11 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
   private startScanLoop(): void {
     if (this.scanInterval) clearInterval(this.scanInterval);
     this.scanInterval = setInterval(async () => {
-      if (!this.isUnlocked() || this.isDetectingFrame || this.isSubmitting() || this.showPopup()) return;
+      if (!this.hasValidHrSession()) {
+        this.lockTerminal('First log in as HR Manager or Company Admin, then do punch.');
+        return;
+      }
+      if (this.isDetectingFrame || this.isSubmitting() || this.showPopup()) return;
 
       const v = this.faceVideoRef?.nativeElement;
       const c = this.faceCanvasRef?.nativeElement;
@@ -1621,6 +1669,11 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async submitFacePunch(emp: EnrolledFace, matchScore: number, snapshotBase64?: string): Promise<void> {
+    if (!this.hasValidHrSession()) {
+      this.lockTerminal('First log in as HR Manager or Company Admin, then do punch.');
+      return;
+    }
+
     this.isSubmitting.set(true);
     this.consecutiveVerifiedFrames = 0;
     const coords = await this.getCurrentCoords();
@@ -1659,7 +1712,7 @@ export class PublicPunchComponent implements OnInit, AfterViewInit, OnDestroy {
         error: (err) => {
           this.isSubmitting.set(false);
           if (err?.status === 401 || err?.status === 403) {
-            this.lockTerminal('HR terminal session expired. Please sign in again.');
+            this.lockTerminal('First log in as HR Manager or Company Admin, then do punch.');
             return;
           }
           const msg = err?.error?.message || err?.error?.title || err?.message || 'Unable to record attendance.';

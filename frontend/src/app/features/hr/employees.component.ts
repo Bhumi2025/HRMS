@@ -11,7 +11,6 @@ import { ToastService } from '../../core/services/toast.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
-import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 interface Employee {
@@ -416,7 +415,7 @@ interface Employee {
               </div>
               <div style="display: flex; gap: 8px; justify-content: center;">
                 <button class="btn btn-outline btn-sm" (click)="startReEnroll()">
-                  🔄 Re-scan / Change Photo
+                  🔄 Re-scan Face ID
                 </button>
                 <button class="btn btn-outline btn-sm" style="color: #ef4444; border-color: #ef4444;" (click)="removeFaceId(faceTarget()!)">
                   Remove Face ID
@@ -441,21 +440,8 @@ interface Employee {
               }
             </div>
 
-            @if (uploadedPhotoBase64) {
-              <div style="display: flex; align-items: center; gap: 10px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px;">
-                <img [src]="uploadedPhotoBase64" alt="Uploaded Preview" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" />
-                <div style="font-size: 12px; color: #10b981; font-weight: 600;">Photo file loaded! Ready to enroll.</div>
-              </div>
-            }
-
             <div style="font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 10px;">
-              Center face in oval frame, then click <b>Capture &amp; Enroll</b>.
-            </div>
-
-            <!-- Alternative: File Upload -->
-            <div style="background: var(--bg); border: 1px dashed var(--border); border-radius: 8px; padding: 8px 12px; text-align: center; margin-bottom: 10px;">
-              <label style="font-size: 11px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 4px;">OR UPLOAD FACE PHOTO (JPG, PNG - Max 2MB)</label>
-              <input type="file" [accept]="acceptImgTypes" (change)="onFaceFileSelected($event)" style="font-size: 12px;" />
+              Center face live in oval frame, then click <b>Capture &amp; Enroll Face ID</b>.
             </div>
           }
         </div>
@@ -626,7 +612,6 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
   protected readonly cameraActive = signal(false);
   protected readonly enrollingFace = signal(false);
   protected readonly reEnrolling = signal(false);
-  protected uploadedPhotoBase64: string | null = null;
   private cameraStream?: MediaStream;
 
   protected readonly filtered = computed(() => {
@@ -1134,7 +1119,6 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
   protected openFaceEnroll(e: Employee): void {
     this.faceTarget.set(e);
     this.reEnrolling.set(false);
-    this.uploadedPhotoBase64 = null;
     this.faceEnrollModalOpen.set(true);
     if (!e.isFaceEnrolled) {
       void this.startCamera();
@@ -1153,19 +1137,25 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
 
   protected async startCamera(): Promise<void> {
     try {
+      const modelsPromise = this.faceService.loadModels();
       this.cameraStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: 640, height: 480 },
         audio: false,
       });
-      this.cameraActive.set(true);
-      setTimeout(() => {
-        if (this.enrollVideo?.nativeElement && this.cameraStream) {
-          this.enrollVideo.nativeElement.srcObject = this.cameraStream;
+      setTimeout(async () => {
+        const video = this.enrollVideo?.nativeElement;
+        if (video && this.cameraStream) {
+          video.srcObject = this.cameraStream;
+          try {
+            await video.play();
+          } catch {}
+          await Promise.all([modelsPromise, this.faceService.waitForVideoReady(video)]);
+          this.cameraActive.set(true);
         }
       }, 150);
     } catch {
       this.cameraActive.set(false);
-      this.toast.show('Camera access unavailable. You can upload a photo file instead.', 'warning');
+      this.toast.show('Camera access unavailable. Live Face ID via camera is required.', 'warning');
     }
   }
 
@@ -1177,29 +1167,6 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
     this.cameraActive.set(false);
     this.faceEnrollModalOpen.set(false);
     this.faceTarget.set(null);
-    this.uploadedPhotoBase64 = null;
-  }
-
-  protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
-
-  protected onFaceFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (!input.files || input.files.length === 0) return;
-    const file = input.files[0];
-
-    const check = validateImageFile(file);
-    if (!check.valid) {
-      this.toast.show(check.error || 'Invalid photo file.', 'danger');
-      input.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      this.uploadedPhotoBase64 = reader.result as string;
-      this.toast.show('Photo loaded. Click "Capture & Enroll Face ID" to save.');
-    };
-    reader.readAsDataURL(file);
   }
 
   protected async captureAndSaveFace(): Promise<void> {
@@ -1210,7 +1177,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
     }
 
     this.enrollingFace.set(true);
-    let photoDataUrl = this.uploadedPhotoBase64 || '';
+    let photoDataUrl = '';
     let realDescriptor: number[] | null = null;
 
     try {
@@ -1220,23 +1187,14 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
         const scan = await this.faceService.detectFace(video, canvas, true);
         if (scan.hasFace && scan.descriptor) {
           realDescriptor = scan.descriptor;
-          photoDataUrl = scan.snapshot || this.faceService.captureSnapshot(video, canvas) || photoDataUrl;
-        }
-      } else if (this.uploadedPhotoBase64 && canvas) {
-        const img = new Image();
-        img.src = this.uploadedPhotoBase64;
-        await new Promise((resolve) => (img.onload = resolve));
-        photoDataUrl = this.faceService.compressImageToDataUrl(img, 640, 0.85) || this.uploadedPhotoBase64;
-        const scan = await this.faceService.detectFace(img, canvas, true);
-        if (scan.hasFace && scan.descriptor) {
-          realDescriptor = scan.descriptor;
+          photoDataUrl = scan.snapshot || this.faceService.captureSnapshot(video, canvas) || '';
         }
       }
     } catch {}
 
     if (!realDescriptor || !photoDataUrl) {
       this.enrollingFace.set(false);
-      this.toast.show('No face detected. Please align a clear face in the camera or upload a clear frontal face photo.', 'warning');
+      this.toast.show('No live face detected. Please look directly into the camera in good lighting.', 'warning');
       return;
     }
 

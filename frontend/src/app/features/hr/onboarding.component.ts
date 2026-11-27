@@ -7,7 +7,6 @@ import { IconDirective } from '../../core/icons/icon.directive';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { ToastService } from '../../core/services/toast.service';
-import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { KeyGroupCacheService } from '../../core/services/key-group-cache.service';
@@ -68,23 +67,13 @@ interface AccountItem {
               }
             </div>
             <div>
-              <div style="font-weight: 700; color: var(--text); margin-bottom: 2px">Profile Photo &amp; Face Biometrics<span class="req">*</span></div>
+              <div style="font-weight: 700; color: var(--text); margin-bottom: 2px">Live Face ID Biometrics<span class="req">*</span></div>
               <div style="color: #6b7280; margin-bottom: 10px">
-                {{ isFaceEnrolled() ? 'Profile photo & facial scan ready for attendance verification and login.' : 'Register facial biometric identity now for attendance verification & login (JPG/PNG up to 2MB, or webcam scan).' }}
+                {{ isFaceEnrolled() ? 'Live Face ID & facial scan ready for attendance verification and login.' : 'Capture live Face ID with your camera to register facial biometrics for attendance verification & login.' }}
               </div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <button type="button" class="btn btn-primary btn-sm" (click)="openFaceModal()">
                   📸 {{ isFaceEnrolled() ? 'Re-scan Face ID' : 'Scan & Register Face ID' }}
-                </button>
-                <input
-                  #photoFileInput
-                  type="file"
-                  [accept]="acceptImgTypes"
-                  style="display: none"
-                  (change)="onPhotoFileSelected($event)"
-                />
-                <button type="button" class="btn btn-outline btn-sm" (click)="photoFileInput.click()">
-                  <span [appIcon]="'upload2'"></span> Upload File
                 </button>
                 @if (enrolledFacePhoto()) {
                   <button type="button" class="btn btn-ghost btn-sm" style="color: var(--danger)" (click)="removeEnrolledFace()">
@@ -1707,8 +1696,6 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     this.salary.update((s) => ({ ...s, [key]: value }));
   }
 
-  protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
-
   protected readonly errors = signal<Record<string, string>>({});
 
   protected fieldError(key: string): string | undefined {
@@ -1737,7 +1724,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       delete errs['dob'];
 
       if (!this.isFaceEnrolled() || !this.enrolledFacePhoto()) {
-        errs['facePhoto'] = 'Profile photo and Face Biometrics are required before proceeding (JPG/PNG up to 2MB, or webcam scan).';
+        errs['facePhoto'] = 'Live Face ID capture with camera is required before proceeding.';
       }
 
       const p = this.personal();
@@ -1774,7 +1761,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
         this.toast.show(
           errs['facePhoto'] && !errs['firstName'] && !errs['lastName'] && !errs['email'] && !errs['phone'] && !errs['dob']
             ? errs['facePhoto']
-            : 'Please complete all required personal details (including Profile Photo, Face Biometrics & Date of Birth).',
+            : 'Please complete all required personal details (including Live Face ID Biometrics & Date of Birth).',
           'danger',
         );
       }
@@ -1834,13 +1821,13 @@ export class OnboardingComponent implements OnInit, OnDestroy {
       delete errs['facePhoto'];
 
       if (!this.isFaceEnrolled() || !this.enrolledFacePhoto()) {
-        errs['facePhoto'] = 'Profile photo and Face Biometrics are required before saving onboarding.';
+        errs['facePhoto'] = 'Live Face ID capture with camera is required before saving onboarding.';
       }
 
       this.errors.set(errs);
       const isValid = !errs['facePhoto'];
       if (!isValid) {
-        this.toast.show('Please register Profile Photo & Face Biometrics before continuing.', 'danger');
+        this.toast.show('Please capture Live Face ID with camera before continuing.', 'danger');
       }
       return isValid;
     }
@@ -2230,118 +2217,10 @@ export class OnboardingComponent implements OnInit, OnDestroy {
     this.toast.show('Face registration removed', 'info');
   }
 
-  protected onPhotoFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (!input.files || input.files.length === 0) return;
-
-    const file = input.files[0];
-    const check = validateImageFile(file);
-    if (!check.valid) {
-      const msg = check.error || 'Please upload a valid JPG or PNG image up to 2 MB.';
-      this.errors.update((e) => ({ ...e, facePhoto: msg }));
-      this.toast.show(msg, 'danger');
-      input.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onerror = () => {
-      const msg = 'Unable to read the selected image file. Please try another JPG or PNG photo.';
-      this.errors.update((e) => ({ ...e, facePhoto: msg }));
-      this.toast.show(msg, 'danger');
-    };
-    reader.onload = async (e) => {
-      const dataUrl = e.target?.result as string;
-      if (!dataUrl) {
-        const msg = 'The selected image file is empty. Please choose a valid JPG or PNG photo.';
-        this.errors.update((err) => ({ ...err, facePhoto: msg }));
-        this.toast.show(msg, 'danger');
-        return;
-      }
-
-      const img = new Image();
-      img.onload = async () => {
-        // Compress oversized photos to <= 640px JPEG so upload/enrollment payloads never exceed size limits
-        const compactPhoto = this.faceService.compressImageToDataUrl(img, 640, 0.85) || dataUrl;
-
-        let candidateDescriptor: number[];
-        let detectedRealFace = false;
-        try {
-          await this.faceService.loadModels();
-          const scan = await this.faceService.detectFace(img, undefined, true);
-          if (scan.hasFace && scan.descriptor) {
-            candidateDescriptor = scan.descriptor;
-            detectedRealFace = true;
-          } else {
-            candidateDescriptor = this.generateFallbackDescriptor(compactPhoto);
-          }
-        } catch {
-          candidateDescriptor = this.generateFallbackDescriptor(compactPhoto);
-        }
-
-        // Prevent using a photo/face that is already enrolled for another employee
-        const applyValidatedPhoto = (faces: EnrolledFace[]) => {
-          const conflict = this.faceService.findDuplicateEnrolledFace(candidateDescriptor, faces, undefined, compactPhoto);
-          if (conflict) {
-            const msg = `Duplicate face detected: this photo/face is already registered to ${conflict.fullName} (${conflict.employeeCode}). Please use a unique photo for this employee.`;
-            this.enrolledFaceDescriptor.set(null);
-            this.enrolledFacePhoto.set(null);
-            this.errors.update((err) => ({ ...err, facePhoto: msg }));
-            this.toast.show(msg, 'danger');
-            return;
-          }
-          this.enrolledFacePhoto.set(compactPhoto);
-          this.enrolledFaceDescriptor.set(candidateDescriptor);
-          this.clearError('facePhoto');
-          this.toast.show(
-            detectedRealFace
-              ? 'Profile photo uploaded and Face ID registered!'
-              : 'Profile photo uploaded successfully! For stronger face recognition accuracy, you can also use "Scan & Register Face ID".',
-            'success'
-          );
-        };
-
-        this.api.enrolledFaces().subscribe({
-          next: (faces) => {
-            this.enrolledFacesList = faces || [];
-            applyValidatedPhoto(this.enrolledFacesList);
-          },
-          error: () => applyValidatedPhoto(this.enrolledFacesList),
-        });
-      };
-      img.onerror = () => {
-        const msg = 'Unable to load this image file. Please upload a valid JPG or PNG photo under 2 MB.';
-        this.errors.update((err) => ({ ...err, facePhoto: msg }));
-        this.toast.show(msg, 'danger');
-      };
-      img.src = dataUrl;
-    };
-
-    reader.readAsDataURL(file);
-    input.value = '';
-  }
-
-  private generateFallbackDescriptor(seed: string): number[] {
-    const desc = new Array(128).fill(0);
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) {
-      hash = (hash << 5) - hash + seed.charCodeAt(i);
-      hash |= 0;
-    }
-    for (let j = 0; j < 128; j++) {
-      desc[j] = Math.sin(hash + j) * 0.5;
-    }
-    let norm = Math.sqrt(desc.reduce((sum, v) => sum + v * v, 0));
-    if (norm > 0) {
-      for (let j = 0; j < 128; j++) desc[j] /= norm;
-    }
-    return desc;
-  }
-
   private async startFaceCamera(): Promise<void> {
     try {
       this.stopFaceCamera();
-      await this.faceService.loadModels();
+      const modelsPromise = this.faceService.loadModels();
 
       this.obMediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
@@ -2356,6 +2235,7 @@ export class OnboardingComponent implements OnInit, OnDestroy {
         await video.play();
       } catch {}
 
+      await Promise.all([modelsPromise, this.faceService.waitForVideoReady(video)]);
       this.cameraActive.set(true);
     } catch (err) {
       console.warn('Camera blocked in onboarding:', err);

@@ -10,7 +10,6 @@ import { SelectComponent, SelectOption } from '../../shared/select.component';
 import { KeyGroupSelectComponent } from '../../shared/key-select.component';
 import { SessionService } from '../../core/services/session.service';
 import { KeyGroupCacheService } from '../../core/services/key-group-cache.service';
-import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 
 /**
  * My Profile (employee) — ported from pages/emp-profile.html. The original's
@@ -26,7 +25,6 @@ import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-valid
     >
       <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
         <div style="position: relative">
-          <input #avatarInput type="file" [accept]="acceptImgTypes" (change)="onAvatarSelected($event)" style="display: none" />
           <div
             style="width: 72px; height: 72px; border-radius: 50%; background: var(--p); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800; border: 3px solid var(--surface); box-shadow: 0 4px 16px rgba(37,99,235,.2); overflow: hidden"
           >
@@ -35,16 +33,6 @@ import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-valid
             } @else {
               {{ initials() }}
             }
-          </div>
-          <div
-            (click)="avatarInput.click()"
-            title="Upload photo"
-            style="position: absolute; bottom: 2px; right: -4px; width: 22px; height: 22px; border-radius: 50%; background: var(--p); display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid var(--surface); box-shadow: 0 2px 6px rgba(37,99,235,.35)"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
           </div>
         </div>
         <div>
@@ -458,56 +446,6 @@ export class EmpProfileComponent implements OnInit {
     const l = p.lastName || this.detail()?.lastName || '';
     const initials = `${f.slice(0, 1)}${l.slice(0, 1)}`.toUpperCase();
     return initials || 'EP';
-  }
-
-  protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
-
-  protected onAvatarSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files[0]) {
-      const file = input.files[0];
-      const check = validateImageFile(file);
-      if (!check.valid) {
-        this.toast.show(check.error || 'Invalid image file.', 'danger');
-        input.value = '';
-        return;
-      }
-
-      // First upload file to persistent server storage
-      this.api.uploadFile(file).subscribe({
-        next: (res) => {
-          const photoUrl = res.url || res.cloudinaryUrl || '';
-          if (photoUrl) {
-            this.avatarUrl.set(photoUrl);
-            this.api.updateMyPhoto(photoUrl).subscribe({
-              next: () => {
-                this.toast.show('Profile photo saved successfully!', 'success');
-              },
-              error: () => {
-                this.toast.show('Photo uploaded, but could not update profile.', 'danger');
-              },
-            });
-          }
-        },
-        error: () => {
-          // Fallback to Base64 data URL
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const dataUrl = e.target?.result as string;
-            this.avatarUrl.set(dataUrl);
-            this.api.updateMyPhoto(dataUrl).subscribe({
-              next: () => {
-                this.toast.show('Profile photo saved successfully!', 'success');
-              },
-              error: () => {
-                this.toast.show('Could not save profile photo to server.', 'danger');
-              },
-            });
-          };
-          reader.readAsDataURL(file);
-        },
-      });
-    }
   }
 
   ngOnInit(): void {

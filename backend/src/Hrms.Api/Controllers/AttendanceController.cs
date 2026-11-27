@@ -132,8 +132,22 @@ public sealed class AttendanceController : ControllerBase
     [ProducesResponseType(typeof(FacePunchResultDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<FacePunchResultDto>> FacePunch(
         [FromBody] FacePunchRequest request,
-        CancellationToken ct) =>
-        Ok(await _attendance.ProcessFacePunchAsync(request, ct));
+        CancellationToken ct)
+    {
+        if (string.Equals(request.Device?.Trim(), "QR Attendance Terminal", StringComparison.OrdinalIgnoreCase))
+        {
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                       ?? User.FindFirst("role")?.Value
+                       ?? string.Empty;
+            var normalizedRole = new string(role.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+            if (User.Identity?.IsAuthenticated != true || normalizedRole is not ("hrmanager" or "companyadmin" or "hr" or "ca"))
+            {
+                return Unauthorized(new { message = "First log in as HR Manager or Company Admin, then do punch." });
+            }
+        }
+
+        return Ok(await _attendance.ProcessFacePunchAsync(request, ct));
+    }
 
     /// <summary>Enrolls face biometric descriptor for an employee.</summary>
     [HttpPost("employees/{id:guid}/enroll-face")]

@@ -1955,15 +1955,21 @@ export class EmployeeProfileComponent implements OnInit {
     }
     this.faceEnrollModalOpen.set(true);
     try {
+      await this.faceService.loadModels();
       this.cameraStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: 640, height: 480 },
         audio: false,
       });
-      setTimeout(() => {
-        if (this.enrollVideo?.nativeElement) {
-          this.enrollVideo.nativeElement.srcObject = this.cameraStream || null;
+      setTimeout(async () => {
+        const video = this.enrollVideo?.nativeElement;
+        if (video && this.cameraStream) {
+          video.srcObject = this.cameraStream;
+          try {
+            await video.play();
+          } catch {}
+          await this.faceService.waitForVideoReady(video);
         }
-      }, 200);
+      }, 150);
     } catch {
       this.toast.show('Camera access needed to capture Face ID.', 'warning');
     }

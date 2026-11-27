@@ -113,6 +113,17 @@ export class FaceRecognitionService {
     return undefined;
   }
 
+  /** Waits briefly until a video element has decoded its first frame dimensions. */
+  async waitForVideoReady(video: HTMLVideoElement, timeoutMs = 4000): Promise<boolean> {
+    if (video.readyState >= 2 && video.videoWidth > 0) return true;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (video.readyState >= 2 && video.videoWidth > 0) return true;
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    return video.videoWidth > 0;
+  }
+
   /**
    * Detects a single face from an HTML video, canvas, or image element.
    */
@@ -127,17 +138,33 @@ export class FaceRecognitionService {
     }
 
     try {
-      const isStaticImage = element instanceof HTMLImageElement;
+      if (element instanceof HTMLVideoElement && element.videoWidth === 0) {
+        await this.waitForVideoReady(element, 2500);
+      }
+
+      const isStaticImage = element instanceof HTMLImageElement || element instanceof HTMLCanvasElement;
       const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-      const options = new faceapi.TinyFaceDetectorOptions({
-        inputSize: isStaticImage ? 416 : (isMobile ? 160 : 224),
-        scoreThreshold: isStaticImage ? 0.35 : 0.5,
+      const primaryOptions = new faceapi.TinyFaceDetectorOptions({
+        inputSize: isStaticImage ? 416 : (captureSnapshot ? 320 : (isMobile ? 160 : 224)),
+        scoreThreshold: isStaticImage ? 0.35 : (captureSnapshot ? 0.38 : 0.5),
       });
 
-      const detection = await faceapi
-        .detectSingleFace(element, options)
+      let detection = await faceapi
+        .detectSingleFace(element, primaryOptions)
         .withFaceLandmarks()
         .withFaceDescriptor();
+
+      // Retry with larger inputSize and lower threshold during active enrollment capture
+      if (!detection && captureSnapshot) {
+        const fallbackOptions = new faceapi.TinyFaceDetectorOptions({
+          inputSize: 416,
+          scoreThreshold: 0.25,
+        });
+        detection = await faceapi
+          .detectSingleFace(element, fallbackOptions)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+      }
 
       if (!detection) {
         return { hasFace: false, score: 0 };

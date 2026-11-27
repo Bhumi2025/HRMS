@@ -16,7 +16,6 @@ import { EmployeeListItem, EnrolledFace, FacePunchResult } from '../../core/api/
 import { SessionService } from '../../core/services/session.service';
 import { ToastService } from '../../core/services/toast.service';
 import { FaceRecognitionService } from '../../core/services/face-recognition.service';
-import { ACCEPT_IMG_TYPES, validateImageFile } from '../../core/utils/file-validator';
 import { NoAutofillDirective } from '../../shared/no-autofill.directive';
 
 interface RecentKioskPunch {
@@ -360,26 +359,20 @@ interface RecentKioskPunch {
                   <div style="text-align: center; color: #94a3b8; padding: 16px;">
                     <div style="font-size: 32px; margin-bottom: 6px;">⚠️</div>
                     <div style="font-size: 13px; font-weight: 600; color: #f8fafc; margin-bottom: 4px;">Camera Not Active</div>
-                    <div style="font-size: 12px;">You can upload an employee photo file below.</div>
+                    <div style="font-size: 12px;">Please allow camera access to capture live Face ID.</div>
                   </div>
                 }
               </div>
 
-              <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+              <div style="display: flex; gap: 8px; margin-bottom: 16px;">
                 <button
                   class="kiosk-btn"
                   style="flex: 1; justify-content: center; background: #0284c7; color: #fff; font-weight: 700; padding: 10px;"
                   [disabled]="!cameraActive()"
                   (click)="captureKioskSnapshot()"
                 >
-                  📸 Capture Snapshot from Camera
+                  📸 Capture Live Face Snapshot
                 </button>
-              </div>
-
-              <!-- File upload alternative -->
-              <div style="background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; text-align: center; margin-bottom: 16px;">
-                <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">OR UPLOAD PHOTO FILE (JPG, PNG - Max 2MB)</label>
-                <input type="file" [accept]="acceptImgTypes" (change)="onKioskPhotoFileSelected($event)" style="font-size: 12px; color: #cbd5e1;" />
               </div>
 
               <div style="display: flex; gap: 10px;">
@@ -1613,28 +1606,6 @@ export class KioskComponent implements OnInit, OnDestroy {
     this.toast.show('Could not capture snapshot. Please ensure camera is active.', 'warning');
   }
 
-  protected readonly acceptImgTypes = ACCEPT_IMG_TYPES;
-
-  protected onKioskPhotoFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (!input.files || input.files.length === 0) return;
-    const file = input.files[0];
-
-    const check = validateImageFile(file);
-    if (!check.valid) {
-      this.toast.show(check.error || 'Invalid photo file.', 'danger');
-      input.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      this.enrollSnapshotPreview.set(reader.result as string);
-      this.playChime('scan');
-    };
-    reader.readAsDataURL(file);
-  }
-
   protected async submitKioskEnrollment(): Promise<void> {
     if (!this.selectedEmployeeId) {
       this.toast.show('Please select an employee.', 'warning');
@@ -1642,27 +1613,39 @@ export class KioskComponent implements OnInit, OnDestroy {
     }
     const photo = this.enrollSnapshotPreview();
     if (!photo) {
-      this.toast.show('Please capture a snapshot or upload a photo.', 'warning');
+      this.toast.show('Please capture a live camera snapshot first.', 'warning');
       return;
     }
 
     this.savingEnrollment.set(true);
 
-    let descriptorJson: string;
+    let realDescriptor: number[] | null = null;
     const canvas = this.snapshotCanvas?.nativeElement;
     if (canvas && canvas.width > 0) {
       try {
-        const scan = await this.faceService.detectFace(canvas);
+        const scan = await this.faceService.detectFace(canvas, undefined, true);
         if (scan.hasFace && scan.descriptor) {
-          descriptorJson = JSON.stringify(scan.descriptor);
-        } else {
-          descriptorJson = JSON.stringify(Array.from({ length: 128 }, () => Number((Math.random() * 0.4 - 0.2).toFixed(4))));
+          realDescriptor = scan.descriptor;
         }
-      } catch {
-        descriptorJson = JSON.stringify(Array.from({ length: 128 }, () => Number((Math.random() * 0.4 - 0.2).toFixed(4))));
-      }
-    } else {
-      descriptorJson = JSON.stringify(Array.from({ length: 128 }, () => Number((Math.random() * 0.4 - 0.2).toFixed(4))));
+      } catch {}
+    }
+
+    if (!realDescriptor) {
+      this.savingEnrollment.set(false);
+      this.toast.show('No clear face detected in the camera snapshot. Please face the camera directly and capture again.', 'warning');
+      return;
+    }
+
+    const descriptorJson = JSON.stringify(realDescriptor);
+    const conflict = this.faceService.findDuplicateEnrolledFace(realDescriptor, this.enrolledList(), this.selectedEmployeeId, photo);
+    if (conflict) {
+      this.savingEnrollment.set(false);
+      this.playChime('error');
+      this.toast.show(
+        `Duplicate face detected: this face is already registered to ${conflict.fullName} (${conflict.employeeCode}).`,
+        'danger'
+      );
+      return;
     }
 
     this.api
